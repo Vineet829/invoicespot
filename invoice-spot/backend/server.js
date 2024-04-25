@@ -2,7 +2,7 @@ import "dotenv/config";
 import chalk from "chalk";
 import path from "path";
 import cookieParser from "cookie-parser";
-
+const cors = require('cors');
 import express from "express";
 import morgan from "morgan";
 import { morganMiddleware,systemLogs } from "./utils/Logger.js";
@@ -32,11 +32,16 @@ if (process.env.NODE_ENV === "development") {
 	app.use(morgan("dev"));
 }
 
+
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: false }));
 
-
+const corsOptions = {
+	origin: 'https://invoice-spot-client.vercel.app',
+  };
+  
+  app.use(cors(corsOptions));
 app.use(passport.initialize());
 googleAuth();
 
