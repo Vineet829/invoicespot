@@ -2,7 +2,7 @@ import "dotenv/config";
 import chalk from "chalk";
 import path from "path";
 import cookieParser from "cookie-parser";
-const cors = require('cors');
+import  cors from 'cors';
 import express from "express";
 import morgan from "morgan";
 import { morganMiddleware,systemLogs } from "./utils/Logger.js";
