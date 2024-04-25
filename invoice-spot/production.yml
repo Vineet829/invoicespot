@@ -11,5 +11,5 @@ services:
         env_file:
             - ./.env
         ports:
-            - "1997"
+            - "1997:1997"
       
