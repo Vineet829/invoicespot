@@ -12,9 +12,4 @@ services:
             - ./.env
         ports:
             - "1997"
-        networks:
-            - reverseproxy_nw
-
-networks:
-    reverseproxy_nw:
-        external: true
+      
