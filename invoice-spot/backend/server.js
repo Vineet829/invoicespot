@@ -2,7 +2,7 @@ import "dotenv/config";
 import chalk from "chalk";
 import path from "path";
 import cookieParser from "cookie-parser";
-import cors from 'cors';
+
 import express from "express";
 import morgan from "morgan";
 import { morganMiddleware, systemLogs } from "./utils/Logger.js";
@@ -19,7 +19,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import connectionToDB from "./config/connectDB.js";
 import https from "https";
 import fs from "fs";
-import cors from "cors"
+
 await connectionToDB();
 
 const app = express();
