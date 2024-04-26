@@ -35,7 +35,7 @@
     "nodemailer-mailgun-transport": "^2.1.5",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "puppeteer": "^22.6.5",
+    "puppeteer": "^22.7.1",
     "validator": "^13.11.0",
     "winston": "^3.13.0",
     "winston-daily-rotate-file": "^5.0.0"
