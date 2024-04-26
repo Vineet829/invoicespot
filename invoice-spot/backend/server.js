@@ -19,11 +19,11 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import connectionToDB from "./config/connectDB.js";
 import https from "https";
 import fs from "fs";
-
+import cors from "cors"
 await connectionToDB();
 
 const app = express();
-app.set('trust proxy', 1); // Trust first proxy
+ // Trust first proxy
 
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "/uploads")));
@@ -34,14 +34,14 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-const corsOptions = {
-	origin: 'https://invoice-spot-client.vercel.app/',
-	credentials: true,
-};
-  
-app.use(cors(corsOptions));
+
+
+
+
+
+  app.use(express.urlencoded({ extended: false }));
+
 app.use(passport.initialize());
 googleAuth();
 
@@ -60,8 +60,19 @@ app.use("/api/v1/customer", apiLimiter, customerRoutes);
 app.use("/api/v1/document", apiLimiter, documentRoutes);
 app.use("/api/v1/upload", apiLimiter, uploadRoutes);
 
+if (process.env.NODE_ENV === "production") {
+	app.use(express.static(path.join(__dirname, "client/build")));
+
+	app.get("*", (req, res) =>
+		res.sendFile(path.resolve(__dirname, "client", "build", "index.html"))
+	);
+} else {
+	app.get("/", (req, res) => res.send("Please set to production"));
+}
+
 app.use(notFound);
 app.use(errorHandler);
+
 
 const PORT = process.env.PORT || 1997;
 
