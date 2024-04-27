@@ -6,18 +6,20 @@ import User from "../../models/userModel.js";
 // $-auth    Private/Admin
 // an admin user can delete any other user account
 const deleteUserAccount = asyncHandler(async (req, res) => {
-	const user = await User.findById(req.params.id);
+	try {
+		const result = await User.findByIdAndDelete(req.params.id);
 
-	if (user) {
-		const result = await user.remove();
-
-		res.json({
-			success: true,
-			message: `User ${result.firstName} deleted successfully`,
-		});
-	} else {
-		res.status(404);
-		throw new Error("user not found");
+		if (result) {
+			res.json({
+				success: true,
+				message: `User ${result.firstName} deleted successfully`,
+			});
+		} else {
+			res.status(404).json({ message: "User not found" });
+		}
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ message: "Error deleting user" });
 	}
 });
 

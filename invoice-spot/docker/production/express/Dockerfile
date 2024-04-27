@@ -14,9 +14,7 @@ ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 
 # Create a user 'invoice' without specifying explicit numeric IDs, and set ownership
-RUN addgroup -g 1001 invoice && \
-    adduser -D -u 1001 -G invoice invoice && \
-    chown -R invoice:invoice ${APP_HOME}
+
 # Install necessary packages for Chromium
 RUN apk add --no-cache \
     udev \
@@ -36,10 +34,9 @@ COPY package*.json ./
 RUN npm install
 
 # Copy the application source code and assign ownership to the 'invoice' user
-COPY --chown=invoice:invoice . ${APP_HOME}
+COPY . ${APP_HOME}
 
-# Switch to the 'invoice' user to run the application
-USER invoice
+
 
 # Define the command to run the application
 CMD ["npm", "run", "start"]
