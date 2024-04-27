@@ -6,23 +6,24 @@ import Document from "../../models/documentModel.js";
 // $-auth    Private
 
 const deleteDocument = asyncHandler(async (req, res) => {
-	const document = await Document.findById(req.params.id);
+    const document = await Document.findById(req.params.id);
 
-	if (!document) {
-		res.status(404);
-		throw new Error("That document does not exist!");
-	}
+    if (!document) {
+        res.status(404);
+        throw new Error("That document does not exist!");
+    }
 
-	if (document.createdBy.toString() !== req.user.id) {
-		res.status(401);
-		throw new Error(
-			"You are not authorized to delete this document. It's not yours"
-		);
-	}
+    if (document.createdBy.toString() !== req.user.id) {
+        res.status(401);
+        throw new Error(
+            "You are not authorized to delete this document. It's not yours"
+        );
+    }
 
-	await document.delete();
+    // Use findByIdAndDelete for deletion
+    await Document.findByIdAndDelete(req.params.id);
 
-	res.json({ success: true, message: "Your document has been deleted" });
+    res.json({ success: true, message: "Your document has been deleted" });
 });
 
 export default deleteDocument;

@@ -22,7 +22,10 @@ if (!fs.existsSync(docsPath)){
 
 async function generateAndSavePDF(content) {
     const browser = await puppeteer.launch({
-        executablePath: process.env.CHROME_BIN // Using CHROME_BIN environment variable.
+       
+        executablePath: process.env.CHROME_BIN, args: ['--no-sandbox', '--disable-setuid-sandbox'] ,
+        
+        // Using CHROME_BIN environment variable.
     });
     const page = await browser.newPage();
     await page.setContent(pdfTemplate(content), { waitUntil: 'networkidle0' });
