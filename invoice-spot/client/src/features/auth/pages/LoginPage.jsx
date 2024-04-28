@@ -1,6 +1,6 @@
 import {
 	Box,
-	Button,
+	// Button,
 	Container,
 	Divider,
 	Grid,
@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { FaSignInAlt } from "react-icons/fa";
 import { Link as RouterLink } from "react-router-dom";
-import GoogleLogin from "../../../components/GoogleLogin";
+// import GoogleLogin from "../../../components/GoogleLogin";
 import StyledDivider from "../../../components/StyledDivider";
 import AuthWrapper from "../forms/AuthWrapper";
 import LoginForm from "../forms/LoginForm";
@@ -44,7 +44,7 @@ const LoginPage = () => {
 					{/* login form */}
 					<LoginForm />
 					{/* or sign in with Google */}
-					<Grid item xs={12}>
+					{/* <Grid item xs={12}>
 						<Box
 							sx={{
 								alignItems: "center",
@@ -86,8 +86,8 @@ const LoginPage = () => {
 							}}
 						>
 							<GoogleLogin />
-						</Box>
-					</Grid>
+						</Box> */}
+					{/* </Grid> */}
 					<Divider
 						sx={{ flexGrow: 1, mb: 1, mt: 1 }}
 						orientation="horizontal"
