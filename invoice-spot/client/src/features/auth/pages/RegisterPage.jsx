@@ -3,13 +3,13 @@ import {
 	Box,
 	Button,
 	Container,
-	Divider,
+	// Divider,
 	Typography,
 	Grid,
 } from "@mui/material";
 import { FaUserCheck } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import GoogleLogin from "../../../components/GoogleLogin";
+// import GoogleLogin from "../../../components/GoogleLogin";
 import StyledDivider from "../../../components/StyledDivider";
 import AuthWrapper from "../forms/AuthWrapper";
 import RegisterForm from "../forms/RegisterForm";
@@ -73,7 +73,7 @@ const RegisterPage = () => (
 					</Button>
 				</Box>
 				{/* or sign up with google */}
-				<Grid item xs={12}>
+				{/* <Grid item xs={12}>
 					<Box sx={{ alignItems: "center", display: "flex" }}>
 						<Divider
 							sx={{ flexGrow: 1 }}
@@ -110,7 +110,7 @@ const RegisterPage = () => (
 					>
 						<GoogleLogin />
 					</Box>
-				</Grid>
+				</Grid> */}
 			</Grid>
 		</Container>
 	</AuthWrapper>
