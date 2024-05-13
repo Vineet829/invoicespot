@@ -32,7 +32,7 @@ const Input = styled("input")({
 });
 
 const EditProfileForm = () => {
-	useTitle("Edit Profile - MERN Invoice");
+	useTitle("Edit Profile - Invoice Spot");
 	const navigate = useNavigate();
 	const goBack = () => navigate(-1);
 
@@ -148,7 +148,11 @@ const EditProfileForm = () => {
 				}}
 			>
 				<BrowserUpdatedIcon sx={{ fontSize: 70 }} />
-				<Typography variant="h2">Update Profile</Typography>
+				<Typography variant="h2" sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>Update Profile</Typography>
 				<Button
 					variant="contained"
 					color="warning"
@@ -176,7 +180,7 @@ const EditProfileForm = () => {
 					autoComplete="off"
 					onSubmit={updateHandler}
 				>
-					<Grid container spacing={2}>
+					<Grid container spacing={2} sx={{justifyContent:"center"}}>
 						<Grid item md={6}>
 							{/* firstName */}
 							<TextField
@@ -324,7 +328,7 @@ const EditProfileForm = () => {
 					</label>
 
 					<Button
-						sx={{ mt: 3, mb: 5 }}
+						sx={{ mt: 3, mb: {xs:"15%",sm:5}, ml:{xs:"5%", sm:"0%"} }}
 						type="submit"
 						fullWidth
 						variant="contained"
@@ -332,7 +336,10 @@ const EditProfileForm = () => {
 						size="large"
 						endIcon={<CheckIcon />}
 					>
-						<Typography variant="h5">Update Profile</Typography>
+						<Typography variant="h5" sx={{ fontSize: {
+                xs: '1.25rem', 
+                sm: '1.25rem', 
+            }}}>Update Profile</Typography>
 					</Button>
 				</Box>
 			)}

@@ -21,7 +21,7 @@ import useTitle from "../../../hooks/useTitle";
 import { useCreateCustomerMutation } from "../customersApiSlice";
 
 const CustomerCreateForm = () => {
-	useTitle("Create Customer - MERN Invoice");
+	useTitle("Create Customer - Invoice Spot");
 
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -103,7 +103,7 @@ const CustomerCreateForm = () => {
 								onSubmit={handleSubmit}
 							>
 								<Grid>
-									<Grid item xs={12}>
+									<Grid item xs={12} sx={{ml:{xs:"10%", sm:"0%"}}}>
 										<Stack
 											direction="row"
 											justifyContent="center"
@@ -116,7 +116,10 @@ const CustomerCreateForm = () => {
 												<SaveAsIcon
 													sx={{ fontSize: 60 }}
 												/>
-												<Typography variant="h3">
+												<Typography variant="h3" sx={{ fontSize: {
+                xs: '1.2rem', // smaller font size on xs (mobile devices)
+                sm: '2rem', // default h2 size on sm and above
+            }}}>
 													Create Customer
 												</Typography>
 											</Stack>
@@ -138,7 +141,7 @@ const CustomerCreateForm = () => {
 									{isLoading ? (
 										<Spinner />
 									) : (
-										<Grid container>
+										<Grid container sx={{ml:{xs:"15%", sm:"0%"}, maxWidth:{xs:"20rem", sm:"auto"}}}>
 											<Grid item xs={12}>
 												<Stack spacing={1}>
 													<InputLabel htmlFor="customer-name">

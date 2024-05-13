@@ -100,19 +100,24 @@ const DocumentsPage = () => {
 	};
 
 	return (
-		<Container component="main" maxWidth="lg" sx={{ mt: 10 }}>
+		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"}}}>
 			<CssBaseline />
-
+         
 			<Box
 				sx={{
 					display: "flex",
 					flexDirection: "row",
 					justifyContent: "center",
 					alignItems: "center",
+
 				}}
 			>
 				<GiTakeMyMoney className="auth-svg" />
-				<Typography variant="h1">Documents</Typography>
+				<Typography variant="h1" sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>Documents</Typography>
 			</Box>
 
 			<StyledDivider />
@@ -120,8 +125,12 @@ const DocumentsPage = () => {
 			<Box
 				sx={{
 					display: "flex",
-					flexDirection: "row",
-					justifyContent: "space-between",
+					flexDirection: {xs:"column", sm:"row"},
+					justifyContent: {xs:"center",sm:"space-between"},
+					alignItems:{xs:"center", sm:"stretch"},
+					rowGap:{xs:"50px", sm:"0px"},
+					mt:{xs:"50px", sm:"0px"},
+					mb:{xs:"50px", sm:"0px"}
 				}}
 			>
 				<Box
@@ -130,7 +139,11 @@ const DocumentsPage = () => {
 						flexDirection: "row",
 					}}
 				>
-					<Typography variant="h4">Total Documents: </Typography>
+					<Typography variant="h4"  sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>Total Documents: </Typography>
 					<Badge
 						badgeContent={data?.totalDocuments || "0"}
 						color="success"
@@ -143,14 +156,26 @@ const DocumentsPage = () => {
 				</Box>
 
 				<StyledButton
-					className="new-customer-btn"
-					variant="contained"
-					color="success"
-					startIcon={<ReceiptLongIcon />}
-					onClick={() => navigate("/create-doc")}
-				>
-					Create New Document
-				</StyledButton>
+  className="new-customer-btn"
+  variant="contained"
+  color="success"
+  startIcon={<ReceiptLongIcon />}
+  onClick={() => navigate("/create-doc")}
+  sx={{
+    // Apply these styles for all screens
+    fontSize: '1rem', // Default font size
+    padding: '8px 16px',
+ // Default padding
+    // Styles for screens smaller than the 'sm' breakpoint (600px)
+    '@media (max-width:600px)': {
+      fontSize: '0.75rem', // Smaller font size on extra-small screens (mobile)
+      padding: '6px 12px'
+	  // Smaller padding on extra-small screens (mobile)
+    }
+  }}
+>
+  Create New Document
+</StyledButton>
 			</Box>
 
 			{isLoading ? (

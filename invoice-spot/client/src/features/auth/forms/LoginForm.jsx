@@ -98,7 +98,7 @@ const LoginForm = () => {
 						{isLoading ? (
 							<Spinner />
 						) : (
-							<Grid container spacing={3}>
+							<Grid container spacing={3} sx={{maxWidth:{xs:"25rem", sm:"40rem"}, ml:{xs:"-8px", sm:"-13px"}}}>
 								{/* Email */}
 								<Grid item xs={12}>
 									<Stack spacing={1}>

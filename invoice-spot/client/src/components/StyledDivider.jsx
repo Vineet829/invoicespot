@@ -5,14 +5,14 @@ const DividerStyle = styled(Divider)({
 	marginTop: "10px",
 	marginBottom: "15px",
 	marginLeft: "auto",
-	marginRight: "auto",
+	marginRight: "auto", 
 	height: "3px",
 	backgroundImage:
 		"linear-gradient(to right,rgba(0,0,0,0), rgba(9,84,132), rgba(0,0,0,0))",
 });
 
 const StyledDivider = () => {
-	return <DividerStyle />;
+	return <DividerStyle   />;
 };
 
 export default StyledDivider;

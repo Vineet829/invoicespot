@@ -86,12 +86,14 @@ const CustomerEditForm = () => {
 	return (
 		<Container
 			component="main"
-			maxWidth="sm"
+			
 			sx={{
 				border: "2px solid  #e4e5e7",
 				borderRadius: "25px",
 				py: 2,
 				mt: 10,
+                maxWidth: {xs:"25rem", sm:"sm"}
+				
 			}}
 		>
 			<CssBaseline />
@@ -101,10 +103,13 @@ const CustomerEditForm = () => {
 					direction="row"
 					justifyContent="center"
 					alignItems="center"
+					sx={{ml:"5%", sm:"0%"}}
 				>
 					<Stack direction="row" alignItems="center">
 						<GrDocumentUpdate fontSize="40px" />
-						<Typography variant="h3">Edit Customer Info</Typography>
+						<Typography variant="h3" sx={{fontSize: {
+                xs: '1.25rem',
+                sm: '2rem'}}}>Edit Customer Info</Typography>
 					</Stack>
 					<Button
 						variant="contained"
@@ -130,6 +135,7 @@ const CustomerEditForm = () => {
 						display: "flex",
 						flexDirection: "column",
 						alignItems: "center",
+						ml:{xs:"15%", sm:"0%"}
 					}}
 					component="form"
 					noValidate
@@ -232,7 +238,9 @@ const CustomerEditForm = () => {
 						size="large"
 						endIcon={<CheckIcon />}
 					>
-						<Typography variant="h5">Update Customer</Typography>
+						<Typography variant="h5" sx={{fontSize: {
+                xs: '1.25rem',
+                sm: '1.3rem'}}}>Update Customer</Typography>
 					</Button>
 				</Box>
 			)}

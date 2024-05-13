@@ -85,7 +85,7 @@ const SingleDocumentPage = () => {
 	};
 
 	return (
-		<Container component="main" maxWidth="md" sx={{ mt: 10 }}>
+		<Container component="main" sx={{ mt: 10,  maxWidth:{xs:"25rem", sm:"lg"} }}>
 			<CssBaseline />
 			<Box
 				sx={{
@@ -96,7 +96,11 @@ const SingleDocumentPage = () => {
 				}}
 			>
 				<FaUserSecret fontSize="35px" />
-				<Typography variant="h3">
+				<Typography variant="h3" sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>
 					{document?.customer?.name.split(" ")[0]}'s Doc
 				</Typography>
 				<Button
@@ -112,7 +116,7 @@ const SingleDocumentPage = () => {
 
 			<StyledDivider />
 
-			<Grid container spacing={2} sx={{ mt: "30px" }}>
+			<Grid container spacing={2} sx={{ mt: "30px", ml:{xs:"5%", sm:"0%"} }}>
 				<Grid item md={6}>
 					<Button
 						sx={{ borderRadius: "50px", cursor: "pointer" }}
@@ -123,7 +127,10 @@ const SingleDocumentPage = () => {
 						startIcon={<EditIcon fontSize="large" />}
 						onClick={() => navigate(`/edit-doc/${document._id}`)}
 					>
-						<Typography variant="h5">
+						<Typography variant="h5" sx= {{fontSize: {
+                xs: '0.75rem', // smaller font size on xs
+                sm: '1rem', // default font size on sm and above
+            }}}>
 							{" "}
 							Edit {document?.documentType}
 						</Typography>
@@ -154,7 +161,10 @@ const SingleDocumentPage = () => {
 							startIcon={<AttachEmailIcon />}
 							onClick={sendPdfEmail}
 						>
-							<Typography variant="h5">
+							<Typography variant="h5" sx= {{fontSize: {
+                xs: '0.67rem', // smaller font size on xs
+                sm: '1rem', // default font size on sm and above
+            }}}>
 								Email {document?.documentType} to Customer
 							</Typography>
 						</Button>
@@ -200,6 +210,7 @@ const SingleDocumentPage = () => {
 						display: "flex",
 						flexDirection: "column",
 						alignItems: "center",
+						maxWidth:{xs:"25rem", sm:"lg"}
 					}}
 				>
 					<StyledContainer>
@@ -223,19 +234,27 @@ const SingleDocumentPage = () => {
 											onClick={() => navigate("/profile")}
 										/>
 									) : (
-										<Typography variant="h2">
+										<Typography variant="h2"  >
 											{profile?.businessName}
 										</Typography>
 									)}
 								</Box>
 							</Grid>
 							<Grid item>
-								<Typography variant="h2" gutterBottom>
+								<Typography variant="h2" gutterBottom sx={{
+											fontSize: {
+												xs: '1.25rem', // smaller font size on xs (mobile devices)
+												sm: '2rem', // default h2 size on sm and above
+											},
+										}}>
 									{document?.documentType}
 								</Typography>
 								<Typography
 									variant="h6"
-									sx={{ color: "#5a5a5a" }}
+									sx={{ color: "#5a5a5a", fontSize: {
+										xs: '1.25rem', // smaller font size on xs (mobile devices)
+										sm: '2rem', // default h2 size on sm and above
+									} }}
 								>
 									<b> No: {document?.documentNumber}</b>
 								</Typography>
@@ -245,10 +264,10 @@ const SingleDocumentPage = () => {
 						<Grid
 							container
 							justifyContent="space-between"
-							sx={{ mt: "30px" }}
+							sx={{ mt: "30px",marginLeft:{xs:"10%", sm:"0%" }}}
 						>
 							<Grid item>
-								<Box>
+								<Box >
 									<Typography
 										variant="h6"
 										gutterBottom
@@ -540,7 +559,7 @@ const SingleDocumentPage = () => {
 
 						<Box
 							sx={{
-								marginLeft: "50%",
+								marginLeft: {xs:"8%", sm:"50%"},
 								textAlign: "left",
 								borderBottom: "1px solid rgb(17,65,141)",
 							}}
@@ -615,14 +634,19 @@ const SingleDocumentPage = () => {
 							sx={{
 								marginTop: "20px",
 								display: "flex",
-								flexDirection: "row",
+								flexDirection: {xs:"column",sm:"row"},
+								maxWidth:{xs:"0.75rem",sm:"80rem"},
 								justifyContent: "space-between",
+								marginLeft:{xs:"10%", sm:"0%"}
 							}}
 						>
 							<Box item>
 								<Typography
 									variant="h4"
-									sx={{ color: "rgb(17,65,141)" }}
+									sx={{ color: "rgb(17,65,141)",fontSize: {
+										xs: '1.5rem', // smaller font size on xs (mobile devices)
+										sm: '2rem', // default h2 size on sm and above
+									  } }}
 								>
 									Additional Info
 								</Typography>
@@ -631,7 +655,7 @@ const SingleDocumentPage = () => {
 									disabled
 									minRows={4}
 									style={{
-										width: 350,
+										width: 300,
 										border: "solid 1px #d6d6d6",
 										padding: "10px",
 									}}
@@ -641,7 +665,10 @@ const SingleDocumentPage = () => {
 							<Box>
 								<Typography
 									variant="h4"
-									sx={{ color: "rgb(17,65,141)" }}
+									sx={{ color: "rgb(17,65,141)",fontSize: {
+										xs: '1.5rem', // smaller font size on xs (mobile devices)
+										sm: '2rem', // default h2 size on sm and above
+									  } }}
 								>
 									Terms & Conditions
 								</Typography>
@@ -650,7 +677,7 @@ const SingleDocumentPage = () => {
 									disabled
 									minRows={4}
 									style={{
-										width: 350,
+										width: 300,
 										border: "solid 1px #d6d6d6",
 										padding: "10px",
 									}}
@@ -660,7 +687,7 @@ const SingleDocumentPage = () => {
 						</Box>
 					</StyledContainer>
 
-					<Grid container sx={{ mb: "80px", mt: "-50px" }}>
+					<Grid container sx={{ mb: "80px", mt: "-50px", ml:{xs:"30%", sm:"0%"} }}>
 						<Grid item md={12}>
 							<Typography
 								variant="h5"
@@ -672,6 +699,10 @@ const SingleDocumentPage = () => {
 									backgroundColor: "#651fff",
 									color: "#fff",
 									padding: 1,
+									fontSize: {
+										xs: '1.25rem', // smaller font size on xs (mobile devices)
+										sm: '2rem', // default h2 size on sm and above
+									  }
 								}}
 							>
 								{`Record any payment by ${
