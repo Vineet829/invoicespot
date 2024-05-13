@@ -8,6 +8,8 @@ import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import SaveAsIcon from "@mui/icons-material/SaveAs";
 import { produce } from "immer";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import { useMediaQuery } from '@mui/material';
+
 import {
 	Box,
 	Button,
@@ -216,30 +218,55 @@ const DocCreateEditForm = () => {
 			}
 		}
 	};
+	const isMobile = useMediaQuery('(max-width:600px)');
 
 	return (
-		<Container component="main" maxWidth="lg" sx={{ mt: 10 }}>
+		<Container component="main" sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"} }}>
 			<CssBaseline />
 			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				<NoteAddIcon sx={{ fontSize: 70 }} />
-				<Typography variant="h2">Create Document</Typography>
-				<Button
-					variant="contained"
-					color="warning"
-					size="small"
-					sx={{ fontSize: "1rem", ml: "10px" }}
-					onClick={goBack}
-				>
-					Go Back
-				</Button>
-			</Box>
+    sx={{
+        display: "flex",
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+		
+        
+    }}
+>
+    <NoteAddIcon sx={{ 
+        fontSize: {
+            xs: '40px', // smaller size on xs (mobile devices)
+            sm: '70px', // default size on sm and above
+        } 
+    }} />
+    <Typography 
+        variant="h2" 
+        sx={{
+            fontSize: {
+                xs: '1rem', // smaller font size on xs (mobile devices)
+                sm: '3.75rem', // default h2 size on sm and above
+            },
+        }}
+    >
+        Create Document
+    </Typography>
+    <Button
+        variant="contained"
+        color="warning"
+        size="small"
+        sx={{ 
+            fontSize: {
+                xs: '0.75rem', // smaller font size on xs
+                sm: '1rem', // default font size on sm and above
+            },
+            ml: "10px",
+            // Adjust padding or other properties for mobile as needed
+        }}
+        onClick={goBack}
+    >
+        Go Back
+    </Button>
+</Box>
 			<StyledDivider />
 			{isLoading || updateDocLoading ? (
 				<Spinner />
@@ -257,7 +284,7 @@ const DocCreateEditForm = () => {
 					onSubmit={createUpdateDocHandler}
 				>
 					<StyledContainer>
-						<Grid container justifyContent="space-between">
+						<Grid container justifyContent="space-between" sx={{flexDirection:{xs:"column", sm:"row"}, marginLeft:{xs:"2%", sm:"0%"}}}>
 							<Grid></Grid>
 							<Grid>
 								<DocumentType
@@ -267,216 +294,69 @@ const DocCreateEditForm = () => {
 							</Grid>
 						</Grid>
 						<NormalDivider />
-						<Grid
-							container
-							justifyContent="space-between"
-							sx={{ mt: "30px" }}
-						>
-							<Grid item sx={{ width: "50%" }}>
-								<Container>
-									<Typography
-										variant="inherit"
-										style={{
-											color: "#5a5a5a",
-											pl: "3px",
-											textTransform: "uppercase",
-										}}
-										gutterBottom
-									>
-										Send to:
-									</Typography>
-									{customer && (
-										<>
-											<Typography
-												variant="subtitle1"
-												gutterBottom
-											>
-												<b>Name:</b> {customer?.name}
-											</Typography>
-											<Typography
-												variant="body1"
-												gutterBottom
-											>
-												<b>Email:</b> {customer?.email}
-											</Typography>
-											<Typography
-												variant="body1"
-												gutterBottom
-											>
-												<b>AccountNo:</b>{" "}
-												{customer?.accountNo}
-											</Typography>
-											<Typography
-												variant="body1"
-												gutterBottom
-											>
-												<b>VAT/TIN No:</b>{" "}
-												{customer?.vatTinNo}
-											</Typography>
-											<Typography variant="body1">
-												<b>Phone Number:</b>{" "}
-												{customer?.phoneNumber}
-											</Typography>
-											<Typography variant="body1">
-												<b>Address:</b>{" "}
-												{customer?.address}
-											</Typography>
-											<Button
-												sx={{ textTransform: "none" }}
-												color="warning"
-												size="large"
-												onClick={() =>
-													setCustomer(null)
-												}
-												startIcon={
-													<ChangeCircleIcon color="warning" />
-												}
-											>
-												choose another customer
-											</Button>
-										</>
-									)}
-									<div
-										style={
-											customer
-												? { display: "none" }
-												: { display: "block" }
-										}
-									>
-										<Autocomplete
-											disablePortal
-											sx={{ pt: "10px" }}
-											id="customers-list"
-											options={
-												customers?.myCustomers || []
-											}
-											getOptionLabel={(option) =>
-												option ? option.name : ""
-											}
-											renderInput={(params) => (
-												<TextField
-													{...params}
-													label="Select a customer"
-												/>
-											)}
-											value={customers?.myCustomers?.name}
-											onChange={(event, value) => {
-												setCustomer(value);
-											}}
-										/>
-									</div>
-
-									{!customer && (
-										<>
-											<Grid
-												item
-												sx={{ pt: "10px", pb: "10px" }}
-											>
-												<Chip
-													color="secondary"
-													icon={<FaceIcon />}
-													label="Add New Customer"
-													onClick={() =>
-														navigate(
-															"/create-customer"
-														)
-													}
-												/>
-											</Grid>
-										</>
-									)}
-								</Container>
-							</Grid>
-
-							<Grid
-								item
-								style={{ marginRight: 20, textAlign: "right" }}
-							>
-								<Typography
-									sx={{
-										textTransform: "uppercase",
-										color: "#5a5a5a",
-									}}
-									gutterBottom
-								>
-									Payment Status
-								</Typography>
-
-								<Typography
-									variant="h5"
-									style={{
-										color:
-											documentType === "Receipt"
-												? "green"
-												: "red",
-									}}
-									gutterBottom
-								>
-									{documentType === "Receipt"
-										? "Paid"
-										: "Not Paid"}
-								</Typography>
-
-								<Typography
-									sx={{
-										display: "flex",
-										textTransform: "uppercase",
-										color: "#5a5a5a",
-									}}
-									gutterBottom
-								>
-									<CalendarMonthIcon
-										sx={{ alignItems: "center" }}
-										fontSize="small"
-										color="info"
-									/>
-									Date of Issue:
-								</Typography>
-								<Typography gutterBottom>
-									<b>{format(new Date(), "do MMMM yyyy")}</b>
-								</Typography>
-
-								<Typography
-									sx={{
-										display: "flex",
-										textTransform: "uppercase",
-										color: "#5a5a5a",
-									}}
-									gutterBottom
-								>
-									<CalendarMonthIcon
-										fontSize="small"
-										color="warning"
-									/>
-									Due Date:
-								</Typography>
-								<Typography variant="body1" gutterBottom>
-									<b>
-										{dueDate &&
-											format(dueDate, "do MMMM yyyy")}
-									</b>
-								</Typography>
-
-								<Typography
-									sx={{
-										display: "flex",
-										textTransform: "uppercase",
-										color: "#5a5a5a",
-									}}
-									gutterBottom
-								>
-									<CurrencyExchangeIcon
-										fontSize="small"
-										color="success"
-									/>
-									Total Amount:{" "}
-								</Typography>
-								<Typography variant="h6" gutterBottom>
-									{currency}
-									{addCurrencyCommas(total.toFixed(2))}
-								</Typography>
-							</Grid>
-						</Grid>
+						<Container>
+  <Grid container justifyContent="space-between" sx={{ mt: "30px", maxWidth:"auto" }}>
+    <Grid item xs={12} md={6} sx={{ textAlign: { xs: "center", md: "left" } }}>
+      <Typography variant="inherit" style={{ color: "#5a5a5a", textTransform: "uppercase", }} gutterBottom>
+        Send to:
+      </Typography>
+      {customer && (
+        <>
+          <Typography variant="subtitle1" gutterBottom><b>Name:</b> {customer?.name}</Typography>
+          <Typography variant="body1" gutterBottom><b>Email:</b> {customer?.email}</Typography>
+          <Typography variant="body1" gutterBottom><b>Account No:</b> {customer?.accountNo}</Typography>
+          <Typography variant="body1" gutterBottom><b>VAT/TIN No:</b> {customer?.vatTinNo}</Typography>
+          <Typography variant="body1"><b>Phone Number:</b> {customer?.phoneNumber}</Typography>
+          <Typography variant="body1"><b>Address:</b> {customer?.address}</Typography>
+          <Button sx={{ textTransform: "none" }} color="warning" size="large" onClick={() => setCustomer(null)} startIcon={<ChangeCircleIcon color="warning" />}>
+            Choose another customer
+          </Button>
+        </>
+      )}
+      <div style={customer ? { display: "none" } : { display: "block" }}>
+        <Autocomplete
+          disablePortal
+          sx={{ pt: "10px" }}
+          id="customers-list"
+          options={customers?.myCustomers || []}
+          getOptionLabel={(option) => option ? option.name : ""}
+          renderInput={(params) => (<TextField {...params} label="Select a customer" />)}
+          value={customers?.myCustomers?.name}
+          onChange={(event, value) => { setCustomer(value); }}
+        />
+      </div>
+      {!customer && (
+        <>
+          <Grid item sx={{ pt: "10px", pb: "10px" }}>
+            <Chip color="secondary" icon={<FaceIcon />} label="Add New Customer" onClick={() => navigate("/create-customer")} />
+          </Grid>
+        </>
+      )}
+    </Grid>
+    <Grid item xs={12} md={6} sx={{ textAlign: { xs: "center", md: "right" }, mt: { xs: "20px", md: "0" } }}>
+      <Typography sx={{ textTransform: "uppercase", color: "#5a5a5a", }} gutterBottom>
+        Payment Status
+      </Typography>
+      <Typography variant="h5" style={{ color: documentType === "Receipt" ? "green" : "red", }} gutterBottom>
+        {documentType === "Receipt" ? "Paid" : "Not Paid"}
+      </Typography>
+      <Typography sx={{ display: "flex", justifyContent: { xs: "center", md: "flex-end" }, textTransform: "uppercase", color: "#5a5a5a", }} gutterBottom>
+        <CalendarMonthIcon sx={{ alignItems: "center" }} fontSize="small" color="info" /> Date of Issue:
+      </Typography>
+      <Typography gutterBottom><b>{format(new Date(), "do MMMM yyyy")}</b></Typography>
+      <Typography sx={{ display: "flex", justifyContent: { xs: "center", md: "flex-end" }, textTransform: "uppercase", color: "#5a5a5a", }} gutterBottom>
+        <CalendarMonthIcon fontSize="small" color="warning" /> Due Date:
+      </Typography>
+      <Typography variant="body1" gutterBottom><b>{dueDate && format(dueDate, "do MMMM yyyy")}</b></Typography>
+      <Typography sx={{ display: "flex", justifyContent: { xs: "center", md: "flex-end" }, textTransform: "uppercase", color: "#5a5a5a", }} gutterBottom>
+        <CurrencyExchangeIcon fontSize="small" color="success" /> Total Amount: {""}
+      </Typography>
+      <Typography variant="h6" gutterBottom>
+        {currency}{addCurrencyCommas(total.toFixed(2))}
+      </Typography>
+    </Grid>
+  </Grid>
+</Container>
 
 						<NormalDivider />
 
@@ -682,6 +562,7 @@ const DocCreateEditForm = () => {
 								color="success"
 								startIcon={<AddCircleOutlineIcon />}
 								onClick={handleAddBillingItemsRow}
+								sx={{marginLeft:{xs:"17%", sm:"0%"}}}
 							>
 								Add Product or Service
 							</StyledItemButton>
@@ -689,9 +570,13 @@ const DocCreateEditForm = () => {
 
 						<Box
 							sx={{
-								marginLeft: "50%",
-								textAlign: "left",
+								marginLeft: {xs:"17%",sm:"50%"},
+								marginTop:{xs:"10%", sm:"-10%"},
+								
+								textAlign:{xs:"center", sm:"left"},
 								borderBottom: "1px solid rgb(17,65,141)",
+								maxWidth:{xs:"15rem", sm:"40rem"}
+								
 							}}
 						>
 							<Typography variant="h6" className="title">
@@ -731,14 +616,17 @@ const DocCreateEditForm = () => {
 						</Box>
 
 						<div className="toolbar">
-							<Container>
-								<Grid container>
+							<Container >
+								<Grid container >
 									<Grid
 										item
 										sx={{
-											marginTop: "16px",
-											marginRight: 5,
+											marginTop: {xs:"40px",sm:"16px"},
+											marginRight: 5, marginLeft:{xs:"12%", sm:"0%"}
 										}}
+									xs={12}
+									sm={3}
+									
 									>
 										<TextField
 											type="text"
@@ -755,20 +643,24 @@ const DocCreateEditForm = () => {
 										item
 										sx={{
 											marginTop: "16px",
-											marginRight: 5,
+											marginRight: 5, marginLeft:{xs:"12%", sm:"-3%"}
 										}}
+										xs={12}
+										sm={3}
 									>
 										<LocalizationProvider
-											dateAdapter={AdapterDateFns}
+											dateAdapter={AdapterDateFns} 
+											
 										>
 											<DatePicker
 												label="Set Due Date"
 												value={dueDate}
+												
 												onChange={(date) => {
 													setDueDate(date);
 												}}
 												renderInput={(params) => (
-													<TextField {...params} />
+													<TextField {...params}  />
 												)}
 											/>
 										</LocalizationProvider>
@@ -776,7 +668,10 @@ const DocCreateEditForm = () => {
 
 									<Grid
 										item
-										sx={{ width: 255, marginTop: "5px" }}
+										sx={{ width: 255, marginTop: "5px", marginLeft:{xs:"12%", sm:"0%"}}}
+										xs={10}
+										sm={2.5}
+										
 									>
 										<Autocomplete
 											disablePortal
@@ -804,16 +699,21 @@ const DocCreateEditForm = () => {
 
 						<Box
 							sx={{
-								marginTop: "20px",
+								marginTop: {xs:"40px",sm:"20px"},
 								display: "flex",
-								flexDirection: "row",
-								justifyContent: "space-between",
+								flexDirection: {xs:"column",sm:"row"},
+								justifyContent: {sm:"space-between"},
+								maxWidth:{xs:"5rem",sm:"80rem"},
+								marginLeft:{xs:"10%", sm:"1%"}
 							}}
 						>
-							<Box item>
+							<Box item >
 								<Typography
 									variant="h4"
-									sx={{ color: "rgb(17,65,141)" }}
+									sx={{ color: "rgb(17,65,141)",fontSize: {
+										xs: '2rem', // smaller font size on xs (mobile devices)
+										sm: '2.25rem', // default h2 size on sm and above
+									  } }}
 								>
 									Additional Info
 								</Typography>
@@ -821,7 +721,7 @@ const DocCreateEditForm = () => {
 								<TextareaAutosize
 									minRows={4}
 									style={{
-										width: 350,
+										width: 300,
 										border: "solid 1px #d6d6d6",
 										padding: "10px",
 									}}
@@ -839,7 +739,10 @@ const DocCreateEditForm = () => {
 							<Box>
 								<Typography
 									variant="h4"
-									sx={{ color: "rgb(17,65,141)" }}
+									sx={{ color: "rgb(17,65,141)",fontSize: {
+										xs: '2rem', // smaller font size on xs (mobile devices)
+										sm: '2.25rem', // default h2 size on sm and above
+									  } }}
 								>
 									Terms & Conditions
 								</Typography>
@@ -847,7 +750,7 @@ const DocCreateEditForm = () => {
 								<TextareaAutosize
 									minRows={4}
 									style={{
-										width: 350,
+										width: 300,
 										border: "solid 1px #d6d6d6",
 										padding: "10px",
 									}}
@@ -870,6 +773,7 @@ const DocCreateEditForm = () => {
 								size="large"
 								sx={{
 									marginTop: "20px",
+									marginLeft:{xs:"10%", sm:"-1%"},
 									borderColor: "rgb(17,65,141)",
 									borderRadius: "30px",
 									"&:hover": {
@@ -883,6 +787,8 @@ const DocCreateEditForm = () => {
 								Create/Update Doc
 							</Button>
 						</Box>
+				
+				
 					</StyledContainer>
 				</Box>
 			)}

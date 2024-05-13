@@ -15,29 +15,32 @@ const DocumentType = ({ documentType, setDocumentType }) => {
 		setDocumentType(e.target.value);
 	};
 	return (
-		<Box sx={{ marginLeft: "400px", marginBottom: "15px" }}>
-			<FormControl sx={{ m: 1, minWidth: 120 }}>
-				<StyledSelect
-					input={<Input />}
-					labelId="doc-helper-label"
-					id="doc-select-helper"
-					value={documentType}
-					label="Select Document"
-					onChange={handleChange}
-				>
-					<MenuItem value="">
-						<em>Select Document Type</em>
-					</MenuItem>
-					<MenuItem value="Invoice">Invoice</MenuItem>
-					<MenuItem value="Receipt">Receipt</MenuItem>
-					<MenuItem value="Quotation">Quotation</MenuItem>
-				</StyledSelect>
-				<FormHelperText>
-					Select a Document to generate, defaults to Invoice
-				</FormHelperText>
-			</FormControl>
+		<Box sx={{ marginLeft: { xs: "5%", sm: "5%" }, marginBottom: "15px" }}>
+		  <FormControl sx={{ m: 1 }}>
+			<StyledSelect
+			  input={<Input />}
+			  labelId="doc-helper-label"
+			  id="doc-select-helper"
+			  value={documentType}
+			  label="Select Document"
+			  onChange={handleChange}
+			  sx={{
+				fontSize: { xs: "1rem", sm: "2rem" }}}
+			>
+			  <MenuItem value="">
+				<em>Select Document Type</em>
+			  </MenuItem>
+			  <MenuItem value="Invoice">Invoice</MenuItem>
+			  <MenuItem value="Receipt">Receipt</MenuItem>
+			  <MenuItem value="Quotation">Quotation</MenuItem>
+			</StyledSelect>
+			<FormHelperText>
+			  Select a Document to generate, defaults to Invoice
+			</FormHelperText>
+		  </FormControl>
 		</Box>
-	);
+	  );
+	  
 };
 
 export default DocumentType;

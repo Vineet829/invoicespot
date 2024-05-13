@@ -17,7 +17,7 @@ const sendEmail = async (email, subject, payload, template) => {
 		);
 
 		const compiledTemplate = handlebars.compile(sourceDirectory);
-
+		console.log(compiledTemplate(payload))
 		const emailOptions = {
 			from: process.env.SENDER_EMAIL,
 			to: email,

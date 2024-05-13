@@ -105,26 +105,36 @@ const CustomersPage = () => {
 	};
 
 	return (
-		<Container component="main" maxWidth="lg" sx={{ mt: 10 }}>
+		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"} }}>
 			<CssBaseline />
 			<Stack direction="row" justifyContent="center" alignItems="center">
 				<FaUsers className="auth-svg" />
-				<Typography variant="h1">Customers</Typography>
+				<Typography variant="h1" sx={{
+            fontSize: {
+                xs: '1rem', // smaller font size on xs (mobile devices)
+                sm: '3rem', // default h2 size on sm and above
+            },
+        }}>Customers</Typography>
 			</Stack>
 			<StyledDivider />
 
 			<Grid>
 				<Grid item>
-					<Stack direction="row" justifyContent="space-between">
-						<Stack direction="row">
-							<Typography variant="h4">Total: </Typography>
+					<Stack direction={{ xs: 'column', sm: 'row' }}  sx={{alignItems:{xs:"center", sm:"center"},justifyContent:{xs:"center",sm:"space-between"}, mt:{xs:"10%", sm:"0%"}}}>
+						<Stack direction={{ xs: 'column', sm: 'row' }}>
+							<Typography variant="h4"  sx={{
+            fontSize: {
+                xs: '1.25rem',
+                sm: '2rem',
+				
+            }}}>Total: </Typography>
 							<Badge
 								badgeContent={data?.totalCustomers || "0"}
 								color="primary"
 								sx={{
-									marginTop: "3px",
+									marginTop: {xs:"30%", sm:"3px"},
 									marginLeft: "5px",
-									marginBottom: "5px",
+									marginBottom: {xs:"30%",sm:"5px"},
 								}}
 							>
 								<GroupIcon color="action" fontSize="large" />
@@ -137,6 +147,8 @@ const CustomersPage = () => {
 							color="primary"
 							startIcon={<PersonAddAltIcon />}
 							onClick={() => navigate("/create-customer")}
+							sx={{mb:{xs:"20%", sm:"0%"}
+						}}
 						>
 							Create New Customer
 						</StyledButton>

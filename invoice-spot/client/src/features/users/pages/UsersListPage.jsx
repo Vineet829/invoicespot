@@ -35,9 +35,9 @@ import {
 	useDeleteUserMutation,
 	useDeactivateUserMutation,
 } from "../usersApiSlice";
-
+import "../../../styles/homepage.css"
 const UserListPage = () => {
-	useTitle("All Users - MERN Invoice");
+	useTitle("All Users - Invoice Spot");
 
 	const [page, setPage] = useState(0);
 	const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -110,7 +110,7 @@ const UserListPage = () => {
 	}));
 
 	return (
-		<Container component="main" maxWidth="lg" sx={{ mt: 10 }}>
+		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"} }}>
 			<CssBaseline />
 
 			<Box
@@ -121,14 +121,22 @@ const UserListPage = () => {
 					alignItems: "center",
 				}}
 			>
-				<MdOutlineBadge className="auth-svg" />
-				<Typography variant="h1"> Users</Typography>
+				<MdOutlineBadge className="auth-svg"  />
+				<Typography variant="h1" sx={{ml:{xs:"5%", sm:"2%"},
+            fontSize: {
+                xs: '1.5rem', // smaller font size on xs (mobile devices)
+                sm: '2rem',
+				 // default h2 size on sm and above
+            },
+        }}> Users</Typography>
 			</Box>
 			<StyledDivider />
 			<Box
 				sx={{
 					display: "flex",
 					flexDirection: "row",
+					ml:{xs:"30%", sm:"0%"},
+					mt:{xs:"15%", sm:"0%"}
 				}}
 			>
 				<Typography variant="h4"> Total: </Typography>
@@ -143,7 +151,7 @@ const UserListPage = () => {
 			{isLoading ? (
 				<Spinner />
 			) : (
-				<TableContainer component={Paper}>
+				<TableContainer component={Paper} sx={{  mt:{xs:"20%", sm:"0%"}, ml:{xs:"10%", sm:"0%"} }}>
 					<Table sx={{ minWidth: 650 }} aria-label="user table">
 						<TableHead>
 							<TableRow>

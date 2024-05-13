@@ -42,12 +42,13 @@ const SingleCustomerPage = () => {
 	return (
 		<Container
 			component="main"
-			maxWidth="md"
+			
 			sx={{
 				border: "2px solid  #e4e5e7",
 				borderRadius: "25px",
 				py: 2,
 				mt: 10,
+			    maxWidth:{xs:"25rem", sm:"md"}
 			}}
 		>
 			<CssBaseline />
@@ -60,7 +61,12 @@ const SingleCustomerPage = () => {
 				}}
 			>
 				<GrUser fontSize="40px" />
-				<Typography variant="h3">
+				<Typography variant="h3" sx={{
+            fontSize: {
+                xs: '1.25rem', // smaller font size on xs (mobile devices)
+                sm: '2rem', // default h2 size on sm and above
+            },
+        }}>
 					{data?.customer.name.split(" ")[0]}'s Info
 				</Typography>
 
@@ -88,7 +94,8 @@ const SingleCustomerPage = () => {
 					<Box
 						sx={{
 							display: "flex",
-							flexDirection: "row",
+							flexDirection: {xs:"column",sm:"row"},
+							ml:{xs:"10%", sm:"0%"}
 						}}
 					>
 						<List sx={{ width: "50%" }}>
@@ -196,7 +203,7 @@ const SingleCustomerPage = () => {
 
 					<Stack direction="row" justifyContent="center">
 						<Button
-							sx={{ mt: 3, mb: 2 }}
+							sx={{ mt: 3, mb: {xs:"30%",sm:2}, }}
 							fullWidth
 							variant="contained"
 							color="primary"
@@ -206,7 +213,10 @@ const SingleCustomerPage = () => {
 								navigate(`/edit-customer/${data?.customer._id}`)
 							}
 						>
-							<Typography variant="h5">
+							<Typography variant="h5" sx={{ fontSize: {
+                xs: '1rem', // smaller font size on xs (mobile devices)
+                sm: '1.3rem', // default h2 size on sm and above
+            }}}>
 								Edit Customer Info
 							</Typography>
 						</Button>

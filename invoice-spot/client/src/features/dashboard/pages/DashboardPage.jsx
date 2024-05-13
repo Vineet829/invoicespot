@@ -70,7 +70,7 @@ const DashboardPage = () => {
 	);
 
 	return (
-		<Container component="main" maxWidth="md" sx={{ mt: 10 }}>
+		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"100vw", sm:"md"} }}>
 			<CssBaseline />
 			<Box
 				sx={{
@@ -81,11 +81,17 @@ const DashboardPage = () => {
 				}}
 			>
 				<DashboardTwoToneIcon sx={{ fontSize: 70 }} />
-				<Typography variant="h2">My Dashboard</Typography>
+				<Typography variant="h2"  sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>My Dashboard</Typography>
 			</Box>
 			<StyledDivider />
 			<Box>
-				<Grid container spacing={2}>
+				<Grid container spacing={2} sx={{flexDirection:{xs:"column", sm:"row"}, justifyContent:{xs:"center", sm:"flex-start"},
+			alignItems: {xs:"center", sm:"flex-start"}}}
+			>
 					{/* customers */}
 					<StyledDashboardGrid>
 						<Box
@@ -265,7 +271,11 @@ const DashboardPage = () => {
 				}}
 			>
 				<HistoryEduTwoToneIcon sx={{ fontSize: 60 }} />
-				<Typography variant="h3">
+				<Typography variant="h3" sx={{
+    fontSize: {
+      xs: '1.5rem', 
+      sm: '3.75rem', 
+    }}}>
 					{paymentHistory?.length
 						? "Payment History"
 						: "No Payments as of now"}

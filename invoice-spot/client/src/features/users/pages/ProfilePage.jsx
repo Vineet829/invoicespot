@@ -100,6 +100,7 @@ const ProfilePage = () => {
 				borderRadius: "25px",
 				py: 2,
 				mt: 12,
+				
 			}}
 		>
 			<CssBaseline />
@@ -109,10 +110,15 @@ const ProfilePage = () => {
 					flexDirection: "row",
 					justifyContent: "center",
 					alignItems: "center",
+					
 				}}
 			>
 				<BadgeIcon sx={{ fontSize: 80 }} />
-				<Typography variant="h1">User Profile</Typography>
+				<Typography variant="h1" sx={{
+    fontSize: {
+      xs: '1.5rem', // smaller font size on xs (mobile devices)
+      sm: '3.75rem', // default h2 size on sm and above
+    }}}>User Profile</Typography>
 			</Box>
 			{isLoading ? (
 				<Spinner />
@@ -138,173 +144,167 @@ const ProfilePage = () => {
 						)}
 					</Box>
 					<StyledDivider />
-					<Grid container>
-						<Grid item md={12} sm={6}>
-							<Stack direction="row" spacing={8}>
-								<Stack>
-									<List>
-										{/* provider */}
-										<ListItem>
-											<ListItemIcon>
-												<LoginIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={`Logged in With : ${capitalizeFirstLetter(
-													data.userProfile.provider
-												)}`}
-											/>
-										</ListItem>
-										{/* email */}
-										<ListItem>
-											<ListItemIcon>
-												<AttachEmailIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={data.userProfile.email}
-											/>
-										</ListItem>
-										{/* first name */}
-										<ListItem>
-											<ListItemIcon>
-												<LabelImportantIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={`First Name: ${data.userProfile.firstName}`}
-											/>
-										</ListItem>
-										{/* last name */}
-										<ListItem>
-											<ListItemIcon>
-												<LabelImportantIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={`Last Name: ${data.userProfile.lastName}`}
-											/>
-										</ListItem>
-										{/* username */}
-										<ListItem>
-											<ListItemIcon>
-												<BadgeIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={`Username: ${data.userProfile.username}`}
-											/>
-										</ListItem>
-										{/* address */}
-										<ListItem>
-											<ListItemIcon>
-												<HomeIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={
-													data.userProfile.address
-														? `Address : ${data.userProfile?.address}`
-														: "Address: ................"
-												}
-											/>
-										</ListItem>
-									</List>
-								</Stack>
-								<Stack>
-									<List>
-										{/* businessName */}
-										<ListItem>
-											<ListItemIcon>
-												<BusinessIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={
-													data.userProfile
-														.businessName
-														? `Business Name: ${data.userProfile?.businessName}`
-														: "Business Name: ................"
-												}
-											/>
-										</ListItem>
+<Grid container sx={{flexDirection:{xs:"column", sm:"row"}, justifyContent:{xs:"center", sm:"flex-start"},
+			alignItems: {xs:"center", sm:"flex-start"}, ml:{xs:"35px"}
+			} }>
+    <Grid item xs={12}>
+        <Stack spacing={2}  sx={{flexDirection:{xs:"column", sm:"row"}}}>
+            <Stack>
+                <List>
+                    {/* provider */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <LoginIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={`Logged in With : ${capitalizeFirstLetter(data.userProfile.provider)}`} />
+                    </ListItem>
+                    {/* email */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <AttachEmailIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.email} />
+                    </ListItem>
+                    {/* first name */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <LabelImportantIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={`First Name: ${data.userProfile.firstName}`} />
+                    </ListItem>
+                    {/* last name */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <LabelImportantIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={`Last Name: ${data.userProfile.lastName}`} />
+                    </ListItem>
+                    {/* username */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <BadgeIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={`Username: ${data.userProfile.username}`} />
+                    </ListItem>
+                    {/* address */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <HomeIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.address ? `Address : ${data.userProfile?.address}` : "Address: ................"} />
+                    </ListItem>
+                </List>
+            </Stack>
+            <Stack sx={{ml:"40px"}}>
+                <List>
+                    {/* businessName */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <BusinessIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.businessName ? `Business Name: ${data.userProfile?.businessName}` : "Business Name: ................"} />
+                    </ListItem>
+                    {/* city */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <PushPinIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.city ? `City: ${data.userProfile?.city}` : "City: ................"} />
+                    </ListItem>
+                    {/* country */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <VpnLockIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.country ? `Country: ${data.userProfile?.country}` : "Country: ................"} />
+                    </ListItem>
+                    {/* phone */}
+                    <ListItem>
+                        <ListItemIcon>
+                            <PhoneIcon fontSize="large" />
+                        </ListItemIcon>
+                        <ListItemText primary={data.userProfile.phoneNumber ? `Call me: ${data.userProfile?.phoneNumber}` : "Phone: ................"} />
+                    </ListItem>
+                </List>
+            </Stack>
+        </Stack>
+    </Grid>
+</Grid>
 
-										{/* city */}
-										<ListItem>
-											<ListItemIcon>
-												<PushPinIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={
-													data.userProfile.city
-														? `City: ${data.userProfile?.city}`
-														: "City: ................"
-												}
-											/>
-										</ListItem>
-										{/* country */}
-										<ListItem>
-											<ListItemIcon>
-												<VpnLockIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={
-													data.userProfile.country
-														? `Country: ${data.userProfile?.country}`
-														: "Country: ................"
-												}
-											/>
-										</ListItem>
-										{/* phone */}
-										<ListItem>
-											<ListItemIcon>
-												<PhoneIcon fontSize="large" />
-											</ListItemIcon>
-											<ListItemText
-												primary={
-													data.userProfile.phoneNumber
-														? `Call me: ${data.userProfile?.phoneNumber}`
-														: "Phone: ................"
-												}
-											/>
-										</ListItem>
-									</List>
-								</Stack>
-							</Stack>
-						</Grid>
-					</Grid>
-					<Grid container spacing={2}>
-						<Grid item md={6}>
-							<Button
-								sx={{ mt: 3, mb: 2, borderRadius: "25px" }}
-								fullWidth
-								variant="contained"
-								color="success"
-								size="large"
-								endIcon={<EditIcon />}
-								onClick={() => navigate("/edit-profile")}
-							>
-								<Typography variant="h5">
-									Edit Profile
-								</Typography>
-							</Button>
-						</Grid>
-						<Grid item md={6}>
-							<Button
-								sx={{ mt: 3, mb: 2, borderRadius: "25px" }}
-								fullWidth
-								variant="contained"
-								color="error"
-								size="large"
-								startIcon={
-									<PersonRemoveAlt1Icon
-										sx={{ color: "white" }}
-									/>
-								}
-								onClick={handleOpen}
-							>
-								<Typography
-									variant="h5"
-									sx={{ color: "white" }}
-								>
-									Delete Account?
-								</Typography>
-							</Button>
-						</Grid>
-					</Grid>
+<Grid container spacing={2} sx={{ justifyContent:{ xs:'center', sm:"flex-start"}, mb: { xs: 4, sm: 3 }, ml:{xs:"auto", sm:"-25px"} }}>
+  <Grid item md={6} xs={10}>
+    <Button
+      sx={{
+        mt: 3, 
+         mb:{sm:2},
+        borderRadius: "25px",
+        fontSize: {
+          xs: '0.75rem', // Smaller font size on extra-small screens (mobile)
+          sm: '1rem', // Default font size on small screens and above
+        },
+        padding: {
+          xs: '6px 12px', // Smaller padding on extra-small screens (mobile)
+          sm: '8px 16px', // Default padding on small screens and above
+        },
+      }}
+      fullWidth
+      variant="contained"
+      color="success"
+      size="large"
+      endIcon={<EditIcon />}
+      onClick={() => navigate("/edit-profile")}
+    >
+      <Typography 
+        variant="h5" 
+		sx={{ 
+			color: "white",
+			'@media (max-width:600px)': {
+			  fontSize: '1rem', // Smaller font size for the text inside the button
+			}
+		  }}
+      >
+        Edit Profile
+      </Typography>
+    </Button>
+  </Grid>
+  <Grid item md={6} xs={10}>
+    <Button
+      sx={{
+        mt: 3, 
+        mb: 2, 
+        borderRadius: "25px",
+        '@media (max-width:600px)': {
+          fontSize: '0.875rem', // Smaller font size for the button text
+          padding: '8px 16px', // Adjusted padding for a smaller button appearance
+        },
+        '.MuiButton-startIcon': {
+          marginRight: '8px',
+          '@media (max-width:600px)': {
+            fontSize: '18px', // Smaller icon size
+          },
+        },
+      }}
+      fullWidth
+      variant="contained"
+      color="error"
+      size="large"
+      startIcon={<PersonRemoveAlt1Icon sx={{ color: "white" }} />}
+      onClick={handleOpen}
+    >
+      <Typography
+        variant="h5"
+        sx={{ 
+          color: "white",
+          '@media (max-width:600px)': {
+            fontSize: '1rem', // Smaller font size for the text inside the button
+          }
+        }}
+      >
+        Delete Account?
+      </Typography>
+    </Button>
+  </Grid>
+</Grid>
 
 					{/* modal */}
 					<Modal
