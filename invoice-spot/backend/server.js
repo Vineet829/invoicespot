@@ -1,8 +1,7 @@
 import "dotenv/config";
 import chalk from "chalk";
 import path from "path";
-import cookieParser from "cookie-parser";
-
+import cookieParser from "cookie-parser"
 import express from "express";
 import morgan from "morgan";
 import { morganMiddleware, systemLogs } from "./utils/Logger.js";
@@ -23,7 +22,7 @@ import fs from "fs";
 await connectionToDB();
 
 const app = express();
- // Trust first proxy
+ 
 
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "/uploads")));
@@ -76,14 +75,14 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 1997;
 
-// Define SSL options
+
 const sslOptions = {
     key: fs.readFileSync(path.join(__dirname, '/backend/private.key')),
     cert: fs.readFileSync(path.join(__dirname, '/backend/certificate.crt')),
-    ca: fs.readFileSync(path.join(__dirname, '/backend/ca_bundle.crt')) // Optional: Including CA bundle if provided
+    ca: fs.readFileSync(path.join(__dirname, '/backend/ca_bundle.crt')) 
 };
 
-// Create HTTPS server
+
 https.createServer(sslOptions, app).listen(PORT, () => {
     console.log(
         `${chalk.green.bold("✔")} 👍 Server running in ${chalk.yellow.bold(

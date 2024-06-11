@@ -9,10 +9,8 @@ import pdfTemplate from '../../utils/pdf/pdfTemplate.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Corrected the filepath to ensure it points to the correct location
 const filepath = path.join(__dirname, "../../../docs/myDocument.pdf");
 
-// Directory where the PDF will be stored
 const docsPath = path.join(__dirname, '../../../docs');
 
 
@@ -25,7 +23,6 @@ async function generateAndSavePDF(content) {
        
         executablePath: process.env.CHROME_BIN, args: ['--no-sandbox', '--disable-setuid-sandbox'] ,
         
-        // Using CHROME_BIN environment variable.
     });
     const page = await browser.newPage();
     await page.setContent(pdfTemplate(content), { waitUntil: 'networkidle0' });

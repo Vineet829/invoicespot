@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.post("/register", registerUser);
 
-router.get("/verify/:emailToken/:userId", verifyUserEmail);
+router.post("/verify/:emailToken/:userId", verifyUserEmail);
 
 router.post("/login", loginLimiter, loginUser);
 
