@@ -16,8 +16,7 @@ const googleAuth = () => {
 				callbackURL: `${domainURL}/api/v1/${googleCallbackURL}`,
 			},
 			(accessToken, refreshToken, profile, done) => {
-				// TODO: remove this console in production
-				// console.log(profile);
+				
 
 				User.findOne({ googleID: profile.id }).then((user) => {
 					if (!user) {

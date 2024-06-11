@@ -17,7 +17,6 @@ if (process.env.NODE_ENV === "development") {
         port: 1025,
     });
 } else if (process.env.NODE_ENV === "production") {
-    // Configuration for using Gmail with OAuth2
 	const accessToken = await oAuth2Client.getAccessToken();
     transporter = nodemailer.createTransport({
       service: "gmail",

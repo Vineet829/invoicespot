@@ -20,7 +20,6 @@ const deleteDocument = asyncHandler(async (req, res) => {
         );
     }
 
-    // Use findByIdAndDelete for deletion
     await Document.findByIdAndDelete(req.params.id);
 
     res.json({ success: true, message: "Your document has been deleted" });
