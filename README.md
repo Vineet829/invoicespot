@@ -8,7 +8,6 @@ Welcome to the Invoice Management App repository! This application is designed t
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
-- [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
 
