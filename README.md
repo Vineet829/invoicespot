@@ -66,7 +66,7 @@ Welcome to the Invoice Management App repository! This application is designed t
    ```bash
    npm install
    ```
-7  **.Start the application:**
+7  **Start the application:**
    ```bash
    npm install
    ```
