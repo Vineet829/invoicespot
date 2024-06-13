@@ -137,7 +137,7 @@ const RegisterForm = () => {
 							<Spinner />
 						) : (
 							<Grid container spacing={3}>
-								{/* FirstName */}
+								
 								<Grid item xs={12} md={6}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="firstName-signup">
@@ -168,7 +168,7 @@ const RegisterForm = () => {
 											)}
 									</Stack>
 								</Grid>
-								{/* LastName */}
+								
 								<Grid item xs={12} md={6}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="lastName-signup">
@@ -199,7 +199,7 @@ const RegisterForm = () => {
 											)}
 									</Stack>
 								</Grid>
-								{/* Username */}
+								
 								<Grid item xs={12} md={6}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="username-signup">
@@ -230,7 +230,7 @@ const RegisterForm = () => {
 											)}
 									</Stack>
 								</Grid>
-								{/* Email */}
+								
 								<Grid item xs={12} md={6}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="email-signup">
@@ -259,7 +259,7 @@ const RegisterForm = () => {
 										)}
 									</Stack>
 								</Grid>
-								{/* password */}
+								
 								<Grid item xs={12}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="password-signup">
@@ -346,7 +346,7 @@ const RegisterForm = () => {
 										</Grid>
 									</FormControl>
 								</Grid>
-								{/* password Confirm */}
+							
 								<Grid item xs={12}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="passwordConfirm-signup">
@@ -405,7 +405,7 @@ const RegisterForm = () => {
 											)}
 									</Stack>
 								</Grid>
-								{/* terms of service */}
+								
 								<Grid item xs={12}>
 									<Typography variant="body2">
 										By Signing up, you agree to our &nbsp;
@@ -426,7 +426,7 @@ const RegisterForm = () => {
 										</Link>
 									</Typography>
 								</Grid>
-								{/* display any submission errors */}
+								
 								{errors.submit && (
 									<Grid item xs={12}>
 										<FormHelperText error>
@@ -434,7 +434,7 @@ const RegisterForm = () => {
 										</FormHelperText>
 									</Grid>
 								)}
-								{/* Create account button */}
+								
 								<Grid item xs={12}>
 									<AuthButtonAnimation>
 										<Button

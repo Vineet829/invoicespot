@@ -93,7 +93,6 @@ const App = () => {
 						<Route path="dashboard" element={<DashboardPage />} />
 					</Route>
 
-					{/* Private Routes - Admin Users only */}
 					<Route
 						element={<AuthRequired allowedRoles={[ROLES.Admin]} />}
 					>

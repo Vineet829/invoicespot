@@ -32,7 +32,7 @@ const CustomerEditForm = () => {
 	const [country, setCountry] = useState("");
 
 	const navigate = useNavigate();
-	// -1 means go back to the previous page where you came from
+	
 	const goBack = () => navigate(-1);
 
 	const { data } = useGetSingleCustomerQuery(custId);
@@ -144,7 +144,7 @@ const CustomerEditForm = () => {
 				>
 					<Grid container spacing={2}>
 						<Grid item md={6}>
-							{/* customer name */}
+							
 							<TextField
 								required
 								fullWidth
@@ -157,7 +157,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* customer Email */}
+							
 							<TextField
 								required
 								fullWidth
@@ -170,7 +170,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* Phone Number */}
+							
 							<TextField
 								required
 								fullWidth
@@ -183,7 +183,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* VAT/TIN Number */}
+							
 							<TextField
 								fullWidth
 								id="vatTinNo"
@@ -195,7 +195,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* Address */}
+							
 							<TextField
 								fullWidth
 								id="address"
@@ -207,7 +207,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* City */}
+							
 							<TextField
 								fullWidth
 								id="city"
@@ -219,7 +219,7 @@ const CustomerEditForm = () => {
 							/>
 						</Grid>
 					</Grid>
-					{/* Country */}
+					
 					<TextField
 						fullWidth
 						id="country"

@@ -70,9 +70,9 @@ const CustomersPage = () => {
 
 	const rows = data?.myCustomers;
 
-	// state to handle opening and closing of modal
+	
 	const [open, setOpen] = useState(false);
-	// state to be used and passed onto the modal instance
+	
 	const [selectedCustomer, setSelectedCustomer] = useState("");
 	const handleOpen = (customer) => {
 		setSelectedCustomer(customer);
@@ -81,7 +81,6 @@ const CustomersPage = () => {
 
 	const handleClose = () => setOpen(false);
 
-	// Avoid a layout jump when reaching the last page with empty rows.
 	const emptyRows =
 		page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows?.length) : 0;
 
@@ -111,8 +110,8 @@ const CustomersPage = () => {
 				<FaUsers className="auth-svg" />
 				<Typography variant="h1" sx={{
             fontSize: {
-                xs: '1rem', // smaller font size on xs (mobile devices)
-                sm: '3rem', // default h2 size on sm and above
+                xs: '1rem', 
+                sm: '3rem',
             },
         }}>Customers</Typography>
 			</Stack>

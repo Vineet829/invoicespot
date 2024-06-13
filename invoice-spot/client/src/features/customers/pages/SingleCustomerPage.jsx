@@ -63,8 +63,8 @@ const SingleCustomerPage = () => {
 				<GrUser fontSize="40px" />
 				<Typography variant="h3" sx={{
             fontSize: {
-                xs: '1.25rem', // smaller font size on xs (mobile devices)
-                sm: '2rem', // default h2 size on sm and above
+                xs: '1.25rem', 
+                sm: '2rem', 
             },
         }}>
 					{data?.customer.name.split(" ")[0]}'s Info
@@ -99,7 +99,7 @@ const SingleCustomerPage = () => {
 						}}
 					>
 						<List sx={{ width: "50%" }}>
-							{/* name` */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<BadgeIcon fontSize="large" />
@@ -110,14 +110,14 @@ const SingleCustomerPage = () => {
 									)}`}
 								/>
 							</ListItem>
-							{/* email` */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<AttachEmailIcon fontSize="large" />
 								</ListItemIcon>
 								<ListItemText primary={data?.customer.email} />
 							</ListItem>
-							{/* account No` */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<NumbersTwoToneIcon fontSize="large" />
@@ -126,7 +126,7 @@ const SingleCustomerPage = () => {
 									primary={`No : ${data?.customer.accountNo}`}
 								/>
 							</ListItem>
-							{/* VAT/TIN No` */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<RequestQuoteTwoToneIcon fontSize="large" />
@@ -141,9 +141,9 @@ const SingleCustomerPage = () => {
 							</ListItem>
 						</List>
 
-						{/* second list */}
+						
 						<List sx={{ width: "50%" }}>
-							{/*address */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<CottageTwoToneIcon fontSize="large" />
@@ -157,7 +157,7 @@ const SingleCustomerPage = () => {
 								/>
 							</ListItem>
 
-							{/*city */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<PushPinTwoToneIcon fontSize="large" />
@@ -171,7 +171,7 @@ const SingleCustomerPage = () => {
 								/>
 							</ListItem>
 
-							{/*country */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<VpnLockTwoToneIcon fontSize="large" />
@@ -185,7 +185,7 @@ const SingleCustomerPage = () => {
 								/>
 							</ListItem>
 
-							{/*phone */}
+							
 							<ListItem>
 								<ListItemIcon>
 									<PermPhoneMsgTwoToneIcon fontSize="large" />
@@ -214,8 +214,8 @@ const SingleCustomerPage = () => {
 							}
 						>
 							<Typography variant="h5" sx={{ fontSize: {
-                xs: '1rem', // smaller font size on xs (mobile devices)
-                sm: '1.3rem', // default h2 size on sm and above
+                xs: '1rem', 
+                sm: '1.3rem', 
             }}}>
 								Edit Customer Info
 							</Typography>

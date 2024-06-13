@@ -116,8 +116,8 @@ const ProfilePage = () => {
 				<BadgeIcon sx={{ fontSize: 80 }} />
 				<Typography variant="h1" sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem', 
+      sm: '3.75rem', 
     }}}>User Profile</Typography>
 			</Box>
 			{isLoading ? (
@@ -151,42 +151,42 @@ const ProfilePage = () => {
         <Stack spacing={2}  sx={{flexDirection:{xs:"column", sm:"row"}}}>
             <Stack>
                 <List>
-                    {/* provider */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <LoginIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={`Logged in With : ${capitalizeFirstLetter(data.userProfile.provider)}`} />
                     </ListItem>
-                    {/* email */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <AttachEmailIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={data.userProfile.email} />
                     </ListItem>
-                    {/* first name */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <LabelImportantIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={`First Name: ${data.userProfile.firstName}`} />
                     </ListItem>
-                    {/* last name */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <LabelImportantIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={`Last Name: ${data.userProfile.lastName}`} />
                     </ListItem>
-                    {/* username */}
+                   
                     <ListItem>
                         <ListItemIcon>
                             <BadgeIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={`Username: ${data.userProfile.username}`} />
                     </ListItem>
-                    {/* address */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <HomeIcon fontSize="large" />
@@ -197,28 +197,28 @@ const ProfilePage = () => {
             </Stack>
             <Stack sx={{ml:"40px"}}>
                 <List>
-                    {/* businessName */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <BusinessIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={data.userProfile.businessName ? `Business Name: ${data.userProfile?.businessName}` : "Business Name: ................"} />
                     </ListItem>
-                    {/* city */}
+                   
                     <ListItem>
                         <ListItemIcon>
                             <PushPinIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={data.userProfile.city ? `City: ${data.userProfile?.city}` : "City: ................"} />
                     </ListItem>
-                    {/* country */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <VpnLockIcon fontSize="large" />
                         </ListItemIcon>
                         <ListItemText primary={data.userProfile.country ? `Country: ${data.userProfile?.country}` : "Country: ................"} />
                     </ListItem>
-                    {/* phone */}
+                    
                     <ListItem>
                         <ListItemIcon>
                             <PhoneIcon fontSize="large" />
@@ -239,12 +239,12 @@ const ProfilePage = () => {
          mb:{sm:2},
         borderRadius: "25px",
         fontSize: {
-          xs: '0.75rem', // Smaller font size on extra-small screens (mobile)
-          sm: '1rem', // Default font size on small screens and above
+          xs: '0.75rem', 
+          sm: '1rem', 
         },
         padding: {
-          xs: '6px 12px', // Smaller padding on extra-small screens (mobile)
-          sm: '8px 16px', // Default padding on small screens and above
+          xs: '6px 12px', 
+          sm: '8px 16px', 
         },
       }}
       fullWidth
@@ -259,7 +259,7 @@ const ProfilePage = () => {
 		sx={{ 
 			color: "white",
 			'@media (max-width:600px)': {
-			  fontSize: '1rem', // Smaller font size for the text inside the button
+			  fontSize: '1rem', 
 			}
 		  }}
       >
@@ -274,13 +274,13 @@ const ProfilePage = () => {
         mb: 2, 
         borderRadius: "25px",
         '@media (max-width:600px)': {
-          fontSize: '0.875rem', // Smaller font size for the button text
-          padding: '8px 16px', // Adjusted padding for a smaller button appearance
+          fontSize: '0.875rem', 
+          padding: '8px 16px', 
         },
         '.MuiButton-startIcon': {
           marginRight: '8px',
           '@media (max-width:600px)': {
-            fontSize: '18px', // Smaller icon size
+            fontSize: '18px', 
           },
         },
       }}
@@ -296,7 +296,7 @@ const ProfilePage = () => {
         sx={{ 
           color: "white",
           '@media (max-width:600px)': {
-            fontSize: '1rem', // Smaller font size for the text inside the button
+            fontSize: '1rem', 
           }
         }}
       >
@@ -306,7 +306,7 @@ const ProfilePage = () => {
   </Grid>
 </Grid>
 
-					{/* modal */}
+					
 					<Modal
 						open={open}
 						onClose={handleClose}

@@ -18,10 +18,10 @@ const RegisterPage = () => {
         sx={{
           border: '2px solid #e4e5e7',
           borderRadius: '25px',
-          mt: isMobile ? 2 : 8, // Slightly increased margin-top for mobile
-          mb: isMobile ? 2 : 8, // Slightly increased margin-bottom for mobile
-          padding: isMobile ? 1 : 3, // Adjust padding for mobile
-          minHeight: '130vh', // Changed from 80vh to auto for better scrollability
+          mt: isMobile ? 2 : 8, 
+          mb: isMobile ? 2 : 8,
+          padding: isMobile ? 1 : 3, 
+          minHeight: '130vh', 
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',

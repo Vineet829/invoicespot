@@ -115,8 +115,8 @@ const DocumentsPage = () => {
 				<GiTakeMyMoney className="auth-svg" />
 				<Typography variant="h1" sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem', 
+      sm: '3.75rem', 
     }}}>Documents</Typography>
 			</Box>
 
@@ -141,8 +141,8 @@ const DocumentsPage = () => {
 				>
 					<Typography variant="h4"  sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem', 
+      sm: '3.75rem', 
     }}}>Total Documents: </Typography>
 					<Badge
 						badgeContent={data?.totalDocuments || "0"}
@@ -162,15 +162,15 @@ const DocumentsPage = () => {
   startIcon={<ReceiptLongIcon />}
   onClick={() => navigate("/create-doc")}
   sx={{
-    // Apply these styles for all screens
-    fontSize: '1rem', // Default font size
+    
+    fontSize: '1rem', 
     padding: '8px 16px',
- // Default padding
-    // Styles for screens smaller than the 'sm' breakpoint (600px)
+
+   
     '@media (max-width:600px)': {
-      fontSize: '0.75rem', // Smaller font size on extra-small screens (mobile)
+      fontSize: '0.75rem', 
       padding: '6px 12px'
-	  // Smaller padding on extra-small screens (mobile)
+	  
     }
   }}
 >

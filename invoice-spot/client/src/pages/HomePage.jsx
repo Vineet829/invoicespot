@@ -5,7 +5,7 @@ import "../styles/homepage.css";
 const StyledTypography = styled(Typography)(({ theme }) => ({
     fontSize: "12rem",
     [theme.breakpoints.down("sm")]: {
-        fontSize: "6rem", // Adjusted for smaller screens
+        fontSize: "6rem", 
     },
 }));
 
@@ -13,9 +13,9 @@ const CreateAccountButton = styled(Button)(({ theme }) => ({
     borderColor: "#000000",
     borderRadius: "25px",
     border: "3px solid",
-    fontSize: "1rem", // Base font size
+    fontSize: "1rem", 
     [theme.breakpoints.up("sm")]: {
-        fontSize: "1.5em", // Larger screens
+        fontSize: "1.5em", 
     },
     "&:hover": {
         borderColor: "#07f011",

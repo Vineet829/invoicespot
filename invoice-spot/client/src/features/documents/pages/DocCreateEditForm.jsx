@@ -235,16 +235,16 @@ const DocCreateEditForm = () => {
 >
     <NoteAddIcon sx={{ 
         fontSize: {
-            xs: '40px', // smaller size on xs (mobile devices)
-            sm: '70px', // default size on sm and above
+            xs: '40px', 
+            sm: '70px', 
         } 
     }} />
     <Typography 
         variant="h2" 
         sx={{
             fontSize: {
-                xs: '1rem', // smaller font size on xs (mobile devices)
-                sm: '3.75rem', // default h2 size on sm and above
+                xs: '1rem', 
+                sm: '3.75rem', 
             },
         }}
     >
@@ -256,11 +256,11 @@ const DocCreateEditForm = () => {
         size="small"
         sx={{ 
             fontSize: {
-                xs: '0.75rem', // smaller font size on xs
-                sm: '1rem', // default font size on sm and above
+                xs: '0.75rem', 
+                sm: '1rem', 
             },
             ml: "10px",
-            // Adjust padding or other properties for mobile as needed
+            
         }}
         onClick={goBack}
     >
@@ -432,7 +432,7 @@ const DocCreateEditForm = () => {
 														placeholder="Name/Description"
 													/>
 												</StyledTableCell>
-												{/* quantity */}
+												
 												<StyledTableCell align="right">
 													<InputBase
 														sx={{ ml: 1, flex: 1 }}
@@ -457,7 +457,7 @@ const DocCreateEditForm = () => {
 														placeholder="0"
 													/>
 												</StyledTableCell>
-												{/* unit price */}
+												
 												<StyledTableCell align="right">
 													<InputBase
 														sx={{ ml: 1, flex: 1 }}
@@ -483,7 +483,7 @@ const DocCreateEditForm = () => {
 													/>
 												</StyledTableCell>
 
-												{/* discount */}
+												
 												<StyledTableCell align="right">
 													<InputBase
 														sx={{ ml: 1, flex: 1 }}
@@ -509,7 +509,7 @@ const DocCreateEditForm = () => {
 													/>
 												</StyledTableCell>
 
-												{/* line total */}
+												
 												<StyledTableCell align="right">
 													<InputBase
 														sx={{ ml: 1, flex: 1 }}
@@ -711,8 +711,8 @@ const DocCreateEditForm = () => {
 								<Typography
 									variant="h4"
 									sx={{ color: "rgb(17,65,141)",fontSize: {
-										xs: '2rem', // smaller font size on xs (mobile devices)
-										sm: '2.25rem', // default h2 size on sm and above
+										xs: '2rem', 
+										sm: '2.25rem', 
 									  } }}
 								>
 									Additional Info
@@ -740,8 +740,8 @@ const DocCreateEditForm = () => {
 								<Typography
 									variant="h4"
 									sx={{ color: "rgb(17,65,141)",fontSize: {
-										xs: '2rem', // smaller font size on xs (mobile devices)
-										sm: '2.25rem', // default h2 size on sm and above
+										xs: '2rem', 
+										sm: '2.25rem',
 									  } }}
 								>
 									Terms & Conditions

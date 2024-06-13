@@ -60,7 +60,7 @@ const SingleDocumentPage = () => {
 	}, [document]);
 
 	useEffect(() => {
-		//Get the total amount paid
+		
 		let totalReceived = 0;
 		for (var i = 0; i < document?.paymentRecords?.length; i++) {
 			totalReceived += Number(document?.paymentRecords[i]?.amountPaid);
@@ -98,8 +98,8 @@ const SingleDocumentPage = () => {
 				<FaUserSecret fontSize="35px" />
 				<Typography variant="h3" sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem', 
+      sm: '3.75rem', 
     }}}>
 					{document?.customer?.name.split(" ")[0]}'s Doc
 				</Typography>
@@ -128,8 +128,8 @@ const SingleDocumentPage = () => {
 						onClick={() => navigate(`/edit-doc/${document._id}`)}
 					>
 						<Typography variant="h5" sx= {{fontSize: {
-                xs: '0.75rem', // smaller font size on xs
-                sm: '1rem', // default font size on sm and above
+                xs: '0.75rem', 
+                sm: '1rem', 
             }}}>
 							{" "}
 							Edit {document?.documentType}
@@ -162,8 +162,8 @@ const SingleDocumentPage = () => {
 							onClick={sendPdfEmail}
 						>
 							<Typography variant="h5" sx= {{fontSize: {
-                xs: '0.67rem', // smaller font size on xs
-                sm: '1rem', // default font size on sm and above
+                xs: '0.67rem', 
+                sm: '1rem', 
             }}}>
 								Email {document?.documentType} to Customer
 							</Typography>
@@ -644,8 +644,8 @@ const SingleDocumentPage = () => {
 								<Typography
 									variant="h4"
 									sx={{ color: "rgb(17,65,141)",fontSize: {
-										xs: '1.5rem', // smaller font size on xs (mobile devices)
-										sm: '2rem', // default h2 size on sm and above
+										xs: '1.5rem', 
+										sm: '2rem', 
 									  } }}
 								>
 									Additional Info
@@ -666,8 +666,8 @@ const SingleDocumentPage = () => {
 								<Typography
 									variant="h4"
 									sx={{ color: "rgb(17,65,141)",fontSize: {
-										xs: '1.5rem', // smaller font size on xs (mobile devices)
-										sm: '2rem', // default h2 size on sm and above
+										xs: '1.5rem', 
+										sm: '2rem', 
 									  } }}
 								>
 									Terms & Conditions
@@ -700,8 +700,8 @@ const SingleDocumentPage = () => {
 									color: "#fff",
 									padding: 1,
 									fontSize: {
-										xs: '1.25rem', // smaller font size on xs (mobile devices)
-										sm: '2rem', // default h2 size on sm and above
+										xs: '1.25rem', 
+										sm: '2rem', 
 									  }
 								}}
 							>

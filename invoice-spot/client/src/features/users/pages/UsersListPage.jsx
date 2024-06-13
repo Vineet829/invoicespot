@@ -124,9 +124,9 @@ const UserListPage = () => {
 				<MdOutlineBadge className="auth-svg"  />
 				<Typography variant="h1" sx={{ml:{xs:"5%", sm:"2%"},
             fontSize: {
-                xs: '1.5rem', // smaller font size on xs (mobile devices)
+                xs: '1.5rem', 
                 sm: '2rem',
-				 // default h2 size on sm and above
+				 
             },
         }}> Users</Typography>
 			</Box>
@@ -255,14 +255,14 @@ const UserListPage = () => {
 									))}
 								</>
 							)}
-							{/* control how emptyRows are displayed */}
+							
 							{emptyRows > 0 && (
 								<TableRow style={{ height: 53 * emptyRows }}>
 									<TableCell colSpan={6} />
 								</TableRow>
 							)}
 						</TableBody>
-						{/* footer with pagination */}
+						
 						<TableFooter>
 							<TableRow>
 								<TablePagination
