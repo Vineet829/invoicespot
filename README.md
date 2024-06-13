@@ -45,7 +45,7 @@ Welcome to the Invoice Management App repository! This application is designed t
    ```
 
 2. **Install backend dependencies:**
-  ```bash
+   ```bash
    npm install
    ```
 3. **Set up the environment variables:**
@@ -56,8 +56,9 @@ Welcome to the Invoice Management App repository! This application is designed t
    EMAIL_SERVICE=your_email_service
    EMAIL_USER=your_email@example.com
    EMAIL_PASS=your_email_password
+
 5. **Start the application:**
-  ```bash
+   ```bash
    npm start
    The application will be running at http://localhost:3000.
    ```
@@ -92,9 +93,9 @@ Welcome to the Invoice Management App repository! This application is designed t
   Request a password reset if you've forgotten your password.
   Follow the instructions sent to your email to reset your password.
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice1.png)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png)
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice2.png)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice2.png)
 
 
 ### Customer Management
@@ -111,12 +112,11 @@ Welcome to the Invoice Management App repository! This application is designed t
 - **Retrieve Customer Information:**
   View all customers or a specific customer's details.
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice10.png)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png)
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice15.png)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice15.png)
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice16.png)
-
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice16.png)
 
 
 ### Document Management
@@ -133,17 +133,18 @@ Welcome to the Invoice Management App repository! This application is designed t
 - **Generate PDF:**
   Create PDF versions of invoices for easy sharing.
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice6.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice6.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice7.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice7.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice8.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice8.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice9.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice9.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice12.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice12.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice13.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice13.png)
+
 
 ### Payment Management
 
@@ -161,13 +162,13 @@ Welcome to the Invoice Management App repository! This application is designed t
 - **Delete Account:**
   Delete your account if you no longer wish to use the app.
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice3.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice3.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice4.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice4.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice5.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice5.png)
 
-  ![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice1.png)
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png)
 
 
 ### User Management
@@ -181,7 +182,7 @@ Welcome to the Invoice Management App repository! This application is designed t
 - **Delete User:**
   Remove user accounts that are no longer needed.
 
-![alt text](https://github.com/Vineet829/Stock-Management/blob/main/images/invoice11.png)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice11.png)
 
 
 ## Configuration
