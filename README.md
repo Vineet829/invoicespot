@@ -61,14 +61,15 @@ Welcome to the Invoice Management App repository! This application is designed t
    npm start
    The application will be running at http://localhost:3000.
    ```
+
 6. **Install frontend dependencies:**
-   cd client
    ```bash
    npm install
    ```
-7  **Start the application:**
+
+7. **Start the application:**
    ```bash
-   npm install
+   npm start
    ```
 
 ## Usage
