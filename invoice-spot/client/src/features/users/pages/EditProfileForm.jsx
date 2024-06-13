@@ -150,8 +150,8 @@ const EditProfileForm = () => {
 				<BrowserUpdatedIcon sx={{ fontSize: 70 }} />
 				<Typography variant="h2" sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem', 
+      sm: '3.75rem', 
     }}}>Update Profile</Typography>
 				<Button
 					variant="contained"
@@ -182,7 +182,7 @@ const EditProfileForm = () => {
 				>
 					<Grid container spacing={2} sx={{justifyContent:"center"}}>
 						<Grid item md={6}>
-							{/* firstName */}
+							
 							<TextField
 								required
 								fullWidth
@@ -195,7 +195,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* lastName */}
+							
 							<TextField
 								required
 								fullWidth
@@ -208,7 +208,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* username */}
+							
 							<TextField
 								required
 								fullWidth
@@ -222,7 +222,7 @@ const EditProfileForm = () => {
 						</Grid>
 
 						<Grid item md={6}>
-							{/* phoneNumber */}
+							
 							<TextField
 								required
 								fullWidth
@@ -244,7 +244,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* business name */}
+							
 							<TextField
 								required
 								fullWidth
@@ -259,7 +259,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* address */}
+							
 							<TextField
 								required
 								fullWidth
@@ -272,7 +272,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* City */}
+							
 							<TextField
 								fullWidth
 								id="city"
@@ -284,7 +284,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 						<Grid item md={6}>
-							{/* Country */}
+							
 							<TextField
 								fullWidth
 								id="country"
@@ -296,7 +296,7 @@ const EditProfileForm = () => {
 							/>
 						</Grid>
 					</Grid>
-					{/* avatar logo */}
+					
 					<TextField
 						fullWidth
 						id="avatar"

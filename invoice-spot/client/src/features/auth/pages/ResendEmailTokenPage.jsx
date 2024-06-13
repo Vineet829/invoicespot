@@ -141,7 +141,7 @@ const ResendEmailTokenPage = () => {
 													)}
 											</Stack>
 										</Grid>
-										{/* button */}
+										
 										<Grid item xs={12}>
 											<Button
 												sx={{ mt: 3, mb: 2 }}
@@ -156,7 +156,7 @@ const ResendEmailTokenPage = () => {
 												Resend Verification Email
 											</Button>
 										</Grid>
-										{/* go back button */}
+										
 										<Grid item xs={12}>
 											<Button
 												variant="contained"

@@ -15,7 +15,7 @@ const DocumentSVG = () => {
 							variant="h5"
 							sx={{
 								marginBottom: "10px",
-								fontSize: { xs: '1rem', sm: '1.5rem' }, // Adjust font size for mobile
+								fontSize: { xs: '1rem', sm: '1.5rem' }, 
 							}}
 						>
 							Sadly, You have no Documents yet. To create one click
@@ -26,9 +26,9 @@ const DocumentSVG = () => {
 							alt="customer logo"
 							className="customer-svg"
 							style={{
-								maxWidth: '100%', // Ensure the image is responsive and does not overflow its container
+								maxWidth: '100%', 
 								height: 'auto',
-								width: { xs: '150px', sm: 'auto' }, // Make the image smaller on mobile
+								width: { xs: '150px', sm: 'auto' }, 
 							}}
 						/>
 					</Stack>

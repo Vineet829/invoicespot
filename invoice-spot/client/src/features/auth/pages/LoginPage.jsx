@@ -26,7 +26,7 @@ import {
 			maxWidth:{xs:"25rem", sm:"40rem"}
 		  }}
 		>
-		  <Grid container spacing={2}> {/* Ensure that container prop is added for proper spacing */}
+		  <Grid container spacing={2}> 
 			<Grid item xs={12}>
 			  <Box
 				sx={{
@@ -41,13 +41,13 @@ import {
 			  </Box>
 			  <StyledDivider />
 			</Grid>
-			{/* login form */}
+			
 			<LoginForm />
 			<Divider
 			  sx={{ flexGrow: 1, mb: 1, mt: 1 ,}}
 			  orientation="horizontal"
 			/>
-			{/* forgot password */}
+			
 			<Grid item xs={12}>
 			  <Box
 				sx={{
@@ -62,7 +62,7 @@ import {
 					variant="body1"
 					component={RouterLink}
 					to="/register"
-					sx={{ textDecoration: "none", ml: 0.5 }} // Adjust margin
+					sx={{ textDecoration: "none", ml: 0.5 }} 
 				  >
 					Sign Up Here
 				  </Link>
@@ -73,7 +73,7 @@ import {
 			  sx={{ flexGrow: 1, mb: 1, mt: 1 }}
 			  orientation="horizontal"
 			/>
-			{/* resend email verification button */}
+			
 			<Grid item xs={12}>
 			  <Box
 				sx={{
@@ -88,7 +88,7 @@ import {
 					variant="body1"
 					component={RouterLink}
 					to="/resend"
-					sx={{ textDecoration: "none", ml: 0.5 }} // Adjust margin
+					sx={{ textDecoration: "none", ml: 0.5 }} 
 				  >
 					Resend Email
 				  </Link>

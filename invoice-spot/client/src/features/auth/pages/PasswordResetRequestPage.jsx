@@ -25,7 +25,6 @@ import { usePasswordResetRequestMutation } from "../authApiSlice";
 const PasswordResetRequestPage = () => {
 	useTitle("Request Reset Password");
 	const navigate = useNavigate();
-	// -1 means go back to the previous page where you came from
 	const goBack = () => navigate(-1);
 
 	const [passwordResetRequest, { data, isLoading, isSuccess }] =
@@ -126,7 +125,6 @@ const PasswordResetRequestPage = () => {
 									<Spinner />
 								) : (
 									<Grid container>
-										{/* email */}
 										<Grid item xs={12}>
 											<Stack spacing={1}>
 												<InputLabel htmlFor="email-signup">
@@ -158,7 +156,6 @@ const PasswordResetRequestPage = () => {
 													)}
 											</Stack>
 										</Grid>
-										{/* button */}
 										<Grid item xs={12}>
 											<Button
 												sx={{ mt: 3, mb: 2 }}
@@ -173,7 +170,6 @@ const PasswordResetRequestPage = () => {
 												Send Password Reset Email
 											</Button>
 										</Grid>
-										{/* Go back button */}
 										<Grid item xs={12}>
 											<Button
 												variant="contained"

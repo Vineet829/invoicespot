@@ -83,8 +83,8 @@ const DashboardPage = () => {
 				<DashboardTwoToneIcon sx={{ fontSize: 70 }} />
 				<Typography variant="h2"  sx={{
     fontSize: {
-      xs: '1.5rem', // smaller font size on xs (mobile devices)
-      sm: '3.75rem', // default h2 size on sm and above
+      xs: '1.5rem',
+      sm: '3.75rem',
     }}}>My Dashboard</Typography>
 			</Box>
 			<StyledDivider />
@@ -92,7 +92,7 @@ const DashboardPage = () => {
 				<Grid container spacing={2} sx={{flexDirection:{xs:"column", sm:"row"}, justifyContent:{xs:"center", sm:"flex-start"},
 			alignItems: {xs:"center", sm:"flex-start"}}}
 			>
-					{/* customers */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -111,7 +111,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Total Customers</Typography>
 					</StyledDashboardGrid>
-					{/* total documents */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -130,7 +130,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Total Documents</Typography>
 					</StyledDashboardGrid>
-					{/* total amount */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -149,7 +149,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Expected Income</Typography>
 					</StyledDashboardGrid>
-					{/* total paid */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -167,7 +167,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Cash Received</Typography>
 					</StyledDashboardGrid>
-					{/* pending amount */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -187,7 +187,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Cash Pending</Typography>
 					</StyledDashboardGrid>
-					{/* Fully paid docs */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -205,7 +205,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Total Paid Docs</Typography>
 					</StyledDashboardGrid>
-					{/* Partially Paid */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -223,7 +223,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Not Fully Paid</Typography>
 					</StyledDashboardGrid>
-					{/* overdue */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{
@@ -241,7 +241,7 @@ const DashboardPage = () => {
 						</Box>
 						<Typography variant="h6">Overdue</Typography>
 					</StyledDashboardGrid>
-					{/* unpaid */}
+					
 					<StyledDashboardGrid>
 						<Box
 							sx={{

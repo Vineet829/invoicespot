@@ -22,7 +22,6 @@ const PaymentHistory = ({ sortPaymentHistory }) => {
 
 	const rows = sortPaymentHistory;
 
-	// Avoid a layout jump when reaching the last page with empty rows.
 	const emptyRows =
 		page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows?.length) : 0;
 
@@ -90,7 +89,6 @@ const PaymentHistory = ({ sortPaymentHistory }) => {
 						</StyledTableRow>
 					))}
 
-					{/* control how empty rows shall be displayed should they exist*/}
 					{emptyRows > 0 && (
 						<TableRow style={{ height: 53 * emptyRows }}>
 							<TableCell colSpan={6} />

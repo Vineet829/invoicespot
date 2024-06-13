@@ -9,6 +9,5 @@ export const store = configureStore({
 	},
 	middleware: (getDefaultMiddleware) =>
 		getDefaultMiddleware().concat(baseApiSlice.middleware),
-	// TODO: change this to false in production
 	devTools: false,
 });

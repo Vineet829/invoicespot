@@ -35,7 +35,7 @@ const PasswordResetPage = () => {
 	useTitle("Request Reset Password");
 	const navigate = useNavigate();
 
-	// level state will help manage the color to display when passwordConfirm field is  changed
+	
 	const [level, setLevel] = useState();
 
 	const [showPassword, setShowPassword] = useState(false);
@@ -49,12 +49,10 @@ const PasswordResetPage = () => {
 		setShowConfirmPassword(!showConfirmPassword);
 	};
 
-	// prevent default behavior when a mouse is pressed when the pointer is inside the passwordConfirm field
 	const handleMouseDownPassword = (event) => {
 		event.preventDefault();
 	};
 
-	// when the password is typed/changed run this function to show the password strength
 	const changePassword = (value) => {
 		const temp = strengthIndicator(value);
 		setLevel(strengthColor(temp));
@@ -83,7 +81,6 @@ const PasswordResetPage = () => {
 						.max(255)
 						.required("Password is required"),
 					passwordConfirm: Yup.string()
-						// reference the password field and check if passwords match
 						.oneOf([Yup.ref("password")], "Passwords Must Match")
 						.required("Please confirm your password"),
 				})}
@@ -164,7 +161,6 @@ const PasswordResetPage = () => {
 									<Spinner />
 								) : (
 									<Grid container>
-										{/* password */}
 										<Grid item xs={12}>
 											<Stack spacing={1}>
 												<InputLabel htmlFor="password-signup">
@@ -225,7 +221,6 @@ const PasswordResetPage = () => {
 														</FormHelperText>
 													)}
 											</Stack>
-											{/* password strength indicator */}
 											<FormControl
 												fullWidth
 												sx={{ mt: 2 }}
@@ -259,7 +254,6 @@ const PasswordResetPage = () => {
 											</FormControl>
 										</Grid>
 
-										{/* passwordConfirm */}
 										<Grid item xs={12}>
 											<Stack spacing={1}>
 												<InputLabel htmlFor="passwordConfirm-signup">
@@ -322,7 +316,6 @@ const PasswordResetPage = () => {
 													)}
 											</Stack>
 										</Grid>
-										{/* button */}
 										<Grid item xs={12}>
 											<Button
 												sx={{ mt: 3, mb: 2 }}

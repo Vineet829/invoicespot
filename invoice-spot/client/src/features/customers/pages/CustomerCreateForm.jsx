@@ -117,8 +117,8 @@ const CustomerCreateForm = () => {
 													sx={{ fontSize: 60 }}
 												/>
 												<Typography variant="h3" sx={{ fontSize: {
-                xs: '1.2rem', // smaller font size on xs (mobile devices)
-                sm: '2rem', // default h2 size on sm and above
+                xs: '1.2rem', 
+                sm: '2rem', 
             }}}>
 													Create Customer
 												</Typography>
@@ -171,7 +171,7 @@ const CustomerCreateForm = () => {
 																{errors.name}
 															</FormHelperText>
 														)}
-													{/* email address */}
+													
 													<InputLabel htmlFor="email-signup">
 														Email Address*
 													</InputLabel>
@@ -199,7 +199,7 @@ const CustomerCreateForm = () => {
 																{errors.email}
 															</FormHelperText>
 														)}
-													{/* phone number */}
+													
 													<InputLabel htmlFor="customer-phoneNumber">
 														Mobile Phone Number*
 													</InputLabel>
@@ -231,7 +231,7 @@ const CustomerCreateForm = () => {
 																}
 															</FormHelperText>
 														)}
-													{/* VatTinNo */}
+												
 													<InputLabel htmlFor="customer-vatTin">
 														VAT/TIN No*
 													</InputLabel>
@@ -262,7 +262,7 @@ const CustomerCreateForm = () => {
 															</FormHelperText>
 														)}
 
-													{/* Address */}
+													
 													<InputLabel htmlFor="customer-address">
 														Address
 													</InputLabel>
@@ -290,7 +290,7 @@ const CustomerCreateForm = () => {
 																{errors.address}
 															</FormHelperText>
 														)}
-													{/* City */}
+													
 													<InputLabel htmlFor="customer-city">
 														City
 													</InputLabel>
@@ -318,7 +318,7 @@ const CustomerCreateForm = () => {
 																{errors.city}
 															</FormHelperText>
 														)}
-													{/* Country */}
+													
 													<InputLabel htmlFor="customer-country">
 														Country
 													</InputLabel>
@@ -346,7 +346,7 @@ const CustomerCreateForm = () => {
 																{errors.country}
 															</FormHelperText>
 														)}
-													{/* button */}
+													
 													<Grid item xs={12}>
 														<Button
 															sx={{

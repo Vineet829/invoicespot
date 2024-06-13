@@ -27,9 +27,7 @@ export const customTheme = createTheme({
 	components: {
 		MuiDrawer: {
 			styleOverrides: {
-				// Name of the slot
 				paper: {
-					// Some CSS
 					backgroundColor: "#000000",
 					color: "#fff",
 				},
