@@ -16,13 +16,12 @@ import customerRoutes from "./routes/customerRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import connectionToDB from "./config/connectDB.js";
-import https from "https";
+import http from "http";
 import fs from "fs";
 
 await connectionToDB();
 
 const app = express();
- 
 
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "/uploads")));
@@ -33,13 +32,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.use(express.json());
-
-
-
-
-
-
-  app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false }));
 
 app.use(passport.initialize());
 googleAuth();
@@ -72,24 +65,15 @@ if (process.env.NODE_ENV === "production") {
 app.use(notFound);
 app.use(errorHandler);
 
-
 const PORT = process.env.PORT || 1997;
 
-
-const sslOptions = {
-    key: fs.readFileSync(path.join(__dirname, '/backend/private.key')),
-    cert: fs.readFileSync(path.join(__dirname, '/backend/certificate.crt')),
-    ca: fs.readFileSync(path.join(__dirname, '/backend/ca_bundle.crt')) 
-};
-
-
-https.createServer(sslOptions, app).listen(PORT, () => {
+http.createServer(app).listen(PORT, () => {
     console.log(
         `${chalk.green.bold("✔")} 👍 Server running in ${chalk.yellow.bold(
             process.env.NODE_ENV
-        )} mode on port ${chalk.blue.bold(PORT)} with SSL`
+        )} mode on port ${chalk.blue.bold(PORT)}`
     );
     systemLogs.info(
-        `Server running in ${process.env.NODE_ENV} mode on port ${PORT} with SSL`
+        `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
     );
 });
