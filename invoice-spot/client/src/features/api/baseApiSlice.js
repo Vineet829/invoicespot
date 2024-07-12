@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { logIn, logOut } from "../auth/authSlice";
 
 const baseQuery = fetchBaseQuery({
-	baseUrl: "https://invoicespot.onrender.com/api/v1",
+	baseUrl: "https:///localhost:1997/api/v1",
 	credentials: "include",
 	prepareHeaders: (headers, { getState }) => {
 		
