@@ -5,6 +5,7 @@ import User from "../../models/userModel.js";
 // $-title   Get new access tokens from the refresh token
 // $-path    GET /api/v1/auth/new_access_token
 // $-auth    Public
+// we are rotating the refresh tokens, deleting the old ones, creating new ones and detecting token reuse
 
 const newAccessToken = asyncHandler(async (req, res) => {
 	const cookies = req.cookies;
