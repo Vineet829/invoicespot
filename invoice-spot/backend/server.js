@@ -1,9 +1,10 @@
-import "dotenv/config";
 import chalk from "chalk";
 import path from "path";
-import cookieParser from "cookie-parser"
+import cookieParser from "cookie-parser";
+import "dotenv/config";
 import express from "express";
 import morgan from "morgan";
+import connectionToDB from "./config/connectDB.js";
 import { morganMiddleware, systemLogs } from "./utils/Logger.js";
 import mongoSanitize from "express-mongo-sanitize";
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
@@ -15,9 +16,6 @@ import googleAuth from "./config/passportSetup.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
-import connectionToDB from "./config/connectDB.js";
-import http from "http";
-import fs from "fs";
 
 await connectionToDB();
 
@@ -32,18 +30,20 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.use(express.json());
+
 app.use(express.urlencoded({ extended: false }));
 
 app.use(passport.initialize());
 googleAuth();
 
 app.use(cookieParser());
+
 app.use(mongoSanitize());
 
 app.use(morganMiddleware);
 
-app.get("/api/v1/test",(req,res)=>{
-    res.json({Hi:"Welcome to the invoice app"})
+app.get("/api/v1/test", (req, res) => {
+	res.json({ Hi: "Welcome to the Invoice App" });
 });
 
 app.use("/api/v1/auth", authRoutes);
@@ -52,6 +52,7 @@ app.use("/api/v1/customer", apiLimiter, customerRoutes);
 app.use("/api/v1/document", apiLimiter, documentRoutes);
 app.use("/api/v1/upload", apiLimiter, uploadRoutes);
 
+// serve frontend
 if (process.env.NODE_ENV === "production") {
 	app.use(express.static(path.join(__dirname, "client/build")));
 
@@ -67,13 +68,13 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 1997;
 
-http.createServer(app).listen(PORT, () => {
-    console.log(
-        `${chalk.green.bold("✔")} 👍 Server running in ${chalk.yellow.bold(
-            process.env.NODE_ENV
-        )} mode on port ${chalk.blue.bold(PORT)}`
-    );
-    systemLogs.info(
-        `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
-    );
+app.listen(PORT, () => {
+	console.log(
+		`${chalk.green.bold("✔")} 👍 Server running in ${chalk.yellow.bold(
+			process.env.NODE_ENV
+		)} mode on port ${chalk.blue.bold(PORT)}`
+	);
+	systemLogs.info(
+		`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
+	);
 });
