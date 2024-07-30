@@ -2,58 +2,127 @@ import asyncHandler from "express-async-handler";
 import User from "../../models/userModel.js";
 import VerificationToken from "../../models/verifyResetTokenModel.js";
 import sendEmail from "../../utils/sendEmail.js";
-
 const domainURL = process.env.DOMAIN;
+const { randomBytes } = await import("crypto");
 
-// $-title   Verify User Email
-// $-path    GET /api/v1/auth/verify/:emailToken/:userId
+// $-title   Send password reset email link
+// $-path    POST /api/v1/auth/reset_password_request
 // $-auth    Public
 
-const verifyUserEmail = asyncHandler(async (req, res) => {
-	const user = await User.findOne({ _id: req.params.userId }).select(
+const resetPasswordRequest = asyncHandler(async (req, res) => {
+	const { email } = req.body;
+
+	if (!email) {
+		res.status(400);
+		throw new Error("You must enter your email address");
+	}
+
+	const existingUser = await User.findOne({ email }).select(
 		"-passwordConfirm"
 	);
 
-	if (!user) {
+	if (!existingUser) {
 		res.status(400);
-		throw new Error("We were unable to find a user for this token");
-	}
-	if (user.isEmailVerified) {
-		res.status(400).send(
-			"This user has already been verified. Please login"
-		);
+		throw new Error("That email is not associated with any account");
 	}
 
-	const userToken = await VerificationToken.findOne({
-		_userId: user._id,
-		token: req.params.emailToken,
+	let verificationToken = await VerificationToken.findOne({
+		_userId: existingUser._id,
 	});
 
-	if (!userToken) {
-		res.status(400);
-		throw new Error("Token invalid! Your token may have expired");
+	if (verificationToken) {
+		await verificationToken.deleteOne();
 	}
 
-	user.isEmailVerified = true;
-	await user.save();
+	const resetToken = randomBytes(32).toString("hex");
 
-	if (user.isEmailVerified) {
-		const emailLink = `${domainURL}/login`;
+	let newVerificationToken = await new VerificationToken({
+		_userId: existingUser._id,
+		token: resetToken,
+		createdAt: Date.now(),
+	}).save();
+
+	if (existingUser && existingUser.isEmailVerified) {
+		const emailLink = `${domainURL}/auth/reset_password?emailToken=${newVerificationToken.token}&userId=${existingUser._id}`;
 
 		const payload = {
-			name: user.firstName,
+			name: existingUser.firstName,
 			link: emailLink,
 		};
 
 		await sendEmail(
-			user.email,
-			"Welcome - Account Verified",
+			existingUser.email,
+			"Password Reset Request",
 			payload,
-			"./emails/template/welcome.handlebars"
+			"./emails/template/requestResetPassword.handlebars"
 		);
 
-		res.redirect("/auth/verify");
+		res.status(200).json({
+			success: true,
+			message: `Hey ${existingUser.firstName}, an email has been sent to your account with the password reset link`,
+		});
 	}
 });
 
-export default verifyUserEmail;
+// $-title   Reset User Password
+// $-path    POST /api/v1/auth/reset_password
+// $-auth    Public
+
+const resetPassword = asyncHandler(async (req, res) => {
+	const { password, passwordConfirm, userId, emailToken } = req.body;
+
+	if (!password) {
+		res.status(400);
+		throw new Error("A password is required");
+	}
+	if (!passwordConfirm) {
+		res.status(400);
+		throw new Error("A confirm password field is required");
+	}
+
+	if (password !== passwordConfirm) {
+		res.status(400);
+		throw new Error("Passwords do not match");
+	}
+
+	if (password.length < 8) {
+		res.status(400);
+		throw new Error("Passwords must be at least 8 characters long");
+	}
+
+	const passwordResetToken = await VerificationToken.findOne({ userId });
+
+	if (!passwordResetToken) {
+		res.status(400);
+		throw new Error(
+			"Your token is either invalid or expired. Try resetting your password again"
+		);
+	}
+
+	const user = await User.findById({
+		_id: passwordResetToken._userId,
+	}).select("-passwordConfirm");
+
+	if (user && passwordResetToken) {
+		user.password = password;
+		await user.save();
+
+		const payload = {
+			name: user.firstName,
+		};
+
+		await sendEmail(
+			user.email,
+			"Password Reset Success",
+			payload,
+			"./emails/template/resetPassword.handlebars"
+		);
+
+		res.json({
+			success: true,
+			message: `Hey ${user.firstName},Your password reset was successful. An email has been sent to confirm the same`,
+		});
+	}
+});
+
+export { resetPasswordRequest, resetPassword };
