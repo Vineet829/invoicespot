@@ -73,7 +73,7 @@ const registerUser = asyncHandler(async (req, res) => {
 			token: verificationToken,
 		}).save();
 
-		const emailLink = `https://${domainURL}/api/v1/auth/verify/${emailVerificationToken.token}/${registeredUser._id}`;
+		const emailLink = `${domainURL}/api/v1/auth/verify/${emailVerificationToken.token}/${registeredUser._id}`;
 
 		const payload = {
 			name: registeredUser.firstName,
