@@ -15,6 +15,7 @@
 	margin: auto;
 }
 
+
 @keyframes pulse {
 	to {
 		box-shadow: 0 0 0 12px transparent, 0 0 0 24px rgba(227, 115, 14, 0);
