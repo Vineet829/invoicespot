@@ -17,6 +17,7 @@ import { addCurrencyCommas } from "../../documents/pages/components/addCurrencyC
 import PaymentHistory from "./components/paymentHistory";
 import useTitle from "../../../hooks/useTitle";
 
+
 const DashboardPage = () => {
 	useTitle("My Dashboard - MERN Invoice");
 	const { data: customers } = useGetAllUserCustomersQuery();
