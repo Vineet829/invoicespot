@@ -15,4 +15,5 @@ const StyledDivider = () => {
 	return <DividerStyle   />;
 };
 
+
 export default StyledDivider;

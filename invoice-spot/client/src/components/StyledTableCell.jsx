@@ -14,4 +14,5 @@ const StyledTableCell = ({ children }) => {
 	return <TableCellStyled>{children}</TableCellStyled>;
 };
 
+
 export default StyledTableCell;
