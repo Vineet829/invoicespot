@@ -11,4 +11,5 @@ const NormalDivider = () => {
 	return <DividerStyle />;
 };
 
+
 export default NormalDivider;
