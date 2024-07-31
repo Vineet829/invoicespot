@@ -74,4 +74,5 @@ export default function TablePaginationActions(props) {
 			</IconButton>
 		</Box>
 	);
+
 }
