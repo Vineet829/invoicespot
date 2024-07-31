@@ -13,6 +13,7 @@ if (process.env.NODE_ENV === "production") {
 	disableReactDevTools();
 }
 
+
 const container = document.getElementById("root");
 const root = createRoot(container);
 
