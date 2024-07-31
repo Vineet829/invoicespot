@@ -18,6 +18,7 @@ export const itemsInitialState = [
 	},
 ];
 
+
 export const paymentInitialState = [
 	{
 		paymentDate: new Date(),
