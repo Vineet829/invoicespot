@@ -1,5 +1,6 @@
 import { baseApiSlice } from "../api/baseApiSlice";
 
+
 export const usersApiSlice = baseApiSlice.injectEndpoints({
 	endpoints: (builder) => ({
 		getAllUsers: builder.query({
