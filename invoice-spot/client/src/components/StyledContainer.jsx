@@ -12,4 +12,5 @@ const StyledContainer = ({ children }) => {
 	return <StyledBox>{children}</StyledBox>;
 };
 
+
 export default StyledContainer;
