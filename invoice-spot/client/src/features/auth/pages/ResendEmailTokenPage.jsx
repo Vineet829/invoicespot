@@ -22,6 +22,7 @@ import useTitle from "../../../hooks/useTitle";
 import { useResendVerifyEmailMutation } from "../authApiSlice";
 import AuthWrapper from "../forms/AuthWrapper";
 
+
 const ResendEmailTokenPage = () => {
 	useTitle("Resend Verification Email");
 
