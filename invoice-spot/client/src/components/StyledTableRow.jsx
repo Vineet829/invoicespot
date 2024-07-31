@@ -13,4 +13,5 @@ const StyledTableRow = ({ children }) => {
 	return <TableRowStyled>{children}</TableRowStyled>;
 };
 
+
 export default StyledTableRow;
