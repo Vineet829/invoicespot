@@ -16,6 +16,7 @@ import {
 	useUpdateDocMutation,
 } from "../documentsApiSlice";
 
+
 const PaymentForm = ({ document }) => {
 	const [createPayment, { isLoading, isSuccess, data }] =
 		useCreatePaymentMutation();
