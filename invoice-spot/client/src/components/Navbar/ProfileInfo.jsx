@@ -317,4 +317,5 @@ const ProfileInfo = ({ user }) => {
 	);
 };
 
+
 export default ProfileInfo;
