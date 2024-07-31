@@ -10,6 +10,7 @@ const RegisterPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  
   return (
     <AuthWrapper>
       <Container
