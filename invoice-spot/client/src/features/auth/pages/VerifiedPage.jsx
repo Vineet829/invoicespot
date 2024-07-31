@@ -7,6 +7,7 @@ import useTitle from "../../../hooks/useTitle";
 const VerifiedPage = () => {
 	useTitle("Verify User - Invoice Spot");
 	return (
+		
 		<Stack
 			direction="column"
 			alignItems="center"
