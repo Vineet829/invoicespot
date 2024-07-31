@@ -29,4 +29,5 @@ const checkRole = (...allowedRoles) => {
 
 const role = { ROLES, checkRole };
 
+
 export default role;
