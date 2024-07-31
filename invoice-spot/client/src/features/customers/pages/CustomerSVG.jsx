@@ -2,6 +2,7 @@ import { Container, Grid, Stack, Typography } from "@mui/material";
 import CustomerSvg from "../../../images/add_customer.svg";
 import "../../../styles/customer-button.css";
 
+
 const CustomerSVG = () => {
 	return (
 		<Container component="main" maxWidth="lg">
