@@ -9,6 +9,7 @@ const StyledTypography = styled(Typography)(({ theme }) => ({
     },
 }));
 
+
 const CreateAccountButton = styled(Button)(({ theme }) => ({
     borderColor: "#000000",
     borderRadius: "25px",
