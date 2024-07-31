@@ -13,4 +13,5 @@ const AuthRequired = ({ allowedRoles }) => {
 	);
 };
 
+
 export default AuthRequired;
