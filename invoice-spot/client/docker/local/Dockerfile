@@ -12,4 +12,5 @@ RUN npm install
 
 COPY . ${APP_HOME}
 
+
 CMD ["npm","start"]
