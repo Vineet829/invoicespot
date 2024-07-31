@@ -4,4 +4,5 @@ const Navbar = () => {
 	return <AuthNav />;
 };
 
+
 export default Navbar;
