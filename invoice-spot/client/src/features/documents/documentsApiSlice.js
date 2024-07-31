@@ -1,5 +1,6 @@
 import { baseApiSlice } from "../api/baseApiSlice";
 
+
 export const documentsApiSlice = baseApiSlice.injectEndpoints({
 	endpoints: (builder) => ({
 		getAllMyDocs: builder.query({
