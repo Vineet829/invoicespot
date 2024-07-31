@@ -12,4 +12,5 @@ export default function AuthButtonAnimation({ children, type }) {
 				</motion.div>
 			);
 	}
+
 }
