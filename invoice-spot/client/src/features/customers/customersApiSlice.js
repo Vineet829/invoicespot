@@ -18,6 +18,7 @@ export const customersApiSlice = baseApiSlice.injectEndpoints({
 			query: (custId) => `/customer/${custId}`,
 			providesTags: ["Customer"],
 		}),
+		
 		updateCustomerInfo: builder.mutation({
 			query: ({ id, ...otherFields }) => ({
 				url: `/customer/${id}`,
