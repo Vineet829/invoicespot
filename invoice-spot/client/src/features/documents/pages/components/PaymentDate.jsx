@@ -7,6 +7,7 @@ const PaymentDate = ({ datePaid, setDatePaid }) => {
 	const handleChange = (date) => {
 		setDatePaid(date.toISOString());
 	};
+	
 	return (
 		<LocalizationProvider dateAdapter={AdapterDateFns} >
 			<DesktopDatePicker
