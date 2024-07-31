@@ -29,4 +29,5 @@ const cloudinaryUploader = async function uploadToCloudinary(localFilePath) {
 		});
 };
 
+
 export default cloudinaryUploader;
