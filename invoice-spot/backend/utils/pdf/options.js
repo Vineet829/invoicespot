@@ -3,4 +3,5 @@ export default {
 	orientation: "portrait",
 	border: "10mm",
 	width: "950px",
+
 };
