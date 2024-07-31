@@ -23,6 +23,7 @@ export const statusStyling = (status) => {
 		  };
 };
 
+
 export const DocumentTypeStyling = (documentType) => {
 	return documentType === "Receipt"
 		? {
