@@ -10,6 +10,7 @@ const StyledSelect = styled(Select)({
 	fontWeight: "bold",
 });
 
+
 const DocumentType = ({ documentType, setDocumentType }) => {
 	const handleChange = (e) => {
 		setDocumentType(e.target.value);
