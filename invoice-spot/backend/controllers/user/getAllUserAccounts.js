@@ -4,6 +4,7 @@ import User from "../../models/userModel.js";
 // $-title   Get All Users
 // $-path    GET /api/v1/user/all
 // $-auth    Private/Admin
+
 const getAllUserAccounts = asyncHandler(async (req, res) => {
 	const pageSize = 10;
 
