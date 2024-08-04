@@ -11,6 +11,7 @@ import {
 	sendDocument,
 } from "../controllers/documents/generatePDF.js";
 
+
 import checkAuth from "../middleware/checkAuthMiddleware.js";
 
 const router = express.Router();
