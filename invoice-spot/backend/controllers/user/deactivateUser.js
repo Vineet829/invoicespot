@@ -4,6 +4,7 @@ import User from "../../models/userModel.js";
 // $-title   Deactivate user account
 // $-path    PATCH /api/v1/user/:id/deactivate
 // $-auth    Private/Admin
+
 const deactivateUser = asyncHandler(async (req, res) => {
 	const user = await User.findById(req.params.id);
 
