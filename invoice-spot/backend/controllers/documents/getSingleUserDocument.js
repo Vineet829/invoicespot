@@ -5,6 +5,7 @@ import Document from "../../models/documentModel.js";
 // $-path    GET /api/v1/document/:id
 // $-auth    Private
 
+
 const getSingleUserDocument = asyncHandler(async (req, res) => {
 	const document = await Document.findById(req.params.id);
 
