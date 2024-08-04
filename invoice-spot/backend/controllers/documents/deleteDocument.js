@@ -5,6 +5,8 @@ import Document from "../../models/documentModel.js";
 // $-path    DELETE /api/v1/document/:id
 // $-auth    Private
 
+
+
 const deleteDocument = asyncHandler(async (req, res) => {
     const document = await Document.findById(req.params.id);
 
