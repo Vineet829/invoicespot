@@ -4,6 +4,7 @@ import User from "../../models/userModel.js";
 // $-title   Delete User Account
 // $-path    DELETE /api/v1/user/:id
 // $-auth    Private/Admin
+
 const deleteUserAccount = asyncHandler(async (req, res) => {
 	try {
 		const result = await User.findByIdAndDelete(req.params.id);
