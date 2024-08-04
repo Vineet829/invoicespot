@@ -10,6 +10,7 @@ import role from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
+
 router
 	.route("/profile")
 	.get(checkAuth, getUserProfile)
