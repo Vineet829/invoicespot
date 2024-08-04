@@ -7,6 +7,7 @@ import getSingleUserCustomer from "../controllers/customers/getSingleUserCustome
 import updateCustomerInfo from "../controllers/customers/updateCustomerInfo.js";
 import checkAuth from "../middleware/checkAuthMiddleware.js";
 
+
 const router = express.Router();
 
 router.route("/create").post(checkAuth, createCustomer);
