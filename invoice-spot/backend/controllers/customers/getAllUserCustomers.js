@@ -5,6 +5,7 @@ import Customer from "../../models/customerModel.js";
 // $-path    GET /api/v1/customer/all
 // $-auth    Private
 
+
 const getAllUserCustomers = asyncHandler(async (req, res) => {
 	const pageSize = 10;
 	const page = Number(req.query.page) || 1;
