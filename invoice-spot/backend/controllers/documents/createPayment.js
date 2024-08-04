@@ -5,6 +5,7 @@ import Document from "../../models/documentModel.js";
 // $-path    POST /api/v1/document/:id/payment
 // $-auth    Private
 
+
 const createDocumentPayment = asyncHandler(async (req, res) => {
 	const document = await Document.findById(req.params.id);
 
