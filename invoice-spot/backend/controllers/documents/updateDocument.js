@@ -5,6 +5,7 @@ import Document from "../../models/documentModel.js";
 // $-path    PATCH /api/v1/document/:id
 // $-auth    Private
 
+
 const updateDocument = asyncHandler(async (req, res) => {
 	const document = await Document.findById(req.params.id);
 

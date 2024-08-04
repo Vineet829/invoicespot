@@ -6,6 +6,7 @@ import Document from "../../models/documentModel.js";
 // $-path    POST /api/v1/document/create
 // $-auth    Private
 
+
 const createDocument = asyncHandler(async (req, res) => {
 	const customer = await Customer.findOne({ createdBy: req.user._id });
 
