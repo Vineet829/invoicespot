@@ -5,6 +5,7 @@ import Customer from "../../models/customerModel.js";
 // $-path    DELETE /api/v1/customer/:id
 // $-auth    Private
 
+
 const deleteCustomer = asyncHandler(async (req, res) => {
 	const customer = await Customer.findById(req.params.id);
 
