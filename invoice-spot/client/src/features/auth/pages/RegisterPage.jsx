@@ -62,8 +62,8 @@ const RegisterPage = () => {
                 "&:hover": {
                   bgcolor: '#CCFF996b',
                 },
-                mt: isFirefox && isMobile ? 4 : 2,
-                mb: isFirefox && isMobile ? 4 : 2,
+                mt: isFirefox && isMobile ? 6 : 2,
+                mb: isFirefox && isMobile ? 6 : 2,
               }}
             >
               <Button
