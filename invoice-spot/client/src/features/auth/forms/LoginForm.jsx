@@ -97,10 +97,10 @@ const LoginForm = () => {
 				}) => (
 					<form noValidate autoComplete="off" onSubmit={handleSubmit}>
 						{isLoading ? (
-							<Spinner />
+							<Box sx={{marginLeft:"100px"}}><Spinner/></Box>
 						) : (
 							<Grid container spacing={3} sx={{maxWidth:{xs:"25rem", sm:"40rem"}, ml:{xs:"-8px", sm:"-13px"}}}>
-								{/* Email */}
+								
 								<Grid item xs={12}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="email-signup">
@@ -129,7 +129,7 @@ const LoginForm = () => {
 										)}
 									</Stack>
 								</Grid>
-								{/* password */}
+								
 								<Grid item xs={12}>
 									<Stack spacing={1}>
 										<InputLabel htmlFor="password-signup">
@@ -188,7 +188,7 @@ const LoginForm = () => {
 											)}
 									</Stack>
 								</Grid>
-								{/* forgot password */}
+								
 								<Grid item xs={12}>
 									<Box
 										sx={{
@@ -210,7 +210,7 @@ const LoginForm = () => {
 										</Typography>
 									</Box>
 								</Grid>
-								{/* Login Button */}
+								
 								<Grid item xs={12}>
 									<AuthButtonAnimation>
 										<Button
