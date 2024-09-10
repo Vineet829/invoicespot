@@ -193,21 +193,7 @@ Welcome to the Invoice Management App repository! This application is designed t
 - **Email Service:**
   Configure the email service settings in the `.env` file for sending invoices and verification emails.
 
-## Contributing
 
-We welcome contributions to improve the Invoice Management App. To contribute, please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes.
-4. Commit your changes (`git commit -m 'Add some feature'`).
-5. Push to the branch (`git push origin feature/your-feature-name`).
-6. Open a pull request.
-
-
-## License
-
-This project is licensed under the MIT License.
 
 ## Contact
 
