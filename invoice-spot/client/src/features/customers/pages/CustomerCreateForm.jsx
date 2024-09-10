@@ -142,7 +142,7 @@ const CustomerCreateForm = () => {
 									{isLoading ? (
 										<Spinner />
 									) : (
-										<Grid container sx={{ml:{xs:"15%", sm:"0%"}, maxWidth:{xs:"20rem", sm:"auto"}}}>
+										<Grid container sx={{ml:{xs:"15%", sm:"auto"}, mr:{sm:"auto"}, maxWidth:{xs:"20rem", sm:"30rem"}}}>
 											<Grid item xs={12}>
 												<Stack spacing={1}>
 													<InputLabel htmlFor="customer-name">
@@ -218,7 +218,7 @@ const CustomerCreateForm = () => {
 														name="phoneNumber"
 														onBlur={handleBlur}
 														onChange={handleChange}
-														placeholder="e.g +254710123456 - must be a valid mobile phone number with country code."
+														placeholder="e.g +254710123456"
 														inputProps={{}}
 													/>
 													{touched.phoneNumber &&
