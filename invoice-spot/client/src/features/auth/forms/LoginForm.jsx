@@ -97,7 +97,7 @@ const LoginForm = () => {
 				}) => (
 					<form noValidate autoComplete="off" onSubmit={handleSubmit}>
 						{isLoading ? (
-							<Box sx={{marginLeft:"100px"}}><Spinner/></Box>
+							<Box sx={{marginLeft:{sm:"100px", xs:"auto"}, marginRight:{xs:"auto"} }} ><Spinner/></Box>
 						) : (
 							<Grid container spacing={3} sx={{maxWidth:{xs:"25rem", sm:"40rem"}, ml:{xs:"-8px", sm:"-13px"}}}>
 								
