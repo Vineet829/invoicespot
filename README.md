@@ -1,7 +1,6 @@
 # Invoice Spot
 
-Welcome to the Invoice Management App repository! This application is designed to streamline the process of creating, managing, and tracking invoices for your business. It provides a user-friendly interface and a robust backend to ensure efficient invoice handling.
-
+Welcome to Invoice Spot! This app helps you create, manage, and track invoices for your business. It offers an intuitive interface and a powerful backend to handle invoices effectively.
 ## Table of Contents
 
 - [Features](#features)
@@ -13,12 +12,10 @@ Welcome to the Invoice Management App repository! This application is designed t
 
 ## Features
 
-- **Create Invoices**: Easily create and customize invoices with client details, line items, and tax information.
+- **Create Invoices**: Easily create and customize invoices with client details, and tax information.
 - **Manage Clients**: Store and manage client information for quick access when generating invoices.
 - **Track Payments**: Monitor payment statuses and history for each invoice.
-- **Generate Reports**: Create comprehensive reports on invoices and payments.
 - **Send Invoices**: Email invoices directly to clients from within the app.
-- **Export Data**: Export invoice data in various formats such as PDF, CSV, and Excel.
 - **User Authentication**: Secure login system to protect your data.
 - **Password Management**: Reset and manage user passwords securely.
 - **Account Management**: Update user profiles and manage user accounts.
