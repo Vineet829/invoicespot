@@ -38,7 +38,7 @@ import {
 				}}
 			  >
 				<FaSignInAlt className="auth-svg" />
-				<Typography variant="h5" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}>Log In</Typography> {/* Adjust font size */}
+				<Typography variant="h5" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}>Log In</Typography> 
 			  </Box>
 			  <StyledDivider />
 			</Grid>
@@ -57,8 +57,7 @@ import {
 				  alignItems: "center",
 				}}
 			  >
-				<Typography variant="body1" sx={{ textAlign: 'center', fontSize: { xs: '0.875rem', sm: '1rem' } }}> {/* Adjust font size for smaller screens */}
-				  Don't have an account?
+				<Typography variant="body1" sx={{ textAlign: 'center', fontSize: { xs: '0.875rem', sm: '1rem' } }}> 
 				  <Link
 					variant="body1"
 					component={RouterLink}
