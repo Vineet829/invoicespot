@@ -110,7 +110,7 @@ const DashboardPage = () => {
 								{customers?.totalCustomers}
 							</Typography>
 						</Box>
-						<Typography variant="h6">Total Customers</Typography>
+						<Typography variant="h6" sx={{textAlign:"center"}}>Total Customers</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -129,7 +129,7 @@ const DashboardPage = () => {
 								{documents?.totalDocuments}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Total Documents</Typography>
+						<Typography variant="h6" sx={{ textAlign:"center"}}>Total Documents</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -148,7 +148,7 @@ const DashboardPage = () => {
 								{addCurrencyCommas(totalAmount.toFixed(2))}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Expected Income</Typography>
+						<Typography variant="h6" sx={{textAlign:"center"}}>Expected Income</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -166,7 +166,7 @@ const DashboardPage = () => {
 								{addCurrencyCommas(totalRecieved)}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Cash Received</Typography>
+						<Typography variant="h6" sx={{ textAlign:"center"}}>Cash Received</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -186,7 +186,7 @@ const DashboardPage = () => {
 								)}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Cash Pending</Typography>
+						<Typography variant="h6" sx={{ textAlign:"center"}}>Cash Pending</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -204,7 +204,7 @@ const DashboardPage = () => {
 								{fullyPaid?.length}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Total Paid Docs</Typography>
+						<Typography variant="h6" sx={{ textAlign:"center"}}>Total Paid Docs</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -222,7 +222,7 @@ const DashboardPage = () => {
 								{partiallyPaid?.length}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Not Fully Paid</Typography>
+						<Typography variant="h6" sx={{textAlign:"center"}}>Not Fully Paid</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -240,7 +240,7 @@ const DashboardPage = () => {
 								{docOverDue?.length}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>Overdue</Typography>
+						<Typography variant="h6" sx={{ textAlign:"center"}}>Overdue</Typography>
 					</StyledDashboardGrid>
 					
 					<StyledDashboardGrid>
@@ -258,7 +258,7 @@ const DashboardPage = () => {
 								{notPaid?.length}
 							</Typography>
 						</Box>
-						<Typography variant="h6" sx={{ marginLeft: "auto", marginRight:"auto"}}>UnPaid</Typography>
+						<Typography variant="h6" sx={{textAlign:"center"}}>UnPaid</Typography>
 					</StyledDashboardGrid>
 				</Grid>
 			</Box>
