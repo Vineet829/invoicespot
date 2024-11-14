@@ -93,8 +93,8 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png)
 
 ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice2.png)
-
-
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in1.jpeg)
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in2.jpeg)
 ### Customer Management
 
 - **Create Customer:**
@@ -112,7 +112,7 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png)
 
 
-
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png)
 
 ### Document Management
 
@@ -139,6 +139,11 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
   ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice12.png)
 
 
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in4.jpeg)
+  
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in5.jpeg)
+  
+  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in6.jpeg)
 
 
 ### Payment Management
@@ -159,11 +164,13 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 
   ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice3.png)
 
+![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in3.jpeg)
+
   ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice4.png)
 
   ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice5.png)
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png)
+
 
 
 ### User Management
