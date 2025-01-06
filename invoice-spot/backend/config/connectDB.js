@@ -1,8 +1,12 @@
+
 import chalk from "chalk";
 import mongoose from "mongoose";
 import { systemLogs } from "../utils/Logger.js";
 
+
 const connectionToDB = async () => {
+	
+	console.log(process.env.DB_NAME)
 	try {
 		const connectionParams = {
 			dbName: process.env.DB_NAME,

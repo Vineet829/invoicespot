@@ -3,12 +3,14 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
 import * as Yup from "yup";
 import {
 	strengthColor,
 	strengthIndicator,
 } from "../../../utils/password-strength";
-import { useRegisterUserMutation } from "../authApiSlice";
+import { useRegisterUserMutation, useLoginUserMutation } from "../authApiSlice";
+import { logIn } from "../authSlice"; 
 
 
 import {
@@ -35,6 +37,7 @@ const USERNAME_REGEX = /^[A-z][A-z0-9-_]{3,23}$/;
 
 const RegisterForm = () => {
 	useTitle("Sign Up - Invoice Spot");
+	
 	const navigate = useNavigate();
 
 	const [level, setLevel] = useState();
@@ -58,10 +61,8 @@ const RegisterForm = () => {
 		const temp = strengthIndicator(value);
 		setLevel(strengthColor(temp));
 	};
-
-	useEffect(() => {
-		changePassword("");
-	}, []);
+	
+	const [loginUser] = useLoginUserMutation();
 
 	const [registerUser, { data, isLoading, isSuccess }] =
 		useRegisterUserMutation();
@@ -74,7 +75,24 @@ const RegisterForm = () => {
 			toast.success(message);
 		}
 	}, [data, isSuccess, navigate]);
-
+	const dispatch = useDispatch();
+	
+	const handleGuestLogin = async () => {
+		const guestCredentials = {
+		  email: "vineet.charles53@gmail.com",
+		  password: "1!Password",
+		};
+		try {
+		  const getUserCredentials = await loginUser(guestCredentials).unwrap();
+		  dispatch(logIn({ ...getUserCredentials }));
+		  navigate("/dashboard");
+		} catch (err) {
+		  const message = err.data.message;
+		  toast.error(message);
+		}
+	  };
+	
+	
 	return (
 		<>
 			<Formik
@@ -319,7 +337,7 @@ const RegisterForm = () => {
 												</FormHelperText>
 											)}
 									</Stack>
-									{/* password strength indicator */}
+									
 									<FormControl fullWidth sx={{ mt: 2 }}>
 										<Grid
 											container
@@ -449,8 +467,30 @@ const RegisterForm = () => {
 										>
 											Create Account
 										</Button>
+									
 									</AuthButtonAnimation>
+									
 								</Grid>
+								<Grid item xs={12}>
+                  <AuthButtonAnimation>
+                    <Button
+                      disableElevation
+                      fullWidth
+                      size="large"
+                      variant="contained"
+                      color="primary"
+                      onClick={handleGuestLogin}
+                      sx={{
+                        bgcolor: "#1976d2",
+                        '&:hover': {
+                          bgcolor: "#1565c0",
+                        },
+                      }}
+                    >
+                      Guest Login
+                    </Button>
+                  </AuthButtonAnimation>
+                </Grid>
 							</Grid>
 						)}
 					</form>
