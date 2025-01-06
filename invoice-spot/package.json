@@ -6,8 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js",
-    "postinstall": "./install.sh"
+    "dev": "nodemon backend/server.js"
   },
   "author": "Vineet",
   "license": "MIT",
@@ -17,7 +16,7 @@
     "cloudinary": "^2.1.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.7",
     "express": "^4.19.2",
     "express-async-handler": "^1.2.0",
     "express-mongo-sanitize": "^2.2.0",
