@@ -7,7 +7,6 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
-- [License](#license)
 - [Contact](#contact)
 
 ## Features
