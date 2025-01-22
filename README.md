@@ -166,11 +166,6 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 
 </p>
 
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice12.png" alt="alt text 1" width="850" />
-
-</p>
-
 
   <p align="center">
 <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in4.jpeg" alt="alt text" width="300" height="500">
