@@ -89,12 +89,23 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
   Request a password reset if you've forgotten your password.
   Follow the instructions sent to your email to reset your password.
 
-![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png" alt="alt text 1" width="850" />
 
-![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice2.png)
+</p>
 
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in1.jpeg" alt="alt text" width="400" height="800">
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in2.jpeg" alt="alt text" width="400" height="800">
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice2.png" alt="alt text 1" width="850" />
+
+</p>
+
+  <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in1.jpeg" alt="alt text" width="300" height="500">
+</p>
+
+ <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in2.jpeg" alt="alt text" width="300" height="500">
+</p>
  
 ### Customer Management
 
@@ -110,10 +121,15 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - **Retrieve Customer Information:**
   View all customers or a specific customer's details.
 
-![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png" alt="alt text 1" width="850" />
 
+</p>
 
-![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png" alt="alt text 1" width="850" />
+
+</p>
 
 ### Document Management
 
@@ -129,22 +145,44 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - **Generate PDF:**
   Create PDF versions of invoices for easy sharing.
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice6.png)
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice7.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice6.png" alt="alt text 1" width="850" />
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice8.png)
+</p>
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice9.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice7.png" alt="alt text 1" width="850" />
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice12.png)
+</p>
+
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice8.png" alt="alt text 1" width="850" />
+
+</p>
+
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice9.png" alt="alt text 1" width="850" />
+
+</p>
+
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice12.png" alt="alt text 1" width="850" />
+
+</p>
 
 
+  <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in4.jpeg" alt="alt text" width="300" height="500">
+</p>
 
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in4.jpeg" alt="alt text" width="400" height="800">
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in5.jpeg" alt="alt text" width="400" height="800">
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in6.jpeg" alt="alt text" width="400" height="800">
-  
+  <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in5.jpeg" alt="alt text" width="300" height="500">
+</p>
+
+  <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in6.jpeg" alt="alt text" width="300" height="500">
+</p>
 
 
 ### Payment Management
@@ -163,18 +201,26 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - **Delete Account:**
   Delete your account if you no longer wish to use the app.
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice3.png)
+
+   <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice3.png" alt="alt text 1" width="850" />
+
+</p>
+
+  <p align="center">
+<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in13.jpeg" alt="alt text" width="300" height="500">
+</p>
 
 
- <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in3.jpeg" alt="alt text" width="400" height="800">
+   <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice4.png" alt="alt text 1" width="850" />
 
+</p>
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice4.png)
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice5.png" alt="alt text 1" width="850" />
 
-  ![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice5.png)
-
-
-
+</p>
 
 ### User Management
 
@@ -187,24 +233,13 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - **Delete User:**
   Remove user accounts that are no longer needed.
 
-![alt text](https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice11.png)
+
+ <p align="center">
+    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice11.png" alt="alt text 1" width="850" />
+
+</p>
 
 
-## Configuration
-
-- **Database Configuration:**
-  Modify the MongoDB URI in the `.env` file to connect to your database.
-
-- **Email Service:**
-  Configure the email service settings in the `.env` file for sending invoices and verification emails.
-
-
-
-## Contact
-
-If you have any questions or suggestions, feel free to contact me at vineetsingh5987@gmail.com.
-
-Thank you for using the Invoice Spot.
 
 
    
