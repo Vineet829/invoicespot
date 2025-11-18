@@ -1,13 +1,6 @@
 # Invoice Spot
 
-Welcome to Invoice Spot! This app helps you create, manage, and track invoices for your business. It offers an intuitive interface and a powerful backend to handle invoices effectively.
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Contact](#contact)
+Invoice Spot is an app for managing invoices, featuring client management, payment tracking, PDF generation, and email invoicing.
 
 ## Features
 
@@ -22,53 +15,6 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 - **Document Handling**: Generate, update, and delete invoices and related documents.
 - **PDF Generation**: Generate PDF versions of invoices for easy sharing and printing.
 - **Email Verification**: Ensure secure user registration with email verification and re-verification options.
-
-## Installation
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v14.x or later)
-- [npm](https://www.npmjs.com/) (v6.x or later)
-- [MongoDB](https://www.mongodb.com/) (v4.x or later)
-
-### Steps
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/invoicespot.git
-   cd invoicespot
-   ```
-
-2. **Install backend dependencies:**
-   ```bash
-   npm install
-   ```
-3. **Set up the environment variables:**
-   Create a .env file in the root directory and add the following:
-   PORT=3000
-   MONGODB_URI=
-   JWT_SECRET=your_jwt_secret
-   EMAIL_SERVICE=your_email_service
-   EMAIL_USER=your_email@example.com
-   EMAIL_PASS=your_email_password
-
-5. **Start the application:**
-   ```bash
-   npm start
-   The application will be running at http://localhost:3000.
-   ```
-
-6. **Install frontend dependencies:**
-   ```bash
-   npm install
-   ```
-
-7. **Start the application:**
-   ```bash
-   npm start
-   ```
-
-## Usage
 
 ### Authentication
 
@@ -235,6 +181,3 @@ Welcome to Invoice Spot! This app helps you create, manage, and track invoices f
 </p>
 
 
-
-
-   
