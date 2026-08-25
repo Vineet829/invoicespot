@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: invoicespot_postgres
+    environment:
+      POSTGRES_DB: invoicespot
+      POSTGRES_USER: invoicespot
+      POSTGRES_PASSWORD: invoicespot
+    ports:
+      - "5442:5432"
+    volumes:
+      - invoicespot_pg:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:v1.15
+    container_name: invoicespot_mailpit
+    ports:
+      - "1026:1025"
+      - "8026:8025"
+
+volumes:
+  invoicespot_pg:
