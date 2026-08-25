@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: invoice-spot
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5442}/${POSTGRES_DB:invoicespot}
+    username: ${POSTGRES_USER:invoicespot}
+    password: ${POSTGRES_PASSWORD:invoicespot}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+  mail:
+    host: ${EMAIL_HOST:localhost}
+    port: ${EMAIL_PORT:1026}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  jwt:
+    access-secret: ${JWT_ACCESS_SECRET_KEY:dev-access-secret-change-me-dev-access-secret-change-me}
+    refresh-secret: ${JWT_REFRESH_SECRET_KEY:dev-refresh-secret-change-me-dev-refresh-secret-change-me}
+    access-token-ttl: PT10M
+    refresh-token-ttl: P1D
+  cookie:
+    refresh-name: jwt
+    path: /
+    same-site: None
+    secure: ${COOKIE_SECURE:true}
+  site:
+    name: ${SITE_NAME:Invoice Spot}
+    client-url: ${CLIENT_URL:http://localhost:3000}
+    default-from-email: ${SENDER_EMAIL:support@invoicespot.local}
+
+logging:
+  level:
+    com.invoicespot: DEBUG
