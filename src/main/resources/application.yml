@@ -66,6 +66,8 @@ app:
     name: ${SITE_NAME:Invoice Spot}
     client-url: ${CLIENT_URL:http://localhost:3000}
     default-from-email: ${SENDER_EMAIL:support@invoicespot.local}
+  verification:
+    token-ttl: PT15M
 
 logging:
   level:

@@ -41,7 +41,12 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/new_access_token",
-                                "/api/v1/auth/logout")
+                                "/api/v1/auth/logout",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/verify/**",
+                                "/api/v1/auth/resend_email_token",
+                                "/api/v1/auth/reset_password_request",
+                                "/api/v1/auth/reset_password")
                         .permitAll()
                         .anyRequest()
                         .authenticated())
