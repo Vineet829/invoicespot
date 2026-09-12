@@ -3,6 +3,8 @@ package com.invoicespot.customer;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,8 +16,13 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     List<Customer> findByCreatedByPkidOrderByCreatedAtDesc(Long createdByPkid);
 
     @EntityGraph(attributePaths = {"createdBy"})
+    Page<Customer> findByCreatedByPkid(Long createdByPkid, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"createdBy"})
     @Query("select c from Customer c where c.id = :externalId")
     Optional<Customer> findByExternalId(@Param("externalId") UUID externalId);
 
     boolean existsByEmailIgnoreCase(String email);
+
+    boolean existsByCreatedByPkid(Long createdByPkid);
 }
