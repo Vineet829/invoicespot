@@ -68,6 +68,8 @@ app:
     default-from-email: ${SENDER_EMAIL:support@invoicespot.local}
   verification:
     token-ttl: PT15M
+  pdf:
+    storage-dir: ${PDF_STORAGE_DIR:docs}
 
 logging:
   level:

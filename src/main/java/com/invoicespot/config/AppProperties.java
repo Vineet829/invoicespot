@@ -4,7 +4,7 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Jwt jwt, Cookie cookie, Site site, Verification verification) {
+public record AppProperties(Jwt jwt, Cookie cookie, Site site, Verification verification, Pdf pdf) {
 
     public record Jwt(
             String accessSecret,
@@ -17,4 +17,6 @@ public record AppProperties(Jwt jwt, Cookie cookie, Site site, Verification veri
     public record Site(String name, String clientUrl, String defaultFromEmail) {}
 
     public record Verification(Duration tokenTtl) {}
+
+    public record Pdf(String storageDir) {}
 }
