@@ -70,6 +70,8 @@ app:
     token-ttl: PT15M
   pdf:
     storage-dir: ${PDF_STORAGE_DIR:docs}
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
 
 logging:
   level:

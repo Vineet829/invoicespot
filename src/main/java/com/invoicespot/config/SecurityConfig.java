@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
                                 "/actuator/health",
+                                "/uploads/**",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/new_access_token",
                                 "/api/v1/auth/logout",
