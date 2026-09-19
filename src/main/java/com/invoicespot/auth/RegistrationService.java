@@ -127,7 +127,7 @@ public class RegistrationService {
 
     private void sendVerification(User user) {
         String token = tokenService.issue(user);
-        String link = site.clientUrl() + "/verify-email/" + token + "/" + user.getId();
+        String link = site.serverUrl() + "/api/v1/auth/verify/" + token + "/" + user.getId();
         mailService.send(
                 user.getEmail(),
                 "Account Verification",
@@ -157,7 +157,7 @@ public class RegistrationService {
         return value == null || value.isBlank();
     }
 
-    private static boolean isStrongPassword(String password) {
+    static boolean isStrongPassword(String password) {
         if (password.length() < 8) {
             return false;
         }

@@ -1,11 +1,12 @@
 package com.invoicespot.customer.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.customer.Customer;
 import java.time.Instant;
 import java.util.UUID;
 
 public record CustomerResponse(
-        UUID id,
+        @JsonProperty("_id") UUID id,
         UUID createdBy,
         String name,
         String email,

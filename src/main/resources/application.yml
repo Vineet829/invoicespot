@@ -53,8 +53,8 @@ management:
 
 app:
   jwt:
-    access-secret: ${JWT_ACCESS_SECRET_KEY:dev-access-secret-change-me-dev-access-secret-change-me}
-    refresh-secret: ${JWT_REFRESH_SECRET_KEY:dev-refresh-secret-change-me-dev-refresh-secret-change-me}
+    access-secret: ${JWT_ACCESS_SECRET_KEY}
+    refresh-secret: ${JWT_REFRESH_SECRET_KEY}
     access-token-ttl: PT10M
     refresh-token-ttl: P1D
   cookie:
@@ -65,6 +65,7 @@ app:
   site:
     name: ${SITE_NAME:Invoice Spot}
     client-url: ${CLIENT_URL:http://localhost:3000}
+    server-url: ${SERVER_URL:http://localhost:8080}
     default-from-email: ${SENDER_EMAIL:support@invoicespot.local}
   verification:
     token-ttl: PT15M

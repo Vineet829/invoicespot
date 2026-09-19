@@ -28,6 +28,9 @@ public class UploadService {
         if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Only image files are allowed");
         }
+        if (contentType.toLowerCase(Locale.ROOT).contains("svg")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SVG files are not allowed");
+        }
 
         String fileName = UUID.randomUUID() + extension(contentType, file.getOriginalFilename());
         try {
@@ -49,7 +52,6 @@ public class UploadService {
             case "image/jpeg", "image/jpg" -> ".jpg";
             case "image/gif" -> ".gif";
             case "image/webp" -> ".webp";
-            case "image/svg+xml" -> ".svg";
             default -> "";
         };
     }

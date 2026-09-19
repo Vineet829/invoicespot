@@ -45,8 +45,8 @@ public class PasswordResetService {
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.BAD_REQUEST, "That email is not associated with any account"));
 
-        String token = tokenService.issue(user);
         if (user.isEmailVerified()) {
+            String token = tokenService.issue(user);
             String link = site.clientUrl()
                     + "/auth/reset_password?emailToken="
                     + token
@@ -78,9 +78,11 @@ public class PasswordResetService {
         if (!request.password().equals(request.passwordConfirm())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Passwords do not match");
         }
-        if (request.password().length() < 8) {
+        if (!RegistrationService.isStrongPassword(request.password())) {
             throw new ApiException(
-                    HttpStatus.BAD_REQUEST, "Passwords must be at least 8 characters long");
+                    HttpStatus.BAD_REQUEST,
+                    "Password must be at least 8 characters long, with at least 1 uppercase and"
+                            + " lowercase letters and at least 1 symbol");
         }
 
         VerifyResetToken token = tokenService

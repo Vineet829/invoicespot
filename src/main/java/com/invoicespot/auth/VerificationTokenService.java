@@ -25,7 +25,6 @@ public class VerificationTokenService {
 
     @Transactional
     public String issue(User user) {
-        tokenRepository.deleteByUserPkid(user.getPkid());
         byte[] material = new byte[32];
         random.nextBytes(material);
         String token = HexFormat.of().formatHex(material);

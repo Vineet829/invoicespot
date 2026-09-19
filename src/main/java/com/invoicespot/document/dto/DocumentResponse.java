@@ -1,5 +1,6 @@
 package com.invoicespot.document.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.document.CustomerSnapshot;
 import com.invoicespot.document.Document;
 import com.invoicespot.document.DocumentStatus;
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record DocumentResponse(
-        UUID id,
+        @JsonProperty("_id") UUID id,
         UUID createdBy,
         DocumentCustomerDto customer,
         DocumentType documentType,

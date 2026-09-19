@@ -15,7 +15,7 @@ public record AppProperties(
 
     public record Cookie(String refreshName, String path, String sameSite, boolean secure) {}
 
-    public record Site(String name, String clientUrl, String defaultFromEmail) {}
+    public record Site(String name, String clientUrl, String serverUrl, String defaultFromEmail) {}
 
     public record Verification(Duration tokenTtl) {}
 

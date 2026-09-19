@@ -1,12 +1,13 @@
 package com.invoicespot.user.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.user.User;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
 public record UserSummaryResponse(
-        UUID id,
+        @JsonProperty("_id") UUID id,
         String email,
         String username,
         String firstName,

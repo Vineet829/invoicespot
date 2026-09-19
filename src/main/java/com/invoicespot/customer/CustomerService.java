@@ -89,12 +89,21 @@ public class CustomerService {
                 "You are not authorized to update this customer's information. He/She is not your"
                         + " customer");
         if (request.name() != null) {
+            if (request.name().isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Customer name cannot be blank");
+            }
             customer.setName(request.name());
         }
         if (request.email() != null) {
+            if (request.email().isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Customer email cannot be blank");
+            }
             customer.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
         }
         if (request.phoneNumber() != null) {
+            if (request.phoneNumber().isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Customer phone number cannot be blank");
+            }
             customer.setPhoneNumber(request.phoneNumber());
         }
         if (request.vatTinNo() != null) {
