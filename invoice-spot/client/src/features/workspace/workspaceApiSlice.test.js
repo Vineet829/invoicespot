@@ -1,6 +1,7 @@
+import { expect, it, vi } from "vitest";
 import { fetchWorkspaceRows } from "./workspaceApiSlice";
 
-jest.mock("../api/baseApiSlice", () => ({
+vi.mock("../api/baseApiSlice", () => ({
   baseApiSlice: { injectEndpoints: () => ({}) },
 }));
 
@@ -10,7 +11,7 @@ it.each([
 ])(
   "loads every page using the existing %s query parameter",
   async (path, key, pageKey) => {
-    const request = jest.fn(async (url) => {
+    const request = vi.fn(async (url) => {
       const page = Number(url.split("=")[1]);
       return {
         data: { numberOfPages: 7, count: 7, [key]: [{ _id: `row-${page}` }] },
@@ -27,7 +28,7 @@ it.each([
 
 it("does not show a partial customer list when a later page fails", async () => {
   const error = { status: 503, data: { message: "Unavailable" } };
-  const request = jest
+  const request = vi
     .fn()
     .mockResolvedValueOnce({
       data: { numberOfPages: 2, myCustomers: [{ _id: "one" }] },
@@ -39,7 +40,7 @@ it("does not show a partial customer list when a later page fails", async () => 
 });
 
 it("removes duplicates when server pages overlap and handles an empty account", async () => {
-  const request = jest
+  const request = vi
     .fn()
     .mockResolvedValueOnce({
       data: { numberOfPages: 2, users: [{ _id: "one" }] },

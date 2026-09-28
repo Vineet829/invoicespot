@@ -1,9 +1,10 @@
+import { beforeEach, expect, it, vi } from "vitest";
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { baseApiSlice } from "./baseApiSlice";
 import { logIn, logOut } from "../auth/authSlice";
 
-jest.mock("@reduxjs/toolkit/query/react", () => ({
-  fetchBaseQuery: jest.fn(() => jest.fn()),
+vi.mock("@reduxjs/toolkit/query/react", () => ({
+  fetchBaseQuery: vi.fn(() => vi.fn()),
   createApi: (options) => options,
 }));
 
@@ -15,7 +16,7 @@ beforeEach(() => {
   let user = { accessToken: "expired" };
   api = {
     getState: () => ({ auth: { user } }),
-    dispatch: jest.fn((action) => {
+    dispatch: vi.fn((action) => {
       if (action.type === logIn.type) user = action.payload;
       if (action.type === logOut.type) user = null;
     }),

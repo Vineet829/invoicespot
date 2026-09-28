@@ -1,13 +1,14 @@
+import { expect, it, vi } from "vitest";
 import { fetchDashboardDocuments } from "./dashboardApiSlice";
 
-jest.mock("../api/baseApiSlice", () => ({
+vi.mock("../api/baseApiSlice", () => ({
   baseApiSlice: {
-    injectEndpoints: () => ({ useGetDashboardDocumentsQuery: jest.fn() }),
+    injectEndpoints: () => ({ useGetDashboardDocumentsQuery: vi.fn() }),
   },
 }));
 
 it("loads every document page before returning overview data", async () => {
-  const request = jest.fn(async (url) => {
+  const request = vi.fn(async (url) => {
     const page = Number(url.split("=")[1]);
     return {
       data: {
@@ -28,7 +29,7 @@ it("loads every document page before returning overview data", async () => {
 
 it("returns a later page error instead of misleading partial totals", async () => {
   const error = { status: 503, data: { message: "Unavailable" } };
-  const request = jest
+  const request = vi
     .fn()
     .mockResolvedValueOnce({
       data: { numberOfPages: 2, myDocuments: [{ _id: "one" }] },
@@ -38,7 +39,7 @@ it("returns a later page error instead of misleading partial totals", async () =
 });
 
 it("does not double-count documents repeated across pages", async () => {
-  const request = jest
+  const request = vi
     .fn()
     .mockResolvedValueOnce({
       data: { numberOfPages: 2, myDocuments: [{ _id: "one" }] },
