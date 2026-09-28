@@ -37,25 +37,30 @@ const SingleCustomerPage = () => {
       ) : (
         customer && (
           <Panel>
-            <div className="workspace-identity">
-              <span aria-hidden="true">
+            <div className="mb-6 flex items-center gap-5 border-b border-[#23273512] pb-6 max-[700px]:gap-4">
+              <span
+                className="grid size-16 shrink-0 place-items-center rounded-[20px] bg-avatar-lilac font-display text-[22px] font-light text-avatar-lilac-ink max-[700px]:size-14 max-[700px]:rounded-[18px] max-[700px]:text-[19px]"
+                aria-hidden="true"
+              >
                 {customer.name
                   ?.split(/\s+/)
                   .slice(0, 2)
                   .map((part) => part[0])
                   .join("")}
               </span>
-              <div>
-                <h2>{customer.name}</h2>
-                <p>{customer.accountNo}</p>
+              <div className="min-w-0">
+                <h2 className="font-display text-[28px] font-light leading-[1.15] tracking-[-0.04em] text-spot-ink [overflow-wrap:anywhere] max-[700px]:text-[23px]">
+                  {customer.name}
+                </h2>
+                <p className="mt-1 text-[13.5px] text-spot-muted [overflow-wrap:anywhere]">
+                  {customer.accountNo}
+                </p>
               </div>
             </div>
             <InfoGrid
               items={[
-                ["Name", customer.name],
                 ["Email address", customer.email],
                 ["Phone number", customer.phoneNumber],
-                ["Account number", customer.accountNo],
                 ["VAT / TIN number", customer.vatTinNo],
                 ["Address", customer.address],
                 ["City", customer.city],

@@ -17,6 +17,10 @@ import {
   ErrorState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import {
+  primaryButton,
+  sectionTitle,
+} from "../../../components/workspace/pastel";
 
 const fields = [
   {
@@ -54,7 +58,7 @@ const fields = [
     key: "address",
     label: "Address",
     autoComplete: "street-address",
-    className: "workspace-span-full",
+    className: "col-span-full",
   },
   { key: "city", label: "City", autoComplete: "address-level2" },
   { key: "country", label: "Country", autoComplete: "country-name" },
@@ -70,13 +74,13 @@ const CustomerFields = ({ customer, onSubmit, busy }) => {
         onSubmit({ ...values, vatTinNo: Number(values.vatTinNo) || 0 });
       }}
     >
-      <div className="workspace-form-layout">
-        <div className="workspace-form-main">
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6 compact:gap-5 max-[1359px]:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
           <Panel
             title="Client details"
             description="Contact and billing information"
           >
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               {fields.map(({ key, ...props }) => (
                 <Field
                   key={key}
@@ -94,17 +98,17 @@ const CustomerFields = ({ customer, onSubmit, busy }) => {
               ))}
             </div>
           </Panel>
-          <div className="workspace-form-actions">
-            <button type="submit" className="workspace-button" disabled={busy}>
+          <div className="flex justify-end max-[700px]:[&>*]:flex-1">
+            <button type="submit" className={primaryButton} disabled={busy}>
               <FiCheck aria-hidden="true" />
               {busy ? "Saving…" : customer ? "Save changes" : "Create client"}
             </button>
           </div>
         </div>
-        <aside className="workspace-form-aside">
-          <div className="workspace-panel-body">
+        <aside className="min-w-0 max-[1359px]:hidden min-[1360px]:sticky min-[1360px]:top-[30px]">
+          <div className="rounded-[30px] border border-white/85 bg-white/50 p-6 shadow-panel-soft backdrop-blur-[16px] compact:p-[18px] [&>p]:mt-3 [&>p]:text-[13.5px] [&>p]:leading-[1.7] [&>p]:text-spot-body [&>svg]:mb-4 [&>svg]:size-7 [&>svg]:stroke-[1.4] [&>svg]:text-spot-violet">
             <FiUsers aria-hidden="true" />
-            <h2>Details that stay with you.</h2>
+            <h2 className={sectionTitle}>Details that stay with you.</h2>
             <p>
               These details are used when you select this client for an invoice,
               quotation, or receipt.

@@ -17,6 +17,10 @@ import {
   ErrorState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import {
+  primaryButton,
+  sectionTitle,
+} from "../../../components/workspace/pastel";
 const keys = [
   "firstName",
   "lastName",
@@ -64,13 +68,13 @@ const ProfileFields = ({ profile }) => {
   };
   return (
     <form onSubmit={submit}>
-      <div className="workspace-form-layout">
-        <div className="workspace-form-main">
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6 compact:gap-5 max-[1359px]:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
           <Panel
             title="Personal details"
             description="The details associated with your account."
           >
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="First name"
                 name="firstName"
@@ -115,7 +119,7 @@ const ProfileFields = ({ profile }) => {
             title="Business details"
             description="Your business information appears on your documents."
           >
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="Business name"
                 name="businessName"
@@ -124,7 +128,7 @@ const ProfileFields = ({ profile }) => {
                 value={values.businessName}
                 onChange={change("businessName")}
                 disabled={busy}
-                className="workspace-span-full"
+                className="col-span-full"
               />
               <Field
                 label="Address"
@@ -134,7 +138,7 @@ const ProfileFields = ({ profile }) => {
                 value={values.address}
                 onChange={change("address")}
                 disabled={busy}
-                className="workspace-span-full"
+                className="col-span-full"
               />
               <Field
                 label="City"
@@ -155,14 +159,14 @@ const ProfileFields = ({ profile }) => {
             </div>
           </Panel>
           <Panel title="Business logo">
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="Logo URL"
                 name="avatar"
                 value={values.avatar}
                 onChange={change("avatar")}
                 disabled={busy}
-                className="workspace-span-full"
+                className="col-span-full"
               />
               <Field
                 label="Choose your logo"
@@ -170,26 +174,29 @@ const ProfileFields = ({ profile }) => {
                 accept="image/*"
                 onChange={uploadLogo}
                 disabled={busy}
-                className="workspace-span-full"
+                className="col-span-full"
               />
               {uploading && (
-                <p role="status" className="workspace-loading-label">
+                <p
+                  role="status"
+                  className="col-span-full text-[13px] text-spot-violet"
+                >
                   Uploading your logo…
                 </p>
               )}
             </div>
           </Panel>
-          <div className="workspace-form-actions">
-            <button type="submit" className="workspace-button" disabled={busy}>
+          <div className="flex justify-end max-[700px]:[&>*]:flex-1">
+            <button type="submit" className={primaryButton} disabled={busy}>
               <FiCheck aria-hidden="true" />
               {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </div>
-        <aside className="workspace-form-aside">
-          <div className="workspace-panel-body">
+        <aside className="min-w-0 max-[1359px]:hidden min-[1360px]:sticky min-[1360px]:top-[30px]">
+          <div className="rounded-[30px] border border-white/85 bg-white/50 p-6 shadow-panel-soft backdrop-blur-[16px] compact:p-[18px] [&>p]:mt-3 [&>p]:text-[13.5px] [&>p]:leading-[1.7] [&>p]:text-spot-body [&>svg]:mb-4 [&>svg]:size-7 [&>svg]:stroke-[1.4] [&>svg]:text-spot-violet">
             <FiUser aria-hidden="true" />
-            <h2>A familiar face for your business.</h2>
+            <h2 className={sectionTitle}>A familiar face for your business.</h2>
             <p>
               Keep your contact details and business logo current so your
               documents are ready to send.

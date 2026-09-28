@@ -17,19 +17,29 @@ import {
   Field,
   LoadingState,
   ErrorState,
-  Badge,
-  statusTone,
+  StatusBadge,
+  Amount,
   dateInput,
   dateInstant,
   dateLabel,
-  money,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import {
+  fieldLabel,
+  panelNote,
+  primaryButton,
+  rowAction,
+} from "../../../components/workspace/pastel";
 import {
   documentPayload,
   documentTotals,
   lineAmount,
 } from "./documentEditorModel";
+
+const detailLine =
+  "text-[13.5px] leading-[1.7] text-spot-body [overflow-wrap:anywhere]";
+const removeItemButton =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-overdue/70 text-overdue-strong transition-colors hover:enabled:bg-overdue disabled:cursor-default disabled:text-overdue-muted disabled:opacity-100 [&>svg]:size-[17px] [&>svg]:stroke-[1.7]";
 
 const blankItem = () => ({
   itemName: "",
@@ -89,14 +99,14 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
         );
       }}
     >
-      <div className="workspace-form-layout">
-        <div className="workspace-form-main">
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6 compact:gap-5 max-[1359px]:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
           <Panel
             title="Document details"
             description="Choose the document and who it’s for."
           >
-            <div className="workspace-doc-form-top">
-              <div>
+            <div className="grid grid-cols-2 gap-8 max-[700px]:grid-cols-1 max-[700px]:gap-6">
+              <div className="flex min-w-0 flex-col gap-5">
                 <Field
                   label="Document type"
                   as="select"
@@ -108,26 +118,32 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                     <option key={type}>{type}</option>
                   ))}
                 </Field>
-                <div className="workspace-customer-snapshot">
+                <div className="min-w-0">
                   {customer ? (
-                    <>
-                      <strong>{customer.name}</strong>
-                      <p>{customer.email}</p>
-                      <p>Account no. {customer.accountNo || "—"}</p>
-                      <p>VAT / TIN: {customer.vatTinNo || "—"}</p>
-                      <p>{customer.phoneNumber}</p>
-                      <p>{customer.address}</p>
+                    <div className="rounded-2xl border border-white/90 bg-white/60 p-4">
+                      <strong className="mb-1.5 block text-[15px] font-medium text-spot-ink [overflow-wrap:anywhere]">
+                        {customer.name}
+                      </strong>
+                      <p className={detailLine}>{customer.email}</p>
+                      <p className={detailLine}>
+                        Account no. {customer.accountNo || "—"}
+                      </p>
+                      <p className={detailLine}>
+                        VAT / TIN: {customer.vatTinNo || "—"}
+                      </p>
+                      <p className={detailLine}>{customer.phoneNumber}</p>
+                      <p className={detailLine}>{customer.address}</p>
                       <button
                         type="button"
-                        className="workspace-row-action"
+                        className={`${rowAction} mt-3`}
                         onClick={() => setCustomer(null)}
                         disabled={busy}
                       >
                         <FiRepeat aria-hidden="true" /> Choose another customer
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div className="flex flex-col items-start gap-3">
                       <Field
                         label="Select a customer"
                         as="select"
@@ -141,6 +157,7 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                           )
                         }
                         disabled={busy}
+                        className="w-full"
                       >
                         <option value="">Choose a customer</option>
                         {customers.map((client) => (
@@ -151,16 +168,16 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                       </Field>
                       <button
                         type="button"
-                        className="workspace-row-action"
+                        className={rowAction}
                         onClick={() => navigate("/create-customer")}
                       >
                         <FiPlus aria-hidden="true" /> Add new customer
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
-              <div>
+              <div className="flex min-w-0 flex-col gap-5">
                 <Field
                   label="Due date"
                   type="date"
@@ -169,17 +186,20 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                   onChange={(event) => setDueDate(event.target.value)}
                   disabled={busy}
                 />
-                <div className="workspace-customer-snapshot">
-                  <p>Payment status</p>
-                  <Badge tone={statusTone(status)}>{status}</Badge>
-                  <p>
-                    Date of issue: {dateLabel(doc?.createdAt || new Date())}
-                  </p>
-                  <p>
-                    Total amount:{" "}
-                    <strong>{money(totals.total, currency)}</strong>
-                  </p>
-                </div>
+                <dl className="grid gap-4">
+                  <div>
+                    <dt className={panelNote}>Payment status</dt>
+                    <dd className="mt-1.5">
+                      <StatusBadge status={status} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={panelNote}>Date of issue</dt>
+                    <dd className="mt-1 text-[15px] text-spot-ink">
+                      {dateLabel(doc?.createdAt || new Date())}
+                    </dd>
+                  </div>
+                </dl>
               </div>
             </div>
           </Panel>
@@ -187,9 +207,12 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
             title="Products & services"
             description="The details behind the total."
           >
-            <div className="workspace-line-items">
+            <div className="[container-name:items] [container-type:inline-size]">
               {items.map((item, index) => (
-                <div className="workspace-line-item" key={index}>
+                <div
+                  className="grid grid-cols-[minmax(160px,2.4fr)_repeat(3,minmax(72px,1fr))_minmax(110px,1.1fr)_auto] items-end gap-3 border-t border-[#23273512] py-4 first:border-t-0 first:pt-0 items-md:grid-cols-3 items-sm:grid-cols-2"
+                  key={index}
+                >
                   <Field
                     label={`Product / service ${index + 1}`}
                     value={item.itemName || ""}
@@ -197,6 +220,7 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                       changeItem(index, "itemName", event.target.value)
                     }
                     disabled={busy}
+                    className="items-md:col-span-full"
                   />
                   <Field
                     label={`Quantity ${index + 1}`}
@@ -232,13 +256,18 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                     }
                     disabled={busy}
                   />
-                  <div className="workspace-line-total">
-                    <span>Line total</span>
-                    <strong>{money(lineAmount(item))}</strong>
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <span className={fieldLabel}>Line total</span>
+                    <strong className="flex h-11 items-center justify-end font-normal text-spot-ink items-md:justify-start">
+                      <Amount
+                        value={lineAmount(item)}
+                        className="text-[17px] font-light tracking-[-0.03em]"
+                      />
+                    </strong>
                   </div>
                   <button
                     type="button"
-                    className="workspace-row-action is-danger"
+                    className={`${removeItemButton} items-md:col-start-3 items-md:justify-self-end items-sm:col-start-2`}
                     aria-label={`Remove item ${index + 1}`}
                     onClick={() =>
                       setItems((current) =>
@@ -252,10 +281,10 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
                 </div>
               ))}
             </div>
-            <div className="workspace-add-item">
+            <div className="mt-2 border-t border-[#23273512] pt-4">
               <button
                 type="button"
-                className="workspace-row-action"
+                className={rowAction}
                 onClick={() => setItems((current) => [blankItem(), ...current])}
                 disabled={busy}
               >
@@ -264,7 +293,7 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
             </div>
           </Panel>
           <Panel title="Tax & currency">
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="VAT / sales tax (%)"
                 type="number"
@@ -290,7 +319,7 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
             </div>
           </Panel>
           <Panel title="Notes & terms">
-            <div className="workspace-form-grid">
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="Additional info"
                 as="textarea"
@@ -312,25 +341,43 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
             </div>
           </Panel>
         </div>
-        <aside className="workspace-form-aside">
+        <aside className="flex min-w-0 flex-col gap-6 compact:gap-5 min-[1360px]:sticky min-[1360px]:top-[30px]">
           <Panel title="Cost summary">
-            <dl className="workspace-summary-list">
-              <div>
-                <dt>Subtotal</dt>
-                <dd>{money(totals.subTotal, currency)}</dd>
-              </div>
-              <div>
-                <dt>VAT / sales tax</dt>
-                <dd>{money(totals.salesTax, currency)}</dd>
-              </div>
-              <div>
-                <dt>Total</dt>
-                <dd>{money(totals.total, currency)}</dd>
-              </div>
+            <dl className="m-0">
+              {[
+                ["Subtotal", totals.subTotal],
+                ["VAT / sales tax", totals.salesTax],
+                ["Total", totals.total],
+              ].map(([label, value], index, rows) => {
+                const total = index === rows.length - 1;
+                return (
+                  <div
+                    key={label}
+                    className={`flex items-baseline justify-between gap-5 ${total ? "mt-2 border-t border-[#23273514] pt-5" : "py-2.5"}`}
+                  >
+                    <dt className="text-[13.5px] text-spot-body">{label}</dt>
+                    <dd className="text-right text-spot-ink [overflow-wrap:anywhere]">
+                      <Amount
+                        value={value}
+                        currency={currency}
+                        className={
+                          total
+                            ? "text-[34px] font-extralight tracking-[-0.05em]"
+                            : "text-[17px] font-light tracking-[-0.03em]"
+                        }
+                      />
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
           </Panel>
-          <div className="workspace-form-actions">
-            <button type="submit" className="workspace-button" disabled={busy}>
+          <div className="flex">
+            <button
+              type="submit"
+              className={`${primaryButton} flex-1`}
+              disabled={busy}
+            >
               <FiCheck aria-hidden="true" />
               {busy ? "Saving…" : doc ? "Save document" : "Create document"}
             </button>

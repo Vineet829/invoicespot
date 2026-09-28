@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { isExpired } from "react-jwt";
 import {
   FiArrowUpRight,
-  FiCalendar,
   FiChevronRight,
   FiFileText,
   FiGrid,
@@ -19,55 +18,26 @@ import { toast } from "react-toastify";
 import { logOut } from "../../auth/authSlice";
 import { useLogoutUserMutation } from "../../auth/authApiSlice";
 import useAuthUser from "../../../hooks/useAuthUser";
+import { iconButton } from "../../../components/workspace/pastel";
 
-// The other workspace tabs still use the dark theme in dashboard.css; the
-// overview uses the pastel theme, styled with Tailwind. Both themes share this
-// markup, so each part of the shell names its classes for either theme.
-const DARK = {
-  app: "dashboard-app",
-  skipLink: "dashboard-skip-link",
-  sidebar: "dashboard-sidebar",
-  brandRow: "dashboard-sidebar-brand",
-  brand: "dashboard-brand",
-  navigation: "dashboard-navigation",
-  navLink: "dashboard-nav-link",
-  navLinkActive: "dashboard-nav-link is-active",
-  sidebarBottom: "dashboard-sidebar-bottom",
-  homeLink: "dashboard-home-link",
-  account: "dashboard-account",
-  accountLink: "dashboard-account-link",
-  avatar: "dashboard-avatar",
-  iconButton: "dashboard-icon-button",
-  dialog: "dashboard-sidebar-dialog",
-  mobileSidebar: "dashboard-mobile-sidebar",
-  workspace: "dashboard-workspace",
-  topbar: "dashboard-topbar",
-  topbarStart: "dashboard-topbar-start",
-  menuButton: "dashboard-icon-button dashboard-menu-button",
-  breadcrumb: "dashboard-breadcrumb",
-  mobileBrand: "dashboard-mobile-brand",
-  content: "dashboard-content",
-};
-
-const pastelIconButton =
-  "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-transparent p-0 text-spot-nav transition-colors hover:enabled:border-spot-violet/15 hover:enabled:bg-white/70 hover:enabled:text-spot-night coarse:min-h-11 coarse:min-w-11 [&>svg]:size-[17px]";
-const pastelNavLink =
+const navLink =
   "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
 
-const PASTEL = {
-  // Keeps dashboard-app for the shared resets (box sizing, margins, focus
-  // and reduced motion) and dashboard-pastel for the scoped Tailwind base.
-  app: "dashboard-app dashboard-pastel grid min-h-dvh grid-cols-[260px_minmax(0,1fr)] bg-spot-canvas bg-canvas p-0 font-ui font-normal leading-[normal] tracking-normal text-spot-ink [color-scheme:light] max-[960px]:grid-cols-[minmax(0,1fr)]",
+// The signed-in shell: sidebar navigation, the drawer below 961px, and the
+// top bar that opens it.
+const ui = {
+  // dashboard-app scopes the workspace's reset in src/index.css.
+  app: "dashboard-app grid min-h-dvh grid-cols-[260px_minmax(0,1fr)] bg-spot-canvas bg-canvas p-0 font-ui font-normal leading-[normal] tracking-normal text-spot-ink [color-scheme:light] max-[960px]:grid-cols-[minmax(0,1fr)]",
   skipLink:
-    "dashboard-skip-link left-[276px] bg-white !text-spot-night max-[960px]:left-6 coarse:inline-flex coarse:min-h-11 coarse:items-center",
+    "dashboard-skip-link left-[276px] bg-white text-spot-night max-[960px]:left-6 coarse:inline-flex coarse:min-h-11 coarse:items-center",
   sidebar:
     "sticky top-0 flex h-dvh min-h-[540px] flex-col border-r border-white/70 bg-white/[.34] px-4 pb-[18px] pt-[30px] backdrop-blur-[18px] max-[960px]:hidden",
   brandRow: "flex items-center justify-between px-3",
   brand:
     "whitespace-nowrap font-display text-[24px] font-normal leading-[normal] tracking-[-0.045em] text-spot-ink coarse:inline-flex coarse:min-h-11 coarse:items-center [&>span]:text-spot-brand",
   navigation: "mt-10 flex flex-col gap-1.5",
-  navLink: `${pastelNavLink} text-spot-nav`,
-  navLinkActive: `${pastelNavLink} bg-white font-medium text-spot-ink shadow-nav [&>svg]:text-spot-violet`,
+  navLink: `${navLink} text-spot-nav`,
+  navLinkActive: `${navLink} bg-white font-medium text-spot-ink shadow-nav [&>svg]:text-spot-violet`,
   sidebarBottom: "mt-auto flex flex-col gap-2 pt-6",
   homeLink:
     "flex min-h-11 items-center justify-between gap-3 rounded-[14px] px-3.5 text-[14.5px] text-spot-nav hover:bg-white/[.34] hover:text-spot-night [&>svg]:size-[17px]",
@@ -80,8 +50,8 @@ const PASTEL = {
   accountRole: "block truncate text-[12.5px] text-spot-muted",
   avatar:
     "grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac font-ui text-[12.5px] font-normal leading-none text-[#3f2f6e]",
-  iconButton: `${pastelIconButton} size-9`,
-  signOutButton: `${pastelIconButton} h-10 w-9`,
+  iconButton: `${iconButton} size-9`,
+  signOutButton: `${iconButton} h-10 w-9`,
   dialog:
     "m-0 h-dvh max-h-dvh w-[min(296px,calc(100vw_-_32px))] max-w-none border-r border-white bg-spot-drawer p-0 text-spot-ink backdrop:bg-[#23273566] backdrop:backdrop-blur-[5px]",
   mobileSidebar: "flex min-h-full flex-col px-4 pb-[18px] pt-6",
@@ -89,24 +59,21 @@ const PASTEL = {
   topbar:
     "hidden min-h-[68px] items-center justify-between gap-4 border-b border-white/70 bg-white/[.34] px-6 py-3 max-[960px]:flex",
   topbarStart: "flex min-w-0 items-center gap-3 max-[600px]:gap-[7px]",
-  menuButton: `${pastelIconButton} size-10`,
+  menuButton: `${iconButton} size-10`,
   breadcrumb:
     "flex items-center gap-3.5 text-[13px] text-spot-muted max-[760px]:hidden [&>strong]:font-medium [&>strong]:text-spot-ink [&>svg]:size-3 [&>svg]:text-spot-faint",
   mobileBrand:
     "hidden font-display text-[16px] font-normal leading-[1.2] tracking-[-0.025em] max-[760px]:block coarse:min-h-11",
+  // Pages scroll normally, with the overview's spacing around them.
+  content:
+    "block min-h-dvh w-full px-8 pb-12 pt-[30px] outline-none compact:px-6 compact:pt-5 max-[1359px]:px-7 max-[1359px]:pt-7 max-[960px]:min-h-[calc(100dvh_-_68px)] max-[960px]:px-6 max-[960px]:pt-6 max-[700px]:px-4 max-[700px]:pb-10 max-[700px]:pt-5",
   // The overview fills one desktop screen; the minimum heights add up the
   // smallest panel sizes in the default and compact layouts.
-  content:
+  contentFit:
     "flex h-dvh min-h-[888px] w-full px-8 pb-7 pt-[30px] outline-none has-[.has-error]:h-auto compact:min-h-[763px] compact:px-6 compact:py-5 max-[1359px]:h-auto max-[1359px]:min-h-dvh max-[1359px]:p-7 max-[960px]:min-h-[calc(100dvh_-_68px)] max-[960px]:p-6 max-[700px]:px-4 max-[700px]:pb-6 max-[700px]:pt-5",
 };
 
-const DashboardShell = ({
-  children,
-  documentCount,
-  customerCount,
-  section = "Overview",
-  appearance,
-}) => {
+const DashboardShell = ({ children, section = "Overview", fit = false }) => {
   const { user, googleToken } = useSelector((state) => state.auth);
   const { isAdmin } = useAuthUser();
   const dispatch = useDispatch();
@@ -116,9 +83,6 @@ const DashboardShell = ({
   const dialogRef = useRef(null);
   const menuButtonRef = useRef(null);
   const desktopWidth = 961;
-  const isPastel = appearance === "pastel";
-  const ui = isPastel ? PASTEL : DARK;
-  const Content = isPastel ? "main" : "div";
   const name =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.username ||
@@ -164,13 +128,8 @@ const DashboardShell = ({
 
   const navigation = [
     { to: "/dashboard", label: "Overview", icon: FiGrid },
-    {
-      to: "/documents",
-      label: "Documents",
-      icon: FiFileText,
-      count: documentCount,
-    },
-    { to: "/customers", label: "Clients", icon: FiUsers, count: customerCount },
+    { to: "/documents", label: "Documents", icon: FiFileText },
+    { to: "/customers", label: "Clients", icon: FiUsers },
     { to: "/profile", label: "Profile", icon: FiUser },
     ...(isAdmin
       ? [{ to: "/users", label: "Administration", icon: FiShield }]
@@ -193,14 +152,13 @@ const DashboardShell = ({
           </button>
         )}
       </div>
-      {!isPastel && <div className="dashboard-sidebar-label">WORKSPACE</div>}
       <nav
         className={ui.navigation}
         aria-label={
           mobile ? "Mobile workspace navigation" : "Workspace navigation"
         }
       >
-        {navigation.map(({ to, label, icon: Icon, count }) => (
+        {navigation.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
             to={to}
@@ -210,9 +168,6 @@ const DashboardShell = ({
           >
             <Icon aria-hidden="true" />
             <span>{label}</span>
-            {!isPastel && count != null && (
-              <span className="dashboard-nav-count">{count}</span>
-            )}
           </Link>
         ))}
       </nav>
@@ -238,7 +193,7 @@ const DashboardShell = ({
             </span>
           </Link>
           <button
-            className={ui.signOutButton || ui.iconButton}
+            className={ui.signOutButton}
             onClick={signOut}
             disabled={signingOut}
             aria-label="Sign out"
@@ -295,26 +250,14 @@ const DashboardShell = ({
               Invoice Spot
             </Link>
           </div>
-          {!isPastel && (
-            <span className="dashboard-today">
-              <FiCalendar aria-hidden="true" />
-              {new Date().toLocaleDateString("en", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
-          )}
         </header>
-        <Content className={ui.content} id="dashboard-content" tabIndex={-1}>
+        <main
+          className={fit ? ui.contentFit : ui.content}
+          id="dashboard-content"
+          tabIndex={-1}
+        >
           {children}
-        </Content>
-        {!isPastel && (
-          <footer className="dashboard-footer">
-            <span>© {new Date().getFullYear()} Invoice Spot</span>
-            <span>Made for independent business.</span>
-          </footer>
-        )}
+        </main>
       </div>
     </div>
   );

@@ -21,6 +21,10 @@ import {
   ErrorState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import { buttonBase, sectionTitle } from "../../../components/workspace/pastel";
+
+// The danger zone is already peach, so its button is white.
+const deleteAccountButton = `${buttonBase} border border-overdue-icon/25 bg-white/80 text-overdue-strong hover:bg-white`;
 const ProfilePage = () => {
   useTitle("Profile — Invoice Spot");
   const query = useGetUserProfileQuery();
@@ -62,31 +66,37 @@ const ProfilePage = () => {
         profile && (
           <>
             <Panel>
-              <div className="workspace-identity">
+              <div className="mb-6 flex items-center gap-5 border-b border-[#23273512] pb-6 max-[700px]:gap-4">
                 {profile.avatar ? (
-                  <img src={profile.avatar} alt="Your business logo" />
+                  <img
+                    className="size-16 shrink-0 rounded-[20px] bg-white object-contain max-[700px]:size-14 max-[700px]:rounded-[18px]"
+                    src={profile.avatar}
+                    alt="Your business logo"
+                  />
                 ) : (
-                  <span aria-hidden="true">
+                  <span
+                    className="grid size-16 shrink-0 place-items-center rounded-[20px] bg-avatar-lilac font-display text-[22px] font-light text-avatar-lilac-ink max-[700px]:size-14 max-[700px]:rounded-[18px] max-[700px]:text-[19px]"
+                    aria-hidden="true"
+                  >
                     {[profile.firstName?.[0], profile.lastName?.[0]]
                       .filter(Boolean)
                       .join("") || "IS"}
                   </span>
                 )}
-                <div>
-                  <h2>
+                <div className="min-w-0">
+                  <h2 className="font-display text-[28px] font-light leading-[1.15] tracking-[-0.04em] text-spot-ink [overflow-wrap:anywhere] max-[700px]:text-[23px]">
                     {[profile.firstName, profile.lastName]
                       .filter(Boolean)
-                      .join(" ")}
+                      .join(" ") || profile.username}
                   </h2>
-                  <p>{profile.email}</p>
+                  <p className="mt-1 text-[13.5px] text-spot-muted [overflow-wrap:anywhere]">
+                    {profile.email}
+                  </p>
                 </div>
               </div>
               <InfoGrid
                 items={[
-                  ["First name", profile.firstName],
-                  ["Last name", profile.lastName],
                   ["Username", profile.username],
-                  ["Email address", profile.email],
                   ["Logged in with", profile.provider],
                 ]}
               />
@@ -102,13 +112,18 @@ const ProfilePage = () => {
                 ]}
               />
             </Panel>
-            <section className="workspace-danger-zone">
-              <div>
-                <h2>Delete account</h2>
-                <p>Permanently delete your Invoice Spot account.</p>
+            <section className="flex items-center justify-between gap-6 rounded-[30px] border border-white/90 bg-overdue/60 p-6 compact:p-[18px] max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:rounded-3xl max-[700px]:p-[18px]">
+              <div className="min-w-0">
+                <h2 className={`${sectionTitle} text-overdue-ink`}>
+                  Delete account
+                </h2>
+                <p className="mt-1.5 text-[13.5px] text-overdue-muted">
+                  Permanently delete your Invoice Spot account.
+                </p>
               </div>
               <button
-                className="workspace-button is-danger"
+                type="button"
+                className={deleteAccountButton}
                 onClick={() => setOpen(true)}
               >
                 <FiTrash2 aria-hidden="true" /> Delete account

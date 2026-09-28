@@ -11,6 +11,7 @@ import {
   dateInstant,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import { primaryButton } from "../../../components/workspace/pastel";
 
 const PaymentForm = ({ document }) => {
   const [datePaid, setDatePaid] = useState(dateInput());
@@ -60,7 +61,7 @@ const PaymentForm = ({ document }) => {
   };
   return (
     <form onSubmit={submit}>
-      <div className="workspace-form-grid">
+      <div className="grid grid-cols-4 gap-5 max-[1359px]:grid-cols-2 max-[700px]:grid-cols-1">
         <Field
           label="Date paid"
           type="date"
@@ -106,10 +107,10 @@ const PaymentForm = ({ document }) => {
           disabled={busy}
         />
       </div>
-      <div className="workspace-panel-body" style={{ paddingTop: 0 }}>
+      <div className="mt-5 flex justify-end max-[700px]:[&>*]:flex-1">
         <button
           type="submit"
-          className="workspace-button"
+          className={primaryButton}
           disabled={busy || !amountPaid || !paymentMethod}
         >
           <FiCheck aria-hidden="true" />

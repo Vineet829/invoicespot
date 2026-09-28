@@ -22,6 +22,7 @@ import {
   dateLabel,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import { rowActionDanger } from "../../../components/workspace/pastel";
 const UsersListPage = () => {
   useTitle("Administration — Invoice Spot");
   const query = useGetWorkspaceUsersQuery(undefined, {
@@ -58,7 +59,7 @@ const UsersListPage = () => {
   const columns = [
     {
       label: "Email",
-      className: "workspace-cell-main",
+      type: "main",
       render: (row) => row.email,
     },
     { label: "Username", render: (row) => row.username },
@@ -76,7 +77,7 @@ const UsersListPage = () => {
     {
       label: "Active user",
       render: (row) => (
-        <label className="workspace-checkbox">
+        <label className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] text-spot-body [&>input]:m-0 [&>input]:size-4 [&>input]:accent-spot-violet">
           <input
             type="checkbox"
             checked={Boolean(row.active)}
@@ -90,9 +91,11 @@ const UsersListPage = () => {
     },
     {
       label: "Delete",
+      type: "action",
       render: (row) => (
         <button
-          className="workspace-row-action is-danger"
+          type="button"
+          className={rowActionDanger}
           onClick={() => setSelected(row)}
           aria-label={`Delete ${row.username}`}
         >
@@ -113,14 +116,7 @@ const UsersListPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel
-          title="Users"
-          aside={
-            <span className="workspace-total">
-              Total <strong>{query.data?.count || 0}</strong>
-            </span>
-          }
-        >
+        <Panel title="Users">
           {rows.length ? (
             <>
               <DataTable

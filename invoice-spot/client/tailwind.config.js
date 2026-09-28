@@ -91,6 +91,8 @@ module.exports = {
           ink: "#5a2616",
           muted: "#7a4a38",
           icon: "#b0502e",
+          // Small text on peach tints; icon is too light for it.
+          strong: "#9c4526",
         },
       },
       backgroundImage: {
@@ -140,6 +142,16 @@ module.exports = {
         "@media (min-width: 1360px) and (max-height: 900px)",
       );
       addVariant("coarse", "@media (pointer: coarse)");
+      // Workspace tables become labelled cards when their panel is too
+      // narrow for every column, whatever the window size or zoom. Tables
+      // with eight or more columns need more room.
+      addVariant("stacked", [
+        "@container table (max-width: 860px)",
+        "@container wide-table (max-width: 960px)",
+      ]);
+      // Document line items: three columns in a narrow form, then two.
+      addVariant("items-md", "@container items (max-width: 720px)");
+      addVariant("items-sm", "@container items (max-width: 480px)");
     }),
   ],
 };
