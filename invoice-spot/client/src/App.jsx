@@ -1,13 +1,12 @@
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
 import Footer from "./components/Footer";
 import Layout from "./components/Layout";
 import NotFound from "./components/NotFound";
 import { customTheme } from "./customTheme";
-import useTitle from "./hooks/useTitle";
 import { useSelector } from "react-redux";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
@@ -33,12 +32,13 @@ import DocumentsPage from "./features/documents/pages/DocumentsPage";
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 
 const App = () => {
-	useTitle("Invoice Spot - Home");
 	const { user } = useSelector((state) => state.auth);
+	const { pathname } = useLocation();
+	const hasDashboardShell = /^\/(dashboard|documents|create-doc|edit-doc|document|customers|create-customer|edit-customer|single-customer|profile|edit-profile|users)(?:\/|$)/i.test(pathname);
 	return (
 		<ThemeProvider theme={customTheme}>
 			<CssBaseline />
-			{user && <Navbar />}
+			{user && !hasDashboardShell && <Navbar />}
 			<Routes>
 				<Route path="/" element={<Layout />}>
 					<Route index element={<HomePage />} />
@@ -102,7 +102,7 @@ const App = () => {
 					<Route path="*" element={<NotFound />} />
 				</Route>
 			</Routes>
-			<Footer />
+			{user && !hasDashboardShell && <Footer />}
 			<ToastContainer theme="dark" />
 		</ThemeProvider>
 	);

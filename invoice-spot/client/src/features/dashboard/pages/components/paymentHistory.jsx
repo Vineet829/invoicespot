@@ -1,129 +1,232 @@
-import {
-	Paper,
-	Table,
-	TableContainer,
-	TableBody,
-	TableCell,
-	TableFooter,
-	TableHead,
-	TablePagination,
-	TableRow,
-} from "@mui/material";
-
-import moment from "moment";
 import { useState } from "react";
-import StyledTableCell from "../../../../components/StyledTableCell";
-import StyledTableRow from "../../../../components/StyledTableRow";
-import TablePaginationActions from "../../../../components/TablePaginationActions";
-import { addCurrencyCommas } from "../../../documents/pages/components/addCurrencyCommas";
+import {
+  FiArrowDownLeft,
+  FiChevronLeft,
+  FiChevronRight,
+  FiChevronsLeft,
+  FiChevronsRight,
+  FiCreditCard,
+  FiDollarSign,
+  FiGlobe,
+  FiMoreHorizontal,
+  FiRepeat,
+  FiSmartphone,
+} from "react-icons/fi";
+import { formatDate, formatMoney } from "../../dashboardModel";
+
+const payerTone = (name) =>
+  Array.from(name || "").reduce(
+    (sum, character) => sum + character.codePointAt(0),
+    0,
+  ) % 3;
+
+const MethodLabel = ({ method }) => {
+  const Icon =
+    {
+      "Bank Transfer": FiRepeat,
+      "Credit Card": FiCreditCard,
+      Cash: FiDollarSign,
+      "Mobile Money": FiSmartphone,
+      PayPal: FiGlobe,
+    }[method] || FiMoreHorizontal;
+  return (
+    <span className="dashboard-method-label">
+      <Icon aria-hidden="true" />
+      {method || "—"}
+    </span>
+  );
+};
+
+const PaymentAmount = ({ amount }) => {
+  const formatted = formatMoney(amount);
+  return (
+    <span className="dashboard-payment-value">
+      {formatted.slice(0, -3)}
+      <span className="dashboard-payment-decimal">{formatted.slice(-3)}</span>
+    </span>
+  );
+};
 
 const PaymentHistory = ({ sortPaymentHistory }) => {
-	const [page, setPage] = useState(0);
-	const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [requestedPage, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const rows = sortPaymentHistory;
+  const lastPage =
+    rowsPerPage === -1
+      ? 0
+      : Math.max(0, Math.ceil(rows.length / rowsPerPage) - 1);
+  const page = Math.min(requestedPage, lastPage);
+  const start = rowsPerPage === -1 ? 0 : page * rowsPerPage;
+  const visibleRows =
+    rowsPerPage === -1 ? rows : rows.slice(start, start + rowsPerPage);
 
-	const rows = sortPaymentHistory;
-
-	const emptyRows =
-		page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows?.length) : 0;
-
-	const handleChangePage = (event, newPage) => {
-		setPage(newPage);
-	};
-
-	const handleChangeRowsPerPage = (event) => {
-		setRowsPerPage(parseInt(event.target.value, 10));
-		setPage(0);
-	};
-
-	return (
-		<TableContainer
-			component={Paper}
-			sx={{ marginBottom: "100px", marginTop: "15px" }}
-		>
-			<Table sx={{ minWidth: 650 }} aria-label="simple table">
-				<TableHead>
-					<TableRow>
-						<StyledTableCell>#</StyledTableCell>
-						<StyledTableCell>Paid By</StyledTableCell>
-						<StyledTableCell>Date Paid</StyledTableCell>
-						<StyledTableCell>Amount Paid</StyledTableCell>
-						<StyledTableCell>Payment Method</StyledTableCell>
-						<StyledTableCell>Additional Info</StyledTableCell>
-					</TableRow>
-				</TableHead>
-
-				<TableBody>
-					{(rowsPerPage > 0
-						? rows.slice(
-								page * rowsPerPage,
-								page * rowsPerPage + rowsPerPage
-						  )
-						: rows
-					).map((row, index) => (
-						<StyledTableRow
-							key={row?._id}
-							sx={{
-								"&:last-child td, &:last-child th": {
-									border: 0,
-								},
-								cursor: "pointer",
-							}}
-						>
-							<StyledTableCell component="th" scope="row">
-								{page * rowsPerPage + index + 1}
-							</StyledTableCell>
-							<StyledTableCell>{row?.paidBy}</StyledTableCell>
-							<StyledTableCell>
-								{moment(row?.datePaid).format("DD-MM-YYYY")}
-							</StyledTableCell>
-							<StyledTableCell>
-								{addCurrencyCommas(row?.amountPaid)}
-							</StyledTableCell>
-							<StyledTableCell>
-								{row?.paymentMethod}
-							</StyledTableCell>
-							<StyledTableCell>
-								{row?.additionalInfo
-									? row?.additionalInfo
-									: "No additional info"}
-							</StyledTableCell>
-						</StyledTableRow>
-					))}
-
-					{emptyRows > 0 && (
-						<TableRow style={{ height: 53 * emptyRows }}>
-							<TableCell colSpan={6} />
-						</TableRow>
-					)}
-				</TableBody>
-				<TableFooter>
-					<TableRow>
-						<TablePagination
-							rowsPerPageOptions={[
-								5,
-								10,
-								25,
-								{ label: "All", value: -1 },
-							]}
-							colSpan={9}
-							count={rows.length}
-							rowsPerPage={rowsPerPage}
-							page={page}
-							SelectProps={{
-								inputProps: {
-									"aria-label": "rows per page",
-								},
-								native: true,
-							}}
-							onPageChange={handleChangePage}
-							onRowsPerPageChange={handleChangeRowsPerPage}
-							ActionsComponent={TablePaginationActions}
-						/>
-					</TableRow>
-				</TableFooter>
-			</Table>
-		</TableContainer>
-	);
+  return (
+    <section
+      className="dashboard-panel dashboard-history"
+      aria-labelledby="payments-title"
+    >
+      <div className="dashboard-panel-header">
+        <div className="dashboard-history-heading">
+          <span className="dashboard-history-heading-icon" aria-hidden="true">
+            <FiArrowDownLeft />
+          </span>
+          <div>
+            <h2 id="payments-title">Payment history</h2>
+            <p>Your recorded payments, most recent first.</p>
+          </div>
+        </div>
+        <span className="dashboard-count-badge">
+          {rows.length} {rows.length === 1 ? "payment" : "payments"}
+        </span>
+      </div>
+      <div className="dashboard-history-body">
+        {rows.length ? (
+          <table className="dashboard-history-table">
+            <caption className="dashboard-sr-only">
+              Recorded payment history
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Paid by</th>
+                <th scope="col">Date paid</th>
+                <th scope="col">Amount paid</th>
+                <th scope="col">Payment method</th>
+                <th scope="col">Additional info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((payment, index) => (
+                <tr
+                  key={payment.id}
+                  style={{
+                    "--payment-row-delay": `${Math.min(index, 4) * 35}ms`,
+                  }}
+                >
+                  <td className="dashboard-history-index">
+                    <span className="dashboard-mobile-field" aria-hidden="true">
+                      Payment
+                    </span>
+                    {start + index + 1}
+                  </td>
+                  <th scope="row" className="dashboard-history-name">
+                    <span className="dashboard-payer">
+                      <span
+                        className="dashboard-payer-avatar"
+                        aria-hidden="true"
+                        data-tone={payerTone(payment.paidBy)}
+                      >
+                        {(payment.paidBy || "?")
+                          .split(/\s+/)
+                          .filter((word) => /[\p{L}\p{N}]/u.test(word))
+                          .slice(0, 2)
+                          .map((word) => word[0])
+                          .join("")
+                          .toUpperCase()}
+                      </span>
+                      <span>{payment.paidBy || "—"}</span>
+                    </span>
+                  </th>
+                  <td className="dashboard-history-date">
+                    <span className="dashboard-mobile-field" aria-hidden="true">
+                      Date paid
+                    </span>
+                    {formatDate(payment.datePaid)}
+                  </td>
+                  <td className="dashboard-history-amount">
+                    <span className="dashboard-mobile-field" aria-hidden="true">
+                      Amount paid
+                    </span>
+                    <PaymentAmount amount={payment.amountPaid} />
+                  </td>
+                  <td className="dashboard-history-method">
+                    <span className="dashboard-mobile-field" aria-hidden="true">
+                      Payment method
+                    </span>
+                    <MethodLabel method={payment.paymentMethod} />
+                  </td>
+                  <td className="dashboard-history-note">
+                    <span className="dashboard-mobile-field" aria-hidden="true">
+                      Additional info
+                    </span>
+                    {payment.additionalInfo || "No additional info"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="dashboard-empty-state">
+            <span className="dashboard-empty-icon">
+              <FiArrowDownLeft aria-hidden="true" />
+            </span>
+            <h3>No payments as of now.</h3>
+            <p>Your recorded payments will appear here.</p>
+          </div>
+        )}
+        <div className="dashboard-pagination">
+          <label className="dashboard-page-size">
+            Rows per page
+            <select
+              value={rowsPerPage}
+              onChange={(event) => {
+                setRowsPerPage(Number(event.target.value));
+                setPage(0);
+              }}
+            >
+              {[5, 10, 25, -1].map((count) => (
+                <option key={count} value={count}>
+                  {count === -1 ? "All" : count}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span role="status">
+            {rows.length ? start + 1 : 0}–{start + visibleRows.length} of{" "}
+            {rows.length}
+          </span>
+          <div className="dashboard-page-actions">
+            {[
+              {
+                label: "First page",
+                icon: FiChevronsLeft,
+                target: 0,
+                disabled: page === 0,
+              },
+              {
+                label: "Previous page",
+                icon: FiChevronLeft,
+                target: page - 1,
+                disabled: page === 0,
+              },
+              {
+                label: "Next page",
+                icon: FiChevronRight,
+                target: page + 1,
+                disabled: page === lastPage,
+              },
+              {
+                label: "Last page",
+                icon: FiChevronsRight,
+                target: lastPage,
+                disabled: page === lastPage,
+              },
+            ].map(({ label, icon: Icon, target, disabled }) => (
+              <button
+                key={label}
+                className="dashboard-icon-button"
+                aria-label={label}
+                disabled={disabled}
+                onClick={() => setPage(target)}
+              >
+                <Icon aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 export default PaymentHistory;

@@ -1,387 +1,155 @@
-import ClearIcon from "@mui/icons-material/Clear";
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import {
-	Box,
-	Badge,
-	Button,
-	Container,
-	CssBaseline,
-	Modal,
-	Paper,
-	styled,
-	Table,
-	TableBody,
-	TableCell,
-	TableContainer,
-	TableFooter,
-	TableHead,
-	TablePagination,
-	TableRow,
-	Typography,
-} from "@mui/material";
-
-import moment from "moment";
 import { useState } from "react";
-import { FaEye } from "react-icons/fa";
-import { GiReceiveMoney, GiTakeMyMoney } from "react-icons/gi";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { FiEye, FiFileText, FiPlus, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
-import Spinner from "../../../components/Spinner";
-import StyledDivider from "../../../components/StyledDivider";
-import StyledTableCell from "../../../components/StyledTableCell";
-import StyledTableRow from "../../../components/StyledTableRow";
-import TablePaginationActions from "../../../components/TablePaginationActions";
+import useTitle from "../../../hooks/useTitle";
+import { useGetDashboardDocumentsQuery } from "../../dashboard/dashboardApiSlice";
+import { useDeleteDocMutation } from "../documentsApiSlice";
 import {
-	useDeleteDocMutation,
-	useGetAllMyDocsQuery,
-} from "../documentsApiSlice";
-import DocumentSVG from "./components/DocumentSVG";
-import { DocumentTypeStyling, statusStyling } from "./components/styling";
-
-const modalStyle = {
-	position: "absolute",
-	top: "50%",
-	left: "50%",
-	transform: "translate(-50%, -50%)",
-	width: 500,
-	bgcolor: "background.paper",
-	border: "2px solid #000",
-	borderRadius: "25px",
-	boxShadow: 24,
-	p: 4,
-};
-
-const StyledButton = styled(Button)({
-	boxShadow: "0 0 0 0 #f0f0f0, 0 0 0 0 rgba(124, 105, 239, 1)",
-});
+  WorkspacePage,
+  PageHeader,
+  ActionLink,
+  Panel,
+  DataTable,
+  Pagination,
+  usePagination,
+  ConfirmDialog,
+  EmptyState,
+  LoadingState,
+  ErrorState,
+  Badge,
+  statusTone,
+  dateLabel,
+  money,
+  errorMessage,
+} from "../../../components/workspace/Workspace";
 
 const DocumentsPage = () => {
-	const navigate = useNavigate();
-
-	const [page, setPage] = useState(0);
-	const [rowsPerPage, setRowsPerPage] = useState(5);
-
-	const { data, isLoading } = useGetAllMyDocsQuery(page);
-
-	const [deleteDoc] = useDeleteDocMutation();
-
-	const rows = data?.myDocuments;
-
-	const [open, setOpen] = useState(false);
-
-	const [selectedDoc, setSelectedDoc] = useState("");
-
-	const handleOpen = (document) => {
-		setSelectedDoc(document);
-		setOpen(true);
-	};
-
-	const handleClose = () => setOpen(false);
-
-	const emptyRows =
-		page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows?.length) : 0;
-
-	const handleChangePage = (event, newPage) => {
-		setPage(newPage);
-	};
-
-	const handleChangeRowsPerPage = (event) => {
-		setRowsPerPage(parseInt(event.target.value, 10));
-		setPage(0);
-	};
-
-	const deleteDocumentHandler = async (id) => {
-		try {
-			const response = await deleteDoc(id).unwrap();
-			toast.success(`${response.message}`);
-		} catch (err) {
-			toast.error("The document could not be deleted");
-		}
-	};
-
-	return (
-		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"}}}>
-			<CssBaseline />
-         
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-
-				}}
-			>
-				<GiTakeMyMoney className="auth-svg" />
-				<Typography variant="h1" sx={{
-    fontSize: {
-      xs: '1.5rem', 
-      sm: '3.75rem', 
-    }}}>Documents</Typography>
-			</Box>
-
-			<StyledDivider />
-
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: {xs:"column", sm:"row"},
-					justifyContent: {xs:"center",sm:"space-between"},
-					alignItems:{xs:"center", sm:"stretch"},
-					rowGap:{xs:"50px", sm:"0px"},
-					mt:{xs:"50px", sm:"0px"},
-					mb:{xs:"50px", sm:"0px"}
-				}}
-			>
-				<Box
-					sx={{
-						display: "flex",
-						flexDirection: "row",
-					}}
-				>
-					<Typography variant="h4"  sx={{
-    fontSize: {
-      xs: '1.5rem', 
-      sm: '3.75rem', 
-    }}}>Total Documents: </Typography>
-					<Badge
-						badgeContent={data?.totalDocuments || "0"}
-						color="success"
-						sx={{
-							margin: "3px 0 5px 5px",
-						}}
-					>
-						<GiReceiveMoney color="action" fontSize={45} />
-					</Badge>
-				</Box>
-
-				<StyledButton
-  className="new-customer-btn"
-  variant="contained"
-  color="success"
-  startIcon={<ReceiptLongIcon />}
-  onClick={() => navigate("/create-doc")}
-  sx={{
-    
-    fontSize: '1rem', 
-    padding: '8px 16px',
-
-   
-    '@media (max-width:600px)': {
-      fontSize: '0.75rem', 
-      padding: '6px 12px'
-	  
+  useTitle("Documents — Invoice Spot");
+  const query = useGetDashboardDocumentsQuery(undefined, {
+    refetchOnMountOrArgChange: 60,
+  });
+  const rows = query.data?.myDocuments || [];
+  const pagination = usePagination(rows);
+  const [selected, setSelected] = useState(null);
+  const [deleteDoc, { isLoading: deleting }] = useDeleteDocMutation();
+  const remove = async () => {
+    try {
+      const result = await deleteDoc(selected._id).unwrap();
+      toast.success(result.message || "Document deleted.");
+      setSelected(null);
+    } catch (error) {
+      toast.error(errorMessage(error, "The document could not be deleted."));
     }
-  }}
->
-  Create New Document
-</StyledButton>
-			</Box>
-
-			{isLoading ? (
-				<Spinner />
-			) : !rows.length ? (
-				<DocumentSVG />
-			) : (
-				<TableContainer
-					component={Paper}
-					sx={{ marginBottom: "100px", marginTop: "15px" }}
-				>
-					{isLoading && <Spinner />}
-					<Table sx={{ minWidth: 650 }} aria-label="simple-table">
-						<TableHead>
-							<TableRow>
-								<StyledTableCell>#</StyledTableCell>
-								<StyledTableCell>Doc No</StyledTableCell>
-								<StyledTableCell>Type</StyledTableCell>
-								<StyledTableCell>Customer</StyledTableCell>
-								<StyledTableCell>Amount</StyledTableCell>
-								<StyledTableCell>Due Date</StyledTableCell>
-								<StyledTableCell>
-									Payment Status
-								</StyledTableCell>
-								<StyledTableCell>View</StyledTableCell>
-								<StyledTableCell>Delete</StyledTableCell>
-							</TableRow>
-						</TableHead>
-						<TableBody>
-							{(rowsPerPage > 0
-								? rows.slice(
-										page * rowsPerPage,
-										page * rowsPerPage + rowsPerPage
-								  )
-								: rows
-							).map((row, index) => (
-								<StyledTableRow
-									key={row?._id}
-									sx={{
-										"&:last-child td, &:last-child th": {
-											border: 0,
-										},
-										cursor: "pointer",
-									}}
-								>
-									<StyledTableCell component="th" scope="row">
-										{page * rowsPerPage + index + 1}
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										{row?.documentNumber}
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										<button
-											style={DocumentTypeStyling(
-												row.documentType
-											)}
-										>
-											{row?.documentType}
-										</button>
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										{row?.customer?.name}
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										{row?.total?.toFixed(2)}
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										{moment(row?.dueDate).format(
-											"DD-MM-YYYY"
-										)}
-									</StyledTableCell>
-
-									<StyledTableCell component="th" scope="row">
-										<button
-											style={statusStyling(row.status)}
-										>
-											{row?.status}
-										</button>
-									</StyledTableCell>
-
-									<StyledTableCell align="center">
-										<Box
-											sx={{
-												"&:hover": {
-													cursor: "pointer",
-												},
-											}}
-										>
-											<FaEye
-												color="error"
-												fontSize="medium"
-												onClick={() =>
-													navigate(
-														`/document/${row._id}`
-													)
-												}
-											/>
-										</Box>
-									</StyledTableCell>
-
-									<StyledTableCell align="center">
-										<Box
-											sx={{
-												"&:hover": {
-													cursor: "pointer",
-												},
-											}}
-										>
-											<ClearIcon
-												color="error"
-												fontSize="medium"
-												onClick={() => handleOpen(row)}
-											/>
-										</Box>
-									</StyledTableCell>
-								</StyledTableRow>
-							))}
-
-							{open && (
-								<Modal
-									open={open}
-									onClose={handleClose}
-									aria-labelledby="modal-modal-title"
-									aria-describedby="modal-modal-description"
-								>
-									<Box sx={modalStyle}>
-										<Typography
-											id="modal-modal-title"
-											variant="h6"
-											component="h2"
-										>
-											{`Are you sure you want to delete this ${selectedDoc.documentType}, with number ${selectedDoc.documentNumber}, belonging to ${selectedDoc.customer.name}?`}
-										</Typography>
-										<Button
-											id="modal-modal-description"
-											sx={{ mt: 2 }}
-											color="darkRed"
-											size="large"
-											fullWidth
-											variant="contained"
-											endIcon={
-												<DeleteForeverIcon
-													sx={{ color: "white" }}
-												/>
-											}
-											onClick={() => {
-												deleteDocumentHandler(
-													`${selectedDoc._id}`
-												);
-												handleClose();
-											}}
-										>
-											<Typography
-												variant="h5"
-												sx={{ color: "white" }}
-											>
-												Delete Document
-											</Typography>
-										</Button>
-									</Box>
-								</Modal>
-							)}
-							{emptyRows > 0 && (
-								<TableRow style={{ height: 53 * emptyRows }}>
-									<TableCell colSpan={6} />
-								</TableRow>
-							)}
-						</TableBody>
-						<TableFooter>
-							<TableRow>
-								<TablePagination
-									rowsPerPageOptions={[
-										5,
-										10,
-										25,
-										{ label: "All", value: -1 },
-									]}
-									colSpan={9}
-									count={rows.length}
-									rowsPerPage={rowsPerPage}
-									page={page}
-									SelectProps={{
-										inputProps: {
-											"aria-label": "rows per page",
-										},
-										native: true,
-									}}
-									onPageChange={handleChangePage}
-									onRowsPerPageChange={
-										handleChangeRowsPerPage
-									}
-									ActionsComponent={TablePaginationActions}
-								/>
-							</TableRow>
-						</TableFooter>
-					</Table>
-				</TableContainer>
-			)}
-		</Container>
-	);
+  };
+  const columns = [
+    {
+      label: "#",
+      className: "workspace-cell-index",
+      render: (_row, index) => pagination.start + index + 1,
+    },
+    {
+      label: "Document no.",
+      className: "workspace-cell-main",
+      render: (row) => row.documentNumber,
+    },
+    { label: "Type", render: (row) => <Badge>{row.documentType}</Badge> },
+    { label: "Customer", render: (row) => row.customer?.name || "—" },
+    {
+      label: "Amount",
+      className: "workspace-cell-amount",
+      render: (row) => money(row.total),
+    },
+    { label: "Due date", render: (row) => dateLabel(row.dueDate) },
+    {
+      label: "Payment status",
+      render: (row) => (
+        <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+      ),
+    },
+    {
+      label: "View",
+      render: (row) => (
+        <Link
+          className="workspace-row-action"
+          to={`/document/${row._id}`}
+          aria-label={`View ${row.documentNumber}`}
+        >
+          <FiEye aria-hidden="true" />
+          <span>View</span>
+        </Link>
+      ),
+    },
+    {
+      label: "Delete",
+      render: (row) => (
+        <button
+          className="workspace-row-action is-danger"
+          onClick={() => setSelected(row)}
+          aria-label={`Delete ${row.documentNumber}`}
+        >
+          <FiTrash2 aria-hidden="true" />
+          <span>Delete</span>
+        </button>
+      ),
+    },
+  ];
+  return (
+    <WorkspacePage
+      section="Documents"
+      documentCount={query.data?.totalDocuments}
+    >
+      <PageHeader
+        title="Documents"
+        description="Invoices, quotations, and receipts. All your paperwork in one place."
+        actions={
+          <ActionLink to="/create-doc">
+            <FiPlus aria-hidden="true" /> Create document
+          </ActionLink>
+        }
+      />
+      {query.isLoading ? (
+        <LoadingState />
+      ) : query.isError && !query.data ? (
+        <ErrorState error={query.error} retry={query.refetch} />
+      ) : (
+        <Panel
+          title="Your documents"
+          aside={
+            <span className="workspace-total">
+              Total <strong>{query.data?.totalDocuments || 0}</strong>
+            </span>
+          }
+        >
+          {rows.length ? (
+            <>
+              <DataTable
+                columns={columns}
+                rows={pagination.rows}
+                label="Documents"
+              />
+              <Pagination pagination={pagination} />
+            </>
+          ) : (
+            <EmptyState
+              title="Your work, ready to invoice."
+              text="Create a document to keep your invoices, quotations, and receipts together."
+              icon={FiFileText}
+            />
+          )}
+        </Panel>
+      )}
+      <ConfirmDialog
+        open={Boolean(selected)}
+        title="Delete this document?"
+        confirmLabel="Delete document"
+        onConfirm={remove}
+        onClose={() => setSelected(null)}
+        busy={deleting}
+      >
+        {selected?.documentNumber} will be permanently deleted.
+      </ConfirmDialog>
+    </WorkspacePage>
+  );
 };
-
 export default DocumentsPage;
