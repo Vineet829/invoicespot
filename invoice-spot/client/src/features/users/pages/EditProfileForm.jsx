@@ -1,351 +1,225 @@
-import BrowserUpdatedIcon from "@mui/icons-material/BrowserUpdated";
-import CheckIcon from "@mui/icons-material/Check";
-import PhotoCamera from "@mui/icons-material/PhotoCamera";
-import {
-	Box,
-	Button,
-	CircularProgress,
-	Container,
-	CssBaseline,
-	Grid,
-	styled,
-	TextField,
-	Typography,
-} from "@mui/material";
-
-import axios from "axios";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FiCheck, FiUser } from "react-icons/fi";
 import { toast } from "react-toastify";
-import validator from "validator";
-import Spinner from "../../../components/Spinner";
-
-import StyledDivider from "../../../components/StyledDivider";
 import useTitle from "../../../hooks/useTitle";
-
 import {
-	useGetUserProfileQuery,
-	useUpdateUserProfileMutation,
+  useGetUserProfileQuery,
+  useUpdateUserProfileMutation,
 } from "../usersApiSlice";
-
-const Input = styled("input")({
-	display: "none",
-});
-
-const EditProfileForm = () => {
-	useTitle("Edit Profile - Invoice Spot");
-	const navigate = useNavigate();
-	const goBack = () => navigate(-1);
-
-	const [firstName, setFirstName] = useState("");
-	const [lastName, setLastName] = useState("");
-	const [username, setUsername] = useState("");
-	const [phoneNumber, setPhoneNumber] = useState("");
-
-	const isValidPhoneNumber = validator.isMobilePhone(phoneNumber);
-	const [address, setAddress] = useState("");
-	const [businessName, setBusinessName] = useState("");
-	const [city, setCity] = useState("");
-	const [country, setCountry] = useState("");
-
-	const [avatar, setAvatar] = useState("");
-	const [uploading, setUploading] = useState(false);
-
-	const { data } = useGetUserProfileQuery();
-
-	const [updateMyProfile, { data: updateData, isLoading, isSuccess }] =
-		useUpdateUserProfileMutation();
-
-	useEffect(() => {
-		const userProfile = data?.userProfile;
-		if (userProfile) {
-			setFirstName(userProfile.firstName);
-			setLastName(userProfile.lastName);
-			setUsername(userProfile.username);
-			setPhoneNumber(userProfile.phoneNumber);
-			setBusinessName(userProfile.businessName);
-			setCity(userProfile.city);
-			setAddress(userProfile.address);
-			setCountry(userProfile.country);
-			setAvatar(userProfile.avatar);
-		}
-	}, [data]);
-
-	useEffect(() => {
-		if (isSuccess) {
-			navigate("/profile");
-			const message = updateData?.message;
-			toast.success(message);
-		}
-	}, [updateData, isSuccess, navigate]);
-
-	const uploadFileHandler = async (e) => {
-		const file = e.target.files[0];
-		if (!file) {
-			alert("Please select a file to upload.");
-			return;
-		}
-	    
-		const formData = new FormData();
-		formData.append("logo", file);
-		setUploading(true);
-	
-		try {
-			const config = {
-				headers: {
-					"Content-Type": "multipart/form-data",
-				},
-			};
-	
-			const { data } = await axios.patch("/api/v1/upload", formData, config);
-			setAvatar(data);
-			alert("Upload successful!");
-		} catch (error) {
-			console.error("Upload failed:", error);
-			alert("Upload failed. Please try again.");
-		} finally {
-			setUploading(false);
-		}
-	};
-	const updateHandler = async (e) => {
-		e.preventDefault();
-		try {
-			const userData = {
-				firstName,
-				lastName,
-				username,
-				phoneNumber,
-				businessName,
-				address,
-				city,
-				country,
-				avatar,
-			};
-			await updateMyProfile(userData).unwrap();
-		} catch (err) {
-			const message = err.data.message;
-			toast.error(message);
-		}
-	};
-
-	return (
-		<Container
-			component="main"
-			maxWidth="sm"
-			sx={{
-				border: "2px solid  #e4e5e7",
-				borderRadius: "25px",
-				py: 2,
-				mt: 10,
-			}}
-		>
-			<CssBaseline />
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				<BrowserUpdatedIcon sx={{ fontSize: 70 }} />
-				<Typography variant="h2" sx={{
-    fontSize: {
-      xs: '1.5rem', 
-      sm: '3.75rem', 
-    }}}>Update Profile</Typography>
-				<Button
-					variant="contained"
-					color="warning"
-					size="small"
-					sx={{ fontSize: "1rem", ml: "10px" }}
-					onClick={goBack}
-				>
-					Go Back
-				</Button>
-			</Box>
-			<StyledDivider />
-
-			{isLoading ? (
-				<Spinner />
-			) : (
-				<Box
-					sx={{
-						mt: "1rem",
-						display: "flex",
-						flexDirection: "column",
-						alignItems: "center",
-					}}
-					component="form"
-					noValidate
-					autoComplete="off"
-					onSubmit={updateHandler}
-				>
-					<Grid container spacing={2} sx={{justifyContent:"center"}}>
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								id="firstname"
-								label="First Name"
-								name="firstname"
-								margin="normal"
-								value={firstName}
-								onChange={(e) => setFirstName(e.target.value)}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								id="lastname"
-								label="Last Name"
-								name="lastname"
-								margin="normal"
-								value={lastName}
-								onChange={(e) => setLastName(e.target.value)}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								id="username"
-								label="Username"
-								name="username"
-								margin="normal"
-								value={username}
-								onChange={(e) => setUsername(e.target.value)}
-							/>
-						</Grid>
-
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								error={!isValidPhoneNumber}
-								id="phonenumber"
-								label={
-									!isValidPhoneNumber
-										? "Mobile Number Required"
-										: "Phone Number"
-								}
-								name="phonenumber"
-								margin="normal"
-								helperText={
-									!isValidPhoneNumber &&
-									"A valid mobile phone number is required in the format of +(country-code) then followed by the number. e.g +254123456789"
-								}
-								value={phoneNumber}
-								onChange={(e) => setPhoneNumber(e.target.value)}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								id="businessName"
-								label="Name of Business"
-								name="businessName"
-								margin="normal"
-								value={businessName}
-								onChange={(e) =>
-									setBusinessName(e.target.value)
-								}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								required
-								fullWidth
-								id="address"
-								label="Address"
-								name="address"
-								margin="normal"
-								value={address}
-								onChange={(e) => setAddress(e.target.value)}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								fullWidth
-								id="city"
-								label="City"
-								name="city"
-								margin="normal"
-								value={city}
-								onChange={(e) => setCity(e.target.value)}
-							/>
-						</Grid>
-						<Grid item md={6}>
-							
-							<TextField
-								fullWidth
-								id="country"
-								label="Country"
-								name="country"
-								margin="normal"
-								value={country}
-								onChange={(e) => setCountry(e.target.value)}
-							/>
-						</Grid>
-					</Grid>
-					
-					<TextField
-						fullWidth
-						id="avatar"
-						name="avatar"
-						margin="normal"
-						value={avatar || ""}
-						onChange={(e) => setAvatar(e.target.value)}
-					/>
-					<label htmlFor="logo">
-						<Input
-							accept="image/*"
-							id="logo"
-							name="logo"
-							type="file"
-							onChange={uploadFileHandler}
-						/>
-						{!uploading ? (
-							<Button
-								sx={{ mt: "5px" }}
-								variant="contained"
-								component="span"
-								endIcon={<PhotoCamera />}
-							>
-								Choose Your Logo
-							</Button>
-						) : (
-							<CircularProgress size={60} />
-						)}
-					</label>
-
-					<Button
-						sx={{ mt: 3, mb: {xs:"15%",sm:5}, ml:{xs:"5%", sm:"0%"} }}
-						type="submit"
-						fullWidth
-						variant="contained"
-						color="success"
-						size="large"
-						endIcon={<CheckIcon />}
-					>
-						<Typography variant="h5" sx={{ fontSize: {
-                xs: '1.25rem', 
-                sm: '1.25rem', 
-            }}}>Update Profile</Typography>
-					</Button>
-				</Box>
-			)}
-		</Container>
-	);
+import { useUploadProfileLogoMutation } from "../../workspace/workspaceApiSlice";
+import {
+  WorkspacePage,
+  PageHeader,
+  Panel,
+  Field,
+  LoadingState,
+  ErrorState,
+  errorMessage,
+} from "../../../components/workspace/Workspace";
+const keys = [
+  "firstName",
+  "lastName",
+  "username",
+  "phoneNumber",
+  "businessName",
+  "address",
+  "city",
+  "country",
+  "avatar",
+];
+const ProfileFields = ({ profile }) => {
+  const navigate = useNavigate();
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(keys.map((key) => [key, profile[key] || ""])),
+  );
+  const [save, { isLoading: saving }] = useUpdateUserProfileMutation();
+  const [upload, { isLoading: uploading }] = useUploadProfileLogoMutation();
+  const busy = saving || uploading;
+  const change = (key) => (event) =>
+    setValues((current) => ({ ...current, [key]: event.target.value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      const result = await save(values).unwrap();
+      toast.success(result.message || "Profile updated.");
+      navigate("/profile");
+    } catch (error) {
+      toast.error(errorMessage(error, "Your profile could not be saved."));
+    }
+  };
+  const uploadLogo = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const body = new FormData();
+    body.append("logo", file);
+    try {
+      const url = await upload(body).unwrap();
+      setValues((current) => ({ ...current, avatar: url }));
+      toast.success("Logo uploaded. Save your changes to update your profile.");
+    } catch (error) {
+      toast.error(errorMessage(error, "Your logo could not be uploaded."));
+    }
+    event.target.value = "";
+  };
+  return (
+    <form onSubmit={submit}>
+      <div className="workspace-form-layout">
+        <div className="workspace-form-main">
+          <Panel
+            title="Personal details"
+            description="The details associated with your account."
+          >
+            <div className="workspace-form-grid">
+              <Field
+                label="First name"
+                name="firstName"
+                required
+                autoComplete="given-name"
+                value={values.firstName}
+                onChange={change("firstName")}
+                disabled={busy}
+              />
+              <Field
+                label="Last name"
+                name="lastName"
+                required
+                autoComplete="family-name"
+                value={values.lastName}
+                onChange={change("lastName")}
+                disabled={busy}
+              />
+              <Field
+                label="Username"
+                name="username"
+                required
+                autoComplete="username"
+                value={values.username}
+                onChange={change("username")}
+                disabled={busy}
+              />
+              <Field
+                label="Phone number"
+                name="phoneNumber"
+                type="tel"
+                required
+                autoComplete="tel"
+                value={values.phoneNumber}
+                onChange={change("phoneNumber")}
+                disabled={busy}
+                hint="Include your country code."
+              />
+            </div>
+          </Panel>
+          <Panel
+            title="Business details"
+            description="Your business information appears on your documents."
+          >
+            <div className="workspace-form-grid">
+              <Field
+                label="Business name"
+                name="businessName"
+                required
+                autoComplete="organization"
+                value={values.businessName}
+                onChange={change("businessName")}
+                disabled={busy}
+                className="workspace-span-full"
+              />
+              <Field
+                label="Address"
+                name="address"
+                required
+                autoComplete="street-address"
+                value={values.address}
+                onChange={change("address")}
+                disabled={busy}
+                className="workspace-span-full"
+              />
+              <Field
+                label="City"
+                name="city"
+                autoComplete="address-level2"
+                value={values.city}
+                onChange={change("city")}
+                disabled={busy}
+              />
+              <Field
+                label="Country"
+                name="country"
+                autoComplete="country-name"
+                value={values.country}
+                onChange={change("country")}
+                disabled={busy}
+              />
+            </div>
+          </Panel>
+          <Panel title="Business logo">
+            <div className="workspace-form-grid">
+              <Field
+                label="Logo URL"
+                name="avatar"
+                value={values.avatar}
+                onChange={change("avatar")}
+                disabled={busy}
+                className="workspace-span-full"
+              />
+              <Field
+                label="Choose your logo"
+                type="file"
+                accept="image/*"
+                onChange={uploadLogo}
+                disabled={busy}
+                className="workspace-span-full"
+              />
+              {uploading && (
+                <p role="status" className="workspace-loading-label">
+                  Uploading your logo…
+                </p>
+              )}
+            </div>
+          </Panel>
+          <div className="workspace-form-actions">
+            <button type="submit" className="workspace-button" disabled={busy}>
+              <FiCheck aria-hidden="true" />
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+        <aside className="workspace-form-aside">
+          <div className="workspace-panel-body">
+            <FiUser aria-hidden="true" />
+            <h2>A familiar face for your business.</h2>
+            <p>
+              Keep your contact details and business logo current so your
+              documents are ready to send.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </form>
+  );
 };
-
+const EditProfileForm = () => {
+  useTitle("Edit profile — Invoice Spot");
+  const query = useGetUserProfileQuery();
+  return (
+    <WorkspacePage section="Profile">
+      <PageHeader
+        back
+        title="Edit profile"
+        description="Keep your account and business information up to date."
+      />
+      {query.isLoading ? (
+        <LoadingState />
+      ) : query.isError ? (
+        <ErrorState error={query.error} retry={query.refetch} />
+      ) : (
+        query.data?.userProfile && (
+          <ProfileFields profile={query.data.userProfile} />
+        )
+      )}
+    </WorkspacePage>
+  );
+};
 export default EditProfileForm;

@@ -1,0 +1,13 @@
+:root {
+  --public-display: 'Sora', sans-serif;
+  --public-ui: 'Geist', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --public-mono: 'IBM Plex Mono', monospace;
+  --public-bg: #08090D;
+  --public-surface: #12131A;
+  --public-elevated: #1C1D27;
+  --public-heading: #EEECF5;
+  --public-muted: #9A96AF;
+  --public-accent: #A29BFE;
+  --public-brand-gradient: linear-gradient(135deg, #6C5CE7, #A29BFE);
+  --public-text-gradient: linear-gradient(120deg, #D9D4FF 0%, #A29BFE 55%, #8578F2 100%);
+}
