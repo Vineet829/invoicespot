@@ -1,4 +1,4 @@
-ARG NODE_VERSION=16-alpine3.12
+ARG NODE_VERSION=24-alpine
 
 FROM node:${NODE_VERSION}
 
@@ -13,4 +13,4 @@ RUN npm install
 COPY . ${APP_HOME}
 
 
-CMD ["npm","start"]
+CMD ["npm","start","--","--host","0.0.0.0"]

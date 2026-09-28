@@ -9,7 +9,7 @@ import "./index.css";
 
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 
-if (process.env.NODE_ENV === "production") {
+if (import.meta.env.PROD) {
 	disableReactDevTools();
 }
 

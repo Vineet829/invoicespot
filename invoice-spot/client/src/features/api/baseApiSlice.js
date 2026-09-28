@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { logIn, logOut } from "../auth/authSlice";
 
 const baseQuery = fetchBaseQuery({
-	baseUrl: process.env.REACT_APP_API_URL || (process.env.NODE_ENV === "development"
+	baseUrl: import.meta.env.VITE_API_URL || (import.meta.env.DEV
 		? "/api/v1"
 		: "https://invoice.vineetpersonal.site/api/v1"),
 	credentials: "include",

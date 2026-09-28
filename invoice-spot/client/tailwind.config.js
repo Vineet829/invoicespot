@@ -2,7 +2,7 @@ const plugin = require("tailwindcss/plugin");
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/**/*.{js,jsx}"],
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
   // Older pages rely on their own stylesheets and on Material UI, which
   // Tailwind's global reset would restyle, so it stays off. src/index.css
   // applies the part of the reset that utilities need inside the new UI.
