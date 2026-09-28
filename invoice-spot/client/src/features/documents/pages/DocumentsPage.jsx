@@ -18,11 +18,15 @@ import {
   LoadingState,
   ErrorState,
   Badge,
-  statusTone,
+  StatusBadge,
+  Amount,
   dateLabel,
-  money,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import {
+  rowAction,
+  rowActionDanger,
+} from "../../../components/workspace/pastel";
 
 const DocumentsPage = () => {
   useTitle("Documents — Invoice Spot");
@@ -45,33 +49,32 @@ const DocumentsPage = () => {
   const columns = [
     {
       label: "#",
-      className: "workspace-cell-index",
+      type: "index",
       render: (_row, index) => pagination.start + index + 1,
     },
     {
       label: "Document no.",
-      className: "workspace-cell-main",
+      type: "main",
       render: (row) => row.documentNumber,
     },
     { label: "Type", render: (row) => <Badge>{row.documentType}</Badge> },
     { label: "Customer", render: (row) => row.customer?.name || "—" },
     {
       label: "Amount",
-      className: "workspace-cell-amount",
-      render: (row) => money(row.total),
+      type: "amount",
+      render: (row) => <Amount value={row.total} />,
     },
     { label: "Due date", render: (row) => dateLabel(row.dueDate) },
     {
       label: "Payment status",
-      render: (row) => (
-        <Badge tone={statusTone(row.status)}>{row.status}</Badge>
-      ),
+      render: (row) => <StatusBadge status={row.status} />,
     },
     {
       label: "View",
+      type: "action",
       render: (row) => (
         <Link
-          className="workspace-row-action"
+          className={rowAction}
           to={`/document/${row._id}`}
           aria-label={`View ${row.documentNumber}`}
         >
@@ -82,9 +85,11 @@ const DocumentsPage = () => {
     },
     {
       label: "Delete",
+      type: "action",
       render: (row) => (
         <button
-          className="workspace-row-action is-danger"
+          type="button"
+          className={rowActionDanger}
           onClick={() => setSelected(row)}
           aria-label={`Delete ${row.documentNumber}`}
         >
@@ -95,10 +100,7 @@ const DocumentsPage = () => {
     },
   ];
   return (
-    <WorkspacePage
-      section="Documents"
-      documentCount={query.data?.totalDocuments}
-    >
+    <WorkspacePage section="Documents">
       <PageHeader
         title="Documents"
         description="Invoices, quotations, and receipts. All your paperwork in one place."
@@ -113,14 +115,7 @@ const DocumentsPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel
-          title="Your documents"
-          aside={
-            <span className="workspace-total">
-              Total <strong>{query.data?.totalDocuments || 0}</strong>
-            </span>
-          }
-        >
+        <Panel title="Your documents">
           {rows.length ? (
             <>
               <DataTable

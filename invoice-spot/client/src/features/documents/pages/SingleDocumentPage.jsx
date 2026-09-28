@@ -11,16 +11,24 @@ import {
   ActionLink,
   Panel,
   DataTable,
-  Badge,
+  StatusBadge,
+  Amount,
   LoadingState,
   ErrorState,
-  statusTone,
   dateLabel,
-  money,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import { primaryButton } from "../../../components/workspace/pastel";
 import { lineAmount } from "./documentEditorModel";
 import PaymentForm from "./PaymentForm";
+
+const partyHeading = "mb-3 text-[12.5px] font-normal text-spot-muted";
+const partyName = "mb-1.5 block text-[15px] font-medium text-spot-ink";
+const partyLine =
+  "text-[13.5px] leading-[1.7] text-spot-body [overflow-wrap:anywhere]";
+const copy =
+  "whitespace-pre-wrap text-[14px] leading-[1.7] [overflow-wrap:anywhere]";
+
 const SingleDocumentPage = () => {
   const { id } = useParams();
   const query = useGetSingleDocQuery(id);
@@ -49,25 +57,27 @@ const SingleDocumentPage = () => {
   const columns = [
     {
       label: "#",
-      className: "workspace-cell-index",
+      type: "index",
       render: (_item, index) => index + 1,
     },
     {
       label: "Product / service",
-      className: "workspace-cell-main",
+      type: "main",
       render: (item) => item.itemName,
     },
     { label: "Quantity", render: (item) => item.quantity },
     {
       label: "Unit price",
-      className: "workspace-cell-amount",
-      render: (item) => money(item.unitPrice),
+      type: "amount",
+      render: (item) => <Amount value={item.unitPrice} />,
     },
     { label: "Discount (%)", render: (item) => item.discount || "0" },
     {
       label: "Line total",
-      className: "workspace-cell-amount",
-      render: (item) => money(lineAmount(item), document?.currency),
+      type: "amount",
+      render: (item) => (
+        <Amount value={lineAmount(item)} currency={document?.currency} />
+      ),
     },
   ];
   return (
@@ -87,7 +97,8 @@ const SingleDocumentPage = () => {
                 <FiEdit2 aria-hidden="true" /> Edit document
               </ActionLink>
               <button
-                className="workspace-button"
+                type="button"
+                className={primaryButton}
                 onClick={sendEmail}
                 disabled={sending || !profile}
               >
@@ -114,30 +125,26 @@ const SingleDocumentPage = () => {
             <Panel
               title={document.documentType}
               aside={
-                <Badge
-                  tone={statusTone(
+                <StatusBadge
+                  status={
                     totalAmountReceived >= document.total
                       ? "Paid"
-                      : document.status,
-                  )}
-                >
-                  {totalAmountReceived >= document.total
-                    ? "Paid"
-                    : document.status}
-                </Badge>
+                      : document.status
+                  }
+                />
               }
             >
-              <div className="workspace-document-summary">
-                <div>
-                  <h3>From</h3>
+              <div className="grid grid-cols-3 gap-8 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1 max-[700px]:gap-6">
+                <div className="min-w-0">
+                  <h3 className={partyHeading}>From</h3>
                   {profile?.avatar && (
                     <img
-                      className="workspace-logo-preview"
+                      className="mb-3 max-h-14 max-w-[120px] object-contain"
                       src={profile.avatar}
                       alt={`${profile.businessName || "Business"} logo`}
                     />
                   )}
-                  <strong>
+                  <strong className={partyName}>
                     {profile?.businessName ||
                       `${profile?.firstName || ""} ${profile?.lastName || ""}`}
                   </strong>
@@ -150,14 +157,22 @@ const SingleDocumentPage = () => {
                   ]
                     .filter(Boolean)
                     .map((value, index) => (
-                      <p key={index}>{value}</p>
+                      <p className={partyLine} key={index}>
+                        {value}
+                      </p>
                     ))}
                 </div>
-                <div>
-                  <h3>For</h3>
-                  <strong>{document.customer?.name}</strong>
-                  <p>Customer no. {document.customer?.accountNo || "—"}</p>
-                  <p>VAT / TIN: {document.customer?.vatTinNo || "—"}</p>
+                <div className="min-w-0">
+                  <h3 className={partyHeading}>For</h3>
+                  <strong className={partyName}>
+                    {document.customer?.name}
+                  </strong>
+                  <p className={partyLine}>
+                    Customer no. {document.customer?.accountNo || "—"}
+                  </p>
+                  <p className={partyLine}>
+                    VAT / TIN: {document.customer?.vatTinNo || "—"}
+                  </p>
                   {[
                     document.customer?.email,
                     document.customer?.phoneNumber,
@@ -167,17 +182,26 @@ const SingleDocumentPage = () => {
                   ]
                     .filter(Boolean)
                     .map((value, index) => (
-                      <p key={index}>{value}</p>
+                      <p className={partyLine} key={index}>
+                        {value}
+                      </p>
                     ))}
                 </div>
-                <div>
-                  <h3>Document details</h3>
-                  <p>Issue date</p>
-                  <strong>{dateLabel(document.createdAt)}</strong>
-                  <p>Due date</p>
-                  <strong>{dateLabel(document.dueDate)}</strong>
-                  <p>Total amount</p>
-                  <strong>{money(document.total, document.currency)}</strong>
+                <div className="min-w-0 max-[960px]:col-span-full max-[700px]:col-span-1">
+                  <h3 className={partyHeading}>Document details</h3>
+                  <dl className="grid gap-4 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1">
+                    {[
+                      ["Issue date", document.createdAt],
+                      ["Due date", document.dueDate],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt className={partyLine}>{label}</dt>
+                        <dd className="text-[15px] text-spot-ink">
+                          {dateLabel(value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               </div>
             </Panel>
@@ -189,21 +213,25 @@ const SingleDocumentPage = () => {
                 label="Order details"
               />
             </Panel>
-            <div className="workspace-detail-grid">
-              <div>
+            <div className="grid grid-cols-2 items-start gap-6 compact:gap-5 max-[1100px]:grid-cols-1">
+              <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
                 <Panel title="Additional info">
-                  <p className="workspace-copy">
+                  <p
+                    className={`${copy} ${document.additionalInfo ? "text-spot-body" : "text-spot-faint"}`}
+                  >
                     {document.additionalInfo || "No additional info."}
                   </p>
                 </Panel>
                 <Panel title="Terms & conditions">
-                  <p className="workspace-copy">
+                  <p
+                    className={`${copy} ${document.termsConditions ? "text-spot-body" : "text-spot-faint"}`}
+                  >
                     {document.termsConditions || "No terms provided."}
                   </p>
                 </Panel>
               </div>
               <Panel title="Cost summary">
-                <dl className="workspace-summary-list">
+                <dl className="m-0">
                   {[
                     ["Subtotal", document.subTotal],
                     [
@@ -216,12 +244,30 @@ const SingleDocumentPage = () => {
                       "Balance",
                       Number(document.total || 0) - totalAmountReceived,
                     ],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt>{label}</dt>
-                      <dd>{money(value, document.currency)}</dd>
-                    </div>
-                  ))}
+                  ].map(([label, value], index, rows) => {
+                    const balance = index === rows.length - 1;
+                    return (
+                      <div
+                        key={label}
+                        className={`flex items-baseline justify-between gap-5 ${balance ? "mt-2 border-t border-[#23273514] pt-5" : "py-2.5"}`}
+                      >
+                        <dt className="text-[13.5px] text-spot-body">
+                          {label}
+                        </dt>
+                        <dd className="text-right text-spot-ink [overflow-wrap:anywhere]">
+                          <Amount
+                            value={value}
+                            currency={document.currency}
+                            className={
+                              balance
+                                ? "text-[34px] font-extralight tracking-[-0.05em]"
+                                : "text-[17px] font-light tracking-[-0.03em]"
+                            }
+                          />
+                        </dd>
+                      </div>
+                    );
+                  })}
                 </dl>
               </Panel>
             </div>

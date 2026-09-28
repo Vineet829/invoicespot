@@ -11,12 +11,16 @@ import {
   HoverCard,
   historyHeading,
   historyPanel,
-  hoverLabel,
-  hoverValue,
-  panelNote,
-  sectionTitle,
   useHoverCard,
 } from "../../components/DashboardPanels";
+import {
+  hoverLabel,
+  hoverValue,
+  pageSizeSelect,
+  pagerButton,
+  panelNote,
+  sectionTitle,
+} from "../../../../components/workspace/pastel";
 
 const AVATAR_TONES = [
   "bg-avatar-lilac text-avatar-lilac-ink",
@@ -29,8 +33,6 @@ const cell =
 // On phones each row becomes a small card with labelled fields.
 const mobileField =
   "hidden max-[700px]:mb-1 max-[700px]:block max-[700px]:text-[11px] max-[700px]:text-spot-muted";
-const pageButton =
-  "inline-flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-0 bg-white/70 p-0 text-spot-night transition-colors hover:enabled:bg-white disabled:cursor-default disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 coarse:min-w-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.7]";
 
 const PaymentAmount = ({ amount }) => {
   const formatted = formatMoney(amount);
@@ -243,7 +245,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
         <label className="flex items-center gap-2 text-[12.5px] text-spot-muted">
           Rows per page
           <select
-            className="h-[30px] rounded-[9px] border border-[#23273524] bg-white/80 px-2 text-[12.5px] text-spot-ink coarse:min-h-11 coarse:min-w-11"
+            className={pageSizeSelect}
             value={rowsPerPage}
             onChange={(event) => {
               setRowsPerPage(Number(event.target.value));
@@ -295,7 +297,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
             <button
               type="button"
               key={label}
-              className={`${pageButton} ${primary ? "enabled:bg-white enabled:shadow-key" : ""}`}
+              className={`${pagerButton} ${primary ? "enabled:bg-white enabled:shadow-key" : ""}`}
               aria-label={label}
               disabled={disabled}
               onClick={() => setPage(target)}

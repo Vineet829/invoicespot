@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { FiAlertCircle, FiFileText, FiUsers } from "react-icons/fi";
 import { getStatusRingRatio } from "../dashboardModel";
-
-// Shared overview styles.
-export const sectionTitle =
-  "font-display text-[22px] font-light leading-[normal] tracking-[-0.035em] max-[700px]:text-[21px]";
-export const panelNote = "text-[12.5px] text-spot-muted";
+import {
+  hoverLabel,
+  hoverValue,
+  panelNote,
+  sectionTitle,
+  skeleton,
+} from "../../../components/workspace/pastel";
 
 // A small card that follows the pointer inside a positioned container. It
 // adds detail for mouse users; the same facts stay readable as text or as
@@ -40,10 +42,6 @@ export const HoverCard = ({ card }) =>
       {card.content}
     </div>
   ) : null;
-
-export const hoverLabel = "flex items-center gap-2 text-[12px] text-spot-muted";
-export const hoverValue =
-  "mt-1 block font-display text-[17px] font-light leading-[1.25] tracking-[-0.02em]";
 
 const STATUS_DOTS = ["bg-spot-violet", "bg-spot-lilac", "bg-spot-coral"];
 const RING_STROKES = [
@@ -105,10 +103,7 @@ export const DashboardNumber = ({
 
 // Loading placeholders keep every panel in place and never show figures.
 const Skeleton = ({ className }) => (
-  <span
-    className={`block max-w-full shrink-0 animate-ov-pulse bg-spot-violet/[.08] ${className}`}
-    aria-hidden="true"
-  />
+  <span className={`${skeleton} ${className}`} aria-hidden="true" />
 );
 
 export const OverviewTotals = ({

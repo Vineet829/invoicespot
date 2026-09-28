@@ -2,19 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tailwind's global reset is off (tailwind.config.js), so areas built with
-   Tailwind get the part of it that border utilities rely on. */
+/* Tailwind's global reset is off (tailwind.config.js) so the public pages
+   and Material UI keep their look. The signed-in workspace gets the parts
+   of a reset its utilities rely on. */
 @layer base {
-	.dashboard-pastel *,
-	.dashboard-pastel ::before,
-	.dashboard-pastel ::after {
+	.dashboard-app {
+		font-size: 14px;
+		-webkit-font-smoothing: antialiased;
+		text-rendering: optimizeLegibility;
+	}
+	.dashboard-app *,
+	.dashboard-app ::before,
+	.dashboard-app ::after {
+		box-sizing: border-box;
 		border-width: 0;
 		border-style: solid;
 		border-color: currentColor;
 	}
-	.dashboard-pastel :is(a, button, input, select, [tabindex]):focus-visible {
+	.dashboard-app :is(h1, h2, h3, p, ul, dl, dd) {
+		margin: 0;
+	}
+	.dashboard-app :is(button, input, select) {
+		font: inherit;
+	}
+	.dashboard-app button {
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.dashboard-app button:disabled {
+		cursor: default;
+		opacity: 0.4;
+	}
+	.dashboard-app a {
+		color: inherit;
+		text-decoration: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.dashboard-app svg {
+		flex-shrink: 0;
+	}
+	.dashboard-app :is(a, button, input, select, [tabindex]):focus-visible {
 		outline: 2px solid #5b47a0;
 		outline-offset: 3px;
+	}
+	/* Hidden above the window until it receives keyboard focus. */
+	.dashboard-skip-link {
+		position: fixed;
+		z-index: 10;
+		top: 12px;
+		padding: 10px 16px;
+		border-radius: 8px;
+		transform: translateY(-160%);
+	}
+	.dashboard-skip-link:focus {
+		transform: none;
+	}
+}
+
+/* Reduced motion shows every animation's final state. */
+@media (prefers-reduced-motion: reduce) {
+	.dashboard-app *,
+	.dashboard-app ::before,
+	.dashboard-app ::after {
+		animation: none !important;
+		transition: none !important;
+		scroll-behavior: auto !important;
 	}
 }
 

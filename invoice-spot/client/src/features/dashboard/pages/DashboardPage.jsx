@@ -25,11 +25,18 @@ import {
   financePanelHeading,
   mainColumn,
   overviewLayout,
-  panelNote,
-  sectionTitle,
 } from "../components/DashboardPanels";
+import {
+  errorBanner,
+  errorDetail,
+  errorTitle,
+  pageSubtitle,
+  pageTitle,
+  panelNote,
+  retryButton,
+  sectionTitle,
+} from "../../../components/workspace/pastel";
 import PaymentHistory from "./components/paymentHistory";
-import "../../../styles/dashboard.css";
 
 const EMPTY_DOCUMENTS = [];
 
@@ -64,16 +71,16 @@ const DashboardPage = () => {
   };
 
   return (
-    <DashboardShell appearance="pastel">
+    <DashboardShell fit>
       <div
         className={`flex min-h-0 min-w-0 flex-1 flex-col gap-[22px] compact:gap-4${hasError ? " has-error" : ""}`}
       >
         <header className="flex flex-[0_0_84px] animate-ov-rise items-end justify-between gap-8 compact:basis-[72px] max-[1359px]:items-start max-[1359px]:gap-5 max-[700px]:flex-wrap">
           <div className="min-w-0">
-            <h1 className="font-display text-[54px] font-extralight leading-none tracking-[-0.055em] compact:text-[46px] max-[1359px]:text-[38px] max-[700px]:text-[clamp(29px,7.4vw,38px)] [&>span]:text-spot-brand">
+            <h1 className={pageTitle}>
               Business overview<span>.</span>
             </h1>
-            <p className="mt-2.5 text-[14.5px] text-spot-sub compact:mt-2 max-[1359px]:text-[13px] max-[700px]:leading-[1.6]">
+            <p className={pageSubtitle}>
               Your documents, payments, and customers at a glance{" "}
               <span className="whitespace-nowrap max-[700px]:whitespace-normal">
                 · {today}
@@ -89,18 +96,15 @@ const DashboardPage = () => {
           />
         </header>
         {hasError && (
-          <div
-            className="m-0 flex items-center gap-3.5 rounded-xl border border-white/90 bg-overdue/85 px-5 py-[18px] text-overdue-ink max-[600px]:flex-wrap max-[600px]:items-start [&>svg]:size-5 [&>svg]:shrink-0"
-            role="alert"
-          >
+          <div className={errorBanner} role="alert">
             <FiAlertCircle aria-hidden="true" />
             <div className="flex-1">
-              <strong className="block text-[14px] font-medium">
+              <strong className={errorTitle}>
                 {documentsQuery.isError && !documentsQuery.data
                   ? "We couldn’t load your overview."
                   : "Some workspace data couldn’t be refreshed."}
               </strong>
-              <span className="mt-1 block text-[12px] text-overdue-muted">
+              <span className={errorDetail}>
                 {documentsQuery.data
                   ? "Your last loaded figures are still shown. Try refreshing."
                   : "Please try again to see your latest figures."}
@@ -108,7 +112,7 @@ const DashboardPage = () => {
             </div>
             <button
               type="button"
-              className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-spot-violet/15 bg-white/70 px-4 py-[11px] text-[13px] font-medium leading-[1.4] text-spot-night transition-colors hover:enabled:bg-white max-[600px]:ml-[34px]"
+              className={retryButton}
               onClick={refresh}
               disabled={refreshing}
             >

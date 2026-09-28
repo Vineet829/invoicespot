@@ -19,6 +19,10 @@ import {
   ErrorState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import {
+  rowAction,
+  rowActionDanger,
+} from "../../../components/workspace/pastel";
 
 const CustomersPage = () => {
   useTitle("Clients — Invoice Spot");
@@ -41,26 +45,27 @@ const CustomersPage = () => {
   const columns = [
     {
       label: "No.",
-      className: "workspace-cell-index",
+      type: "index",
       render: (_row, index) => pagination.start + index + 1,
     },
     {
       label: "Name",
-      className: "workspace-cell-main",
+      type: "main",
       render: (row) => row.name,
     },
     {
       label: "Email",
-      className: "workspace-cell-email",
+      type: "email",
       render: (row) => row.email,
     },
     { label: "Phone", render: (row) => row.phoneNumber || "—" },
     { label: "Account no.", render: (row) => row.accountNo },
     {
       label: "View details",
+      type: "action",
       render: (row) => (
         <Link
-          className="workspace-row-action"
+          className={rowAction}
           to={`/single-customer/${row._id}`}
           aria-label={`View ${row.name}`}
         >
@@ -71,9 +76,11 @@ const CustomersPage = () => {
     },
     {
       label: "Delete",
+      type: "action",
       render: (row) => (
         <button
-          className="workspace-row-action is-danger"
+          type="button"
+          className={rowActionDanger}
           onClick={() => setSelected(row)}
           aria-label={`Delete ${row.name}`}
         >
@@ -84,7 +91,7 @@ const CustomersPage = () => {
     },
   ];
   return (
-    <WorkspacePage section="Clients" customerCount={query.data?.totalCustomers}>
+    <WorkspacePage section="Clients">
       <PageHeader
         title="Clients"
         description="The people behind your work. Keep their details close at hand."
@@ -99,14 +106,7 @@ const CustomersPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel
-          title="Your clients"
-          aside={
-            <span className="workspace-total">
-              Total <strong>{query.data?.totalCustomers || 0}</strong>
-            </span>
-          }
-        >
+        <Panel title="Your clients">
           {rows.length ? (
             <>
               <DataTable
