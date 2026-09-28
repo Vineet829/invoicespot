@@ -1,3 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tailwind's global reset is off (tailwind.config.js), so areas built with
+   Tailwind get the part of it that border utilities rely on. */
+@layer base {
+	.dashboard-pastel *,
+	.dashboard-pastel ::before,
+	.dashboard-pastel ::after {
+		border-width: 0;
+		border-style: solid;
+		border-color: currentColor;
+	}
+	.dashboard-pastel :is(a, button, input, select, [tabindex]):focus-visible {
+		outline: 2px solid #5b47a0;
+		outline-offset: 3px;
+	}
+}
+
 body {
 	margin: 0;
 	padding: 0;

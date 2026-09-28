@@ -58,3 +58,55 @@ export const formatDate = (value) => {
       })
     : "—";
 };
+
+// Ratios only describe the existing amounts; invalid comparisons have no bars.
+export const getFinanceBarRatios = ({
+  expectedIncome,
+  cashReceived,
+  cashPending,
+}) => {
+  if (
+    !Number.isFinite(expectedIncome) ||
+    expectedIncome <= 0 ||
+    ![cashReceived, cashPending].every(
+      (amount) =>
+        Number.isFinite(amount) && amount >= 0 && amount <= expectedIncome,
+    )
+  ) {
+    return null;
+  }
+  return {
+    expected: 1,
+    received: cashReceived / expectedIncome,
+    pending: cashPending / expectedIncome,
+  };
+};
+
+// An empty or invalid status draws only its track. Overdue is never a ring.
+export const getStatusRingRatio = (count, total) =>
+  Number.isFinite(total) &&
+  total > 0 &&
+  Number.isFinite(count) &&
+  count >= 0 &&
+  count <= total
+    ? count / total
+    : 0;
+
+// The document each recorded payment belongs to, keyed like the payment ids
+// in getDashboardSnapshot. Payment hover details read the document from here.
+export const getPaymentDocuments = (documents) =>
+  new Map(
+    documents.flatMap((document) =>
+      (document.paymentRecords || []).map((_payment, index) => [
+        `${document._id}-${index}`,
+        document,
+      ]),
+    ),
+  );
+
+// Stored status values, in the words the overview uses for them.
+export const STATUS_LABELS = {
+  Paid: "Paid",
+  "Not Fully Paid": "Partially paid",
+  "Not Paid": "Unpaid",
+};

@@ -2,6 +2,9 @@ import {
   formatDate,
   formatMoney,
   getDashboardSnapshot,
+  getFinanceBarRatios,
+  getPaymentDocuments,
+  getStatusRingRatio,
 } from "./dashboardModel";
 
 const now = new Date("2026-09-28T12:00:00.000Z");
@@ -55,6 +58,58 @@ it("preserves the original totals, backend status categories, and due-date count
   expect(summary.payments[0].amountPaid).toBe(35);
 });
 
+describe("finance bar comparisons", () => {
+  it("compares each existing amount with expected income", () => {
+    expect(
+      getFinanceBarRatios({
+        expectedIncome: 100,
+        cashReceived: 25,
+        cashPending: 75,
+      }),
+    ).toEqual({ expected: 1, received: 0.25, pending: 0.75 });
+  });
+
+  it.each([
+    [100, 0, 100, { expected: 1, received: 0, pending: 1 }],
+    [100, 100, 0, { expected: 1, received: 1, pending: 0 }],
+    [0, 0, 0, null],
+    [-100, 0, -100, null],
+    [100, 110, -10, null],
+    [100, -10, 110, null],
+    [100, 101, 0, null],
+    [100, 0, 101, null],
+    [Infinity, 0, 0, null],
+    [100, NaN, 100, null],
+    [100, 0, undefined, null],
+  ])(
+    "handles expected %s, received %s, pending %s",
+    (expectedIncome, cashReceived, cashPending, result) => {
+      expect(
+        getFinanceBarRatios({ expectedIncome, cashReceived, cashPending }),
+      ).toEqual(result);
+    },
+  );
+});
+
+describe("status ring comparisons", () => {
+  it.each([
+    [4, 12, 1 / 3],
+    [3, 12, 0.25],
+    [5, 12, 5 / 12],
+    [12, 12, 1],
+    [0, 12, 0],
+    [0, 0, 0],
+    [1, 0, 0],
+    [-1, 12, 0],
+    [13, 12, 0],
+    [NaN, 12, 0],
+    [1, Infinity, 0],
+    [undefined, 12, 0],
+  ])("draws count %s against total %s as %s", (count, total, ratio) => {
+    expect(getStatusRingRatio(count, total)).toBe(ratio);
+  });
+});
+
 it("keeps every original payment-history field and sorts recorded payments newest first", () => {
   const older = {
     paidBy: "First client",
@@ -98,4 +153,32 @@ it("shows empty data safely without creating payment records or inferred statuse
   expect(formatMoney(undefined)).toBe("0.00");
   expect(formatMoney(1234.5)).toBe("1,234.50");
   expect(formatDate("invalid")).toBe("—");
+});
+
+it("finds the document behind every payment the history shows", () => {
+  const invoice = {
+    _id: "invoice",
+    documentNumber: "INV-1",
+    paymentRecords: [
+      { amountPaid: 10, datePaid: "2026-09-01" },
+      { amountPaid: 20, datePaid: "2026-09-02" },
+    ],
+  };
+  const receipt = {
+    _id: "receipt",
+    documentNumber: "REC-1",
+    paymentRecords: [{ amountPaid: 5, datePaid: "2026-09-03" }],
+  };
+  const documents = [invoice, receipt, { _id: "quote" }];
+  const byPayment = getPaymentDocuments(documents);
+  // Every payment id in the history resolves to its own document.
+  const ids = getDashboardSnapshot(documents, now).payments.map(
+    (payment) => payment.id,
+  );
+  expect(ids.map((id) => byPayment.get(id)?.documentNumber)).toEqual([
+    "REC-1",
+    "INV-1",
+    "INV-1",
+  ]);
+  expect(byPayment.size).toBe(3);
 });
