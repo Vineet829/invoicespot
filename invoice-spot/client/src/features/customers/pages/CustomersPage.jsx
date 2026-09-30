@@ -52,6 +52,7 @@ import {
   secondaryIconButton,
   toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 
 const NO_CLIENTS = [];
 
@@ -80,6 +81,9 @@ const CustomersPage = () => {
     if (pages && list.page > pages) update({ page: pages });
   }, [pages, list.page, update]);
 
+  const { reason } = useBusiness();
+  const editRefusal = reason("EDIT_RECORDS");
+  const deleteRefusal = reason("DELETE_RECORDS");
   const [selected, setSelected] = useState(null);
   const [deleteCustomer, { isLoading: deleting }] = useDeleteCustomerMutation();
   const remove = async () => {
@@ -161,6 +165,9 @@ const CustomersPage = () => {
           className={rowActionDanger}
           onClick={() => setSelected(row)}
           aria-label={`Delete ${row.name}`}
+          disabled={Boolean(deleteRefusal)}
+          title={deleteRefusal}
+          aria-describedby={deleteRefusal ? "client-delete-refusal" : undefined}
         >
           <FiTrash2 aria-hidden="true" />
           <span>Delete</span>
@@ -220,6 +227,9 @@ const CustomersPage = () => {
               type="button"
               className={secondaryButton}
               onClick={() => setImporting(true)}
+              disabled={Boolean(editRefusal)}
+              title={editRefusal}
+              aria-describedby={editRefusal ? "client-edit-refusal" : undefined}
             >
               <FiUpload aria-hidden="true" /> Import
             </button>
@@ -238,12 +248,14 @@ const CustomersPage = () => {
             >
               <FiDownload aria-hidden="true" />
             </button>
-            <ActionLink to="/create-customer">
+            <ActionLink to="/create-customer" reason={editRefusal}>
               <FiPlus aria-hidden="true" /> Add client
             </ActionLink>
           </>
         }
       />
+      <RefusalNote id="client-edit-refusal" reason={editRefusal} />
+      <RefusalNote id="client-delete-refusal" reason={deleteRefusal} />
       {query.isLoading ? (
         <LoadingState />
       ) : (

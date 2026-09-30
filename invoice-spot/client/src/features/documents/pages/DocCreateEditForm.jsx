@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FiBookmark,
   FiCheck,
+  FiLock,
   FiPlus,
   FiRepeat,
   FiTrash2,
@@ -19,6 +20,7 @@ import { useGetWorkspaceCustomersQuery } from "../../workspace/workspaceApiSlice
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import NewClientDialog from "../../customers/components/NewClientDialog";
 import { matchClients } from "./documentEditorModel";
+import { useBusiness } from "../../business/permissions";
 import {
   useCreateItemMutation,
   useGetItemsQuery,
@@ -30,6 +32,7 @@ import {
   Field,
   LoadingState,
   ErrorState,
+  EmptyState,
   StatusBadge,
   Amount,
   dateInput,
@@ -545,6 +548,7 @@ const DocCreateEditForm = () => {
   const clientId = id ? null : params.get("client");
   const navigate = useNavigate();
   useTitle(`${id ? "Edit document" : "Create document"} — Invoice Spot`);
+  const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const query = useGetSingleDocQuery(id, { skip: !id });
   const clients = useGetWorkspaceCustomersQuery();
   const settings = useGetSettingsQuery();
@@ -570,7 +574,13 @@ const DocCreateEditForm = () => {
         title={id ? "Edit document" : "Create document"}
         description="The details of your work, presented with care."
       />
-      {(id && query.isLoading) || clients.isLoading || settings.isLoading ? (
+      {editRefusal ? (
+        <EmptyState
+          title="This business is view only for you."
+          text={`${editRefusal}.`}
+          icon={FiLock}
+        />
+      ) : (id && query.isLoading) || clients.isLoading || settings.isLoading ? (
         <LoadingState />
       ) : query.isError || clients.isError ? (
         <ErrorState

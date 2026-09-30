@@ -14,6 +14,7 @@ import useListState from "../../../hooks/useListState";
 import useFileDownload from "../../../hooks/useFileDownload";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import DocumentsTabs from "../components/DocumentsTabs";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
   useDeleteDocMutation,
   useGetAllMyDocsQuery,
@@ -86,6 +87,8 @@ const DocumentsPage = () => {
     if (pages && list.page > pages) update({ page: pages });
   }, [pages, list.page, update]);
 
+  const { reason } = useBusiness();
+  const deleteRefusal = reason("DELETE_RECORDS");
   const [selected, setSelected] = useState(null);
   const [deleteDoc, { isLoading: deleting }] = useDeleteDocMutation();
   const remove = async () => {
@@ -159,6 +162,11 @@ const DocumentsPage = () => {
           className={rowActionDanger}
           onClick={() => setSelected(row)}
           aria-label={`Delete ${row.documentNumber}`}
+          disabled={Boolean(deleteRefusal)}
+          title={deleteRefusal}
+          aria-describedby={
+            deleteRefusal ? "document-delete-refusal" : undefined
+          }
         >
           <FiTrash2 aria-hidden="true" />
           <span>Delete</span>
@@ -230,12 +238,13 @@ const DocumentsPage = () => {
             >
               <FiDownload aria-hidden="true" />
             </button>
-            <ActionLink to="/create-doc">
+            <ActionLink to="/create-doc" reason={reason("EDIT_RECORDS")}>
               <FiPlus aria-hidden="true" /> Create document
             </ActionLink>
           </>
         }
       />
+      <RefusalNote id="document-delete-refusal" reason={deleteRefusal} />
       {query.isLoading ? (
         <LoadingState />
       ) : (

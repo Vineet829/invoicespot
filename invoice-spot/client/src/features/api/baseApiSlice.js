@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { logIn, logOut } from "../auth/authSlice";
+import { businessChanged } from "../business/businessSlice";
 
 const baseQuery = fetchBaseQuery({
   baseUrl:
@@ -16,9 +17,21 @@ const baseQuery = fetchBaseQuery({
     } else if (googleToken) {
       headers.set("authorization", `Bearer ${googleToken}`);
     }
+    const businessId = getState().business?.activeId;
+    if (businessId) headers.set("x-business-id", businessId);
     return headers;
   },
 });
+
+// A 409 naming the session's business means another tab switched it, or the
+// user is no longer in any. The app then starts over in that business.
+const followBusiness = (response, api) => {
+  const moved =
+    response?.error?.status === 409 &&
+    response.meta?.response?.headers?.get("X-Active-Business");
+  if (moved) api.dispatch(businessChanged(moved === "none" ? null : moved));
+  return response;
+};
 
 let refreshInFlight;
 
@@ -27,7 +40,10 @@ let refreshInFlight;
 const rejectedToken = (error) =>
   (error?.originalStatus ?? error?.status) === 403 && !error?.data;
 
-const baseQueryWithRefreshToken = async (args, api, extraOptions) => {
+const baseQueryWithRefreshToken = async (args, api, extraOptions) =>
+  followBusiness(await refreshingQuery(args, api, extraOptions), api);
+
+const refreshingQuery = async (args, api, extraOptions) => {
   // A dashboard loads several resources at once. Rotate its cookie once, then
   // let every waiting request use the same new access token.
   if (refreshInFlight) await refreshInFlight;
@@ -76,6 +92,9 @@ export const baseApiSlice = createApi({
     "Session",
     "TwoFactor",
     "Activity",
+    "Business",
+    "Team",
+    "Invitation",
   ],
   endpoints: (builder) => ({}),
 });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Formik, useField } from "formik";
 import * as Yup from "yup";
@@ -112,6 +112,8 @@ const RegisterPage = () => {
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  // An invitation sends people here with the address it was sent to.
+  const invitedEmail = useLocation().state?.email || "";
 
   const [registerUser, { isLoading: registering }] = useRegisterUserMutation();
   const [loginUser, { isLoading: loggingIn }] = useLoginUserMutation();
@@ -155,7 +157,7 @@ const RegisterPage = () => {
               firstName: "",
               lastName: "",
               username: "",
-              email: "",
+              email: invitedEmail,
               password: "",
               passwordConfirm: "",
             }}

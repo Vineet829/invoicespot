@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiBarChart2,
+  FiBriefcase,
   FiFileText,
   FiGrid,
   FiList,
@@ -13,11 +14,13 @@ import {
   FiSettings,
   FiShield,
   FiUser,
+  FiUserCheck,
   FiUserPlus,
   FiUsers,
 } from "react-icons/fi";
 import { useGetAllUserCustomersQuery } from "../customers/customersApiSlice";
 import { useGetAllMyDocsQuery } from "../documents/documentsApiSlice";
+import { useBusiness } from "../business/permissions";
 
 const PAGES = [
   { to: "/dashboard", label: "Overview", icon: FiGrid },
@@ -28,6 +31,8 @@ const PAGES = [
   { to: "/reports", label: "Reports", icon: FiBarChart2 },
   { to: "/profile", label: "Profile", icon: FiUser },
   { to: "/settings", label: "Settings", icon: FiSettings },
+  { to: "/settings/business", label: "Business details", icon: FiBriefcase },
+  { to: "/settings/team", label: "Team", icon: FiUserCheck },
   { to: "/settings/security", label: "Security", icon: FiLock },
   { to: "/users", label: "Administration", icon: FiShield, admin: true },
   { to: "/users/audit", label: "Audit log", icon: FiList, admin: true },
@@ -80,6 +85,7 @@ const Palette = ({ isAdmin, onClose }) => {
   const clients = useGetAllUserCustomersQuery(search, { skip: !query });
   const documents = useGetAllMyDocsQuery(search, { skip: !query });
   const typed = text.trim();
+  const canCreate = useBusiness().can("EDIT_RECORDS");
 
   const groups = [
     {
@@ -90,8 +96,9 @@ const Palette = ({ isAdmin, onClose }) => {
     },
     {
       label: "Create",
-      options: ACTIONS.filter((action) =>
-        matches(`${action.label} ${action.hint || ""}`, typed),
+      options: ACTIONS.filter(
+        (action) =>
+          canCreate && matches(`${action.label} ${action.hint || ""}`, typed),
       ).map((action) => ({ ...action, key: action.to, meta: "Action" })),
     },
     {

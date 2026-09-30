@@ -25,6 +25,10 @@ import useAuthUser from "../../../hooks/useAuthUser";
 import { brandMark, iconButton } from "../../../components/workspace/pastel";
 import CommandPalette from "../../shell/CommandPalette";
 import NotificationBell from "../../notifications/NotificationBell";
+import BusinessSwitcher, {
+  ROLE_LABELS,
+} from "../../business/components/BusinessSwitcher";
+import { useGetBusinessesQuery } from "../../business/businessApiSlice";
 
 const navLink =
   "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
@@ -57,11 +61,10 @@ const ui = {
     "flex min-h-11 items-center justify-between gap-3 rounded-[14px] px-3.5 text-[14.5px] text-spot-nav hover:bg-white/[.34] hover:text-spot-night [&>svg]:size-[17px]",
   account:
     "flex items-center gap-2 rounded-[18px] border border-white/85 bg-white/[.62] py-2.5 pl-2.5 pr-1 coarse:flex-wrap",
-  accountLink:
-    "flex min-w-0 flex-1 items-center gap-2 coarse:min-h-11 coarse:basis-[145px]",
-  accountText: "min-w-0",
-  accountName: "block truncate text-[15px] font-medium text-spot-ink",
-  accountRole: "block truncate text-[12.5px] text-spot-muted",
+  accountLink: "flex min-w-0 flex-1 items-center gap-2 coarse:basis-[145px]",
+  accountText: "flex min-w-0 flex-col items-start",
+  accountName:
+    "block max-w-full truncate text-[15px] font-medium text-spot-ink coarse:py-[13px]",
   avatar:
     "grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac font-ui text-[12.5px] font-normal leading-none text-[#3f2f6e]",
   iconButton: `${iconButton} size-9`,
@@ -97,6 +100,9 @@ const DashboardShell = ({
 }) => {
   const { user, googleToken } = useSelector((state) => state.auth);
   const { isAdmin } = useAuthUser();
+  const business = useGetBusinessesQuery().data?.businesses?.find(
+    (candidate) => candidate.active,
+  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [logoutUser, { isLoading: signingOut }] = useLogoutUserMutation();
@@ -238,22 +244,37 @@ const DashboardShell = ({
           Back to homepage <FiArrowUpRight aria-hidden="true" />
         </Link>
         <div className={ui.account}>
-          <Link
-            to="/profile"
-            className={ui.accountLink}
-            aria-label={`Profile for ${name}`}
-            title={name}
-          >
-            <span className={ui.avatar} aria-hidden="true">
+          <div className={ui.accountLink}>
+            <Link
+              to="/profile"
+              className={ui.avatar}
+              tabIndex={-1}
+              aria-hidden="true"
+            >
               {initials}
-            </span>
+            </Link>
             <span className={ui.accountText}>
-              <strong className={ui.accountName}>{name}</strong>
-              <small className={ui.accountRole}>
-                {isAdmin ? "Administrator" : "Personal workspace"}
-              </small>
+              <Link
+                to="/profile"
+                className={ui.accountName}
+                aria-label={`Profile for ${name}`}
+                title={name}
+              >
+                {name}
+              </Link>
+              <BusinessSwitcher
+                label={
+                  business
+                    ? business.role === "OWNER"
+                      ? business.name
+                      : `${business.name} · ${ROLE_LABELS[business.role]}`
+                    : isAdmin
+                      ? "Administrator"
+                      : "Personal workspace"
+                }
+              />
             </span>
-          </Link>
+          </div>
           <button
             className={ui.signOutButton}
             onClick={signOut}

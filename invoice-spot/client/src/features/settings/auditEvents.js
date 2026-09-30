@@ -18,6 +18,16 @@ export const EVENT_LABELS = {
   USER_DELETED: "Deleted by an admin",
   ADMIN_GRANTED: "Made an admin",
   ADMIN_REVOKED: "Admin role removed",
+  BUSINESS_CREATED: "Business started",
+  MEMBER_ROLE_CHANGED: "Role changed",
+  MEMBER_REMOVED: "Removed from the business",
+  MEMBER_LEFT: "Left the business",
+  OWNERSHIP_TRANSFERRED: "Business handed over",
+  BUSINESS_DELETED: "Business deleted",
+  MEMBER_INVITED: "Invitation sent",
+  INVITATION_RESENT: "Invitation sent again",
+  INVITATION_REVOKED: "Invitation withdrawn",
+  MEMBER_JOINED: "Joined the business",
 };
 
 // Entries that may mean someone else is trying the account.

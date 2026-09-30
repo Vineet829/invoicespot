@@ -39,6 +39,7 @@ import {
 } from "../recurringApiSlice";
 import { frequencyLabel } from "../frequencies";
 import ScheduleDialog from "../components/ScheduleDialog";
+import { useBusiness } from "../../business/permissions";
 
 const NO_SCHEDULES = [];
 
@@ -53,6 +54,7 @@ const RecurringPage = () => {
   const [removing, setRemoving] = useState(null);
   const [setPaused, { isLoading: pausing }] = useSetSchedulePausedMutation();
   const [remove, { isLoading: deleting }] = useDeleteScheduleMutation();
+  const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const togglePause = async (schedule) => {
     try {
       const result = await setPaused({
@@ -171,6 +173,12 @@ const RecurringPage = () => {
       ),
     },
   ];
+  // Viewers see the schedules, but not the ways to change them.
+  const shown = editRefusal
+    ? columns.filter(
+        (column) => !["Edit", "Pause", "Stop"].includes(column.label),
+      )
+    : columns;
   return (
     <WorkspacePage section="Documents">
       <PageHeader
@@ -179,7 +187,7 @@ const RecurringPage = () => {
         actions={
           <>
             <DocumentsTabs />
-            <ActionLink to="/create-doc">
+            <ActionLink to="/create-doc" reason={editRefusal}>
               <FiPlus aria-hidden="true" /> Create document
             </ActionLink>
           </>
@@ -196,7 +204,7 @@ const RecurringPage = () => {
         >
           {schedules.length ? (
             <DataTable
-              columns={columns}
+              columns={shown}
               rows={schedules}
               label="Recurring invoices"
             />

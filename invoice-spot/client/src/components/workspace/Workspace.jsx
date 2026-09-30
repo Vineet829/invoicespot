@@ -121,15 +121,41 @@ export const PageHeader = ({ title, description, actions, back }) => {
   );
 };
 
-export const ActionLink = ({ children, to, secondary = false, ...props }) => (
-  <Link
-    to={to}
-    className={secondary ? secondaryButton : primaryButton}
-    {...props}
-  >
-    {children}
-  </Link>
-);
+// A link styled as a button. With a `reason`, it can't be followed, and the
+// reason is shown on hover and read out with it.
+export const ActionLink = ({
+  children,
+  to,
+  secondary = false,
+  reason,
+  ...props
+}) => {
+  const noteId = useId();
+  const className = secondary ? secondaryButton : primaryButton;
+  if (reason) {
+    return (
+      <>
+        <button
+          type="button"
+          className={className}
+          disabled
+          title={reason}
+          aria-describedby={noteId}
+        >
+          {children}
+        </button>
+        <span id={noteId} className="sr-only">
+          {reason}
+        </span>
+      </>
+    );
+  }
+  return (
+    <Link to={to} className={className} {...props}>
+      {children}
+    </Link>
+  );
+};
 export const Panel = ({
   children,
   title,

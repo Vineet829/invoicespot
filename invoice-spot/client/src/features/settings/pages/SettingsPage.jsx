@@ -32,6 +32,7 @@ import {
 } from "../../documents/documentsApiSlice";
 import { useGetCustomersCsvMutation } from "../../customers/customersApiSlice";
 import SettingsTabs from "../components/SettingsTabs";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
   useGetDataExportMutation,
   useGetSettingsQuery,
@@ -68,6 +69,7 @@ const NUMBERING = [
 ];
 
 const SettingsForm = ({ settings }) => {
+  const refusal = useBusiness().reason("MANAGE_BUSINESS");
   const [values, setValues] = useState({
     defaultCurrency: settings.defaultCurrency,
     paymentTermsDays: String(settings.paymentTermsDays),
@@ -117,8 +119,10 @@ const SettingsForm = ({ settings }) => {
       toast.error(errorMessage(error, "Your settings could not be saved."));
     }
   };
+  const locked = saving || Boolean(refusal);
   return (
     <form className="flex flex-col gap-6 compact:gap-5" onSubmit={submit}>
+      {refusal && <p className={panelNote}>{refusal}.</p>}
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-start gap-6 compact:gap-5 max-[1100px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
           <Panel
@@ -131,7 +135,7 @@ const SettingsForm = ({ settings }) => {
                 as="select"
                 value={values.defaultCurrency}
                 onChange={change("defaultCurrency")}
-                disabled={saving}
+                disabled={locked}
               >
                 {currencies.map((item) => (
                   <option key={item.code} value={item.code}>
@@ -148,7 +152,7 @@ const SettingsForm = ({ settings }) => {
                 required
                 value={values.paymentTermsDays}
                 onChange={change("paymentTermsDays")}
-                disabled={saving}
+                disabled={locked}
                 hint="The due date is this many days after the issue date."
               />
               <Field
@@ -157,7 +161,7 @@ const SettingsForm = ({ settings }) => {
                 maxLength={20}
                 value={values.taxLabel}
                 onChange={change("taxLabel")}
-                disabled={saving}
+                disabled={locked}
                 hint="Shown on documents and PDFs, such as VAT or GST."
               />
               <Field
@@ -169,7 +173,7 @@ const SettingsForm = ({ settings }) => {
                 required
                 value={values.defaultTaxRate}
                 onChange={change("defaultTaxRate")}
-                disabled={saving}
+                disabled={locked}
               />
               <Field
                 label="Notes"
@@ -177,7 +181,7 @@ const SettingsForm = ({ settings }) => {
                 maxLength={5000}
                 value={values.defaultNotes}
                 onChange={change("defaultNotes")}
-                disabled={saving}
+                disabled={locked}
                 className="col-span-full"
               />
               <Field
@@ -186,7 +190,7 @@ const SettingsForm = ({ settings }) => {
                 maxLength={5000}
                 value={values.defaultTerms}
                 onChange={change("defaultTerms")}
-                disabled={saving}
+                disabled={locked}
                 className="col-span-full"
               />
             </div>
@@ -201,7 +205,7 @@ const SettingsForm = ({ settings }) => {
                 className="size-[18px] shrink-0 accent-spot-violet"
                 checked={values.remindersEnabled}
                 onChange={toggle("remindersEnabled")}
-                disabled={saving}
+                disabled={locked}
               />
               Send reminders automatically
             </label>
@@ -271,7 +275,7 @@ const SettingsForm = ({ settings }) => {
               maxLength={5000}
               value={values.emailMessage}
               onChange={change("emailMessage")}
-              disabled={saving}
+              disabled={locked}
               hint="{client}, {document} and {business} are filled in for each email. Leave it empty for the standard message."
             />
           </Panel>
@@ -296,7 +300,7 @@ const SettingsForm = ({ settings }) => {
                     maxLength={20}
                     value={values[prefix]}
                     onChange={change(prefix)}
-                    disabled={saving}
+                    disabled={locked}
                   />
                   <Field
                     label={`Next ${type.toLowerCase().replace(/s$/, "")} number`}
@@ -307,7 +311,7 @@ const SettingsForm = ({ settings }) => {
                     required
                     value={values[next]}
                     onChange={change(next)}
-                    disabled={saving}
+                    disabled={locked}
                   />
                 </fieldset>
               ))}
@@ -319,7 +323,7 @@ const SettingsForm = ({ settings }) => {
               as="select"
               value={values.timeZone}
               onChange={change("timeZone")}
-              disabled={saving}
+              disabled={locked}
             >
               {timeZones(values.timeZone).map((zone) => (
                 <option key={zone} value={zone}>
@@ -331,7 +335,12 @@ const SettingsForm = ({ settings }) => {
         </div>
       </div>
       <div className="flex justify-end max-[700px]:[&>*]:flex-1">
-        <button type="submit" className={primaryButton} disabled={saving}>
+        <button
+          type="submit"
+          className={primaryButton}
+          disabled={locked}
+          title={refusal}
+        >
           <FiCheck aria-hidden="true" />
           {saving ? "Saving…" : "Save settings"}
         </button>
@@ -350,6 +359,7 @@ const YourData = () => {
   const [everything, everythingBusy] = useFileDownload(
     useGetDataExportMutation,
   );
+  const archiveRefusal = useBusiness().reason("EXPORT_ARCHIVE");
   const today = dateInput();
   const files = [
     {
@@ -379,14 +389,19 @@ const YourData = () => {
       title="Your data"
       description="Download what you keep in Invoice Spot as CSV files, which open in any spreadsheet, or everything at once as a ZIP file with your items, recurring invoices, settings and profile too."
       aside={
-        <button
-          type="button"
-          className={`${secondaryButton} shrink-0`}
-          onClick={() => everything(null, `invoice-spot-export-${today}.zip`)}
-          disabled={everythingBusy}
-        >
-          <FiArchive aria-hidden="true" /> Download everything
-        </button>
+        <>
+          <button
+            type="button"
+            className={`${secondaryButton} shrink-0`}
+            onClick={() => everything(null, `invoice-spot-export-${today}.zip`)}
+            disabled={everythingBusy || Boolean(archiveRefusal)}
+            title={archiveRefusal}
+            aria-describedby={archiveRefusal ? "archive-refusal" : undefined}
+          >
+            <FiArchive aria-hidden="true" /> Download everything
+          </button>
+          <RefusalNote id="archive-refusal" reason={archiveRefusal} />
+        </>
       }
     >
       <ul className="m-0 grid list-none grid-cols-3 gap-4 p-0 max-[1100px]:grid-cols-1">

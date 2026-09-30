@@ -18,6 +18,8 @@ import {
   useGetSingleDocQuery,
 } from "../documentsApiSlice";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
+import { useGetBusinessQuery } from "../../business/businessApiSlice";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import { useDocumentPdf } from "../useDocumentPdf";
 import EmailDocumentDialog from "../components/EmailDocumentDialog";
@@ -65,6 +67,19 @@ const SingleDocumentPage = () => {
   const settings = useGetSettingsQuery();
   const document = query.data?.document;
   const profile = profileQuery.data?.userProfile;
+  const business = useGetBusinessQuery().data?.business;
+  const { reason } = useBusiness();
+  const editRefusal = reason("EDIT_RECORDS");
+  // Sending is refused to viewers, and turned off for the demo account.
+  const sendNote = editRefusal || (profile?.demo ? DEMO_EMAIL_NOTE : undefined);
+  const sendNoteId = editRefusal ? "document-edit-refusal" : "demo-email-note";
+  // Shown only when it differs from the name the business trades under.
+  const legalName =
+    business?.legalName &&
+    business.legalName.trim().toLowerCase() !==
+      business.name?.trim().toLowerCase()
+      ? business.legalName
+      : null;
   const [emailing, setEmailing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [reminding, setReminding] = useState(false);
@@ -150,7 +165,7 @@ const SingleDocumentPage = () => {
         actions={
           document && (
             <>
-              <ActionLink to={`/edit-doc/${id}`} secondary>
+              <ActionLink to={`/edit-doc/${id}`} secondary reason={editRefusal}>
                 <FiEdit2 aria-hidden="true" /> Edit document
               </ActionLink>
               <button
@@ -179,10 +194,13 @@ const SingleDocumentPage = () => {
                 type="button"
                 className={secondaryIconButton}
                 onClick={duplicate}
-                disabled={duplicating}
+                disabled={duplicating || Boolean(editRefusal)}
                 aria-busy={duplicating}
                 aria-label="Duplicate"
-                title="Duplicate"
+                title={editRefusal || "Duplicate"}
+                aria-describedby={
+                  editRefusal ? "document-edit-refusal" : undefined
+                }
               >
                 <FiCopy aria-hidden="true" />
               </button>
@@ -190,8 +208,12 @@ const SingleDocumentPage = () => {
                 type="button"
                 className={secondaryIconButton}
                 onClick={() => setSharing(true)}
+                disabled={Boolean(editRefusal)}
                 aria-label="Share link"
-                title="Share link"
+                title={editRefusal || "Share link"}
+                aria-describedby={
+                  editRefusal ? "document-edit-refusal" : undefined
+                }
               >
                 <FiLink aria-hidden="true" />
               </button>
@@ -200,8 +222,12 @@ const SingleDocumentPage = () => {
                   type="button"
                   className={secondaryButton}
                   onClick={convert}
-                  disabled={converting}
+                  disabled={converting || Boolean(editRefusal)}
                   aria-busy={converting}
+                  title={editRefusal}
+                  aria-describedby={
+                    editRefusal ? "document-edit-refusal" : undefined
+                  }
                 >
                   <FiRepeat aria-hidden="true" />
                   {converting ? "Converting…" : "Convert to invoice"}
@@ -213,11 +239,9 @@ const SingleDocumentPage = () => {
                     type="button"
                     className={secondaryButton}
                     onClick={() => setReminding(true)}
-                    disabled={profile?.demo}
-                    title={profile?.demo ? DEMO_EMAIL_NOTE : undefined}
-                    aria-describedby={
-                      profile?.demo ? "demo-email-note" : undefined
-                    }
+                    disabled={Boolean(sendNote)}
+                    title={sendNote}
+                    aria-describedby={sendNote ? sendNoteId : undefined}
                   >
                     <FiBell aria-hidden="true" /> Send reminder
                   </button>
@@ -226,9 +250,9 @@ const SingleDocumentPage = () => {
                 type="button"
                 className={primaryButton}
                 onClick={() => setEmailing(true)}
-                disabled={profile?.demo}
-                title={profile?.demo ? DEMO_EMAIL_NOTE : undefined}
-                aria-describedby={profile?.demo ? "demo-email-note" : undefined}
+                disabled={Boolean(sendNote)}
+                title={sendNote}
+                aria-describedby={sendNote ? sendNoteId : undefined}
               >
                 <FiMail aria-hidden="true" /> Email document
               </button>
@@ -237,6 +261,7 @@ const SingleDocumentPage = () => {
                   {DEMO_EMAIL_NOTE}
                 </span>
               )}
+              <RefusalNote id="document-edit-refusal" reason={editRefusal} />
             </>
           )
         }
@@ -272,23 +297,25 @@ const SingleDocumentPage = () => {
               <div className="grid grid-cols-3 gap-8 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1 max-[700px]:gap-6">
                 <div className="min-w-0">
                   <h3 className={partyHeading}>From</h3>
-                  {profile?.avatar && (
+                  {business?.logo && (
                     <img
                       className="mb-3 max-h-14 max-w-[120px] object-contain"
-                      src={profile.avatar}
-                      alt={`${profile.businessName || "Business"} logo`}
+                      src={business.logo}
+                      alt={`${business.name} logo`}
                     />
                   )}
-                  <strong className={partyName}>
-                    {profile?.businessName ||
-                      `${profile?.firstName || ""} ${profile?.lastName || ""}`}
-                  </strong>
+                  <strong className={partyName}>{business?.name}</strong>
                   {[
-                    profile?.email,
-                    profile?.phoneNumber,
-                    profile?.address,
-                    profile?.city,
-                    profile?.country,
+                    legalName,
+                    business?.email,
+                    business?.phoneNumber,
+                    business?.address,
+                    business?.city,
+                    [business?.state, business?.postalCode]
+                      .filter(Boolean)
+                      .join(" "),
+                    business?.country,
+                    business?.taxId && `Tax ID ${business.taxId}`,
                   ]
                     .filter(Boolean)
                     .map((value, index) => (
@@ -390,13 +417,15 @@ const SingleDocumentPage = () => {
                             ) : (
                               <span className="text-spot-muted">No</span>
                             )}
-                            <button
-                              type="button"
-                              className={`${textLink} bg-transparent p-0 text-[13.5px]`}
-                              onClick={() => setScheduling(true)}
-                            >
-                              {schedule ? "Change" : "Make recurring"}
-                            </button>
+                            {!editRefusal && (
+                              <button
+                                type="button"
+                                className={`${textLink} bg-transparent p-0 text-[13.5px]`}
+                                onClick={() => setScheduling(true)}
+                              >
+                                {schedule ? "Change" : "Make recurring"}
+                              </button>
+                            )}
                           </dd>
                         </div>
                       )}
@@ -484,11 +513,16 @@ const SingleDocumentPage = () => {
                 title="Payments"
                 description="Payments recorded against this document."
               >
-                <PaymentsLedger document={document} demo={profile?.demo} />
+                <PaymentsLedger
+                  document={document}
+                  demo={profile?.demo}
+                  refusal={editRefusal}
+                />
               </Panel>
             )}
             {document.documentType === "Invoice" &&
-              document.status !== "Paid" && (
+              document.status !== "Paid" &&
+              !editRefusal && (
                 <Panel
                   title="Record payment"
                   description={`Record a payment from ${document.customer?.name || "your customer"}.`}

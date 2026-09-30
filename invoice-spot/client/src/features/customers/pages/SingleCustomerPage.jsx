@@ -26,6 +26,7 @@ import { useGetAllMyDocsQuery } from "../../documents/documentsApiSlice";
 import { SORT_FIELDS } from "../../documents/documentFilters";
 import { saveFile } from "../../documents/useDocumentPdf";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 import EmailStatementDialog from "../components/EmailStatementDialog";
 import {
   WorkspacePage,
@@ -97,7 +98,7 @@ const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
 const statementFileName = (customer) =>
   `Statement-${(customer.accountNo || customer.name || "client").replace(/[^A-Za-z0-9-]+/g, "-")}-${dateInput()}.pdf`;
 
-const StatementActions = ({ customer, demo }) => {
+const StatementActions = ({ customer, demo, refusal }) => {
   const [getStatement] = useGetStatementPdfMutation();
   const [downloading, setDownloading] = useState(false);
   const [emailing, setEmailing] = useState(false);
@@ -128,12 +129,19 @@ const StatementActions = ({ customer, demo }) => {
         type="button"
         className={secondaryButton}
         onClick={() => setEmailing(true)}
-        disabled={demo}
-        title={demo ? DEMO_EMAIL_NOTE : undefined}
-        aria-describedby={demo ? "statement-demo-note" : undefined}
+        disabled={demo || Boolean(refusal)}
+        title={refusal || (demo ? DEMO_EMAIL_NOTE : undefined)}
+        aria-describedby={
+          refusal
+            ? "statement-refusal"
+            : demo
+              ? "statement-demo-note"
+              : undefined
+        }
       >
         <FiMail aria-hidden="true" /> Email statement
       </button>
+      <RefusalNote id="statement-refusal" reason={refusal} />
       {demo && (
         <span id="statement-demo-note" className="sr-only">
           {DEMO_EMAIL_NOTE}
@@ -279,6 +287,7 @@ const SingleCustomerPage = () => {
     skip: !query.data?.customer,
   });
   const profile = useGetUserProfileQuery().data?.userProfile;
+  const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const customer = query.data?.customer;
   const totals = summary.data?.totals || [];
   useTitle(`${customer?.name || "Client details"} — Invoice Spot`);
@@ -291,10 +300,17 @@ const SingleCustomerPage = () => {
         actions={
           customer && (
             <>
-              <ActionLink to={`/edit-customer/${custId}`} secondary>
+              <ActionLink
+                to={`/edit-customer/${custId}`}
+                secondary
+                reason={editRefusal}
+              >
                 <FiEdit2 aria-hidden="true" /> Edit client
               </ActionLink>
-              <ActionLink to={`/create-doc?client=${custId}`}>
+              <ActionLink
+                to={`/create-doc?client=${custId}`}
+                reason={editRefusal}
+              >
                 <FiPlus aria-hidden="true" /> New invoice
               </ActionLink>
             </>
@@ -346,7 +362,11 @@ const SingleCustomerPage = () => {
               title="Account summary"
               description="What this client was billed, has paid and still owes."
               aside={
-                <StatementActions customer={customer} demo={profile?.demo} />
+                <StatementActions
+                  customer={customer}
+                  demo={profile?.demo}
+                  refusal={editRefusal}
+                />
               }
             >
               {summary.isError ? (
