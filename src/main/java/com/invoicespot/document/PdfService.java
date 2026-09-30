@@ -30,7 +30,7 @@ import org.thymeleaf.context.Context;
 @Service
 public class PdfService {
 
-    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
+    static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
 
     private final ITemplateEngine templateEngine;
     private final UploadService uploadService;
@@ -48,6 +48,40 @@ public class PdfService {
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("pdf", view(document, owner, settings));
         return templateEngine.process("pdf/document", context);
+    }
+
+    byte[] renderReceipt(
+            Document document, Payment payment, String number, BigDecimal paidToDate, User owner) {
+        return toPdf(receiptHtml(document, payment, number, paidToDate, owner));
+    }
+
+    // A payment receipt: what was received, how, and what the document still
+    // owed once this payment had been made.
+    String receiptHtml(Document document, Payment payment, String number, BigDecimal paidToDate, User owner) {
+        CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
+        BigDecimal total = orZero(document.getTotal());
+        Context context = new Context(Locale.ENGLISH);
+        context.setVariable("receipt", new ReceiptView(
+                logo(owner.getAvatar()),
+                senderName(owner),
+                senderLines(owner),
+                number,
+                DATE.format(payment.getDatePaid()),
+                value(client.getName()),
+                lines(
+                        client.getEmail(),
+                        client.getPhoneNumber(),
+                        joined(client.getAddress(), client.getCity(), client.getCountry()),
+                        client.getAccountNo() == null ? null : "Account no. " + client.getAccountNo()),
+                document.getDocumentType().getValue() + " " + value(document.getDocumentNumber()),
+                value(document.getCurrency()),
+                money(payment.getAmountPaid()),
+                payment.getPaymentMethod().getValue(),
+                blankToNull(payment.getAdditionalInfo()),
+                money(total),
+                money(paidToDate),
+                money(total.subtract(paidToDate).max(BigDecimal.ZERO))));
+        return templateEngine.process("pdf/receipt", context);
     }
 
     byte[] renderStatement(User owner, Customer customer, LocalDate day, List<Statements.Account> accounts) {
@@ -103,6 +137,23 @@ public class PdfService {
     public record Line(int index, String name, String quantity, String unitPrice, String discount, String amount) {}
 
     public record Total(String label, String value) {}
+
+    public record ReceiptView(
+            String logo,
+            String sender,
+            List<String> senderLines,
+            String number,
+            String date,
+            String clientName,
+            List<String> clientLines,
+            String documentTitle,
+            String currency,
+            String amount,
+            String method,
+            String note,
+            String total,
+            String paidToDate,
+            String balance) {}
 
     public record StatementView(
             String logo,

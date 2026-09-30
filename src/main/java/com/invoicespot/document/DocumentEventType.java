@@ -1,0 +1,21 @@
+package com.invoicespot.document;
+
+public enum DocumentEventType {
+    CREATED,
+    EDITED,
+    EMAILED,
+    PAYMENT_RECORDED,
+    PAYMENT_EDITED,
+    PAYMENT_DELETED,
+    COPIED_FROM,
+    COPIED_TO,
+    CONVERTED_FROM,
+    CONVERTED_TO,
+    RECEIPT_EMAILED,
+    SHARED,
+    SHARE_REVOKED,
+    VIEWED,
+    ACCEPTED,
+    REMINDED,
+    RECURRING
+}

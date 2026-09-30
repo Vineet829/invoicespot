@@ -37,6 +37,22 @@ public class Document extends BaseEntity {
     @JoinColumn(name = "customer_pkid")
     private Customer customer;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_pkid")
+    private Document source;
+
+    @Column(name = "accepted_at")
+    private Instant acceptedAt;
+
+    @Column(name = "reminders_sent", nullable = false)
+    private int remindersSent;
+
+    @Column(name = "last_reminded_at")
+    private Instant lastRemindedAt;
+
+    @Column(name = "overdue_alerted_at")
+    private Instant overdueAlertedAt;
+
     @Embedded
     private CustomerSnapshot customerSnapshot;
 

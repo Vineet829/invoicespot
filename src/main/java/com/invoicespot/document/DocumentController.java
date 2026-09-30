@@ -1,6 +1,7 @@
 package com.invoicespot.document;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.document.dto.ActivityResponse;
 import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.CreatedDocumentResponse;
@@ -100,6 +101,23 @@ public class DocumentController {
     public SingleDocumentResponse getOne(
             @AuthenticationPrincipal User principal, @PathVariable String id) {
         return new SingleDocumentResponse(true, documentService.getOne(principal.getPkid(), id));
+    }
+
+    @PostMapping("/{id}/duplicate")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreatedDocumentResponse duplicate(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return new CreatedDocumentResponse(true, documentService.duplicate(principal.getPkid(), id));
+    }
+
+    @PostMapping("/{id}/convert")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreatedDocumentResponse convert(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return new CreatedDocumentResponse(true, documentService.convert(principal.getPkid(), id));
+    }
+
+    @GetMapping("/{id}/activity")
+    public ActivityResponse activity(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return documentService.activity(principal.getPkid(), id);
     }
 
     @PatchMapping("/{id}")

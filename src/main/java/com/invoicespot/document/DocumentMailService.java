@@ -10,6 +10,8 @@ import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.User;
 import jakarta.mail.MessagingException;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +52,56 @@ public class DocumentMailService {
 
     public void email(User owner, String id, EmailDocumentRequest request) {
         send(owner, () -> documentService.renderPdf(owner, id), request,
-                "This document's client has no email address", "document", id);
+                "This document's client has no email address", "document", id,
+                to -> documentService.recordEmailed(owner, id, to));
+    }
+
+    public EmailDraft receiptDraft(User owner, String id, String paymentId) {
+        return defaults(
+                owner,
+                documentService.receiptEnvelope(owner, id, paymentId),
+                settingsService.forUser(owner.getPkid()));
+    }
+
+    public void emailReceipt(User owner, String id, String paymentId, EmailDocumentRequest request) {
+        send(owner, () -> documentService.renderReceipt(owner, id, paymentId), request,
+                "This document's client has no email address", "receipt", paymentId,
+                to -> documentService.recordReceiptEmailed(owner, id, paymentId, to));
+    }
+
+    public EmailDraft reminderDraft(User owner, String id) {
+        return reminder(owner, documentService.reminderFacts(owner, id));
+    }
+
+    public void remind(User owner, String id, EmailDocumentRequest request) {
+        ReminderFacts facts = documentService.reminderFacts(owner, id);
+        send(owner, () -> documentService.renderPdf(owner, id), pdf -> reminder(owner, facts), request,
+                "This document's client has no email address", "reminder", id,
+                to -> documentService.recordReminder(owner, id, to, false));
+    }
+
+    // An automatic reminder: no rate limit, since the reminder settings bound
+    // it, and a failure is thrown for the daily job to log.
+    public void remindAutomatically(User owner, String id) throws MessagingException {
+        ReminderFacts facts = documentService.reminderFacts(owner, id);
+        DocumentPdf pdf = documentService.renderPdf(owner, id);
+        EmailDraft draft = reminder(owner, facts);
+        mailService.sendDocument(
+                draft.to(), owner.getEmail(), draft.subject(), draft.message(), pdf.fileName(), pdf.content());
+        documentService.recordReminder(owner, id, draft.to(), true);
+    }
+
+    // A recurring invoice sent as it is made: the standard message, no rate
+    // limit, and a failure thrown for the daily job to log.
+    public void emailAutomatically(User owner, String id) throws MessagingException {
+        DocumentPdf pdf = documentService.renderPdf(owner, id);
+        EmailDraft draft = defaults(owner, pdf.envelope(), settingsService.forUser(owner.getPkid()));
+        if (isBlank(draft.to())) {
+            throw new MessagingException("The client of document " + id + " has no email address");
+        }
+        mailService.sendDocument(
+                draft.to(), owner.getEmail(), draft.subject(), draft.message(), pdf.fileName(), pdf.content());
+        documentService.recordEmailedAutomatically(owner, id, draft.to());
     }
 
     public EmailDraft statementDraft(User owner, String customerId) {
@@ -60,7 +111,7 @@ public class DocumentMailService {
 
     public void emailStatement(User owner, String customerId, EmailDocumentRequest request) {
         send(owner, () -> statementService.render(owner, customerId), request,
-                "This client has no email address", "statement", customerId);
+                "This client has no email address", "statement", customerId, to -> {});
     }
 
     private void send(
@@ -69,11 +120,25 @@ public class DocumentMailService {
             EmailDocumentRequest request,
             String noRecipient,
             String kind,
-            String id) {
+            String id,
+            Consumer<String> sent) {
+        send(owner, render, pdf -> defaults(owner, pdf.envelope(), settingsService.forUser(owner.getPkid())),
+                request, noRecipient, kind, id, sent);
+    }
+
+    private void send(
+            User owner,
+            Supplier<DocumentPdf> render,
+            Function<DocumentPdf, EmailDraft> draft,
+            EmailDocumentRequest request,
+            String noRecipient,
+            String kind,
+            String id,
+            Consumer<String> sent) {
         demoAccountGuard.requireNotDemo(owner, "emailing");
         rateLimiter.consume(RateLimit.OUTGOING_EMAIL, owner.getId().toString());
         DocumentPdf pdf = render.get();
-        EmailDraft defaults = defaults(owner, pdf.envelope(), settingsService.forUser(owner.getPkid()));
+        EmailDraft defaults = draft.apply(pdf);
         String to = isBlank(request.to()) ? defaults.to() : request.to().trim();
         if (isBlank(to)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, noRecipient);
@@ -89,6 +154,7 @@ public class DocumentMailService {
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY, "The " + kind + " could not be emailed. Please try again later.");
         }
+        sent.accept(to);
     }
 
     private static EmailDraft defaults(User owner, DocumentEnvelope envelope, BusinessSettings settings) {
@@ -103,6 +169,20 @@ public class DocumentMailService {
                 message.replace("{client}", client)
                         .replace("{document}", envelope.title())
                         .replace("{business}", sender));
+    }
+
+    // A reminder names what is still owed and when it was, or is, due.
+    private static EmailDraft reminder(User owner, ReminderFacts facts) {
+        String sender = PdfService.senderName(owner);
+        String client = isBlank(facts.clientName()) ? "there" : facts.clientName();
+        String due = facts.due() == null
+                ? " is still open"
+                : facts.overdue() ? " was due on " + facts.due() + " and is still open" : " is due on " + facts.due();
+        return new EmailDraft(
+                facts.clientEmail(),
+                "Reminder: " + facts.title() + " from " + sender,
+                "Hello " + client + ",\n\nA friendly reminder that " + facts.title() + " for " + facts.balance() + due
+                        + ". A copy is attached.\n\nThank you,\n" + sender);
     }
 
     private static boolean isBlank(String value) {

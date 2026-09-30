@@ -54,4 +54,15 @@ public record UpdateSettingsRequest(
                 Integer nextQuotationNumber,
         @Min(value = 1, message = "The next number must be at least 1")
                 @Max(value = 999_999_999, message = "The next number can be at most 999,999,999")
-                Integer nextReceiptNumber) {}
+                Integer nextReceiptNumber,
+        Boolean remindersEnabled,
+        @Min(value = 0, message = "Remind from 0 to 60 days before the due date")
+                @Max(value = 60, message = "Remind from 0 to 60 days before the due date")
+                Integer reminderDaysBefore,
+        Boolean reminderOnDue,
+        @Min(value = 0, message = "Repeat reminders every 0 to 60 days")
+                @Max(value = 60, message = "Repeat reminders every 0 to 60 days")
+                Integer reminderEveryDays,
+        @Min(value = 1, message = "Send from 1 to 10 reminders an invoice")
+                @Max(value = 10, message = "Send from 1 to 10 reminders an invoice")
+                Integer reminderMax) {}

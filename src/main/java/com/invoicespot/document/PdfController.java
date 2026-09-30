@@ -44,6 +44,45 @@ public class PdfController {
                 .body(pdf.content());
     }
 
+    @GetMapping("/{id}/payment/{paymentId}/receipt")
+    public ResponseEntity<byte[]> receipt(
+            @AuthenticationPrincipal User principal, @PathVariable String id, @PathVariable String paymentId) {
+        return inline(documentService.renderReceipt(principal, id, paymentId));
+    }
+
+    @GetMapping("/{id}/payment/{paymentId}/receipt/email")
+    public EmailDraftResponse receiptDraft(
+            @AuthenticationPrincipal User principal, @PathVariable String id, @PathVariable String paymentId) {
+        EmailDraft draft = documentMailService.receiptDraft(principal, id, paymentId);
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+    }
+
+    @PostMapping("/{id}/payment/{paymentId}/receipt/email")
+    public MessageResponse emailReceipt(
+            @AuthenticationPrincipal User principal,
+            @PathVariable String id,
+            @PathVariable String paymentId,
+            @Valid @RequestBody(required = false) EmailDocumentRequest request) {
+        documentMailService.emailReceipt(
+                principal, id, paymentId, request == null ? EmailDocumentRequest.DEFAULTS : request);
+        return new MessageResponse(true, "Receipt sent successfully.");
+    }
+
+    @GetMapping("/{id}/remind")
+    public EmailDraftResponse reminderDraft(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        EmailDraft draft = documentMailService.reminderDraft(principal, id);
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+    }
+
+    @PostMapping("/{id}/remind")
+    public MessageResponse remind(
+            @AuthenticationPrincipal User principal,
+            @PathVariable String id,
+            @Valid @RequestBody(required = false) EmailDocumentRequest request) {
+        documentMailService.remind(principal, id, request == null ? EmailDocumentRequest.DEFAULTS : request);
+        return new MessageResponse(true, "Reminder sent successfully.");
+    }
+
     @GetMapping("/{id}/email")
     public EmailDraftResponse emailDraft(@AuthenticationPrincipal User principal, @PathVariable String id) {
         EmailDraft draft = documentMailService.draft(principal, id);

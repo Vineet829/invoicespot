@@ -132,6 +132,30 @@ class PdfServiceTest {
         assertThat(html).doesNotContain("Amount paid").doesNotContain("Balance due").doesNotContain("Partially paid");
     }
 
+    @Test
+    @DisplayName("a payment receipt shows what was received, how, and the balance left afterwards")
+    void receiptHtml() {
+        Document document = sampleDocument(DocumentType.INVOICE);
+        Payment payment = document.getPayments().get(0);
+        payment.setDatePaid(LocalDate.of(2026, 9, 12));
+        payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+        payment.setAdditionalInfo("Deposit & <thanks>");
+
+        String html = service.receiptHtml(
+                document, payment, "2026-September-ABC123-P1", new BigDecimal("445.50"), owner("Ada Analytics"));
+
+        assertThat(html)
+                .contains("Payment receipt 2026-September-ABC123-P1")
+                .contains("Sep 12, 2026")
+                .contains("Invoice 2026-September-ABC123")
+                .contains("USD 445.50")
+                .contains("Paid by Bank Transfer")
+                .contains("Deposit &amp; &lt;thanks&gt;")
+                .contains("USD 1,445.50")
+                .contains("Balance after this payment")
+                .contains("USD 1,000.00");
+    }
+
     private static Customer client() {
         Customer customer = new Customer();
         customer.setName("Beta & <Sons>");

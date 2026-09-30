@@ -3,6 +3,8 @@ package com.invoicespot.document;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
+import com.invoicespot.document.dto.ActivityEntry;
+import com.invoicespot.document.dto.ActivityResponse;
 import com.invoicespot.document.dto.BillingItemDto;
 import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
@@ -11,6 +13,9 @@ import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
+import com.invoicespot.notification.NotificationService;
+import com.invoicespot.notification.NotificationType;
+import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
@@ -18,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
@@ -43,6 +49,8 @@ public class DocumentService {
     private final PdfService pdfService;
     private final SettingsService settingsService;
     private final DocumentNumbering documentNumbering;
+    private final DocumentActivity activity;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public DocumentService(
@@ -52,6 +60,8 @@ public class DocumentService {
             PdfService pdfService,
             SettingsService settingsService,
             DocumentNumbering documentNumbering,
+            DocumentActivity activity,
+            NotificationService notificationService,
             Clock clock) {
         this.documentRepository = documentRepository;
         this.customerRepository = customerRepository;
@@ -59,6 +69,8 @@ public class DocumentService {
         this.pdfService = pdfService;
         this.settingsService = settingsService;
         this.documentNumbering = documentNumbering;
+        this.activity = activity;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -84,6 +96,7 @@ public class DocumentService {
         document.setDocumentNumber(documentNumbering.next(ownerPkid, document.getDocumentType()));
         DocumentTotals.apply(document);
         documentRepository.save(document);
+        activity.record(document, DocumentEventType.CREATED, null);
         return respond(document);
     }
 
@@ -114,7 +127,10 @@ public class DocumentService {
     }
 
     private DocumentResponse respond(Document document) {
-        return DocumentResponse.from(document, startOfToday(zoneOf(document.getCreatedBy().getPkid())));
+        return DocumentResponse.detail(
+                document,
+                startOfToday(zoneOf(document.getCreatedBy().getPkid())),
+                documentRepository.findBySourceOrderByCreatedAtAscPkidAsc(document));
     }
 
     @Transactional(readOnly = true)
@@ -194,8 +210,104 @@ public class DocumentService {
         }
         DocumentTotals.apply(document);
         requireConsistentPayments(document);
+        if (!DocumentTotals.isOverdue(document, startOfToday(zoneOf(ownerPkid)))) {
+            document.setOverdueAlertedAt(null);
+        }
         documentRepository.save(document);
+        activity.record(document, DocumentEventType.EDITED, null);
         return respond(document);
+    }
+
+    @Transactional
+    public DocumentResponse duplicate(Long ownerPkid, String id) {
+        Document original = requireOwned(
+                ownerPkid, id, "That document does not exist",
+                "You are not authorized to copy this document. It's not yours");
+        Document copy = copyOf(original, original.getDocumentType(), true);
+        activity.record(copy, DocumentEventType.COPIED_FROM, original.getDocumentNumber());
+        activity.record(original, DocumentEventType.COPIED_TO, copy.getDocumentNumber());
+        return respond(copy);
+    }
+
+    @Transactional
+    public DocumentResponse convert(Long ownerPkid, String id) {
+        Document quotation = requireOwned(
+                ownerPkid, id, "That document does not exist",
+                "You are not authorized to convert this document. It's not yours");
+        if (quotation.getDocumentType() != DocumentType.QUOTATION) {
+            throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can become an invoice");
+        }
+        documentRepository.findFirstBySourceAndDocumentType(quotation, DocumentType.INVOICE).ifPresent(invoice -> {
+            throw new ApiException(
+                    HttpStatus.CONFLICT, "This quotation is already invoice " + invoice.getDocumentNumber());
+        });
+        Document invoice = copyOf(quotation, DocumentType.INVOICE, true);
+        activity.record(invoice, DocumentEventType.CONVERTED_FROM, quotation.getDocumentNumber());
+        activity.record(quotation, DocumentEventType.CONVERTED_TO, invoice.getDocumentNumber());
+        return respond(invoice);
+    }
+
+    // The next invoice of a recurring schedule. It isn't linked to the
+    // template as a copy, or a monthly template would list every month.
+    Document createRecurring(Document template, RecurringFrequency frequency) {
+        Document invoice = copyOf(template, DocumentType.INVOICE, false);
+        activity.record(
+                invoice, DocumentEventType.RECURRING, template.getDocumentNumber() + " · " + frequency.label());
+        return invoice;
+    }
+
+    // A new document with the original's client and lines, a fresh number,
+    // and a due date from the business's payment terms. Payments stay behind.
+    private Document copyOf(Document original, DocumentType type, boolean linkSource) {
+        Long ownerPkid = original.getCreatedBy().getPkid();
+        BusinessSettings settings = settingsService.forUser(ownerPkid);
+        ZoneId zone = ZoneId.of(settings.getTimeZone());
+        Document copy = new Document();
+        copy.setCreatedBy(original.getCreatedBy());
+        copy.setSource(linkSource ? original : null);
+        copy.setCustomer(original.getCustomer());
+        copy.setCustomerSnapshot(original.getCustomer() == null
+                ? copyOf(original.getCustomerSnapshot())
+                : snapshotOf(original.getCustomer()));
+        copy.setDocumentType(type);
+        copy.setDueDate(LocalDate.now(clock.withZone(zone))
+                .plusDays(settings.getPaymentTermsDays())
+                .atTime(LocalTime.NOON)
+                .atZone(zone)
+                .toInstant());
+        copy.setAdditionalInfo(original.getAdditionalInfo());
+        copy.setTermsConditions(original.getTermsConditions());
+        copy.setRates(original.getRates());
+        copy.setCurrency(original.getCurrency());
+        copy.setBillingItems(original.getBillingItems().stream().map(DocumentService::copyOf).toList());
+        copy.setDocumentNumber(documentNumbering.next(ownerPkid, type));
+        DocumentTotals.apply(copy);
+        return documentRepository.save(copy);
+    }
+
+    private static BillingItem copyOf(BillingItem original) {
+        BillingItem item = new BillingItem();
+        item.setItemName(original.getItemName());
+        item.setUnitPrice(original.getUnitPrice());
+        item.setQuantity(original.getQuantity());
+        item.setDiscount(original.getDiscount());
+        return item;
+    }
+
+    private static CustomerSnapshot copyOf(CustomerSnapshot original) {
+        if (original == null) {
+            return null;
+        }
+        CustomerSnapshot snapshot = new CustomerSnapshot();
+        snapshot.setName(original.getName());
+        snapshot.setEmail(original.getEmail());
+        snapshot.setAccountNo(original.getAccountNo());
+        snapshot.setVatTinNo(original.getVatTinNo());
+        snapshot.setAddress(original.getAddress());
+        snapshot.setCity(original.getCity());
+        snapshot.setCountry(original.getCountry());
+        snapshot.setPhoneNumber(original.getPhoneNumber());
+        return snapshot;
     }
 
     @Transactional
@@ -226,7 +338,12 @@ public class DocumentService {
         requireWithinBalance(document, payment.getAmountPaid());
         document.getPayments().add(payment);
         DocumentTotals.apply(document);
-        documentRepository.save(document);
+        documentRepository.flush();
+        activity.record(
+                document,
+                DocumentEventType.PAYMENT_RECORDED,
+                DocumentActivity.paymentDetail(document, payment),
+                payment.getPkid());
         return respond(document);
     }
 
@@ -250,15 +367,133 @@ public class DocumentService {
             payment.setAmountPaid(amount);
         }
         DocumentTotals.apply(document);
+        activity.record(
+                document,
+                DocumentEventType.PAYMENT_EDITED,
+                DocumentActivity.paymentDetail(document, payment),
+                payment.getPkid());
         return respond(document);
     }
 
     @Transactional
     public DocumentResponse deletePayment(Long ownerPkid, String id, String paymentId) {
         Document document = requireOwnedForPayment(ownerPkid, id);
-        document.getPayments().remove(requirePayment(document, paymentId));
+        Payment payment = requirePayment(document, paymentId);
+        document.getPayments().remove(payment);
         DocumentTotals.apply(document);
+        activity.record(
+                document, DocumentEventType.PAYMENT_DELETED, DocumentActivity.paymentDetail(document, payment));
         return respond(document);
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityResponse activity(Long ownerPkid, String id) {
+        Document document = requireOwned(
+                ownerPkid, id, "document not found",
+                "You are not authorized to view this document. It's not yours");
+        return new ActivityResponse(
+                true,
+                activity.history(document).stream()
+                        .map(event -> new ActivityEntry(
+                                event.getType().name(), event.getDetail(), event.getOccurredAt()))
+                        .toList());
+    }
+
+    @Transactional
+    public void recordEmailed(User owner, String id, String to) {
+        activity.record(requireReadable(owner, id), DocumentEventType.EMAILED, "to " + to);
+    }
+
+    @Transactional
+    public void recordEmailedAutomatically(User owner, String id, String to) {
+        activity.record(requireReadable(owner, id), DocumentEventType.EMAILED, "automatically to " + to);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentPdf renderReceipt(User owner, String id, String paymentId) {
+        Document document = requireReadable(owner, id);
+        Payment payment = requirePayment(document, paymentId);
+        List<Payment> paidSoFar = document.getPayments().subList(0, document.getPayments().indexOf(payment) + 1);
+        String number = receiptNumber(document, payment);
+        return new DocumentPdf(
+                "Receipt-" + number.replaceAll("[^A-Za-z0-9._-]", "-") + ".pdf",
+                pdfService.renderReceipt(
+                        document,
+                        payment,
+                        number,
+                        paidSoFar.stream().map(Payment::getAmountPaid).reduce(BigDecimal.ZERO, BigDecimal::add),
+                        owner),
+                receiptEnvelope(document, number));
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentEnvelope receiptEnvelope(User owner, String id, String paymentId) {
+        Document document = requireReadable(owner, id);
+        return receiptEnvelope(document, receiptNumber(document, requirePayment(document, paymentId)));
+    }
+
+    @Transactional
+    public void recordReceiptEmailed(User owner, String id, String paymentId, String to) {
+        Document document = requireReadable(owner, id);
+        Payment payment = requirePayment(document, paymentId);
+        activity.record(
+                document,
+                DocumentEventType.RECEIPT_EMAILED,
+                receiptNumber(document, payment) + " to " + to,
+                payment.getPkid());
+    }
+
+    @Transactional(readOnly = true)
+    public ReminderFacts reminderFacts(User owner, String id) {
+        Document document = requireReadable(owner, id);
+        if (document.getDocumentType() != DocumentType.INVOICE || document.getStatus() == DocumentStatus.PAID) {
+            throw new ApiException(HttpStatus.CONFLICT, "Only an unpaid invoice needs a reminder");
+        }
+        return reminderFacts(document);
+    }
+
+    ReminderFacts reminderFacts(Document document) {
+        ZoneId zone = zoneOf(document.getCreatedBy().getPkid());
+        CustomerSnapshot customer = document.getCustomerSnapshot();
+        BigDecimal total = document.getTotal() == null ? BigDecimal.ZERO : document.getTotal();
+        BigDecimal received =
+                document.getTotalAmountReceived() == null ? BigDecimal.ZERO : document.getTotalAmountReceived();
+        return new ReminderFacts(
+                document.getDocumentType().getValue() + " " + document.getDocumentNumber(),
+                customer == null ? null : customer.getName(),
+                customer == null ? null : customer.getEmail(),
+                DocumentActivity.amount(document, total.subtract(received)),
+                document.getDueDate() == null ? null : PdfService.DATE.format(document.getDueDate().atZone(zone)),
+                DocumentTotals.isOverdue(document, startOfToday(zone)));
+    }
+
+    @Transactional
+    public void recordReminder(User owner, String id, String to, boolean automatic) {
+        Document document = requireReadable(owner, id);
+        document.setRemindersSent(document.getRemindersSent() + 1);
+        document.setLastRemindedAt(Instant.now(clock));
+        activity.record(document, DocumentEventType.REMINDED, (automatic ? "automatically " : "") + "to " + to);
+        if (automatic) {
+            notificationService.notify(
+                    document.getCreatedBy(),
+                    document,
+                    NotificationType.REMINDER_SENT,
+                    "Reminder sent to " + to + " for " + document.getDocumentType().getValue() + " "
+                            + document.getDocumentNumber());
+        }
+    }
+
+    // Payments are kept in date order, so a receipt's number follows it.
+    private static String receiptNumber(Document document, Payment payment) {
+        return document.getDocumentNumber() + "-P" + (document.getPayments().indexOf(payment) + 1);
+    }
+
+    private static DocumentEnvelope receiptEnvelope(Document document, String number) {
+        CustomerSnapshot customer = document.getCustomerSnapshot();
+        return new DocumentEnvelope(
+                "Payment receipt " + number,
+                customer == null ? null : customer.getName(),
+                customer == null ? null : customer.getEmail());
     }
 
     private Document requireOwnedForPayment(Long ownerPkid, String id) {
@@ -424,7 +659,7 @@ public class DocumentService {
                 HttpStatus.BAD_REQUEST, label + " must be a number from 0 to 100, with up to 4 decimals");
     }
 
-    private static String pdfFileName(Document document) {
+    static String pdfFileName(Document document) {
         String number = document.getDocumentNumber() == null
                 ? ""
                 : document.getDocumentNumber().replaceAll("[^A-Za-z0-9._-]", "-");

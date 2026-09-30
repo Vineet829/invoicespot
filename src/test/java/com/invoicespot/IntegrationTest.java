@@ -23,6 +23,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
             "app.jwt.access-secret=integration-test-access-secret-0123456789abcdef",
             "app.jwt.refresh-secret=integration-test-refresh-secret-0123456789abcdef",
             "management.health.mail.enabled=false",
+            "app.jobs.enabled=false",
             "app.demo.email=" + IntegrationTest.DEMO_EMAIL
         })
 @AutoConfigureMockMvc

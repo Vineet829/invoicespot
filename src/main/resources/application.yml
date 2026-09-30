@@ -83,6 +83,10 @@ app:
   demo:
     email: ${DEMO_EMAIL:guest@demo.invoicespot.local}
     seed: ${DEMO_SEED:false}
+  jobs:
+    enabled: ${JOBS_ENABLED:true}
+    cron: ${JOBS_CRON:0 0 7 * * *}
+    zone: ${JOBS_ZONE:UTC}
 
 logging:
   level:

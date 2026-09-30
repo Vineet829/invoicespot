@@ -18,6 +18,11 @@ public record SettingsResponse(
         int nextInvoiceNumber,
         int nextQuotationNumber,
         int nextReceiptNumber,
+        boolean remindersEnabled,
+        int reminderDaysBefore,
+        boolean reminderOnDue,
+        int reminderEveryDays,
+        int reminderMax,
         boolean saved) {
 
     public static SettingsResponse from(BusinessSettings settings) {
@@ -36,6 +41,11 @@ public record SettingsResponse(
                 settings.getNextInvoiceNumber(),
                 settings.getNextQuotationNumber(),
                 settings.getNextReceiptNumber(),
+                settings.isRemindersEnabled(),
+                settings.getReminderDaysBefore(),
+                settings.isReminderOnDue(),
+                settings.getReminderEveryDays(),
+                settings.getReminderMax(),
                 settings.getPkid() != null);
     }
 }

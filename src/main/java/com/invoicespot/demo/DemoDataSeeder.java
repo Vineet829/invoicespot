@@ -109,7 +109,7 @@ public class DemoDataSeeder {
         if (settingsRepository.findByUserPkid(owner).isEmpty()) {
             settingsService.update(owner, new UpdateSettingsRequest(
                     "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS, DemoData.EMAIL_MESSAGE,
-                    ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301));
+                    ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null));
         }
         DemoData.ITEMS.forEach(item -> itemService.create(
                 owner, new CreateItemRequest(item.name(), item.description(), item.price())));
@@ -179,6 +179,7 @@ public class DemoDataSeeder {
                 backdate("payments", record.id(), record.datePaid(), zone);
             }
         }
+        backdateHistory(document.id());
         return paymentDates.size();
     }
 
@@ -229,6 +230,21 @@ public class DemoDataSeeder {
 
     private static LocalDate earliest(LocalDate date, LocalDate today) {
         return date.isAfter(today) ? today : date;
+    }
+
+    // A document's history happens when the document and its payments did.
+    private void backdateHistory(UUID documentId) {
+        jdbcTemplate.update("""
+                update document_events event set occurred_at = doc.created_at
+                from documents doc
+                where event.document_pkid = doc.pkid and doc.id = ? and event.type = 'CREATED'
+                """, documentId);
+        jdbcTemplate.update("""
+                update document_events event set occurred_at = payment.created_at
+                from payments payment
+                where event.payment_pkid = payment.pkid
+                  and payment.document_pkid = (select pkid from documents where id = ?)
+                """, documentId);
     }
 
     private void backdate(String table, UUID id, LocalDate day, ZoneId zone) {

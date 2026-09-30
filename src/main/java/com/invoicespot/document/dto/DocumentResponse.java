@@ -1,5 +1,6 @@
 package com.invoicespot.document.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.document.CustomerSnapshot;
 import com.invoicespot.document.Document;
@@ -32,9 +33,24 @@ public record DocumentResponse(
         List<BillingItemResponse> billingItems,
         List<PaymentRecordDto> paymentRecords,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) DocumentLink source,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<DocumentLink> copies,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant acceptedAt,
+        int remindersSent,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRemindedAt) {
 
     public static DocumentResponse from(Document document, Instant startOfToday) {
+        return from(document, startOfToday, null);
+    }
+
+    // One document on its own also names the document it came from and the
+    // copies made of it.
+    public static DocumentResponse detail(Document document, Instant startOfToday, List<Document> copies) {
+        return from(document, startOfToday, copies.stream().map(DocumentLink::from).toList());
+    }
+
+    private static DocumentResponse from(Document document, Instant startOfToday, List<DocumentLink> copies) {
         CustomerSnapshot snapshot = document.getCustomerSnapshot();
         DocumentCustomerDto customer = snapshot == null
                 ? null
@@ -81,7 +97,12 @@ public record DocumentResponse(
                 billingItems,
                 paymentRecords,
                 document.getCreatedAt(),
-                document.getUpdatedAt());
+                document.getUpdatedAt(),
+                copies == null || document.getSource() == null ? null : DocumentLink.from(document.getSource()),
+                copies,
+                document.getAcceptedAt(),
+                document.getRemindersSent(),
+                document.getLastRemindedAt());
     }
 
     private static String plain(BigDecimal value) {

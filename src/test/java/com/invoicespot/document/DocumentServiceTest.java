@@ -16,6 +16,7 @@ import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
+import com.invoicespot.notification.NotificationService;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
@@ -46,6 +47,8 @@ class DocumentServiceTest {
     @Mock private PdfService pdfService;
     @Mock private SettingsService settingsService;
     @Mock private DocumentNumbering documentNumbering;
+    @Mock private DocumentActivity activity;
+    @Mock private NotificationService notificationService;
     private DocumentService service;
 
     @BeforeEach
@@ -57,6 +60,8 @@ class DocumentServiceTest {
                 pdfService,
                 settingsService,
                 documentNumbering,
+                activity,
+                notificationService,
                 CLOCK);
         lenient().when(settingsService.forUser(any())).thenReturn(new BusinessSettings());
     }
@@ -167,7 +172,8 @@ class DocumentServiceTest {
         assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
         assertThat(payment.getDatePaid()).isEqualTo(LocalDate.of(2026, 9, 30));
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.NOT_FULLY_PAID);
-        verify(documentRepository).save(document);
+        verify(documentRepository).flush();
+        verify(activity).record(document, DocumentEventType.PAYMENT_RECORDED, "50.00 · Cash", null);
     }
 
     private static CreateDocumentRequest requestWith(String rates, String discount) {

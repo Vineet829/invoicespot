@@ -1,6 +1,7 @@
 package com.invoicespot.document;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,34 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             order by d.createdAt, d.pkid
             """)
     List<Document> findForStatement(@Param("customerPkid") Long customerPkid, @Param("type") DocumentType type);
+
+    List<Document> findBySourceOrderByCreatedAtAscPkidAsc(Document source);
+
+    // Unpaid invoices due before a moment that nobody was yet told about.
+    @EntityGraph(attributePaths = {"createdBy"})
+    @Query("""
+            select d from Document d
+            where d.documentType = :invoice and d.status <> :paid
+              and d.dueDate < :before and d.overdueAlertedAt is null
+            """)
+    List<Document> findUnalertedOverdue(
+            @Param("invoice") DocumentType invoice,
+            @Param("paid") DocumentStatus paid,
+            @Param("before") Instant before);
+
+    // Unpaid invoices that may still get an automatic reminder.
+    @Query("""
+            select d from Document d
+            where d.createdBy.pkid = :ownerPkid and d.documentType = :invoice and d.status <> :paid
+              and d.dueDate is not null and d.remindersSent < :most
+            """)
+    List<Document> findRemindable(
+            @Param("ownerPkid") Long ownerPkid,
+            @Param("invoice") DocumentType invoice,
+            @Param("paid") DocumentStatus paid,
+            @Param("most") int most);
+
+    Optional<Document> findFirstBySourceAndDocumentType(Document source, DocumentType documentType);
 
     boolean existsByCreatedByPkidAndDocumentNumber(Long createdByPkid, String documentNumber);
 

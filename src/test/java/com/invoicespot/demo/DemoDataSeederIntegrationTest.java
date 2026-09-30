@@ -56,6 +56,16 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
         assertThat(count("select count(*) from payments p join documents d on d.pkid = p.document_pkid"
                         + " where d.created_by_pkid = ? and p.date_paid > current_date", owner))
                 .isZero();
+        assertThat(count("""
+                select count(*) from document_events e join documents d on d.pkid = e.document_pkid
+                left join payments p on p.pkid = e.payment_pkid
+                where d.created_by_pkid = ?
+                  and e.occurred_at <> case when e.type = 'CREATED' then d.created_at else p.created_at end
+                """, owner)).isZero();
+        assertThat(count("""
+                select count(*) from document_events e join documents d on d.pkid = e.document_pkid
+                where d.created_by_pkid = ? and e.type = 'PAYMENT_RECORDED'
+                """, owner)).isEqualTo(result.payments());
 
         DemoDataSeeder.Result again = seeder.seed(demo.getEmail());
         assertThat(again.seeded()).isFalse();

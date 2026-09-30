@@ -64,6 +64,21 @@ public class SettingsService {
         if (request.nextReceiptNumber() != null) {
             settings.setNextReceiptNumber(request.nextReceiptNumber());
         }
+        if (request.remindersEnabled() != null) {
+            settings.setRemindersEnabled(request.remindersEnabled());
+        }
+        if (request.reminderDaysBefore() != null) {
+            settings.setReminderDaysBefore(request.reminderDaysBefore());
+        }
+        if (request.reminderOnDue() != null) {
+            settings.setReminderOnDue(request.reminderOnDue());
+        }
+        if (request.reminderEveryDays() != null) {
+            settings.setReminderEveryDays(request.reminderEveryDays());
+        }
+        if (request.reminderMax() != null) {
+            settings.setReminderMax(request.reminderMax());
+        }
         settingsRepository.save(settings);
         return SettingsResponse.from(settings);
     }

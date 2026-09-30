@@ -63,4 +63,19 @@ public class BusinessSettings extends BaseEntity {
 
     @Column(name = "next_receipt_number", nullable = false)
     private int nextReceiptNumber = 1;
+
+    @Column(name = "reminders_enabled", nullable = false)
+    private boolean remindersEnabled;
+
+    @Column(name = "reminder_days_before", nullable = false)
+    private int reminderDaysBefore = 3;
+
+    @Column(name = "reminder_on_due", nullable = false)
+    private boolean reminderOnDue = true;
+
+    @Column(name = "reminder_every_days", nullable = false)
+    private int reminderEveryDays = 7;
+
+    @Column(name = "reminder_max", nullable = false)
+    private int reminderMax = 3;
 }
