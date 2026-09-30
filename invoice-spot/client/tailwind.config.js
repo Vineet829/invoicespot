@@ -3,11 +3,11 @@ const plugin = require("tailwindcss/plugin");
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
-  // Older pages rely on their own stylesheets and on Material UI, which
-  // Tailwind's global reset would restyle, so it stays off. src/index.css
-  // applies the part of the reset that utilities need inside the new UI.
+  // Tailwind's global reset stays off; src/index.css supplies the parts of
+  // it that the pages rely on.
   corePlugins: { preflight: false },
-  // Utilities must win over the legacy workspace CSS they sit next to.
+  // Utilities must win over that reset, which is scoped to .dashboard-app
+  // and so outranks a single class.
   important: "#root",
   theme: {
     extend: {
@@ -20,6 +20,7 @@ module.exports = {
           "BlinkMacSystemFont",
           "sans-serif",
         ],
+        mono: ["IBM Plex Mono", "monospace"],
       },
       colors: {
         // Invoice Spot's pastel workspace palette.
@@ -116,6 +117,68 @@ module.exports = {
         },
         "ov-pulse": { to: { opacity: "0.4" } },
         "ov-fade": { from: { opacity: "0" } },
+        // Log in and sign up. Entrances move with `translate`, so hover
+        // transforms still apply.
+        "auth-rise": {
+          from: { opacity: "0", translate: "0 var(--rise, 12px)" },
+        },
+        "auth-sheen": { to: { translate: "100% 0" } },
+        "auth-divider": {
+          from: { backgroundPosition: "200% 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
+        "auth-glow-1": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)", opacity: "0.6" },
+          "50%": {
+            transform: "translate(20px, 15px) scale(1.15)",
+            opacity: "1",
+          },
+        },
+        "auth-glow-2": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)", opacity: "0.4" },
+          "50%": {
+            transform: "translate(-15px, -20px) scale(1.1)",
+            opacity: "0.8",
+          },
+        },
+        "auth-glow-3": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)", opacity: "0.3" },
+          "50%": {
+            transform: "translate(10px, -25px) scale(1.2)",
+            opacity: "0.6",
+          },
+        },
+        "auth-grid": { to: { backgroundPosition: "60px 60px" } },
+        "auth-streak": {
+          "0%": { left: "-20%", opacity: "0" },
+          "20%, 80%": { opacity: "1" },
+          "100%": { left: "110%", opacity: "0" },
+        },
+        "auth-float": {
+          "0%, 100%": { transform: "translate(0, 0)", opacity: "0.15" },
+          "25%": { opacity: "0.5" },
+          "50%": {
+            transform: "translate(var(--dx), var(--dy))",
+            opacity: "0.3",
+          },
+          "75%": { opacity: "0.6" },
+        },
+        "auth-grow": { from: { width: "0" } },
+        "auth-wave": {
+          "0%": { translate: "-100% 0" },
+          "55%, 100%": { translate: "100% 0" },
+        },
+        "auth-dot": {
+          "0%": { left: "0", opacity: "0" },
+          "5%, 95%": { opacity: "1" },
+          "100%": { left: "calc(100% - 12px)", opacity: "0" },
+        },
+        "auth-row": { from: { opacity: "0", translate: "-8px 0" } },
+        "auth-toast": {
+          "0%": { opacity: "0", translate: "0 8px" },
+          "12%, 85%": { opacity: "1", translate: "0 0" },
+          "100%": { opacity: "0", translate: "0 -4px" },
+        },
       },
       animation: {
         // Panels rise in sequence; set --rise-delay per panel.
@@ -128,6 +191,32 @@ module.exports = {
           "ov-roll 1.4s calc(300ms + var(--digit-delay, 0ms)) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-pulse": "ov-pulse 1.6s ease-in-out infinite alternate",
         "ov-fade": "ov-fade 0.12s ease-out both",
+        // Content rises in sequence; set --d (and --rise) per element.
+        "auth-rise":
+          "auth-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0s) backwards",
+        "auth-sheen": "auth-sheen 0.7s ease forwards",
+        "auth-divider": "auth-divider 4s linear infinite",
+        "auth-glow-1": "auth-glow-1 8s ease-in-out infinite",
+        "auth-glow-2": "auth-glow-2 10s ease-in-out infinite",
+        "auth-glow-3": "auth-glow-3 12s ease-in-out infinite",
+        "auth-grid": "auth-grid 25s linear infinite",
+        "auth-streak": "auth-streak 6s ease-in-out infinite",
+        "auth-streak-late": "auth-streak 6s ease-in-out -3s infinite",
+        "auth-float": "auth-float var(--dur) ease-in-out infinite",
+        // The loader fills from 0.8s to 2.6s, then its sheen repeats.
+        "auth-fill":
+          "auth-grow 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s backwards",
+        "auth-dot": "auth-dot 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s",
+        "auth-loader-wave": "auth-wave 1.8s ease-in-out 2.6s infinite",
+        // The sample window: rows slide in, values grow, then a shimmer
+        // repeats; set --rd, --gd and --sd per element.
+        "auth-row": "auth-row 0.45s ease var(--rd, 1.5s) backwards",
+        "auth-grow":
+          "auth-grow 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--gd, 1.4s) backwards",
+        "auth-shimmer":
+          "auth-wave 2.2s ease-in-out calc(1.9s + var(--sd, 0s)) infinite",
+        "auth-fade": "ov-fade 0.6s ease 1.8s backwards",
+        "auth-toast": "auth-toast 2.6s ease 3.2s",
       },
     },
   },

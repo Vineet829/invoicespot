@@ -30,9 +30,19 @@ export const pagerButton =
 export const pageSizeSelect =
   "h-[30px] rounded-[9px] border border-[#23273524] bg-white/80 px-2 text-[12.5px] text-spot-ink coarse:min-h-11 coarse:min-w-11";
 
-// The frosted surface every workspace panel sits on.
-export const panel =
-  "min-w-0 rounded-[30px] border border-white/90 bg-white/[.66] p-6 shadow-panel backdrop-blur-[16px] compact:p-[18px] max-[700px]:rounded-3xl max-[700px]:p-[18px]";
+// The frosted surface panels and cards sit on, and a workspace panel.
+export const surface =
+  "rounded-[30px] border border-white/90 bg-white/[.66] shadow-panel backdrop-blur-[16px]";
+export const panel = `min-w-0 ${surface} p-6 compact:p-[18px] max-[700px]:rounded-3xl max-[700px]:p-[18px]`;
+
+// The root of a page outside the workspace shell: canvas, type and the
+// workspace reset (dashboard-app, see src/index.css).
+export const appSurface =
+  "dashboard-app bg-spot-canvas bg-canvas font-ui font-normal leading-[normal] tracking-normal text-spot-ink [color-scheme:light]";
+export const brandMark =
+  "whitespace-nowrap font-display text-[24px] font-normal leading-[normal] tracking-[-0.045em] text-spot-ink coarse:inline-flex coarse:min-h-11 coarse:items-center [&>span]:text-spot-brand";
+export const textLink =
+  "text-spot-violet underline-offset-4 transition-colors hover:text-spot-night hover:underline";
 
 // Buttons, and links that look like buttons. The base sets shape and type
 // only; each kind adds its colours.
