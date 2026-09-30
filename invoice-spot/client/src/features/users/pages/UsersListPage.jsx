@@ -31,7 +31,7 @@ const UsersListPage = () => {
     refetchOnMountOrArgChange: true,
   });
   const rows = query.data?.users || [];
-  const pagination = usePagination(rows);
+  const pagination = usePagination(rows, 10);
   const [selected, setSelected] = useState(null);
   const [busyUser, setBusyUser] = useState(null);
   const [remove, { isLoading: deleting }] = useDeleteUserMutation();
@@ -77,7 +77,7 @@ const UsersListPage = () => {
     {
       label: "Active user",
       render: (row) => (
-        <label className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] text-spot-body [&>input]:m-0 [&>input]:size-4 [&>input]:accent-spot-violet">
+        <label className="inline-flex items-center gap-2 whitespace-nowrap text-spot-body [&>input]:m-0 [&>input]:size-4 [&>input]:accent-spot-violet">
           <input
             type="checkbox"
             checked={Boolean(row.active)}
@@ -106,7 +106,7 @@ const UsersListPage = () => {
     },
   ];
   return (
-    <WorkspacePage section="Administration">
+    <WorkspacePage section="Administration" fill>
       <PageHeader
         title="Administration"
         description="View user accounts and manage their access."
@@ -116,12 +116,13 @@ const UsersListPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel title="Users">
+        <Panel title="Users" fill={rows.length > 0}>
           {rows.length ? (
             <>
               <DataTable
                 columns={columns}
                 rows={pagination.rows}
+                fillRows={pagination.fullPage}
                 label="Users"
               />
               <Pagination pagination={pagination} />

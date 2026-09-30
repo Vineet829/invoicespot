@@ -58,10 +58,13 @@ export const dateInput = (value) => {
 export const dateInstant = (value) =>
   value ? new Date(`${value}T12:00:00`).toISOString() : null;
 
-// Page sections rise one after another, like the overview's panels.
-export const WorkspacePage = ({ children, section }) => (
-  <DashboardShell section={section}>
-    <div className="flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5 [&>:not(dialog)]:animate-ov-rise [&>:nth-child(2)]:[--rise-delay:80ms] [&>:nth-child(3)]:[--rise-delay:160ms] [&>:nth-child(n+4)]:[--rise-delay:240ms]">
+// Page sections rise one after another, like the overview's panels. On a
+// `fill` page, a `fill` panel reaches the bottom of wide windows.
+export const WorkspacePage = ({ children, section, fill = false }) => (
+  <DashboardShell section={section} fill={fill}>
+    <div
+      className={`flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5 [&>:not(dialog)]:animate-ov-rise [&>:nth-child(2)]:[--rise-delay:80ms] [&>:nth-child(3)]:[--rise-delay:160ms] [&>:nth-child(n+4)]:[--rise-delay:240ms] ${fill ? "min-[1360px]:flex-1" : ""}`}
+    >
       {children}
     </div>
   </DashboardShell>
@@ -110,9 +113,12 @@ export const Panel = ({
   title,
   description,
   aside,
+  fill = false,
   className = "",
 }) => (
-  <section className={`${panel} ${className}`}>
+  <section
+    className={`${panel} ${fill ? "min-[1360px]:flex min-[1360px]:flex-1 min-[1360px]:flex-col" : ""} ${className}`}
+  >
     {title && (
       <header className="mb-5 flex items-start justify-between gap-4 compact:mb-4 max-[700px]:flex-wrap">
         <div className="min-w-0">
@@ -302,9 +308,9 @@ export const ErrorState = ({ error, retry }) => (
   </div>
 );
 
-export const usePagination = (rows = []) => {
+export const usePagination = (rows = [], initialSize = 5) => {
   const [requestedPage, setPage] = useState(0);
-  const [size, setSize] = useState(5);
+  const [size, setSize] = useState(initialSize);
   const last = size === -1 ? 0 : Math.max(0, Math.ceil(rows.length / size) - 1);
   const page = Math.min(requestedPage, last);
   const start = size === -1 ? 0 : page * size;
@@ -314,6 +320,8 @@ export const usePagination = (rows = []) => {
     last,
     start,
     count: rows.length,
+    // Rows on a full page; a short last page keeps their height.
+    fullPage: size === -1 ? rows.length : Math.min(size, rows.length),
     rows: size === -1 ? rows : rows.slice(start, start + size),
     setPage,
     setSize: (value) => {
@@ -422,18 +430,40 @@ const COLUMN_TYPES = {
     td: "w-px whitespace-nowrap pr-3.5 stacked:w-auto",
   },
 };
+// A `fillRows` table takes the rest of its panel on wide windows. Up to ten
+// of its rows share the height (40–88px each); longer pages scroll inside it,
+// so no row is cut off at the bottom. The text grows with the room left:
+// --fill-grow runs from 0 to 42px as the rows get taller than 46px or the
+// table wider, whichever is more.
+const FILL = {
+  wrapper:
+    "min-[1360px]:min-h-[240px] min-[1360px]:flex-[1_1_0] min-[1360px]:overflow-y-auto min-[1360px]:[container-type:size] min-[1360px]:[scrollbar-color:#a996e0_#ffffff26] min-[1360px]:[scrollbar-width:thin] min-[1360px]:[--fill-row:clamp(40px,calc((100cqh_-_34px)_/_var(--fill-rows)),88px)] min-[1360px]:[--fill-grow:clamp(0px,max(var(--fill-row)_-_46px,(100cqi_-_1016px)_*_0.0968),42px)]",
+  row: "min-[1360px]:[height:var(--fill-row)]",
+  // From the 46px row sizes up to 18px text, 20px names and 24px amounts.
+  text: {
+    text: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
+    main: "min-[1360px]:[font-size:calc(16px_+_var(--fill-grow)_*_0.0952)]",
+    email: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
+    index: "min-[1360px]:[font-size:calc(13px_+_var(--fill-grow)_*_0.0476)]",
+    amount: "min-[1360px]:[font-size:calc(19px_+_var(--fill-grow)_*_0.119)]",
+    action: "",
+  },
+};
 
 export const DataTable = ({
   columns,
   rows,
   label,
   rowKey = (row) => row._id,
+  fillRows = 0,
 }) => {
   // In a card, placing the first action in column 1 starts a new line.
   const firstAction = columns.findIndex(({ type }) => type === "action");
+  const fill = fillRows > 0;
   return (
     <div
-      className={`[container-type:inline-size] ${columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"}`}
+      className={`[container-type:inline-size] ${columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""}`}
+      style={fill ? { "--fill-rows": Math.min(fillRows, 10) } : undefined}
     >
       <table className="w-full border-separate border-spacing-0 stacked:block">
         <caption className="sr-only">{label}</caption>
@@ -454,12 +484,12 @@ export const DataTable = ({
           {rows.map((row, index) => (
             <tr
               key={rowKey(row, index)}
-              className="h-[46px] [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512]"
+              className={`h-[46px] ${fill ? FILL.row : ""} [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512]`}
             >
               {columns.map((column, columnIndex) => (
                 <td
                   key={column.label}
-                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${columnIndex === firstAction ? "stacked:col-start-1" : ""}`}
+                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${fill ? FILL.text[column.type || "text"] : ""} ${columnIndex === firstAction ? "stacked:col-start-1" : ""}`}
                   data-label={column.label}
                 >
                   {column.render(row, index)}

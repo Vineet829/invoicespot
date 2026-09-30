@@ -11,19 +11,21 @@ import {
 } from "../../../components/workspace/pastel";
 
 // Log in and sign up in the workspace's pastel style: AuthVisual on the left,
-// the form panel on the right. Below 901px only the form remains.
+// the form panel on the right. Below 901px only the form remains. From 901px
+// both panels' content is zoomed to 140%, and the page scrolls when it is
+// taller than the window.
 const button =
   "relative inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-xl px-3.5 py-3 text-[14px] font-medium leading-[1.3] transition-[transform,box-shadow,background-color,border-color,color] duration-200 after:pointer-events-none after:absolute after:inset-0 after:content-[''] after:[translate:-100%_0] hover:enabled:after:animate-auth-sheen disabled:cursor-progress disabled:opacity-60 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:transition-transform [&>svg]:duration-200";
 const underlinedLinks =
   "[&_a:hover]:text-spot-ink [&_a]:text-spot-text [&_a]:underline [&_a]:decoration-spot-text/35 [&_a]:underline-offset-2";
 
 export const auth = {
-  page: `${appSurface} grid h-dvh grid-cols-2 grid-rows-[minmax(0,1fr)] gap-[clamp(16px,1.5vw,24px)] overflow-hidden p-[clamp(20px,2vw,32px)] max-[900px]:h-auto max-[900px]:min-h-svh max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto] max-[900px]:overflow-visible max-[900px]:p-[clamp(12px,3.5vw,24px)]`,
+  page: `${appSurface} grid min-h-dvh grid-cols-2 grid-rows-[minmax(0,1fr)] gap-[clamp(16px,1.5vw,24px)] p-[clamp(20px,2vw,32px)] max-[900px]:min-h-svh max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto] max-[900px]:p-[clamp(12px,3.5vw,24px)]`,
   formPanel: `${surface} relative flex min-h-0 min-w-0 flex-col overflow-y-auto px-[clamp(32px,4vw,72px)] py-9 [scrollbar-color:#a996e080_transparent] [scrollbar-width:thin] before:pointer-events-none before:absolute before:bottom-0 before:left-0 before:h-80 before:w-[min(320px,100%)] before:rounded-full before:bg-spot-lilac/25 before:blur-[80px] before:content-[''] max-[900px]:overflow-visible max-[900px]:pb-[max(36px,env(safe-area-inset-bottom))] max-[900px]:pl-[max(clamp(20px,5vw,36px),env(safe-area-inset-left))] max-[900px]:pr-[max(clamp(20px,5vw,36px),env(safe-area-inset-right))] max-[900px]:pt-[max(36px,env(safe-area-inset-top))] max-[700px]:rounded-3xl`,
   formWrap:
-    "relative z-[1] m-auto w-full max-w-[400px] max-[900px]:max-w-[480px]",
+    "relative z-[1] m-auto w-full max-w-[400px] min-[901px]:[zoom:1.4] max-[900px]:max-w-[480px]",
   formWrapWide:
-    "relative z-[1] m-auto w-full max-w-[440px] max-[900px]:max-w-[480px]",
+    "relative z-[1] m-auto w-full max-w-[440px] min-[901px]:[zoom:1.4] max-[900px]:max-w-[480px]",
   mobileBrand:
     "mb-8 hidden items-center gap-2.5 font-display text-[16px] leading-none tracking-[-0.025em] text-spot-ink max-[900px]:inline-flex",
   brandMark:
