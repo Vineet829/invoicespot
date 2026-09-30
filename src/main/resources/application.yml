@@ -82,6 +82,7 @@ app:
     dir: ${UPLOAD_DIR:uploads}
   demo:
     email: ${DEMO_EMAIL:guest@demo.invoicespot.local}
+    seed: ${DEMO_SEED:false}
 
 logging:
   level:

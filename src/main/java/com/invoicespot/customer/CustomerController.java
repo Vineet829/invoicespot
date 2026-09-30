@@ -5,6 +5,7 @@ import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.CreatedCustomerResponse;
 import com.invoicespot.customer.dto.CustomerListResponse;
 import com.invoicespot.customer.dto.CustomerResponse;
+import com.invoicespot.customer.dto.CustomerSummaryResponse;
 import com.invoicespot.customer.dto.SingleCustomerResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
 import com.invoicespot.customer.dto.UpdatedCustomerResponse;
@@ -44,14 +45,24 @@ public class CustomerController {
     @GetMapping("/all")
     public CustomerListResponse listMine(
             @AuthenticationPrincipal User principal,
-            @RequestParam(name = "page", defaultValue = "1") int page) {
-        return customerService.listMine(principal.getPkid(), page);
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "sort", defaultValue = "createdAt") String sort,
+            @RequestParam(name = "dir", defaultValue = "desc") String direction) {
+        return customerService.listMine(
+                principal.getPkid(), CustomerSearch.of(query, sort, direction, page, size));
     }
 
     @GetMapping("/{id}")
     public SingleCustomerResponse getOne(
             @AuthenticationPrincipal User principal, @PathVariable String id) {
         return new SingleCustomerResponse(true, customerService.getOne(principal.getPkid(), id));
+    }
+
+    @GetMapping("/{id}/summary")
+    public CustomerSummaryResponse summary(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return customerService.summary(principal.getPkid(), id);
     }
 
     @PatchMapping("/{id}")

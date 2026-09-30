@@ -9,8 +9,10 @@ import static org.mockito.Mockito.when;
 
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
+import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,11 +29,14 @@ class CustomerServiceTest {
 
     @Mock private CustomerRepository customerRepository;
     @Mock private UserRepository userRepository;
+    @Mock private CustomerDirectory customerDirectory;
+    @Mock private SettingsService settingsService;
     private CustomerService service;
 
     @BeforeEach
     void setUp() {
-        service = new CustomerService(customerRepository, userRepository);
+        service = new CustomerService(
+                customerRepository, userRepository, customerDirectory, settingsService, Clock.systemUTC());
     }
 
     private static User userWithPkid(long pkid) {

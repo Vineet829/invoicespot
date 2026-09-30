@@ -1,8 +1,10 @@
 package com.invoicespot.customer.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.customer.Customer;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record CustomerResponse(
@@ -17,9 +19,15 @@ public record CustomerResponse(
         String country,
         String phoneNumber,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Long documentCount,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<CustomerBalance> balances) {
 
     public static CustomerResponse from(Customer customer) {
+        return from(customer, null, null);
+    }
+
+    public static CustomerResponse from(Customer customer, Long documentCount, List<CustomerBalance> balances) {
         return new CustomerResponse(
                 customer.getId(),
                 customer.getCreatedBy().getId(),
@@ -32,6 +40,8 @@ public record CustomerResponse(
                 customer.getCountry(),
                 customer.getPhoneNumber(),
                 customer.getCreatedAt(),
-                customer.getUpdatedAt());
+                customer.getUpdatedAt(),
+                documentCount,
+                balances);
     }
 }

@@ -1,0 +1,62 @@
+package com.invoicespot.demo;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+final class DemoData {
+
+    record Item(String name, String description, BigDecimal price, boolean countable) {}
+
+    record Client(String name, String email, String phone, String address, String city) {}
+
+    static final String MARKER_EMAIL = "accounts@harborandpine.example";
+
+    static final List<Item> ITEMS = List.of(
+            item("Brand strategy workshop", "Half-day session with the leadership team", "1800", false),
+            item("Logo and identity system", "Logo, colour, type and usage guide", "3200", false),
+            item("Website design (per page)", "Responsive layouts for one page", "450", true),
+            item("Front-end build (per page)", "Accessible, production-ready code", "380", true),
+            item("Copywriting (per 500 words)", null, "150", true),
+            item("Product photography (half day)", "Studio, lighting and retouching", "900", false),
+            item("Motion graphics (per 15 seconds)", null, "650", true),
+            item("Social media kit", "Templates for posts, stories and covers", "700", false),
+            item("Hosting and maintenance (monthly)", "Updates, backups and uptime checks", "120", true),
+            item("Consulting (hourly)", null, "140", true));
+
+    static final List<Client> CLIENTS = List.of(
+            new Client("Harbor & Pine Architects", MARKER_EMAIL, "+1 415 555 0142", "88 Bay Street", "San Francisco"),
+            new Client("Bluefin Analytics", "billing@bluefin.example", "+1 206 555 0187", "1200 Western Avenue",
+                    "Seattle"),
+            new Client("Oak Street Bakery", "hello@oakstreetbakery.example", "+1 510 555 0119", "402 Oak Street",
+                    "Oakland"),
+            new Client("Lumen Health", "finance@lumenhealth.example", "+1 617 555 0133", "75 State Street",
+                    "Boston"),
+            new Client("Tidewater Logistics", "ap@tidewater.example", "+1 757 555 0164", "9 Harbor Road",
+                    "Norfolk"),
+            new Client("Atlas Robotics", "payables@atlasrobotics.example", "+1 512 555 0171", "300 Congress Avenue",
+                    "Austin"),
+            new Client("Juniper Films", "studio@juniperfilms.example", "+1 323 555 0158", "6100 Sunset Boulevard",
+                    "Los Angeles"),
+            new Client("Kestrel Outdoor", "accounts@kestreloutdoor.example", "+1 303 555 0126", "1550 Wynkoop Street",
+                    "Denver"),
+            new Client("Marigold Events", "team@marigoldevents.example", "+1 312 555 0149", "220 North Wells Street",
+                    "Chicago"),
+            new Client("Quill & Co. Publishing", "billing@quillandco.example", "+1 212 555 0192", "11 Bond Street",
+                    "New York"),
+            new Client("Sable Fitness", "ops@sablefitness.example", "+1 305 555 0137", "1450 Brickell Avenue",
+                    "Miami"),
+            new Client("Verdant Farms", "office@verdantfarms.example", "+1 503 555 0110", "88 NW Hoyt Street",
+                    "Portland"));
+
+    static final String NOTES = "Thank you for working with us. It's a pleasure to be part of your project.";
+    static final String TERMS =
+            "Payment is due within 14 days of the issue date. Bank transfer details are on request.";
+    static final String EMAIL_MESSAGE = "Hi {client},\n\nPlease find {document} attached. Let me know if you have any"
+            + " questions.\n\nThanks,\n{business}";
+
+    private static Item item(String name, String description, String price, boolean countable) {
+        return new Item(name, description, new BigDecimal(price), countable);
+    }
+
+    private DemoData() {}
+}

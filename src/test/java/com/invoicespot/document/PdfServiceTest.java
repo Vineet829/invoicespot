@@ -3,6 +3,7 @@ package com.invoicespot.document;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
 import com.invoicespot.user.User;
@@ -11,7 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -127,6 +130,65 @@ class PdfServiceTest {
 
         assertThat(html).contains("Valid until").contains("USD 1,445.50");
         assertThat(html).doesNotContain("Amount paid").doesNotContain("Balance due").doesNotContain("Partially paid");
+    }
+
+    private static Customer client() {
+        Customer customer = new Customer();
+        customer.setName("Beta & <Sons>");
+        customer.setEmail("beta@x.com");
+        customer.setAccountNo("CUS-123456");
+        customer.setCity("Mumbai");
+        return customer;
+    }
+
+    private static Statements.Account account(String currency, String overdue) {
+        return new Statements.Account(
+                currency,
+                List.of(
+                        new Statements.Line(LocalDate.of(2026, 8, 1), "Invoice INV-1", new BigDecimal("1200.00"),
+                                null, new BigDecimal("1200.00")),
+                        new Statements.Line(LocalDate.of(2026, 9, 2), "Payment for INV-1 (Cash)", null,
+                                new BigDecimal("200.00"), new BigDecimal("1000.00"))),
+                new BigDecimal("1200.00"),
+                new BigDecimal("200.00"),
+                new BigDecimal("1000.00"),
+                new BigDecimal(overdue));
+    }
+
+    @Test
+    @DisplayName("a statement lists each invoice and payment with the running balance and the amount due")
+    void statementHtml() {
+        String html = service.statementHtml(
+                owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "1000.00")));
+
+        assertThat(html)
+                .contains("Statement for Beta &amp; &lt;Sons&gt;")
+                .contains("Account no. CUS-123456")
+                .contains("Sep 30, 2026")
+                .contains("Aug 1, 2026")
+                .contains("Payment for INV-1 (Cash)")
+                .contains("1,200.00")
+                .contains("USD 200.00")
+                .contains("Overdue")
+                .contains("USD 1,000.00")
+                .contains("Amount due");
+    }
+
+    @Test
+    @DisplayName("a settled statement shows no overdue line, and several currencies are labelled")
+    void statementCurrencies() {
+        String settled = service.statementHtml(
+                owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "0")));
+        String mixed = service.statementHtml(
+                owner("Ada Analytics"),
+                client(),
+                LocalDate.of(2026, 9, 30),
+                List.of(account("USD", "0"), account("EUR", "0")));
+        String empty = service.statementHtml(owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of());
+
+        assertThat(settled).doesNotContain("Overdue");
+        assertThat(mixed).contains("<div class=\"label\">EUR</div>");
+        assertThat(empty).contains("No invoices yet, so nothing is due.");
     }
 
     @Test

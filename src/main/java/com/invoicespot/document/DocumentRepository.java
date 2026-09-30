@@ -30,6 +30,14 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     @Query("select d from Document d where d.id = :externalId")
     Optional<Document> findByExternalId(@Param("externalId") UUID externalId);
 
+    @EntityGraph(attributePaths = {"payments"})
+    @Query("""
+            select d from Document d
+            where d.customer.pkid = :customerPkid and d.documentType = :type
+            order by d.createdAt, d.pkid
+            """)
+    List<Document> findForStatement(@Param("customerPkid") Long customerPkid, @Param("type") DocumentType type);
+
     boolean existsByCreatedByPkidAndDocumentNumber(Long createdByPkid, String documentNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

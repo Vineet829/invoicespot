@@ -1,5 +1,6 @@
 package com.invoicespot.document;
 
+import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
 import com.invoicespot.user.User;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -48,6 +50,28 @@ public class PdfService {
         return templateEngine.process("pdf/document", context);
     }
 
+    byte[] renderStatement(User owner, Customer customer, LocalDate day, List<Statements.Account> accounts) {
+        return toPdf(statementHtml(owner, customer, day, accounts));
+    }
+
+    String statementHtml(User owner, Customer customer, LocalDate day, List<Statements.Account> accounts) {
+        Context context = new Context(Locale.ENGLISH);
+        context.setVariable("statement", new StatementView(
+                logo(owner.getAvatar()),
+                senderName(owner),
+                senderLines(owner),
+                DATE.format(day),
+                value(customer.getName()),
+                lines(
+                        customer.getEmail(),
+                        customer.getPhoneNumber(),
+                        joined(customer.getAddress(), customer.getCity(), customer.getCountry()),
+                        customer.getAccountNo() == null ? null : "Account no. " + customer.getAccountNo(),
+                        vatTin(customer.getVatTinNo())),
+                accounts.stream().map(PdfService::statementAccount).toList()));
+        return templateEngine.process("pdf/statement", context);
+    }
+
     static String senderName(User owner) {
         if (owner.getBusinessName() != null && !owner.getBusinessName().isBlank()) {
             return owner.getBusinessName();
@@ -79,6 +103,44 @@ public class PdfService {
     public record Line(int index, String name, String quantity, String unitPrice, String discount, String amount) {}
 
     public record Total(String label, String value) {}
+
+    public record StatementView(
+            String logo,
+            String sender,
+            List<String> senderLines,
+            String date,
+            String clientName,
+            List<String> clientLines,
+            List<StatementAccount> accounts) {}
+
+    public record StatementAccount(
+            String currency,
+            List<StatementLine> lines,
+            String charged,
+            String paid,
+            String due,
+            String overdue,
+            boolean hasOverdue) {}
+
+    public record StatementLine(String date, String description, String charge, String payment, String balance) {}
+
+    private static StatementAccount statementAccount(Statements.Account account) {
+        return new StatementAccount(
+                account.currency(),
+                account.lines().stream()
+                        .map(line -> new StatementLine(
+                                DATE.format(line.date()),
+                                line.description(),
+                                line.charge() == null ? "" : money(line.charge()),
+                                line.payment() == null ? "" : money(line.payment()),
+                                money(line.balance())))
+                        .toList(),
+                money(account.charged()),
+                money(account.paid()),
+                money(account.due()),
+                money(account.overdue()),
+                account.overdue().signum() > 0);
+    }
 
     private View view(Document document, User owner, BusinessSettings settings) {
         ZoneId zone = ZoneId.of(settings.getTimeZone());
@@ -114,10 +176,7 @@ public class PdfService {
         return new View(
                 logo(owner.getAvatar()),
                 senderName(owner),
-                lines(
-                        owner.getEmail(),
-                        owner.getPhoneNumber(),
-                        joined(owner.getAddress(), owner.getCity(), owner.getCountry())),
+                senderLines(owner),
                 type.getValue(),
                 value(document.getDocumentNumber()),
                 date(document.getCreatedAt(), zone),
@@ -139,6 +198,13 @@ public class PdfService {
                 money(quotation ? total : total.subtract(received)),
                 blankToNull(document.getAdditionalInfo()),
                 blankToNull(document.getTermsConditions()));
+    }
+
+    private static List<String> senderLines(User owner) {
+        return lines(
+                owner.getEmail(),
+                owner.getPhoneNumber(),
+                joined(owner.getAddress(), owner.getCity(), owner.getCountry()));
     }
 
     private String logo(String avatar) {

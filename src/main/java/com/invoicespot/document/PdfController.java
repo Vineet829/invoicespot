@@ -31,7 +31,10 @@ public class PdfController {
 
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> pdf(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        DocumentPdf pdf = documentService.renderPdf(principal, id);
+        return inline(documentService.renderPdf(principal, id));
+    }
+
+    static ResponseEntity<byte[]> inline(DocumentPdf pdf) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(
