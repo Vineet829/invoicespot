@@ -31,6 +31,7 @@ import {
   useGetPaymentsCsvMutation,
 } from "../../documents/documentsApiSlice";
 import { useGetCustomersCsvMutation } from "../../customers/customersApiSlice";
+import SettingsTabs from "../components/SettingsTabs";
 import {
   useGetDataExportMutation,
   useGetSettingsQuery,
@@ -432,6 +433,7 @@ const SettingsPage = () => {
       <PageHeader
         title="Settings"
         description="Defaults for your documents and the emails you send."
+        actions={<SettingsTabs />}
       />
       {query.isLoading ? (
         <LoadingState />

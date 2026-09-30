@@ -4,6 +4,8 @@ import {
   FiBarChart2,
   FiFileText,
   FiGrid,
+  FiList,
+  FiLock,
   FiPackage,
   FiPlus,
   FiRepeat,
@@ -26,7 +28,9 @@ const PAGES = [
   { to: "/reports", label: "Reports", icon: FiBarChart2 },
   { to: "/profile", label: "Profile", icon: FiUser },
   { to: "/settings", label: "Settings", icon: FiSettings },
+  { to: "/settings/security", label: "Security", icon: FiLock },
   { to: "/users", label: "Administration", icon: FiShield, admin: true },
+  { to: "/users/audit", label: "Audit log", icon: FiList, admin: true },
 ];
 
 const ACTIONS = [

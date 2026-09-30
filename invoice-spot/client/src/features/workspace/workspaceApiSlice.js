@@ -37,11 +37,6 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
         fetchWorkspaceRows(baseQuery, "/customer/all", "myCustomers"),
       providesTags: ["Customer"],
     }),
-    getWorkspaceUsers: builder.query({
-      queryFn: (_arg, _api, _options, baseQuery) =>
-        fetchWorkspaceRows(baseQuery, "/user/all", "users", "pageNumber"),
-      providesTags: [{ type: "User", id: "LIST" }],
-    }),
     uploadProfileLogo: builder.mutation({
       query: (body) => ({
         url: "/upload",
@@ -53,8 +48,5 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
   }),
 });
 
-export const {
-  useGetWorkspaceCustomersQuery,
-  useGetWorkspaceUsersQuery,
-  useUploadProfileLogoMutation,
-} = workspaceApiSlice;
+export const { useGetWorkspaceCustomersQuery, useUploadProfileLogoMutation } =
+  workspaceApiSlice;
