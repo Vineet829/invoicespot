@@ -58,7 +58,7 @@ class DemoAccountIntegrationTest extends IntegrationTest {
         String document = mockMvc.perform(post("/api/v1/document/create")
                         .header(HttpHeaders.AUTHORIZATION, bearer(demo))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"customerId\": \"%s\", \"billingItems\": []}"
+                        .content("{\"customerId\": \"%s\", \"billingItems\": [{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": 1}]}"
                                 .formatted((String) JsonPath.read(customer, "$.createdCustomer._id"))))
                 .andReturn()
                 .getResponse()

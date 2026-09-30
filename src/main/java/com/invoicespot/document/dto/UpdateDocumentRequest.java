@@ -15,5 +15,5 @@ public record UpdateDocumentRequest(
         @Size(max = 5000, message = "Terms can be at most 5,000 characters") String termsConditions,
         String rates,
         @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD") String currency,
-        @Size(max = 200, message = "A document can have at most 200 items")
+        @Size(min = 1, max = 200, message = "A document needs 1 to 200 products or services")
                 List<@Valid BillingItemDto> billingItems) {}

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -184,5 +185,25 @@ class DocumentPdfIntegrationTest extends IntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Enter a valid email address"));
         verify(mailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    @DisplayName("the email draft follows the saved message, with the client, document and business filled in")
+    void savedMessage() throws Exception {
+        User owner = createUser();
+        Document document = documentFor(owner, "beta@x.com");
+        mockMvc.perform(put("/api/v1/settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0, "taxLabel": "Tax",
+                                 "emailMessage": "Hi {client}, {document} is attached. {business}", "timeZone": "UTC"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/document/{id}/email", document.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.message").value(
+                        "Hi Beta LLC, Invoice 2026-September-ABC123 is attached. Test User"));
     }
 }

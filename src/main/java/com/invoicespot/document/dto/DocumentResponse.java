@@ -22,6 +22,7 @@ public record DocumentResponse(
         String additionalInfo,
         String termsConditions,
         DocumentStatus status,
+        boolean overdue,
         BigDecimal subTotal,
         BigDecimal salesTax,
         String rates,
@@ -33,7 +34,7 @@ public record DocumentResponse(
         Instant createdAt,
         Instant updatedAt) {
 
-    public static DocumentResponse from(Document document) {
+    public static DocumentResponse from(Document document, Instant startOfToday) {
         CustomerSnapshot snapshot = document.getCustomerSnapshot();
         DocumentCustomerDto customer = snapshot == null
                 ? null
@@ -70,6 +71,7 @@ public record DocumentResponse(
                 document.getAdditionalInfo(),
                 document.getTermsConditions(),
                 document.getStatus(),
+                DocumentTotals.isOverdue(document, startOfToday),
                 document.getSubTotal(),
                 document.getSalesTax(),
                 plain(document.getRates()),

@@ -1,5 +1,6 @@
 package com.invoicespot.document;
 
+import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
 import com.invoicespot.user.User;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
@@ -12,7 +13,7 @@ import java.nio.file.Path;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -27,8 +28,7 @@ import org.thymeleaf.context.Context;
 @Service
 public class PdfService {
 
-    private static final DateTimeFormatter DATE =
-            DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH).withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
 
     private final ITemplateEngine templateEngine;
     private final UploadService uploadService;
@@ -38,13 +38,13 @@ public class PdfService {
         this.uploadService = uploadService;
     }
 
-    public byte[] render(Document document, User owner) {
-        return toPdf(html(document, owner));
+    public byte[] render(Document document, User owner, BusinessSettings settings) {
+        return toPdf(html(document, owner, settings));
     }
 
-    String html(Document document, User owner) {
+    String html(Document document, User owner, BusinessSettings settings) {
         Context context = new Context(Locale.ENGLISH);
-        context.setVariable("pdf", view(document, owner));
+        context.setVariable("pdf", view(document, owner, settings));
         return templateEngine.process("pdf/document", context);
     }
 
@@ -80,7 +80,8 @@ public class PdfService {
 
     public record Total(String label, String value) {}
 
-    private View view(Document document, User owner) {
+    private View view(Document document, User owner, BusinessSettings settings) {
+        ZoneId zone = ZoneId.of(settings.getTimeZone());
         DocumentType type = document.getDocumentType();
         String currency = value(document.getCurrency());
         CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
@@ -102,7 +103,8 @@ public class PdfService {
         BigDecimal total = orZero(document.getTotal());
         List<Total> totals = new ArrayList<>();
         totals.add(new Total("Subtotal", money(document.getSubTotal())));
-        totals.add(new Total("Tax (" + percent(document.getRates()) + ")", money(document.getSalesTax())));
+        totals.add(new Total(
+                settings.getTaxLabel() + " (" + percent(document.getRates()) + ")", money(document.getSalesTax())));
         boolean quotation = type == DocumentType.QUOTATION;
         if (!quotation) {
             totals.add(new Total("Total", money(total)));
@@ -118,9 +120,9 @@ public class PdfService {
                         joined(owner.getAddress(), owner.getCity(), owner.getCountry())),
                 type.getValue(),
                 value(document.getDocumentNumber()),
-                date(document.getCreatedAt()),
+                date(document.getCreatedAt(), zone),
                 quotation ? "Valid until" : "Due",
-                date(document.getDueDate()),
+                date(document.getDueDate(), zone),
                 quotation ? null : statusLabel(document.getStatus()),
                 statusTone(document.getStatus()),
                 value(client.getName()),
@@ -213,8 +215,8 @@ public class PdfService {
         return orZero(value).stripTrailingZeros().toPlainString() + "%";
     }
 
-    private static String date(Instant instant) {
-        return instant == null ? null : DATE.format(instant);
+    private static String date(Instant instant, ZoneId zone) {
+        return instant == null ? null : DATE.format(instant.atZone(zone));
     }
 
     private static BigDecimal orZero(BigDecimal value) {

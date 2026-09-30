@@ -5,6 +5,8 @@ import com.invoicespot.document.dto.EmailDocumentRequest;
 import com.invoicespot.mail.MailService;
 import com.invoicespot.ratelimit.RateLimit;
 import com.invoicespot.ratelimit.RateLimiter;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.User;
 import jakarta.mail.MessagingException;
@@ -23,27 +25,30 @@ public class DocumentMailService {
     private final MailService mailService;
     private final DemoAccountGuard demoAccountGuard;
     private final RateLimiter rateLimiter;
+    private final SettingsService settingsService;
 
     public DocumentMailService(
             DocumentService documentService,
             MailService mailService,
             DemoAccountGuard demoAccountGuard,
-            RateLimiter rateLimiter) {
+            RateLimiter rateLimiter,
+            SettingsService settingsService) {
         this.documentService = documentService;
         this.mailService = mailService;
         this.demoAccountGuard = demoAccountGuard;
         this.rateLimiter = rateLimiter;
+        this.settingsService = settingsService;
     }
 
     public EmailDraft draft(User owner, String id) {
-        return defaults(owner, documentService.envelope(owner, id));
+        return defaults(owner, documentService.envelope(owner, id), settingsService.forUser(owner.getPkid()));
     }
 
     public void email(User owner, String id, EmailDocumentRequest request) {
         demoAccountGuard.requireNotDemo(owner, "emailing");
         rateLimiter.consume(RateLimit.OUTGOING_EMAIL, owner.getId().toString());
         DocumentPdf pdf = documentService.renderPdf(owner, id);
-        EmailDraft defaults = defaults(owner, pdf.envelope());
+        EmailDraft defaults = defaults(owner, pdf.envelope(), settingsService.forUser(owner.getPkid()));
         String to = isBlank(request.to()) ? defaults.to() : request.to().trim();
         if (isBlank(to)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "This document's client has no email address");
@@ -61,13 +66,18 @@ public class DocumentMailService {
         }
     }
 
-    private static EmailDraft defaults(User owner, DocumentEnvelope envelope) {
+    private static EmailDraft defaults(User owner, DocumentEnvelope envelope, BusinessSettings settings) {
         String sender = PdfService.senderName(owner);
-        String greeting = isBlank(envelope.recipientName()) ? "Hello," : "Hello " + envelope.recipientName() + ",";
+        String client = isBlank(envelope.recipientName()) ? "there" : envelope.recipientName();
+        String message = isBlank(settings.getEmailMessage())
+                ? "Hello {client},\n\nPlease find {document} from {business} attached.\n\n{business}"
+                : settings.getEmailMessage();
         return new EmailDraft(
                 envelope.recipientEmail(),
                 envelope.title() + " from " + sender,
-                greeting + "\n\nPlease find " + envelope.title() + " from " + sender + " attached.\n\n" + sender);
+                message.replace("{client}", client)
+                        .replace("{document}", envelope.title())
+                        .replace("{business}", sender));
     }
 
     private static boolean isBlank(String value) {

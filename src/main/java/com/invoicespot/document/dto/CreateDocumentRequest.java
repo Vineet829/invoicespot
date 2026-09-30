@@ -1,6 +1,7 @@
 package com.invoicespot.document.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
@@ -15,5 +16,6 @@ public record CreateDocumentRequest(
         @Size(max = 5000, message = "Terms can be at most 5,000 characters") String termsConditions,
         String rates,
         @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD") String currency,
-        @Size(max = 200, message = "A document can have at most 200 items")
+        @NotEmpty(message = "Add at least one product or service")
+                @Size(max = 200, message = "A document can have at most 200 items")
                 List<@Valid BillingItemDto> billingItems) {}

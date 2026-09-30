@@ -70,7 +70,7 @@ class RequestValidationIntegrationTest extends IntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Quantities can't be negative"));
         send(post("/api/v1/document/create"), owner, """
-                        {"customerId": "%s", "currency": "US DOLLARS", "billingItems": []}
+                        {"customerId": "%s", "currency": "US DOLLARS", "billingItems": [{"itemName": "X", "unitPrice": 1, "quantity": 1}]}
                         """.formatted(customerId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Currency must be a three-letter code such as USD"));
@@ -84,5 +84,23 @@ class RequestValidationIntegrationTest extends IntegrationTest {
                         """.formatted("9".repeat(31)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Phone numbers can be at most 30 characters"));
+    }
+
+    @Test
+    @DisplayName("a document needs at least one line, and every line needs a name")
+    void documentLines() throws Exception {
+        User owner = createUser();
+        String customerId = customerId(owner);
+
+        send(post("/api/v1/document/create"), owner, """
+                        {"customerId": "%s", "billingItems": []}
+                        """.formatted(customerId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Add at least one product or service"));
+        send(post("/api/v1/document/create"), owner, """
+                        {"customerId": "%s", "billingItems": [{"itemName": " ", "unitPrice": 5, "quantity": 1}]}
+                        """.formatted(customerId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Every line needs a product or service name"));
     }
 }

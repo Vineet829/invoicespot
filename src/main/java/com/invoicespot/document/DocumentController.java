@@ -13,6 +13,8 @@ import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.document.dto.UpdatedDocumentResponse;
 import com.invoicespot.user.User;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,8 +47,22 @@ public class DocumentController {
     @GetMapping("/all")
     public DocumentListResponse listMine(
             @AuthenticationPrincipal User principal,
-            @RequestParam(name = "page", defaultValue = "1") int page) {
-        return documentService.listMine(principal.getPkid(), page);
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "type", required = false) String type,
+            @RequestParam(name = "overdue", required = false) Boolean overdue,
+            @RequestParam(name = "customerId", required = false) String customerId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate to,
+            @RequestParam(name = "sort", defaultValue = "createdAt") String sort,
+            @RequestParam(name = "dir", defaultValue = "desc") String direction) {
+        return documentService.listMine(
+                principal.getPkid(),
+                DocumentSearch.of(query, status, type, overdue, customerId, from, to, sort, direction, page, size));
     }
 
     @PostMapping("/{id}/payment")

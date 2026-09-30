@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.Objects;
 
 public final class DocumentTotals {
@@ -43,6 +44,13 @@ public final class DocumentTotals {
                 .map(Payment::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+    }
+
+    public static boolean isOverdue(Document document, Instant startOfToday) {
+        return document.getDocumentType() == DocumentType.INVOICE
+                && document.getStatus() != DocumentStatus.PAID
+                && document.getDueDate() != null
+                && document.getDueDate().isBefore(startOfToday);
     }
 
     public static DocumentStatus status(BigDecimal total, BigDecimal received) {

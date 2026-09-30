@@ -3,6 +3,7 @@ package com.invoicespot.document;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,8 @@ import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
@@ -41,12 +44,21 @@ class DocumentServiceTest {
     @Mock private CustomerRepository customerRepository;
     @Mock private UserRepository userRepository;
     @Mock private PdfService pdfService;
+    @Mock private SettingsService settingsService;
+    @Mock private DocumentNumbering documentNumbering;
     private DocumentService service;
 
     @BeforeEach
     void setUp() {
         service = new DocumentService(
-                documentRepository, customerRepository, userRepository, pdfService, CLOCK);
+                documentRepository,
+                customerRepository,
+                userRepository,
+                pdfService,
+                settingsService,
+                documentNumbering,
+                CLOCK);
+        lenient().when(settingsService.forUser(any())).thenReturn(new BusinessSettings());
     }
 
     private static final UUID CUSTOMER_ID = UUID.randomUUID();
@@ -95,6 +107,8 @@ class DocumentServiceTest {
         ownsCustomer(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
 
+        when(documentNumbering.next(1L, DocumentType.INVOICE)).thenReturn("INV-0001");
+
         service.create(1L, documentRequest(null));
 
         ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
@@ -102,7 +116,7 @@ class DocumentServiceTest {
         Document saved = captor.getValue();
         assertThat(saved.getDocumentType()).isEqualTo(DocumentType.INVOICE);
         assertThat(saved.getStatus()).isEqualTo(DocumentStatus.NOT_PAID);
-        assertThat(saved.getDocumentNumber()).matches("\\d{4}-[A-Za-z]+-[0-9A-F]{6}");
+        assertThat(saved.getDocumentNumber()).isEqualTo("INV-0001");
         assertThat(saved.getCustomer().getId()).isEqualTo(CUSTOMER_ID);
         assertThat(saved.getCustomerSnapshot().getName()).isEqualTo("Beta LLC");
         assertThat(saved.getCustomerSnapshot().getEmail()).isEqualTo("billing@beta.test");

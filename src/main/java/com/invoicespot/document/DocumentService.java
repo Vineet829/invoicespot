@@ -11,20 +11,18 @@ import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
+import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -37,26 +35,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DocumentService {
 
-    private static final int PAGE_SIZE = 10;
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final DocumentRepository documentRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
     private final PdfService pdfService;
+    private final SettingsService settingsService;
+    private final DocumentNumbering documentNumbering;
     private final Clock clock;
-    private final SecureRandom random = new SecureRandom();
 
     public DocumentService(
             DocumentRepository documentRepository,
             CustomerRepository customerRepository,
             UserRepository userRepository,
             PdfService pdfService,
+            SettingsService settingsService,
+            DocumentNumbering documentNumbering,
             Clock clock) {
         this.documentRepository = documentRepository;
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
         this.pdfService = pdfService;
+        this.settingsService = settingsService;
+        this.documentNumbering = documentNumbering;
         this.clock = clock;
     }
 
@@ -79,28 +81,45 @@ public class DocumentService {
         document.setRates(percentage(request.rates(), "Tax rate"));
         document.setCurrency(request.currency());
         document.setBillingItems(toBillingItems(request.billingItems()));
-        document.setDocumentNumber(generateDocumentNumber());
+        document.setDocumentNumber(documentNumbering.next(ownerPkid, document.getDocumentType()));
         DocumentTotals.apply(document);
         documentRepository.save(document);
-        return DocumentResponse.from(document);
+        return respond(document);
     }
 
     @Transactional(readOnly = true)
-    public DocumentListResponse listMine(Long ownerPkid, int pageNumber) {
-        int page = Math.max(pageNumber, 1);
-        Page<Document> result = documentRepository.findByCreatedByPkid(
-                ownerPkid,
-                PageRequest.of(page - 1, PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt")));
+    public DocumentListResponse listMine(Long ownerPkid, DocumentSearch search) {
+        ZoneId zone = zoneOf(ownerPkid);
+        Instant startOfToday = startOfToday(zone);
+        Page<Document> result = documentRepository.findAll(
+                DocumentSpecifications.matching(ownerPkid, search, startOfToday, zone),
+                PageRequest.of(search.page() - 1, search.size(), search.sort()));
         return new DocumentListResponse(
                 true,
                 result.getTotalElements(),
                 result.getTotalPages(),
-                result.getContent().stream().map(DocumentResponse::from).toList());
+                search.page(),
+                search.size(),
+                result.getContent().stream()
+                        .map(document -> DocumentResponse.from(document, startOfToday))
+                        .toList());
+    }
+
+    private ZoneId zoneOf(Long ownerPkid) {
+        return ZoneId.of(settingsService.forUser(ownerPkid).getTimeZone());
+    }
+
+    private Instant startOfToday(ZoneId zone) {
+        return LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
+    }
+
+    private DocumentResponse respond(Document document) {
+        return DocumentResponse.from(document, startOfToday(zoneOf(document.getCreatedBy().getPkid())));
     }
 
     @Transactional(readOnly = true)
     public DocumentResponse getOne(Long ownerPkid, String id) {
-        return DocumentResponse.from(requireOwned(
+        return respond(requireOwned(
                 ownerPkid, id, "document not found",
                 "You are not authorized to view this document. It's not yours"));
     }
@@ -108,7 +127,10 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public DocumentPdf renderPdf(User owner, String id) {
         Document document = requireReadable(owner, id);
-        return new DocumentPdf(pdfFileName(document), pdfService.render(document, owner), envelope(document));
+        return new DocumentPdf(
+                pdfFileName(document),
+                pdfService.render(document, owner, settingsService.forUser(owner.getPkid())),
+                envelope(document));
     }
 
     @Transactional(readOnly = true)
@@ -173,7 +195,7 @@ public class DocumentService {
         DocumentTotals.apply(document);
         requireConsistentPayments(document);
         documentRepository.save(document);
-        return DocumentResponse.from(document);
+        return respond(document);
     }
 
     @Transactional
@@ -205,7 +227,7 @@ public class DocumentService {
         document.getPayments().add(payment);
         DocumentTotals.apply(document);
         documentRepository.save(document);
-        return DocumentResponse.from(document);
+        return respond(document);
     }
 
     @Transactional
@@ -228,7 +250,7 @@ public class DocumentService {
             payment.setAmountPaid(amount);
         }
         DocumentTotals.apply(document);
-        return DocumentResponse.from(document);
+        return respond(document);
     }
 
     @Transactional
@@ -236,7 +258,7 @@ public class DocumentService {
         Document document = requireOwnedForPayment(ownerPkid, id);
         document.getPayments().remove(requirePayment(document, paymentId));
         DocumentTotals.apply(document);
-        return DocumentResponse.from(document);
+        return respond(document);
     }
 
     private Document requireOwnedForPayment(Long ownerPkid, String id) {
@@ -407,18 +429,6 @@ public class DocumentService {
                 ? ""
                 : document.getDocumentNumber().replaceAll("[^A-Za-z0-9._-]", "-");
         return (number.isBlank() ? "document" : number) + ".pdf";
-    }
-
-    private String generateDocumentNumber() {
-        LocalDate now = LocalDate.now();
-        byte[] material = new byte[3];
-        random.nextBytes(material);
-        String suffix = HexFormat.of().formatHex(material).toUpperCase(Locale.ENGLISH);
-        return now.getYear()
-                + "-"
-                + now.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH)
-                + "-"
-                + suffix;
     }
 
     private static DocumentType documentType(String value) {

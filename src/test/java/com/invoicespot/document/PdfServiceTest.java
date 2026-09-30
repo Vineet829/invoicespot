@@ -3,6 +3,7 @@ package com.invoicespot.document;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
 import com.invoicespot.user.User;
 import java.math.BigDecimal;
@@ -23,6 +24,8 @@ class PdfServiceTest {
 
     private static final byte[] PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+
+    private static final BusinessSettings SETTINGS = new BusinessSettings();
 
     @TempDir
     Path uploads;
@@ -98,7 +101,7 @@ class PdfServiceTest {
     @Test
     @DisplayName("an invoice lists line amounts, what was paid and the balance due, text escaped")
     void invoiceHtml() {
-        String html = service.html(sampleDocument(DocumentType.INVOICE), owner("Ada Analytics"));
+        String html = service.html(sampleDocument(DocumentType.INVOICE), owner("Ada Analytics"), SETTINGS);
 
         assertThat(html)
                 .contains("Prototype &amp; &lt;review&gt;")
@@ -120,7 +123,7 @@ class PdfServiceTest {
     @Test
     @DisplayName("a quotation shows a validity date and its total, with no payment status")
     void quotationHtml() {
-        String html = service.html(sampleDocument(DocumentType.QUOTATION), owner("Ada Analytics"));
+        String html = service.html(sampleDocument(DocumentType.QUOTATION), owner("Ada Analytics"), SETTINGS);
 
         assertThat(html).contains("Valid until").contains("USD 1,445.50");
         assertThat(html).doesNotContain("Amount paid").doesNotContain("Balance due").doesNotContain("Partially paid");
@@ -135,9 +138,9 @@ class PdfServiceTest {
         User remote = owner("Ada Analytics");
         remote.setAvatar("https://example.com/brand.png");
 
-        assertThat(service.html(sampleDocument(DocumentType.INVOICE), local)).contains("data:image/png;base64,");
-        assertThat(service.html(sampleDocument(DocumentType.INVOICE), remote)).doesNotContain("example.com");
-        assertThat(new String(service.render(sampleDocument(DocumentType.INVOICE), local), 0, 5)).isEqualTo("%PDF-");
+        assertThat(service.html(sampleDocument(DocumentType.INVOICE), local, SETTINGS)).contains("data:image/png;base64,");
+        assertThat(service.html(sampleDocument(DocumentType.INVOICE), remote, SETTINGS)).doesNotContain("example.com");
+        assertThat(new String(service.render(sampleDocument(DocumentType.INVOICE), local, SETTINGS), 0, 5)).isEqualTo("%PDF-");
     }
 
     @Test
@@ -145,5 +148,19 @@ class PdfServiceTest {
     void senderName() {
         assertThat(PdfService.senderName(owner("Ada Analytics"))).isEqualTo("Ada Analytics");
         assertThat(PdfService.senderName(owner(" "))).isEqualTo("Ada Lovelace");
+    }
+
+    @Test
+    @DisplayName("the tax is named as in the settings, and dates are days in the owner's time zone")
+    void settingsApply() {
+        BusinessSettings settings = new BusinessSettings();
+        settings.setTaxLabel("GST");
+        settings.setTimeZone("Asia/Kolkata");
+        Document document = sampleDocument(DocumentType.INVOICE);
+        document.setCreatedAt(Instant.parse("2026-09-30T20:00:00Z"));
+
+        String html = service.html(document, owner("Ada Analytics"), settings);
+
+        assertThat(html).contains("GST (18%)").contains("Oct 1, 2026").doesNotContain("Tax (18%)");
     }
 }
