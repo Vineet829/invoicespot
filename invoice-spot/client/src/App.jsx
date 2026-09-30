@@ -25,6 +25,8 @@ import DocumentsPage from "./features/documents/pages/DocumentsPage";
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 import SettingsPage from "./features/settings/pages/SettingsPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
+import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
+import RecurringPage from "./features/recurring/pages/RecurringPage";
 
 const App = () => {
   return (
@@ -41,6 +43,7 @@ const App = () => {
             element={<PasswordResetRequestPage />}
           />
           <Route path="auth/reset_password" element={<PasswordResetPage />} />
+          <Route path="p/:token" element={<SharedDocumentPage />} />
           {/* Private Routes - Users */}
           <Route element={<AuthRequired allowedRoles={[ROLES.User]} />}>
             <Route path="profile" element={<ProfilePage />} />
@@ -59,6 +62,7 @@ const App = () => {
             />
 
             <Route path="documents" element={<DocumentsPage />} />
+            <Route path="recurring" element={<RecurringPage />} />
             <Route path="create-doc" element={<DocCreateEditForm />} />
             <Route path="edit-doc/:id" element={<DocCreateEditForm />} />
             <Route path="document/:id" element={<SingleDocumentPage />} />

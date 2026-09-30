@@ -23,6 +23,7 @@ import { useLogoutUserMutation } from "../../auth/authApiSlice";
 import useAuthUser from "../../../hooks/useAuthUser";
 import { brandMark, iconButton } from "../../../components/workspace/pastel";
 import CommandPalette from "../../shell/CommandPalette";
+import NotificationBell from "../../notifications/NotificationBell";
 
 const navLink =
   "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
@@ -187,7 +188,7 @@ const DashboardShell = ({
         <Link to="/" className={ui.brand}>
           Invoice Spot<span>.</span>
         </Link>
-        {mobile && (
+        {mobile ? (
           <button
             className={ui.iconButton}
             onClick={() => setMenuOpen(false)}
@@ -195,6 +196,8 @@ const DashboardShell = ({
           >
             <FiX />
           </button>
+        ) : (
+          <NotificationBell />
         )}
       </div>
       <button
@@ -307,15 +310,18 @@ const DashboardShell = ({
               Invoice Spot
             </Link>
           </div>
-          <button
-            type="button"
-            className={ui.menuButton}
-            onClick={openSearch}
-            aria-label="Search"
-            aria-keyshortcuts="Meta+K Control+K"
-          >
-            <FiSearch aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className={ui.menuButton}
+              onClick={openSearch}
+              aria-label="Search"
+              aria-keyshortcuts="Meta+K Control+K"
+            >
+              <FiSearch aria-hidden="true" />
+            </button>
+            <NotificationBell className="size-10" />
+          </div>
         </header>
         <main
           className={fit ? ui.contentFit : fill ? ui.contentFill : ui.content}

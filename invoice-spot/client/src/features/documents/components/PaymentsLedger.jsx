@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiCheck, FiEdit2, FiTrash2 } from "react-icons/fi";
+import { FiCheck, FiDownload, FiEdit2, FiMail, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Dialog } from "../../../components/workspace/Dialog";
 import {
@@ -19,9 +19,14 @@ import {
 } from "../../../components/workspace/pastel";
 import {
   useDeletePaymentMutation,
+  useGetReceiptPdfMutation,
   useUpdatePaymentMutation,
 } from "../documentsApiSlice";
 import { PAYMENT_METHODS } from "../paymentMethods";
+import { saveFile } from "../useDocumentPdf";
+import EmailReceiptDialog from "./EmailReceiptDialog";
+
+const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
 
 const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
   // What is still owed if this payment were removed.
@@ -105,11 +110,35 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
   );
 };
 
-// The payments recorded on a document, each with edit and delete. The server
-// recalculates the amount received and the status after every change.
-const PaymentsLedger = ({ document }) => {
+// The payments recorded on a document, each with its receipt, edit and
+// delete. The server recalculates the amount received and the status after
+// every change. Receipts are numbered by the payments' date order.
+const PaymentsLedger = ({ document, demo = false }) => {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
+  const [emailingReceipt, setEmailingReceipt] = useState(null);
+  const [downloading, setDownloading] = useState(null);
+  const [getReceipt] = useGetReceiptPdfMutation();
+  const downloadReceipt = async (payment, index) => {
+    setDownloading(payment._id);
+    try {
+      const url = await getReceipt({
+        id: document._id,
+        paymentId: payment._id,
+      }).unwrap();
+      saveFile(
+        url,
+        `Receipt-${document.documentNumber}-P${index + 1}.pdf`.replace(
+          /[^A-Za-z0-9._-]/g,
+          "-",
+        ),
+      );
+    } catch (error) {
+      toast.error(errorMessage(error, "The receipt could not be prepared."));
+    } finally {
+      setDownloading(null);
+    }
+  };
   const [update, { isLoading: saving }] = useUpdatePaymentMutation();
   const [remove, { isLoading: deleting }] = useDeletePaymentMutation();
   const save = async (values) => {
@@ -150,6 +179,35 @@ const PaymentsLedger = ({ document }) => {
       type: "amount",
       render: (payment) => (
         <Amount value={payment.amountPaid} currency={document.currency} />
+      ),
+    },
+    {
+      label: "Receipt",
+      type: "action",
+      render: (payment, index) => (
+        <span className="inline-flex gap-1.5">
+          <button
+            type="button"
+            className={rowAction}
+            onClick={() => downloadReceipt(payment, index)}
+            disabled={downloading === payment._id}
+            aria-busy={downloading === payment._id}
+            aria-label={`Download the receipt for the payment of ${dateLabel(payment.datePaid)}`}
+          >
+            <FiDownload aria-hidden="true" />
+            <span>Receipt</span>
+          </button>
+          <button
+            type="button"
+            className={rowAction}
+            onClick={() => setEmailingReceipt(payment._id)}
+            disabled={demo}
+            title={demo ? DEMO_EMAIL_NOTE : "Email receipt"}
+            aria-label={`Email the receipt for the payment of ${dateLabel(payment.datePaid)}`}
+          >
+            <FiMail aria-hidden="true" />
+          </button>
+        </span>
       ),
     },
     {
@@ -209,6 +267,11 @@ const PaymentsLedger = ({ document }) => {
           />
         )}
       </Dialog>
+      <EmailReceiptDialog
+        documentId={document._id}
+        paymentId={emailingReceipt}
+        onClose={() => setEmailingReceipt(null)}
+      />
       <ConfirmDialog
         open={Boolean(removing)}
         title="Delete this payment?"

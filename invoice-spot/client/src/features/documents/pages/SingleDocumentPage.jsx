@@ -1,12 +1,32 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { FiDownload, FiEdit2, FiMail, FiPrinter } from "react-icons/fi";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  FiBell,
+  FiCopy,
+  FiDownload,
+  FiEdit2,
+  FiLink,
+  FiMail,
+  FiPrinter,
+  FiRepeat,
+} from "react-icons/fi";
+import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
-import { useGetSingleDocQuery } from "../documentsApiSlice";
+import {
+  useConvertDocMutation,
+  useDuplicateDocMutation,
+  useGetSingleDocQuery,
+} from "../documentsApiSlice";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import { useDocumentPdf } from "../useDocumentPdf";
 import EmailDocumentDialog from "../components/EmailDocumentDialog";
+import ActivityTimeline from "../components/ActivityTimeline";
+import ShareDialog from "../components/ShareDialog";
+import ReminderDialog from "../components/ReminderDialog";
+import ScheduleDialog from "../../recurring/components/ScheduleDialog";
+import { useGetDocumentScheduleQuery } from "../../recurring/recurringApiSlice";
+import { frequencyLabel } from "../../recurring/frequencies";
 import {
   WorkspacePage,
   PageHeader,
@@ -17,10 +37,13 @@ import {
   Amount,
   LoadingState,
   ErrorState,
+  Badge,
   dateLabel,
+  errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
   primaryButton,
+  secondaryButton,
   secondaryIconButton,
   textLink,
 } from "../../../components/workspace/pastel";
@@ -43,8 +66,50 @@ const SingleDocumentPage = () => {
   const document = query.data?.document;
   const profile = profileQuery.data?.userProfile;
   const [emailing, setEmailing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [reminding, setReminding] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const scheduleQuery = useGetDocumentScheduleQuery(id, {
+    skip: query.data?.document?.documentType !== "Invoice",
+  });
+  const schedule = scheduleQuery.data?.schedule;
   const pdf = useDocumentPdf(document);
+  const navigate = useNavigate();
+  const [duplicateDoc, { isLoading: duplicating }] = useDuplicateDocMutation();
+  const [convertDoc, { isLoading: converting }] = useConvertDocMutation();
   useTitle(`${document?.documentNumber || "Document"} — Invoice Spot`);
+  // A quotation turned into an invoice lists it as "Invoiced as"; any other
+  // copy as "Copied to".
+  const copies = document?.copies || [];
+  const invoicedAs = copies.filter(
+    (link) =>
+      document.documentType === "Quotation" && link.documentType === "Invoice",
+  );
+  const copiedTo = copies.filter((link) => !invoicedAs.includes(link));
+  const duplicate = async () => {
+    try {
+      const { newDocument } = await duplicateDoc(id).unwrap();
+      toast.success(
+        `Copied as ${newDocument.documentNumber}. Review it before sending.`,
+      );
+      navigate(`/edit-doc/${newDocument._id}`);
+    } catch (error) {
+      toast.error(errorMessage(error, "The document could not be copied."));
+    }
+  };
+  const convert = async () => {
+    try {
+      const { newDocument } = await convertDoc(id).unwrap();
+      toast.success(
+        `Invoice ${newDocument.documentNumber} created from ${document.documentNumber}.`,
+      );
+      navigate(`/document/${newDocument._id}`);
+    } catch (error) {
+      toast.error(
+        errorMessage(error, "The quotation could not become an invoice."),
+      );
+    }
+  };
   const totalAmountReceived = Number(document?.totalAmountReceived || 0);
   const columns = [
     {
@@ -112,6 +177,53 @@ const SingleDocumentPage = () => {
               </button>
               <button
                 type="button"
+                className={secondaryIconButton}
+                onClick={duplicate}
+                disabled={duplicating}
+                aria-busy={duplicating}
+                aria-label="Duplicate"
+                title="Duplicate"
+              >
+                <FiCopy aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={secondaryIconButton}
+                onClick={() => setSharing(true)}
+                aria-label="Share link"
+                title="Share link"
+              >
+                <FiLink aria-hidden="true" />
+              </button>
+              {document.documentType === "Quotation" && !invoicedAs.length && (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={convert}
+                  disabled={converting}
+                  aria-busy={converting}
+                >
+                  <FiRepeat aria-hidden="true" />
+                  {converting ? "Converting…" : "Convert to invoice"}
+                </button>
+              )}
+              {document.documentType === "Invoice" &&
+                document.status !== "Paid" && (
+                  <button
+                    type="button"
+                    className={secondaryButton}
+                    onClick={() => setReminding(true)}
+                    disabled={profile?.demo}
+                    title={profile?.demo ? DEMO_EMAIL_NOTE : undefined}
+                    aria-describedby={
+                      profile?.demo ? "demo-email-note" : undefined
+                    }
+                  >
+                    <FiBell aria-hidden="true" /> Send reminder
+                  </button>
+                )}
+              <button
+                type="button"
                 className={primaryButton}
                 onClick={() => setEmailing(true)}
                 disabled={profile?.demo}
@@ -144,7 +256,18 @@ const SingleDocumentPage = () => {
           <>
             <Panel
               title={document.documentType}
-              aside={<StatusBadge status={document.status} />}
+              aside={
+                <span className="flex flex-wrap justify-end gap-1.5">
+                  {document.acceptedAt && (
+                    <span
+                      title={`Accepted on ${dateLabel(document.acceptedAt)}`}
+                    >
+                      <Badge tone="paid">Accepted</Badge>
+                    </span>
+                  )}
+                  <StatusBadge status={document.status} />
+                </span>
+              }
             >
               <div className="grid grid-cols-3 gap-8 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1 max-[700px]:gap-6">
                 <div className="min-w-0">
@@ -222,6 +345,70 @@ const SingleDocumentPage = () => {
                         </dd>
                       </div>
                     ))}
+                    {[
+                      [
+                        document.source?.documentType === "Quotation" &&
+                        document.documentType === "Invoice"
+                          ? "Converted from"
+                          : "Copied from",
+                        document.source ? [document.source] : [],
+                      ],
+                      ["Invoiced as", invoicedAs],
+                      ["Copied to", copiedTo],
+                    ]
+                      .filter(([, links]) => links.length)
+                      .map(([label, links]) => (
+                        <div key={label}>
+                          <dt className={partyLine}>{label}</dt>
+                          <dd className="flex flex-wrap gap-x-3 text-[15px]">
+                            {links.map((link) => (
+                              <Link
+                                key={link._id}
+                                className={textLink}
+                                to={`/document/${link._id}`}
+                              >
+                                {link.documentNumber}
+                              </Link>
+                            ))}
+                          </dd>
+                        </div>
+                      ))}
+                    {document.documentType === "Invoice" &&
+                      scheduleQuery.isSuccess && (
+                        <div>
+                          <dt className={partyLine}>Repeats</dt>
+                          <dd className="flex flex-wrap items-baseline gap-x-3 text-[15px] text-spot-ink">
+                            {schedule ? (
+                              <span>
+                                {frequencyLabel(schedule.frequency)}
+                                {schedule.finished
+                                  ? ", finished"
+                                  : schedule.paused
+                                    ? ", paused"
+                                    : `, next ${dateLabel(schedule.nextRun)}`}
+                              </span>
+                            ) : (
+                              <span className="text-spot-muted">No</span>
+                            )}
+                            <button
+                              type="button"
+                              className={`${textLink} bg-transparent p-0 text-[13.5px]`}
+                              onClick={() => setScheduling(true)}
+                            >
+                              {schedule ? "Change" : "Make recurring"}
+                            </button>
+                          </dd>
+                        </div>
+                      )}
+                    {document.remindersSent > 0 && (
+                      <div>
+                        <dt className={partyLine}>Reminders</dt>
+                        <dd className="text-[15px] text-spot-ink">
+                          {document.remindersSent} sent, last on{" "}
+                          {dateLabel(document.lastRemindedAt)}
+                        </dd>
+                      </div>
+                    )}
                   </dl>
                 </div>
               </div>
@@ -297,7 +484,7 @@ const SingleDocumentPage = () => {
                 title="Payments"
                 description="Payments recorded against this document."
               >
-                <PaymentsLedger document={document} />
+                <PaymentsLedger document={document} demo={profile?.demo} />
               </Panel>
             )}
             {document.documentType === "Invoice" &&
@@ -309,6 +496,12 @@ const SingleDocumentPage = () => {
                   <PaymentForm document={document} />
                 </Panel>
               )}
+            <Panel
+              title="Activity"
+              description="Everything that happened to this document."
+            >
+              <ActivityTimeline documentId={id} />
+            </Panel>
           </>
         )
       )}
@@ -317,6 +510,26 @@ const SingleDocumentPage = () => {
         open={emailing}
         onClose={() => setEmailing(false)}
       />
+      <ReminderDialog
+        documentId={id}
+        open={reminding}
+        onClose={() => setReminding(false)}
+      />
+      <ScheduleDialog
+        open={scheduling}
+        onClose={() => setScheduling(false)}
+        documentId={id}
+        documentNumber={document?.documentNumber}
+        schedule={schedule}
+        demo={profile?.demo}
+      />
+      {document && (
+        <ShareDialog
+          document={document}
+          open={sharing}
+          onClose={() => setSharing(false)}
+        />
+      )}
     </WorkspacePage>
   );
 };
