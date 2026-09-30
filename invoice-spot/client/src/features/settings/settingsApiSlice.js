@@ -1,4 +1,5 @@
 import { baseApiSlice } from "../api/baseApiSlice";
+import { fetchFile } from "../api/fetchFile";
 
 export const settingsApiSlice = baseApiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -14,8 +15,15 @@ export const settingsApiSlice = baseApiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Settings"],
     }),
+    getDataExport: builder.mutation({
+      queryFn: (_arg, _api, _extraOptions, baseQuery) =>
+        fetchFile(baseQuery, "/export/all"),
+    }),
   }),
 });
 
-export const { useGetSettingsQuery, useUpdateSettingsMutation } =
-  settingsApiSlice;
+export const {
+  useGetDataExportMutation,
+  useGetSettingsQuery,
+  useUpdateSettingsMutation,
+} = settingsApiSlice;

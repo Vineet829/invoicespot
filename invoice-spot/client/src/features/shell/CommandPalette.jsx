@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  FiBarChart2,
   FiFileText,
   FiGrid,
   FiPackage,
@@ -22,6 +23,7 @@ const PAGES = [
   { to: "/recurring", label: "Recurring invoices", icon: FiRepeat },
   { to: "/customers", label: "Clients", icon: FiUsers },
   { to: "/items", label: "Items", icon: FiPackage },
+  { to: "/reports", label: "Reports", icon: FiBarChart2 },
   { to: "/profile", label: "Profile", icon: FiUser },
   { to: "/settings", label: "Settings", icon: FiSettings },
   { to: "/users", label: "Administration", icon: FiShield, admin: true },

@@ -538,7 +538,8 @@ const FILL = {
 
 // A column with `sortBy` gets a header button when the table has `onSort`;
 // `sort` ({ field, dir }) marks the column the rows are sorted by. Cards
-// have no headers, so their list needs another way to sort.
+// have no headers, so their list needs another way to sort. A `narrow`
+// table has a few short columns, so it stays a table in a narrower panel.
 export const DataTable = ({
   columns,
   rows,
@@ -548,13 +549,14 @@ export const DataTable = ({
   sort,
   onSort,
   busy = false,
+  narrow = false,
 }) => {
   // In a card, placing the first action in column 1 starts a new line.
   const firstAction = columns.findIndex(({ type }) => type === "action");
   const fill = fillRows > 0;
   return (
     <div
-      className={`relative transition-opacity [container-type:inline-size] ${columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""} ${busy ? "opacity-60" : ""}`}
+      className={`relative transition-opacity [container-type:inline-size] ${narrow ? "[container-name:narrow-table]" : columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""} ${busy ? "opacity-60" : ""}`}
       style={fill ? { "--fill-rows": Math.min(fillRows, 10) } : undefined}
       aria-busy={busy || undefined}
     >

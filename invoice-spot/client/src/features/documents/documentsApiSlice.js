@@ -1,5 +1,5 @@
 import { baseApiSlice } from "../api/baseApiSlice";
-import { fetchPdf } from "../api/fetchPdf";
+import { fetchFile } from "../api/fetchFile";
 
 export const documentsApiSlice = baseApiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -75,9 +75,17 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Document"],
     }),
+    getDocumentsCsv: builder.mutation({
+      queryFn: (filters, _api, _extraOptions, baseQuery) =>
+        fetchFile(baseQuery, `/document/csv?${new URLSearchParams(filters)}`),
+    }),
+    getPaymentsCsv: builder.mutation({
+      queryFn: (_arg, _api, _extraOptions, baseQuery) =>
+        fetchFile(baseQuery, "/document/payments/csv"),
+    }),
     getDocumentPdf: builder.mutation({
       queryFn: (id, _api, _extraOptions, baseQuery) =>
-        fetchPdf(baseQuery, `/document/${id}/pdf`),
+        fetchFile(baseQuery, `/document/${id}/pdf`),
     }),
     getReminderDraft: builder.query({
       query: (id) => `/document/${id}/remind`,
@@ -93,7 +101,7 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
     }),
     getReceiptPdf: builder.mutation({
       queryFn: ({ id, paymentId }, _api, _extraOptions, baseQuery) =>
-        fetchPdf(baseQuery, `/document/${id}/payment/${paymentId}/receipt`),
+        fetchFile(baseQuery, `/document/${id}/payment/${paymentId}/receipt`),
     }),
     getReceiptEmailDraft: builder.query({
       query: ({ id, paymentId }) =>
@@ -141,6 +149,8 @@ export const {
   useEmailDocumentMutation,
   useGetEmailDraftQuery,
   useGetDocumentPdfMutation,
+  useGetDocumentsCsvMutation,
+  useGetPaymentsCsvMutation,
   useGetReceiptPdfMutation,
   useGetReminderDraftQuery,
   useSendReminderMutation,

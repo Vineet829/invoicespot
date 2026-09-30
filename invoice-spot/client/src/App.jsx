@@ -27,6 +27,7 @@ import SettingsPage from "./features/settings/pages/SettingsPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
 import RecurringPage from "./features/recurring/pages/RecurringPage";
+import ReportsPage from "./features/reports/pages/ReportsPage";
 
 const App = () => {
   return (
@@ -67,6 +68,7 @@ const App = () => {
             <Route path="edit-doc/:id" element={<DocCreateEditForm />} />
             <Route path="document/:id" element={<SingleDocumentPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="reports" element={<ReportsPage />} />
           </Route>
 
           <Route element={<AuthRequired allowedRoles={[ROLES.Admin]} />}>

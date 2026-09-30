@@ -34,10 +34,16 @@ export const clientListSearch = ({ q, ...sortAndPage }) => {
   return writeSortAndPage(params, sortAndPage, SORT_FIELDS, "createdAt");
 };
 
-export const clientQuery = ({ q, sort, dir, page, size }) => ({
-  page,
-  size,
+// The list's search and order; an export of the list sends these without a
+// page.
+export const clientFilterQuery = ({ q, sort, dir }) => ({
   sort,
   dir,
   ...(q && { q }),
+});
+
+export const clientQuery = (list) => ({
+  page: list.page,
+  size: list.size,
+  ...clientFilterQuery(list),
 });

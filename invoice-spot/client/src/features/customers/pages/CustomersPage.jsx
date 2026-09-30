@@ -1,21 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiEye, FiPlus, FiSearch, FiTrash2, FiUsers } from "react-icons/fi";
+import {
+  FiDownload,
+  FiEye,
+  FiPlus,
+  FiSearch,
+  FiTrash2,
+  FiUpload,
+  FiUsers,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import useListState from "../../../hooks/useListState";
+import useFileDownload from "../../../hooks/useFileDownload";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import {
   useDeleteCustomerMutation,
   useGetAllUserCustomersQuery,
+  useGetCustomersCsvMutation,
 } from "../customersApiSlice";
 import {
   SORT_FIELDS,
   SORT_OPTIONS,
+  clientFilterQuery,
   clientListSearch,
   clientQuery,
   readClientList,
 } from "../clientFilters";
+import ImportClientsDialog from "../components/ImportClientsDialog";
 import {
   WorkspacePage,
   PageHeader,
@@ -31,11 +43,13 @@ import {
   ErrorState,
   Amount,
   errorMessage,
+  dateInput,
 } from "../../../components/workspace/Workspace";
 import {
   rowAction,
   rowActionDanger,
   secondaryButton,
+  secondaryIconButton,
   toolbarSelect,
 } from "../../../components/workspace/pastel";
 
@@ -44,6 +58,8 @@ const NO_CLIENTS = [];
 const CustomersPage = () => {
   useTitle("Clients — Invoice Spot");
   const [list, update] = useListState(readClientList, clientListSearch);
+  const [downloadCsv, exporting] = useFileDownload(useGetCustomersCsvMutation);
+  const [importing, setImporting] = useState(false);
   const search = useCallback((q) => update({ q, page: 1 }), [update]);
   const query = useGetAllUserCustomersQuery(clientQuery(list), {
     refetchOnMountOrArgChange: 60,
@@ -199,9 +215,33 @@ const CustomersPage = () => {
         title="Clients"
         description="The people behind your work. Keep their details close at hand."
         actions={
-          <ActionLink to="/create-customer">
-            <FiPlus aria-hidden="true" /> Add client
-          </ActionLink>
+          <>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={() => setImporting(true)}
+            >
+              <FiUpload aria-hidden="true" /> Import
+            </button>
+            <button
+              type="button"
+              className={`${secondaryIconButton} max-[700px]:!flex-none`}
+              onClick={() =>
+                downloadCsv(
+                  clientFilterQuery(list),
+                  `invoice-spot-clients-${dateInput()}.csv`,
+                )
+              }
+              disabled={exporting}
+              aria-label="Download these clients as CSV"
+              title="Download these clients as CSV"
+            >
+              <FiDownload aria-hidden="true" />
+            </button>
+            <ActionLink to="/create-customer">
+              <FiPlus aria-hidden="true" /> Add client
+            </ActionLink>
+          </>
         }
       />
       {query.isLoading ? (
@@ -254,6 +294,10 @@ const CustomersPage = () => {
       >
         {selected?.name} will be permanently deleted.
       </ConfirmDialog>
+      <ImportClientsDialog
+        open={importing}
+        onClose={() => setImporting(false)}
+      />
     </WorkspacePage>
   );
 };
