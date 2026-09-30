@@ -1,14 +1,7 @@
-import { CssBaseline } from "@mui/material";
-import { ThemeProvider } from "@mui/material/styles";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
-import Footer from "./components/Footer";
-import Layout from "./components/Layout";
 import NotFound from "./components/NotFound";
-import { customTheme } from "./customTheme";
-import { useSelector } from "react-redux";
-import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
 import VerifiedPage from "./features/auth/pages/VerifiedPage";
@@ -32,15 +25,10 @@ import DocumentsPage from "./features/documents/pages/DocumentsPage";
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 
 const App = () => {
-	const { user } = useSelector((state) => state.auth);
-	const { pathname } = useLocation();
-	const hasDashboardShell = /^\/(dashboard|documents|create-doc|edit-doc|document|customers|create-customer|edit-customer|single-customer|profile|edit-profile|users)(?:\/|$)/i.test(pathname);
 	return (
-		<ThemeProvider theme={customTheme}>
-			<CssBaseline />
-			{user && !hasDashboardShell && <Navbar />}
+		<>
 			<Routes>
-				<Route path="/" element={<Layout />}>
+				<Route path="/">
 					<Route index element={<HomePage />} />
 					<Route path="register" element={<RegisterPage />} />
 					<Route path="auth/verify" element={<VerifiedPage />} />
@@ -102,9 +90,8 @@ const App = () => {
 					<Route path="*" element={<NotFound />} />
 				</Route>
 			</Routes>
-			{user && !hasDashboardShell && <Footer />}
 			<ToastContainer theme="dark" />
-		</ThemeProvider>
+		</>
 	);
 };
 

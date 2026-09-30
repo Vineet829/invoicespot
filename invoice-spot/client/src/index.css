@@ -2,10 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tailwind's global reset is off (tailwind.config.js) so the public pages
-   and Material UI keep their look. The signed-in workspace gets the parts
-   of a reset its utilities rely on. */
+/* Tailwind's global reset is off (tailwind.config.js); every page gets the
+   parts of one that its utilities rely on here. dashboard-app marks the
+   root of each page. */
 @layer base {
+	*,
+	::before,
+	::after {
+		box-sizing: border-box;
+	}
+	html {
+		-webkit-text-size-adjust: 100%;
+		text-size-adjust: 100%;
+	}
+	body {
+		margin: 0;
+		min-height: 100vh;
+		background: #e6e5f0;
+		color: #232735;
+		font-family: "Geist", "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+			sans-serif;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
 	.dashboard-app {
 		font-size: 14px;
 		-webkit-font-smoothing: antialiased;
@@ -14,7 +33,6 @@
 	.dashboard-app *,
 	.dashboard-app ::before,
 	.dashboard-app ::after {
-		box-sizing: border-box;
 		border-width: 0;
 		border-style: solid;
 		border-color: currentColor;
@@ -68,66 +86,4 @@
 		transition: none !important;
 		scroll-behavior: auto !important;
 	}
-}
-
-body {
-	margin: 0;
-	padding: 0;
-	box-sizing: border-box;
-	font-family: "Roboto", sans-serif;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	min-height: 100vh;
-}
-
-.footer {
-	position: fixed;
-	width: 100%;
-	bottom: 0;
-}
-
-.auth-svg {
-	font-size: 6rem;
-}
-
-.verified {
-	color: limegreen;
-	font-size: 4rem;
-	margin-top: -25px;
-}
-.google-icon {
-	font-size: 4rem;
-}
-
-.broken-heart {
-	font-size: 10rem;
-	color: crimson;
-}
-.sad-tear {
-	font-size: 10rem;
-	color: rgb(158, 158, 13);
-}
-
-/* document styling */
-.title {
-	background-color: rgba(238, 235, 235, 0.954);
-	border-bottom: 1px solid rgb(17, 65, 141);
-	color: rgb(17, 65, 141);
-	font-weight: 500;
-	padding: 15px 0px;
-	text-align: center;
-}
-
-.billItem {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	border-bottom: 1px solid rgb(17, 65, 141);
-}
-.billItem p,
-h4 {
-	padding: 3px;
-}
-.toolBar {
-	margin-top: 50px;
 }

@@ -18,7 +18,7 @@ import { toast } from "react-toastify";
 import { logOut } from "../../auth/authSlice";
 import { useLogoutUserMutation } from "../../auth/authApiSlice";
 import useAuthUser from "../../../hooks/useAuthUser";
-import { iconButton } from "../../../components/workspace/pastel";
+import { brandMark, iconButton } from "../../../components/workspace/pastel";
 
 const navLink =
   "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
@@ -33,8 +33,7 @@ const ui = {
   sidebar:
     "sticky top-0 flex h-dvh min-h-[540px] flex-col border-r border-white/70 bg-white/[.34] px-4 pb-[18px] pt-[30px] backdrop-blur-[18px] max-[960px]:hidden",
   brandRow: "flex items-center justify-between px-3",
-  brand:
-    "whitespace-nowrap font-display text-[24px] font-normal leading-[normal] tracking-[-0.045em] text-spot-ink coarse:inline-flex coarse:min-h-11 coarse:items-center [&>span]:text-spot-brand",
+  brand: brandMark,
   navigation: "mt-10 flex flex-col gap-1.5",
   navLink: `${navLink} text-spot-nav`,
   navLinkActive: `${navLink} bg-white font-medium text-spot-ink shadow-nav [&>svg]:text-spot-violet`,
