@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SORT_OPTIONS,
   documentQuery,
+  documentFilterQuery,
   isFiltered,
   listSearch,
   periodRange,
@@ -67,6 +68,17 @@ describe("the server query", () => {
       size: 10,
       sort: "createdAt",
       dir: "desc",
+      status: "Not Fully Paid",
+    });
+  });
+
+  it("exports the list's filters and order without a page", () => {
+    expect(
+      documentFilterQuery(read("status=partial&q=acme&sort=total&dir=asc")),
+    ).toEqual({
+      q: "acme",
+      sort: "total",
+      dir: "asc",
       status: "Not Fully Paid",
     });
   });

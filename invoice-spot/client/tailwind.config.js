@@ -110,6 +110,7 @@ module.exports = {
       keyframes: {
         "ov-rise": { from: { opacity: "0", transform: "translateY(10px)" } },
         "ov-bar": { from: { transform: "scaleX(0)" } },
+        "ov-column": { from: { transform: "scaleY(0)" } },
         "ov-ring": { from: { strokeDashoffset: "100" } },
         "ov-roll": {
           from: { transform: "translateY(400%)" },
@@ -185,6 +186,9 @@ module.exports = {
         "ov-rise":
           "ov-rise 0.7s var(--rise-delay, 0ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-bar": "ov-bar 1.1s 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both",
+        // Chart columns grow from the baseline; set --column-delay per column.
+        "ov-column":
+          "ov-column 0.9s var(--column-delay, 300ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-ring":
           "ov-ring 1.4s var(--ring-delay, 0ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-roll":
@@ -233,10 +237,12 @@ module.exports = {
       addVariant("coarse", "@media (pointer: coarse)");
       // Workspace tables become labelled cards when their panel is too
       // narrow for every column, whatever the window size or zoom. Tables
-      // with eight or more columns need more room.
+      // with eight or more columns need more room; narrow ones, with a few
+      // short columns, stay tables in half-width panels.
       addVariant("stacked", [
         "@container table (max-width: 860px)",
         "@container wide-table (max-width: 960px)",
+        "@container narrow-table (max-width: 400px)",
       ]);
       // Document line items: three columns in a narrow form, then two.
       addVariant("items-md", "@container items (max-width: 720px)");

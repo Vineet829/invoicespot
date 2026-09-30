@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SORT_OPTIONS,
   clientListSearch,
+  clientFilterQuery,
   clientQuery,
   readClientList,
 } from "./clientFilters";
@@ -35,6 +36,13 @@ describe("the clients list in the URL", () => {
       q: "north",
     });
     expect(clientQuery(read(""))).not.toHaveProperty("q");
+    expect(clientFilterQuery(read("q=north&sort=name&dir=asc&page=3"))).toEqual(
+      {
+        sort: "name",
+        dir: "asc",
+        q: "north",
+      },
+    );
   });
 
   it("sorts balances and document counts largest first", () => {

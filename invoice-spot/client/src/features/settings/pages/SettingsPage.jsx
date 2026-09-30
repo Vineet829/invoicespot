@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { FiCheck } from "react-icons/fi";
+import {
+  FiArchive,
+  FiArrowDownLeft,
+  FiCheck,
+  FiDownload,
+  FiFileText,
+  FiUsers,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
+import useFileDownload from "../../../hooks/useFileDownload";
 import currencies from "../../../world_currencies.json";
 import {
   ErrorState,
@@ -10,10 +18,21 @@ import {
   PageHeader,
   Panel,
   WorkspacePage,
+  dateInput,
   errorMessage,
 } from "../../../components/workspace/Workspace";
-import { primaryButton } from "../../../components/workspace/pastel";
 import {
+  panelNote,
+  primaryButton,
+  secondaryButton,
+} from "../../../components/workspace/pastel";
+import {
+  useGetDocumentsCsvMutation,
+  useGetPaymentsCsvMutation,
+} from "../../documents/documentsApiSlice";
+import { useGetCustomersCsvMutation } from "../../customers/customersApiSlice";
+import {
+  useGetDataExportMutation,
   useGetSettingsQuery,
   useUpdateSettingsMutation,
 } from "../settingsApiSlice";
@@ -320,6 +339,91 @@ const SettingsForm = ({ settings }) => {
   );
 };
 
+// Everything kept in the app, as CSV files for a spreadsheet or another app.
+const YourData = () => {
+  const [documents, documentsBusy] = useFileDownload(
+    useGetDocumentsCsvMutation,
+  );
+  const [payments, paymentsBusy] = useFileDownload(useGetPaymentsCsvMutation);
+  const [clients, clientsBusy] = useFileDownload(useGetCustomersCsvMutation);
+  const [everything, everythingBusy] = useFileDownload(
+    useGetDataExportMutation,
+  );
+  const today = dateInput();
+  const files = [
+    {
+      name: "Documents",
+      detail: "Every invoice, quotation and receipt",
+      icon: FiFileText,
+      busy: documentsBusy,
+      download: () => documents({}, `invoice-spot-documents-${today}.csv`),
+    },
+    {
+      name: "Payments",
+      detail: "Every payment recorded on them",
+      icon: FiArrowDownLeft,
+      busy: paymentsBusy,
+      download: () => payments(null, `invoice-spot-payments-${today}.csv`),
+    },
+    {
+      name: "Clients",
+      detail: "Contact details and what each owes",
+      icon: FiUsers,
+      busy: clientsBusy,
+      download: () => clients({}, `invoice-spot-clients-${today}.csv`),
+    },
+  ];
+  return (
+    <Panel
+      title="Your data"
+      description="Download what you keep in Invoice Spot as CSV files, which open in any spreadsheet, or everything at once as a ZIP file with your items, recurring invoices, settings and profile too."
+      aside={
+        <button
+          type="button"
+          className={`${secondaryButton} shrink-0`}
+          onClick={() => everything(null, `invoice-spot-export-${today}.zip`)}
+          disabled={everythingBusy}
+        >
+          <FiArchive aria-hidden="true" /> Download everything
+        </button>
+      }
+    >
+      <ul className="m-0 grid list-none grid-cols-3 gap-4 p-0 max-[1100px]:grid-cols-1">
+        {files.map(({ name, detail, icon: Icon, busy, download }) => (
+          <li
+            key={name}
+            className="flex min-w-0 items-center justify-between gap-4 rounded-[18px] border border-white/90 bg-white/60 px-4 py-3.5"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span
+                className="grid size-10 shrink-0 place-items-center rounded-xl bg-spot-violet/[.08] text-spot-violet [&>svg]:size-[18px] [&>svg]:stroke-[1.7]"
+                aria-hidden="true"
+              >
+                <Icon />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[14.5px] font-medium text-spot-ink">
+                  {name}
+                </span>
+                <span className={`block ${panelNote}`}>{detail}</span>
+              </span>
+            </span>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={download}
+              disabled={busy}
+              aria-label={`Download ${name.toLowerCase()} as CSV`}
+            >
+              <FiDownload aria-hidden="true" /> CSV
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+};
+
 const SettingsPage = () => {
   useTitle("Settings — Invoice Spot");
   const query = useGetSettingsQuery();
@@ -336,6 +440,7 @@ const SettingsPage = () => {
       ) : (
         <SettingsForm settings={query.data.settings} />
       )}
+      <YourData />
     </WorkspacePage>
   );
 };

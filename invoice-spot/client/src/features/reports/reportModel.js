@@ -1,0 +1,52 @@
+export const DEFAULT_PERIOD = "12m";
+
+// The last few months, this year, then each earlier year since the first
+// invoice, as the server lists them.
+export const periodOptions = (years = []) => [
+  { value: "3m", label: "Last 3 months" },
+  { value: "6m", label: "Last 6 months" },
+  { value: "12m", label: "Last 12 months" },
+  { value: "ytd", label: "This year" },
+  ...years.map((year) => ({ value: String(year), label: String(year) })),
+];
+
+// Four equal steps up to a round figure at or above the largest amount.
+export const axisTicks = (largest) => {
+  const value = Number(largest);
+  if (!Number.isFinite(value) || value <= 0) return [0];
+  const raw = value / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step =
+    [1, 2, 2.5, 5, 10].find((nice) => raw <= nice * magnitude) * magnitude;
+  return [0, 1, 2, 3, 4].map((index) => index * step);
+};
+
+const compact = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+export const compactAmount = (value) => compact.format(Number(value) || 0);
+
+// A month is sent as "2026-09"; it names that month wherever the reader is.
+const firstDay = (month) => {
+  const [year, number] = String(month).split("-").map(Number);
+  return new Date(Date.UTC(year, number - 1, 1));
+};
+export const monthName = (month) =>
+  firstDay(month).toLocaleDateString("en", {
+    month: "short",
+    timeZone: "UTC",
+  });
+export const monthYear = (month) =>
+  firstDay(month).toLocaleDateString("en", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+// A bar's length as a share of the longest one, from 0 to 1.
+export const share = (value, largest) => {
+  const amount = Number(value);
+  const most = Number(largest);
+  return most > 0 && amount > 0 ? Math.min(amount / most, 1) : 0;
+};

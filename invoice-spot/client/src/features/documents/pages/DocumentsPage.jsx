@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiEye, FiFileText, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
+import {
+  FiDownload,
+  FiEye,
+  FiFileText,
+  FiPlus,
+  FiSearch,
+  FiTrash2,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import useListState from "../../../hooks/useListState";
+import useFileDownload from "../../../hooks/useFileDownload";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import DocumentsTabs from "../components/DocumentsTabs";
 import {
   useDeleteDocMutation,
   useGetAllMyDocsQuery,
+  useGetDocumentsCsvMutation,
 } from "../documentsApiSlice";
 import {
   SORT_FIELDS,
@@ -16,6 +25,7 @@ import {
   STATUS_FILTERS,
   TYPE_FILTERS,
   PERIODS,
+  documentFilterQuery,
   documentQuery,
   isFiltered,
   listSearch,
@@ -39,12 +49,14 @@ import {
   Amount,
   DueDate,
   errorMessage,
+  dateInput,
 } from "../../../components/workspace/Workspace";
 import {
   filterChip,
   rowAction,
   rowActionDanger,
   secondaryButton,
+  secondaryIconButton,
   toolbarSelect,
 } from "../../../components/workspace/pastel";
 
@@ -53,6 +65,7 @@ const NO_DOCUMENTS = [];
 const DocumentsPage = () => {
   useTitle("Documents — Invoice Spot");
   const [list, update] = useListState(readListState, listSearch);
+  const [downloadCsv, exporting] = useFileDownload(useGetDocumentsCsvMutation);
   const search = useCallback((q) => update({ q, page: 1 }), [update]);
   const query = useGetAllMyDocsQuery(documentQuery(list), {
     refetchOnMountOrArgChange: 60,
@@ -202,6 +215,21 @@ const DocumentsPage = () => {
         actions={
           <>
             <DocumentsTabs />
+            <button
+              type="button"
+              className={`${secondaryIconButton} max-[700px]:!flex-none`}
+              onClick={() =>
+                downloadCsv(
+                  documentFilterQuery(list),
+                  `invoice-spot-documents-${dateInput()}.csv`,
+                )
+              }
+              disabled={exporting}
+              aria-label="Download these documents as CSV"
+              title="Download these documents as CSV"
+            >
+              <FiDownload aria-hidden="true" />
+            </button>
             <ActionLink to="/create-doc">
               <FiPlus aria-hidden="true" /> Create document
             </ActionLink>

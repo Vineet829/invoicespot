@@ -2,66 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatMoney,
-  getDashboardSnapshot,
   getFinanceBarRatios,
-  getPaymentDocuments,
   getStatusRingRatio,
+  paymentRows,
 } from "./dashboardModel";
-
-it("counts income from invoices and receipts, and overdue from the server's flag", () => {
-  const documents = [
-    {
-      _id: "invoice",
-      documentType: "Invoice",
-      total: 100,
-      totalAmountReceived: 20,
-      status: "Not Fully Paid",
-      dueDate: "2026-09-27T00:00:00.000Z",
-      overdue: true,
-      paymentRecords: [{ amountPaid: 35 }],
-    },
-    {
-      _id: "paid",
-      documentType: "Invoice",
-      total: 200,
-      totalAmountReceived: 200,
-      status: "Paid",
-      dueDate: "2026-09-25T00:00:00.000Z",
-      overdue: false,
-    },
-    {
-      _id: "quote",
-      documentType: "Quotation",
-      total: 900,
-      totalAmountReceived: 0,
-      status: "Not Paid",
-      dueDate: "2026-09-20T00:00:00.000Z",
-      overdue: false,
-    },
-    {
-      _id: "receipt",
-      documentType: "Receipt",
-      total: 60,
-      totalAmountReceived: 60,
-      status: "Paid",
-      dueDate: "2026-09-29T00:00:00.000Z",
-      overdue: false,
-    },
-  ];
-  const summary = getDashboardSnapshot(documents);
-  expect(summary).toMatchObject({
-    expectedIncome: 360,
-    cashReceived: 280,
-    cashPending: 80,
-    paid: 2,
-    partial: 1,
-    unpaid: 1,
-    overdue: 1,
-  });
-  // The UI uses stored totals and statuses, not new payment or invoice rules.
-  expect(summary.payments).toHaveLength(1);
-  expect(summary.payments[0].amountPaid).toBe(35);
-});
 
 describe("finance bar comparisons", () => {
   it("compares each existing amount with expected income", () => {
@@ -115,75 +59,37 @@ describe("status ring comparisons", () => {
   });
 });
 
-it("keeps every original payment-history field and sorts recorded payments newest first", () => {
-  const older = {
-    paidBy: "First client",
-    datePaid: "2026-08-01",
-    amountPaid: 24.5,
-    paymentMethod: "Cash",
-    additionalInfo: "Deposit",
-  };
-  const newer = {
-    paidBy: "Second client",
-    datePaid: "2026-09-20",
-    amountPaid: 10,
-    paymentMethod: "Bank Transfer",
-    additionalInfo: "Balance",
-  };
-  const documents = [
-    { _id: "one", paymentRecords: [older] },
-    { _id: "two", paymentRecords: [newer], status: "Paid", total: 10 },
-    { _id: "three", status: "Paid", total: 999 },
+it("keys each payment by its id and finds the document it was recorded against", () => {
+  const payments = [
+    {
+      _id: "p2",
+      paidBy: "Second client",
+      datePaid: "2026-09-20",
+      amountPaid: 10,
+      document: { _id: "d2", documentNumber: "INV-2" },
+    },
+    {
+      _id: "p1",
+      paidBy: "First client",
+      datePaid: "2026-08-01",
+      amountPaid: 24.5,
+      document: { _id: "d1", documentNumber: "INV-1" },
+    },
   ];
-  const snapshot = getDashboardSnapshot(documents);
-  expect(snapshot.payments).toEqual([
-    { ...newer, id: "two-0" },
-    { ...older, id: "one-0" },
+  const { rows, documents } = paymentRows(payments);
+  expect(rows.map((row) => [row.id, row.paidBy])).toEqual([
+    ["p2", "Second client"],
+    ["p1", "First client"],
   ]);
-  expect(documents[0].paymentRecords).toEqual([older]);
+  expect(rows.map((row) => documents.get(row.id).documentNumber)).toEqual([
+    "INV-2",
+    "INV-1",
+  ]);
+  expect(paymentRows().rows).toEqual([]);
 });
 
-it("shows empty data safely without creating payment records or inferred statuses", () => {
-  expect(getDashboardSnapshot([])).toEqual({
-    expectedIncome: 0,
-    cashReceived: 0,
-    cashPending: 0,
-    paid: 0,
-    partial: 0,
-    unpaid: 0,
-    overdue: 0,
-    payments: [],
-  });
-  expect(getDashboardSnapshot([{ _id: "empty" }]).payments).toEqual([]);
+it("formats amounts and dates safely", () => {
   expect(formatMoney(undefined)).toBe("0.00");
   expect(formatMoney(1234.5)).toBe("1,234.50");
   expect(formatDate("invalid")).toBe("—");
-});
-
-it("finds the document behind every payment the history shows", () => {
-  const invoice = {
-    _id: "invoice",
-    documentNumber: "INV-1",
-    paymentRecords: [
-      { amountPaid: 10, datePaid: "2026-09-01" },
-      { amountPaid: 20, datePaid: "2026-09-02" },
-    ],
-  };
-  const receipt = {
-    _id: "receipt",
-    documentNumber: "REC-1",
-    paymentRecords: [{ amountPaid: 5, datePaid: "2026-09-03" }],
-  };
-  const documents = [invoice, receipt, { _id: "quote" }];
-  const byPayment = getPaymentDocuments(documents);
-  // Every payment id in the history resolves to its own document.
-  const ids = getDashboardSnapshot(documents).payments.map(
-    (payment) => payment.id,
-  );
-  expect(ids.map((id) => byPayment.get(id)?.documentNumber)).toEqual([
-    "REC-1",
-    "INV-1",
-    "INV-1",
-  ]);
-  expect(byPayment.size).toBe(3);
 });

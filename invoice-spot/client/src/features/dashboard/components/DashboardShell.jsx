@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { isExpired } from "react-jwt";
 import {
   FiArrowUpRight,
+  FiBarChart2,
   FiChevronRight,
   FiFileText,
   FiGrid,
@@ -175,6 +176,7 @@ const DashboardShell = ({
     { to: "/documents", label: "Documents", icon: FiFileText },
     { to: "/customers", label: "Clients", icon: FiUsers },
     { to: "/items", label: "Items", icon: FiPackage },
+    { to: "/reports", label: "Reports", icon: FiBarChart2 },
     { to: "/profile", label: "Profile", icon: FiUser },
     { to: "/settings", label: "Settings", icon: FiSettings },
     ...(isAdmin

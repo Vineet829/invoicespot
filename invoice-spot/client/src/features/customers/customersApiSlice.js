@@ -1,5 +1,11 @@
 import { baseApiSlice } from "../api/baseApiSlice";
-import { fetchPdf } from "../api/fetchPdf";
+import { fetchFile } from "../api/fetchFile";
+
+const fileForm = (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return form;
+};
 
 export const customersApiSlice = baseApiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -27,9 +33,30 @@ export const customersApiSlice = baseApiSlice.injectEndpoints({
       query: (custId) => `/customer/${custId}/summary`,
       providesTags: ["Customer", "Document"],
     }),
+    // The same file goes to both: the server reads it for the preview and
+    // again when adding, so the preview shows exactly what is added.
+    previewClientImport: builder.mutation({
+      query: (file) => ({
+        url: "/customer/import/preview",
+        method: "POST",
+        body: fileForm(file),
+      }),
+    }),
+    importClients: builder.mutation({
+      query: (file) => ({
+        url: "/customer/import",
+        method: "POST",
+        body: fileForm(file),
+      }),
+      invalidatesTags: ["Customer"],
+    }),
+    getCustomersCsv: builder.mutation({
+      queryFn: (filters, _api, _extraOptions, baseQuery) =>
+        fetchFile(baseQuery, `/customer/csv?${new URLSearchParams(filters)}`),
+    }),
     getStatementPdf: builder.mutation({
       queryFn: (custId, _api, _extraOptions, baseQuery) =>
-        fetchPdf(baseQuery, `/customer/${custId}/statement`),
+        fetchFile(baseQuery, `/customer/${custId}/statement`),
     }),
     getStatementEmailDraft: builder.query({
       query: (custId) => `/customer/${custId}/statement/email`,
@@ -63,6 +90,9 @@ export const customersApiSlice = baseApiSlice.injectEndpoints({
 
 export const {
   useGetAllUserCustomersQuery,
+  useGetCustomersCsvMutation,
+  useImportClientsMutation,
+  usePreviewClientImportMutation,
   useGetSingleCustomerQuery,
   useGetCustomerSummaryQuery,
   useGetStatementPdfMutation,

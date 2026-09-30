@@ -96,15 +96,15 @@ export const isFiltered = ({ q, status, type, period }) =>
   Boolean(q || status || type || period);
 
 // The query the server's document list takes for a list state.
-export const documentQuery = (
-  { q, status, type, period, sort, dir, page, size },
+// The list's filters and order, as the server reads them; an export of the
+// list sends these without a page.
+export const documentFilterQuery = (
+  { q, status, type, period, sort, dir },
   today = new Date(),
 ) => {
   const statusFilter = STATUS_FILTERS.find((filter) => filter.value === status);
   const typeFilter = TYPE_FILTERS.find((filter) => filter.value === type);
   return {
-    page,
-    size,
     sort,
     dir,
     ...(q && { q }),
@@ -114,3 +114,9 @@ export const documentQuery = (
     ...periodRange(period, today),
   };
 };
+
+export const documentQuery = (list, today = new Date()) => ({
+  page: list.page,
+  size: list.size,
+  ...documentFilterQuery(list, today),
+});

@@ -1,5 +1,5 @@
 import { baseApiSlice } from "../api/baseApiSlice";
-import { fetchPdf } from "../api/fetchPdf";
+import { fetchFile } from "../api/fetchFile";
 
 // A document shared by link. No sign-in: the link itself is the key.
 export const publicApiSlice = baseApiSlice.injectEndpoints({
@@ -29,7 +29,7 @@ export const publicApiSlice = baseApiSlice.injectEndpoints({
     }),
     getSharedPdf: builder.mutation({
       queryFn: (token, _api, _extraOptions, baseQuery) =>
-        fetchPdf(baseQuery, `/public/share/${token}/pdf`),
+        fetchFile(baseQuery, `/public/share/${token}/pdf`),
     }),
   }),
 });
