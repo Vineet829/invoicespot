@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentExport documentExport;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, DocumentExport documentExport) {
         this.documentService = documentService;
+        this.documentExport = documentExport;
     }
 
     @PostMapping("/create")
@@ -64,6 +67,32 @@ public class DocumentController {
         return documentService.listMine(
                 principal.getPkid(),
                 DocumentSearch.of(query, status, type, overdue, customerId, from, to, sort, direction, page, size));
+    }
+
+    @GetMapping("/csv")
+    public ResponseEntity<byte[]> csv(
+            @AuthenticationPrincipal User principal,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "type", required = false) String type,
+            @RequestParam(name = "overdue", required = false) Boolean overdue,
+            @RequestParam(name = "customerId", required = false) String customerId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate to,
+            @RequestParam(name = "sort", defaultValue = "createdAt") String sort,
+            @RequestParam(name = "dir", defaultValue = "desc") String direction) {
+        return documentExport
+                .documents(
+                        principal.getPkid(),
+                        DocumentSearch.of(query, status, type, overdue, customerId, from, to, sort, direction, 1, 1))
+                .download();
+    }
+
+    @GetMapping("/payments/csv")
+    public ResponseEntity<byte[]> paymentsCsv(@AuthenticationPrincipal User principal) {
+        return documentExport.payments(principal.getPkid()).download();
     }
 
     @PostMapping("/{id}/payment")

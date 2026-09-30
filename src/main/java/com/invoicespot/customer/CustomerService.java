@@ -1,25 +1,31 @@
 package com.invoicespot.customer;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.CsvFile;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.CustomerBalance;
 import com.invoicespot.customer.dto.CustomerListResponse;
 import com.invoicespot.customer.dto.CustomerResponse;
 import com.invoicespot.customer.dto.CustomerSummaryResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
+import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -76,7 +82,7 @@ public class CustomerService {
         customer.setAddress(request.address());
         customer.setCity(request.city());
         customer.setCountry(request.country());
-        customer.setAccountNo(generateAccountNo());
+        customer.setAccountNo(newAccountNo(ownerPkid));
         customerRepository.save(customer);
         return CustomerResponse.from(customer);
     }
@@ -103,6 +109,55 @@ public class CustomerService {
                                 customers.get(row.pkid()),
                                 row.documents(),
                                 balances.getOrDefault(row.pkid(), List.of())))
+                        .toList());
+    }
+
+    // Every client the list's search matches, in its order, with one column
+    // for what they owe in each currency.
+    @Transactional(readOnly = true)
+    public CsvFile csv(Long ownerPkid, CustomerSearch search) {
+        BusinessSettings settings = settingsService.forUser(ownerPkid);
+        ZoneId zone = ZoneId.of(settings.getTimeZone());
+        List<CustomerDirectory.Contact> contacts =
+                customerDirectory.contacts(ownerPkid, search, settings.getDefaultCurrency());
+        Map<Long, Map<String, BigDecimal>> owed = customerDirectory.balancesOf(ownerPkid).stream()
+                .collect(Collectors.groupingBy(
+                        CustomerDirectory.Balance::customerPkid,
+                        Collectors.toMap(
+                                CustomerDirectory.Balance::currency,
+                                CustomerDirectory.Balance::outstanding,
+                                BigDecimal::add,
+                                TreeMap::new)));
+        List<String> currencies = owed.values().stream()
+                .flatMap(balances -> balances.keySet().stream())
+                .distinct()
+                .sorted()
+                .toList();
+        List<String> header = new ArrayList<>(List.of(
+                "Name", "Email", "Phone", "Account number", "VAT/TIN", "Address", "City", "Country", "Documents"));
+        currencies.forEach(currency -> header.add("Owed " + currency));
+        header.add("Added");
+        return CsvFile.of(
+                "invoice-spot-clients-" + LocalDate.now(clock.withZone(zone)) + ".csv",
+                header,
+                contacts.stream()
+                        .map(contact -> {
+                            List<Object> row = new ArrayList<>(Arrays.asList(
+                                    contact.name(),
+                                    contact.email(),
+                                    contact.phoneNumber(),
+                                    contact.accountNo(),
+                                    contact.vatTinNo(),
+                                    contact.address(),
+                                    contact.city(),
+                                    contact.country(),
+                                    contact.documents()));
+                            Map<String, BigDecimal> balances = owed.getOrDefault(contact.pkid(), Map.of());
+                            currencies.forEach(currency ->
+                                    row.add(balances.getOrDefault(currency, BigDecimal.ZERO.setScale(2))));
+                            row.add(LocalDate.ofInstant(contact.createdAt(), zone));
+                            return row;
+                        })
                         .toList());
     }
 
@@ -186,10 +241,16 @@ public class CustomerService {
         return customer;
     }
 
-    private String generateAccountNo() {
-        byte[] material = new byte[3];
-        random.nextBytes(material);
-        return "CUS-" + HexFormat.of().formatHex(material).toUpperCase(Locale.ROOT);
+    // Account numbers are unique for each owner; a clash, likelier when many
+    // clients are imported at once, draws a new one.
+    private String newAccountNo(Long ownerPkid) {
+        String accountNo;
+        do {
+            byte[] material = new byte[3];
+            random.nextBytes(material);
+            accountNo = "CUS-" + HexFormat.of().formatHex(material).toUpperCase(Locale.ROOT);
+        } while (customerRepository.findByCreatedByPkidAndAccountNo(ownerPkid, accountNo).isPresent());
+        return accountNo;
     }
 
     private static Optional<UUID> externalId(String id) {

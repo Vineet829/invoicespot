@@ -32,6 +32,19 @@ class CustomerDirectory {
 
     record Row(long pkid, long documents) {}
 
+    record Contact(
+            long pkid,
+            String name,
+            String email,
+            String phoneNumber,
+            String accountNo,
+            String vatTinNo,
+            String address,
+            String city,
+            String country,
+            Instant createdAt,
+            long documents) {}
+
     record Balance(long customerPkid, String currency, BigDecimal outstanding) {}
 
     private final JdbcClient jdbc;
@@ -69,6 +82,58 @@ class CustomerDirectory {
                 .query(Long.class)
                 .single();
         return new PageImpl<>(rows, PageRequest.of(search.page() - 1, search.size()), total);
+    }
+
+    // Every client the search matches, in its order, with their details.
+    List<Contact> contacts(Long ownerPkid, CustomerSearch search, String currency) {
+        String direction = search.ascending() ? "asc" : "desc";
+        return jdbc.sql("""
+                        select c.pkid, c.name, c.email, c.phone_number, c.account_no, c.vat_tin_no, c.address,
+                               c.city, c.country, c.created_at,
+                               count(d.pkid) as documents,
+                               coalesce(sum(d.total - d.total_amount_received) filter (
+                                   where d.document_type = 'Invoice' and d.status <> 'Paid'
+                                     and d.currency = :currency), 0) as balance
+                        from customers c
+                        left join documents d on d.customer_pkid = c.pkid
+                        where %s
+                        group by c.pkid
+                        order by %s %s, c.pkid %s
+                        """.formatted(MATCHING, ORDER_BY.get(search.sort()), direction, direction))
+                .param("owner", ownerPkid)
+                .param("pattern", SearchText.containing(search.query()))
+                .param("currency", currency)
+                .query((result, rowNumber) -> new Contact(
+                        result.getLong("pkid"),
+                        result.getString("name"),
+                        result.getString("email"),
+                        result.getString("phone_number"),
+                        result.getString("account_no"),
+                        result.getString("vat_tin_no"),
+                        result.getString("address"),
+                        result.getString("city"),
+                        result.getString("country"),
+                        result.getTimestamp("created_at").toInstant(),
+                        result.getLong("documents")))
+                .list();
+    }
+
+    // What each of an owner's clients still owes, per currency.
+    List<Balance> balancesOf(Long ownerPkid) {
+        return jdbc.sql("""
+                        select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
+                        from documents d
+                        where d.created_by_pkid = :owner and d.customer_pkid is not null
+                          and d.document_type = 'Invoice' and d.status <> 'Paid'
+                        group by d.customer_pkid, d.currency
+                        having sum(d.total - d.total_amount_received) > 0
+                        """)
+                .param("owner", ownerPkid)
+                .query((result, rowNumber) -> new Balance(
+                        result.getLong("customer_pkid"),
+                        result.getString("currency"),
+                        result.getBigDecimal("outstanding")))
+                .list();
     }
 
     List<Balance> balances(Collection<Long> customerPkids) {

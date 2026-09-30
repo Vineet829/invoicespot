@@ -22,6 +22,7 @@
         <jjwt.version>0.12.6</jjwt.version>
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <bucket4j.version>8.14.0</bucket4j.version>
+        <commons-csv.version>1.14.1</commons-csv.version>
         <testcontainers.version>1.21.3</testcontainers.version>
         <docker.api.version>1.44</docker.api.version>
     </properties>
@@ -106,6 +107,12 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${commons-csv.version}</version>
         </dependency>
 
         <dependency>
