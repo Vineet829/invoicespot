@@ -77,6 +77,7 @@ const PaymentForm = ({ document }) => {
         </Field>
         <Field
           label="Additional info"
+          maxLength={255}
           value={additionalInfo}
           onChange={(event) => setAdditionalInfo(event.target.value)}
           disabled={busy}

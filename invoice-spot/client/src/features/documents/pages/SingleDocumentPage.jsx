@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FiDownload, FiEdit2, FiMail, FiPrinter } from "react-icons/fi";
 import useTitle from "../../../hooks/useTitle";
 import { useGetSingleDocQuery } from "../documentsApiSlice";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import { useDocumentPdf } from "../useDocumentPdf";
 import EmailDocumentDialog from "../components/EmailDocumentDialog";
 import {
@@ -21,6 +22,7 @@ import {
 import {
   primaryButton,
   secondaryIconButton,
+  textLink,
 } from "../../../components/workspace/pastel";
 import PaymentForm from "./PaymentForm";
 import PaymentsLedger from "../components/PaymentsLedger";
@@ -37,6 +39,7 @@ const SingleDocumentPage = () => {
   const { id } = useParams();
   const query = useGetSingleDocQuery(id);
   const profileQuery = useGetUserProfileQuery();
+  const settings = useGetSettingsQuery();
   const document = query.data?.document;
   const profile = profileQuery.data?.userProfile;
   const [emailing, setEmailing] = useState(false);
@@ -174,7 +177,16 @@ const SingleDocumentPage = () => {
                 <div className="min-w-0">
                   <h3 className={partyHeading}>For</h3>
                   <strong className={partyName}>
-                    {document.customer?.name}
+                    {document.customerId ? (
+                      <Link
+                        className={textLink}
+                        to={`/single-customer/${document.customerId}`}
+                      >
+                        {document.customer?.name}
+                      </Link>
+                    ) : (
+                      document.customer?.name
+                    )}
                   </strong>
                   <p className={partyLine}>
                     Customer no. {document.customer?.accountNo || "—"}
@@ -244,7 +256,7 @@ const SingleDocumentPage = () => {
                   {[
                     ["Subtotal", document.subTotal],
                     [
-                      `VAT / sales tax (${document.rates || 0}%)`,
+                      `${settings.data?.settings?.taxLabel || "Tax"} (${document.rates || 0}%)`,
                       document.salesTax,
                     ],
                     ["Cumulative total", document.total],

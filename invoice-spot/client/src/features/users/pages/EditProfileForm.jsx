@@ -84,6 +84,7 @@ const ProfileFields = ({ profile }) => {
             <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="First name"
+                maxLength={60}
                 name="firstName"
                 required
                 autoComplete="given-name"
@@ -93,6 +94,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="Last name"
+                maxLength={60}
                 name="lastName"
                 required
                 autoComplete="family-name"
@@ -102,6 +104,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="Username"
+                maxLength={60}
                 name="username"
                 required
                 autoComplete="username"
@@ -111,6 +114,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="Phone number"
+                maxLength={30}
                 name="phoneNumber"
                 type="tel"
                 required
@@ -129,6 +133,7 @@ const ProfileFields = ({ profile }) => {
             <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="Business name"
+                maxLength={255}
                 name="businessName"
                 required
                 autoComplete="organization"
@@ -139,6 +144,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="Address"
+                maxLength={255}
                 name="address"
                 required
                 autoComplete="street-address"
@@ -149,6 +155,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="City"
+                maxLength={255}
                 name="city"
                 autoComplete="address-level2"
                 value={values.city}
@@ -157,6 +164,7 @@ const ProfileFields = ({ profile }) => {
               />
               <Field
                 label="Country"
+                maxLength={255}
                 name="country"
                 autoComplete="country-name"
                 value={values.country}
@@ -169,6 +177,7 @@ const ProfileFields = ({ profile }) => {
             <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
               <Field
                 label="Logo URL"
+                maxLength={500}
                 name="avatar"
                 value={values.avatar}
                 onChange={change("avatar")}
