@@ -1,13 +1,14 @@
 package com.invoicespot.document;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.document.dto.RecurringEnvelope;
 import com.invoicespot.document.dto.RecurringListResponse;
 import com.invoicespot.document.dto.RecurringRequest;
-import com.invoicespot.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,48 +28,49 @@ public class RecurringController {
     }
 
     @GetMapping("/api/v1/recurring")
-    public RecurringListResponse list(@AuthenticationPrincipal User principal) {
-        return recurringService.list(principal.getPkid());
+    public RecurringListResponse list(@Requires(Permission.VIEW_RECORDS) BusinessAccess access) {
+        return recurringService.list(access);
     }
 
     @PostMapping("/api/v1/recurring")
     @ResponseStatus(HttpStatus.CREATED)
     public RecurringEnvelope create(
-            @AuthenticationPrincipal User principal, @Valid @RequestBody RecurringRequest request) {
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @Valid @RequestBody RecurringRequest request) {
         return new RecurringEnvelope(
-                true, "The invoice now repeats", recurringService.create(principal.getPkid(), request));
+                true, "The invoice now repeats", recurringService.create(access, request));
     }
 
     @GetMapping("/api/v1/document/{id}/recurring")
-    public RecurringEnvelope forDocument(@AuthenticationPrincipal User principal, @PathVariable String id) {
+    public RecurringEnvelope forDocument(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
         return new RecurringEnvelope(
-                true, null, recurringService.forDocument(principal.getPkid(), id).orElse(null));
+                true, null, recurringService.forDocument(access, id).orElse(null));
     }
 
     @PatchMapping("/api/v1/recurring/{id}")
     public RecurringEnvelope update(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @Valid @RequestBody RecurringRequest request) {
         return new RecurringEnvelope(
-                true, "The schedule was saved", recurringService.update(principal.getPkid(), id, request));
+                true, "The schedule was saved", recurringService.update(access, id, request));
     }
 
     @PostMapping("/api/v1/recurring/{id}/pause")
-    public RecurringEnvelope pause(@AuthenticationPrincipal User principal, @PathVariable String id) {
+    public RecurringEnvelope pause(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         return new RecurringEnvelope(
-                true, "The schedule is paused", recurringService.setPaused(principal.getPkid(), id, true));
+                true, "The schedule is paused", recurringService.setPaused(access, id, true));
     }
 
     @PostMapping("/api/v1/recurring/{id}/resume")
-    public RecurringEnvelope resume(@AuthenticationPrincipal User principal, @PathVariable String id) {
+    public RecurringEnvelope resume(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         return new RecurringEnvelope(
-                true, "The schedule is running again", recurringService.setPaused(principal.getPkid(), id, false));
+                true, "The schedule is running again", recurringService.setPaused(access, id, false));
     }
 
     @DeleteMapping("/api/v1/recurring/{id}")
-    public MessageResponse delete(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        recurringService.delete(principal.getPkid(), id);
+    public MessageResponse delete(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        recurringService.delete(access, id);
         return new MessageResponse(true, "The invoice no longer repeats");
     }
 }

@@ -1,5 +1,6 @@
 package com.invoicespot.common;
 
+import com.invoicespot.business.BusinessChangedException;
 import com.invoicespot.ratelimit.RateLimitedException;
 import com.invoicespot.upload.UploadService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,6 +27,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(ErrorResponse.of(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(BusinessChangedException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessChanged(BusinessChangedException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .header(BusinessChangedException.HEADER, ex.getActiveBusiness())
+                .body(ErrorResponse.of(ex.getStatus().value(), ex.getMessage()));
     }
 
     @ExceptionHandler(ApiException.class)

@@ -43,24 +43,6 @@ public class User extends BaseEntity {
     @Column(name = "google_id")
     private String googleId;
 
-    @Column(name = "avatar", length = 500)
-    private String avatar;
-
-    @Column(name = "business_name")
-    private String businessName;
-
-    @Column(name = "phone_number", length = 30)
-    private String phoneNumber;
-
-    @Column(name = "address")
-    private String address;
-
-    @Column(name = "city")
-    private String city;
-
-    @Column(name = "country")
-    private String country;
-
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;
 
@@ -89,5 +71,12 @@ public class User extends BaseEntity {
         return active
                 && (passwordChangedAt == null
                         || issuedAt.getEpochSecond() >= passwordChangedAt.getEpochSecond());
+    }
+
+    // How the app names the account to others: the full name, or the
+    // username when no name was given.
+    public String displayName() {
+        String name = (firstName + " " + lastName).trim();
+        return name.isEmpty() ? username : name;
     }
 }

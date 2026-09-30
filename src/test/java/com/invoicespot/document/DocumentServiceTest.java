@@ -8,6 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
+import com.invoicespot.business.BusinessRole;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
@@ -46,6 +50,7 @@ class DocumentServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PdfService pdfService;
     @Mock private SettingsService settingsService;
+    @Mock private BusinessRepository businessRepository;
     @Mock private DocumentNumbering documentNumbering;
     @Mock private DocumentActivity activity;
     @Mock private NotificationService notificationService;
@@ -59,20 +64,22 @@ class DocumentServiceTest {
                 userRepository,
                 pdfService,
                 settingsService,
+                businessRepository,
                 documentNumbering,
                 activity,
                 notificationService,
                 CLOCK);
-        lenient().when(settingsService.forUser(any())).thenReturn(new BusinessSettings());
+        lenient().when(settingsService.forBusiness(any())).thenReturn(new BusinessSettings());
+        lenient().when(businessRepository.getReferenceById(1L)).thenReturn(businessWithPkid(1L));
     }
 
     private static final UUID CUSTOMER_ID = UUID.randomUUID();
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-30T10:00:00Z"), ZoneOffset.UTC);
 
-    private void ownsCustomer(long ownerPkid) {
+    private void ownsCustomer(long businessPkid) {
         Customer customer = new Customer();
         customer.setId(CUSTOMER_ID);
-        customer.setCreatedBy(userWithPkid(ownerPkid));
+        customer.setBusiness(businessWithPkid(businessPkid));
         customer.setName("Beta LLC");
         customer.setEmail("billing@beta.test");
         customer.setAccountNo("CUS-000001");
@@ -86,6 +93,16 @@ class DocumentServiceTest {
         return user;
     }
 
+    private static Business businessWithPkid(long pkid) {
+        Business business = new Business();
+        business.setPkid(pkid);
+        return business;
+    }
+
+    private static BusinessAccess access(long businessPkid) {
+        return new BusinessAccess(businessPkid, UUID.randomUUID(), BusinessRole.OWNER, userWithPkid(businessPkid));
+    }
+
     private static CreateDocumentRequest documentRequest(String type) {
         return new CreateDocumentRequest(
                 CUSTOMER_ID.toString(),
@@ -94,11 +111,11 @@ class DocumentServiceTest {
     }
 
     @Test
-    @DisplayName("a document can only be created for one of the user's own customers")
+    @DisplayName("a document can only be created for one of the business's own customers")
     void requiresACustomer() {
         ownsCustomer(99L);
 
-        assertThatThrownBy(() -> service.create(1L, documentRequest("Invoice")))
+        assertThatThrownBy(() -> service.create(access(1L), documentRequest("Invoice")))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("That customer does not exist for the currently logged in user")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -110,11 +127,9 @@ class DocumentServiceTest {
     @DisplayName("a created document gets a generated number and the type/status defaults")
     void createsDocumentWithDefaults() {
         ownsCustomer(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
-
         when(documentNumbering.next(1L, DocumentType.INVOICE)).thenReturn("INV-0001");
 
-        service.create(1L, documentRequest(null));
+        service.create(access(1L), documentRequest(null));
 
         ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
         verify(documentRepository).save(captor.capture());
@@ -132,22 +147,20 @@ class DocumentServiceTest {
     @DisplayName("an unknown document type is rejected")
     void rejectsUnknownType() {
         ownsCustomer(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
-
-        assertThatThrownBy(() -> service.create(1L, documentRequest("Nonsense")))
+        assertThatThrownBy(() -> service.create(access(1L), documentRequest("Nonsense")))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("Invalid document type");
     }
 
     @Test
-    @DisplayName("viewing another user's document is forbidden")
+    @DisplayName("viewing another business's document is forbidden")
     void forbidsForeignDocument() {
         Document document = new Document();
-        document.setCreatedBy(userWithPkid(99L));
+        document.setBusiness(businessWithPkid(99L));
         UUID id = UUID.randomUUID();
         when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(document));
 
-        assertThatThrownBy(() -> service.getOne(1L, id.toString()))
+        assertThatThrownBy(() -> service.getOne(access(1L), id.toString()))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
@@ -162,8 +175,10 @@ class DocumentServiceTest {
         document.setCustomerSnapshot(snapshot);
         UUID id = UUID.randomUUID();
         when(documentRepository.findForUpdateByExternalId(id)).thenReturn(Optional.of(document));
+        User member = userWithPkid(1L);
+        when(userRepository.getReferenceById(1L)).thenReturn(member);
 
-        service.addPayment(1L, id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, "note"));
+        service.addPayment(access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, "note"));
 
         assertThat(document.getPayments()).hasSize(1);
         Payment payment = document.getPayments().get(0);
@@ -173,7 +188,7 @@ class DocumentServiceTest {
         assertThat(payment.getDatePaid()).isEqualTo(LocalDate.of(2026, 9, 30));
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.NOT_FULLY_PAID);
         verify(documentRepository).flush();
-        verify(activity).record(document, DocumentEventType.PAYMENT_RECORDED, "50.00 · Cash", null);
+        verify(activity).record(document, DocumentEventType.PAYMENT_RECORDED, "50.00 · Cash", null, member);
     }
 
     private static CreateDocumentRequest requestWith(String rates, String discount) {
@@ -188,9 +203,7 @@ class DocumentServiceTest {
     @DisplayName("tax and discount percentages are stored as exact numbers")
     void storesPercentages() {
         ownsCustomer(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
-
-        service.create(1L, requestWith(" 18.5 ", "12.25"));
+        service.create(access(1L), requestWith(" 18.5 ", "12.25"));
 
         ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
         verify(documentRepository).save(captor.capture());
@@ -202,13 +215,11 @@ class DocumentServiceTest {
     @DisplayName("a percentage that isn't a number from 0 to 100 is refused")
     void refusesBadPercentages() {
         ownsCustomer(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
-
         for (String bad : new String[] {"abc", "-1", "100.5", "0.00001"}) {
-            assertThatThrownBy(() -> service.create(1L, requestWith(bad, "0")))
+            assertThatThrownBy(() -> service.create(access(1L), requestWith(bad, "0")))
                     .isInstanceOf(ApiException.class)
                     .hasMessage("Tax rate must be a number from 0 to 100, with up to 4 decimals");
-            assertThatThrownBy(() -> service.create(1L, requestWith("0", bad)))
+            assertThatThrownBy(() -> service.create(access(1L), requestWith("0", bad)))
                     .isInstanceOf(ApiException.class)
                     .hasMessage("Discount must be a number from 0 to 100, with up to 4 decimals");
         }
@@ -219,9 +230,7 @@ class DocumentServiceTest {
     @DisplayName("the server computes line totals, tax, total and status, whatever the client sends")
     void computesTotals() {
         ownsCustomer(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithPkid(1L)));
-
-        service.create(1L, requestWith("18", "10"));
+        service.create(access(1L), requestWith("18", "10"));
 
         ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
         verify(documentRepository).save(captor.capture());
@@ -235,6 +244,7 @@ class DocumentServiceTest {
 
     private Document paidInvoice(BigDecimal paid) {
         Document document = new Document();
+        document.setBusiness(businessWithPkid(1L));
         document.setCreatedBy(userWithPkid(1L));
         BillingItem item = new BillingItem();
         item.setItemName("Design");
@@ -260,7 +270,7 @@ class DocumentServiceTest {
         UUID id = UUID.randomUUID();
         when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(paidInvoice(new BigDecimal("40"))));
 
-        assertThatThrownBy(() -> service.update(1L, id.toString(), update("Quotation", null)))
+        assertThatThrownBy(() -> service.update(access(1L), id.toString(), update("Quotation", null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("This document has payments, so it can't become a quotation")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -275,7 +285,7 @@ class DocumentServiceTest {
         when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(paidInvoice(new BigDecimal("80"))));
 
         assertThatThrownBy(() -> service.update(
-                        1L, id.toString(), update(null, List.of(new BillingItemDto("Design", new BigDecimal("50"), 1, "0")))))
+                        access(1L), id.toString(), update(null, List.of(new BillingItemDto("Design", new BigDecimal("50"), 1, "0")))))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The new total is less than the 80.00 already received");
         verify(documentRepository, never()).save(any());

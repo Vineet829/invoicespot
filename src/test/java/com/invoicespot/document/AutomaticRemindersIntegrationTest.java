@@ -133,7 +133,9 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/v1/document/{id}/activity", dueToday.id())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.events[0].type").value("REMINDED"))
-                .andExpect(jsonPath("$.events[0].detail").value("automatically to " + dueToday.email()));
+                .andExpect(jsonPath("$.events[0].detail").value("automatically to " + dueToday.email()))
+                .andExpect(jsonPath("$.events[0].actor").doesNotExist())
+                .andExpect(jsonPath("$.events[0].byYou").value(false));
         mockMvc.perform(get("/api/v1/notification").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.unread").value(3))
                 .andExpect(jsonPath("$.notifications[0].type").value("REMINDER_SENT"));

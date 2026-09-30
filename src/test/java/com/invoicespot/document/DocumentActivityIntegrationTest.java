@@ -1,6 +1,8 @@
 package com.invoicespot.document;
 
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -12,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessRole;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.mail.Session;
@@ -93,7 +97,47 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
                         "USD 50.00 · Bank Transfer",
                         "USD 40.00 · Bank Transfer",
                         null,
-                        null)));
+                        null)))
+                .andExpect(jsonPath("$.events[*].actor", everyItem(is("Test User"))))
+                .andExpect(jsonPath("$.events[*].byYou", everyItem(is(true))));
+    }
+
+    @Test
+    @DisplayName("each event names the member who did it, the client's views name no one, and a deleted account goes")
+    void actors() throws Exception {
+        User owner = createUser();
+        Business business = businessOf(owner);
+        User member = createMember(business, BusinessRole.MEMBER);
+        member.setFirstName("Priya");
+        member.setLastName("Shah");
+        userRepository.save(member);
+        String id = invoice(owner);
+        String memberSession = bearer(member, business);
+        mockMvc.perform(post("/api/v1/document/{id}/payment", id)
+                        .header(HttpHeaders.AUTHORIZATION, memberSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amountPaid\": 40, \"paymentMethod\": \"Bank Transfer\"}"))
+                .andExpect(status().isCreated());
+        String link = JsonPath.read(
+                mockMvc.perform(post("/api/v1/document/{id}/share", id)
+                                .header(HttpHeaders.AUTHORIZATION, memberSession))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.url");
+        mockMvc.perform(get("/api/v1/public/share/{token}", link.substring(link.lastIndexOf('/') + 1)))
+                .andExpect(status().isOk());
+
+        activity(id, owner)
+                .andExpect(jsonPath("$.events[*].type", contains("VIEWED", "SHARED", "PAYMENT_RECORDED", "CREATED")))
+                .andExpect(jsonPath("$.events[*].actor", contains(null, "Priya Shah", "Priya Shah", "Test User")))
+                .andExpect(jsonPath("$.events[*].byYou", contains(false, false, false, true)));
+        mockMvc.perform(get("/api/v1/document/{id}/activity", id).header(HttpHeaders.AUTHORIZATION, memberSession))
+                .andExpect(jsonPath("$.events[*].byYou", contains(false, true, true, false)));
+
+        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, memberSession))
+                .andExpect(status().isOk());
+        activity(id, owner).andExpect(jsonPath("$.events[*].actor", contains(null, null, null, "Test User")));
     }
 
     @Test

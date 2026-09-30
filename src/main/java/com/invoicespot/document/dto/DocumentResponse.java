@@ -78,7 +78,7 @@ public record DocumentResponse(
 
         return new DocumentResponse(
                 document.getId(),
-                document.getCreatedBy().getId(),
+                document.getCreatedBy() == null ? null : document.getCreatedBy().getId(),
                 document.getCustomer() == null ? null : document.getCustomer().getId(),
                 customer,
                 document.getDocumentType(),

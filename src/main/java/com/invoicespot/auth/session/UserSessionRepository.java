@@ -52,4 +52,16 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     @Modifying
     @Query("delete from UserSession s where s.revokedAt is not null or s.expiresAt < :now")
     int deleteEnded(@Param("now") Instant now);
+
+    @Modifying
+    @Query("update UserSession s set s.businessPkid = :businessPkid where s.id = :id")
+    int useBusiness(@Param("id") UUID id, @Param("businessPkid") Long businessPkid);
+
+    // Sessions working in a business someone left start again in another.
+    @Modifying
+    @Query("""
+            update UserSession s set s.businessPkid = null
+            where s.user.pkid = :userPkid and s.businessPkid = :businessPkid
+            """)
+    int clearBusiness(@Param("userPkid") Long userPkid, @Param("businessPkid") Long businessPkid);
 }

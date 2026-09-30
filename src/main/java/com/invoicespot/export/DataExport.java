@@ -2,6 +2,9 @@ package com.invoicespot.export;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessService;
+import com.invoicespot.business.dto.BusinessProfileResponse;
 import com.invoicespot.common.CsvFile;
 import com.invoicespot.customer.CustomerSearch;
 import com.invoicespot.customer.CustomerService;
@@ -13,7 +16,6 @@ import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.user.DemoAccountGuard;
-import com.invoicespot.user.User;
 import com.invoicespot.user.dto.UserProfileResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,9 +36,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-// Everything an owner keeps in the app, in one ZIP file: a CSV file for each
-// kind of record, the settings and profile as JSON, and a note on what each
-// file holds. It is read in one snapshot, so the files agree with each other.
+// Everything a business keeps in the app, in one ZIP file: a CSV file for each
+// kind of record, the settings, business and profile as JSON, and a note on
+// what each file holds. It is read in one snapshot, so the files agree with
+// each other.
 @Service
 public class DataExport {
 
@@ -52,7 +55,8 @@ public class DataExport {
             items.csv        Your saved products and services.
             recurring.csv    The invoices that repeat, and how.
             settings.json    Your defaults for new documents, numbering and reminders.
-            profile.json     Your account and business details.
+            business.json    Your business details, as documents show them.
+            profile.json     Your account details.
 
             Dates follow your time zone, %s. Amounts are plain numbers in the
             currency of their document. CSV files are UTF-8 and open in any
@@ -62,6 +66,7 @@ public class DataExport {
     private final DocumentExport documentExport;
     private final CustomerService customerService;
     private final SettingsService settingsService;
+    private final BusinessService businessService;
     private final DemoAccountGuard demoAccountGuard;
     private final JdbcClient jdbc;
     private final ObjectMapper objectMapper;
@@ -71,6 +76,7 @@ public class DataExport {
             DocumentExport documentExport,
             CustomerService customerService,
             SettingsService settingsService,
+            BusinessService businessService,
             DemoAccountGuard demoAccountGuard,
             JdbcClient jdbc,
             ObjectMapper objectMapper,
@@ -78,6 +84,7 @@ public class DataExport {
         this.documentExport = documentExport;
         this.customerService = customerService;
         this.settingsService = settingsService;
+        this.businessService = businessService;
         this.demoAccountGuard = demoAccountGuard;
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
@@ -85,30 +92,38 @@ public class DataExport {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public Archive all(User owner) {
-        Long ownerPkid = owner.getPkid();
-        BusinessSettings settings = settingsService.forUser(ownerPkid);
+    public Archive all(BusinessAccess access) {
+        Long businessPkid = access.businessPkid();
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put("README.txt", README.formatted(today, zone.getId()).getBytes(StandardCharsets.UTF_8));
         files.put("documents.csv", documentExport
-                .documents(ownerPkid, DocumentSearch.of(null, null, null, false, null, null, null, null, null, 1, 1))
+                .documents(access, DocumentSearch.of(null, null, null, false, null, null, null, null, null, 1, 1))
                 .content());
-        files.put("line-items.csv", lineItems(ownerPkid).content());
-        files.put("payments.csv", documentExport.payments(ownerPkid).content());
+        files.put("line-items.csv", lineItems(businessPkid).content());
+        files.put("payments.csv", documentExport.payments(access).content());
         files.put(
                 "clients.csv",
-                customerService.csv(ownerPkid, CustomerSearch.of(null, "name", "asc", 1, 1)).content());
-        files.put("items.csv", items(ownerPkid).content());
-        files.put("recurring.csv", recurring(ownerPkid).content());
+                customerService.csv(access, CustomerSearch.of(null, "name", "asc", 1, 1)).content());
+        files.put("items.csv", items(businessPkid).content());
+        files.put("recurring.csv", recurring(businessPkid).content());
         files.put("settings.json", json(SettingsResponse.from(settings)));
-        files.put("profile.json", json(UserProfileResponse.from(owner, demoAccountGuard.isDemo(owner))));
+        files.put(
+                "business.json",
+                json(BusinessProfileResponse.from(businessService.require(businessPkid), access.role())));
+        files.put(
+                "profile.json",
+                json(UserProfileResponse.from(
+                        access.user(),
+                        demoAccountGuard.isDemo(access.user()),
+                        businessService.sharedOwnedBy(access.userPkid()))));
         return new Archive("invoice-spot-export-" + today + ".zip", zip(files));
     }
 
     // Each line's total is worked out the way its document's totals are.
-    private CsvFile lineItems(Long ownerPkid) {
+    private CsvFile lineItems(Long businessPkid) {
         return CsvFile.of(
                 "line-items.csv",
                 List.of("Document", "Type", "Line", "Item", "Quantity", "Unit price", "Discount %", "Line total"),
@@ -117,10 +132,10 @@ public class DataExport {
                                        i.unit_price, i.discount
                                 from document_billing_items i
                                 join documents d on d.pkid = i.document_pkid
-                                where d.created_by_pkid = :owner
+                                where d.business_pkid = :business
                                 order by d.created_at, d.pkid, i.position
                                 """)
-                        .param("owner", ownerPkid)
+                        .param("business", businessPkid)
                         .query((result, rowNumber) -> {
                             BillingItem item = new BillingItem();
                             item.setQuantity((Integer) result.getObject("quantity"));
@@ -139,16 +154,16 @@ public class DataExport {
                         .list());
     }
 
-    private CsvFile items(Long ownerPkid) {
+    private CsvFile items(Long businessPkid) {
         return CsvFile.of(
                 "items.csv",
                 List.of("Name", "Description", "Unit price"),
                 jdbc.sql("""
                                 select name, description, unit_price from catalog_items
-                                where created_by_pkid = :owner
+                                where business_pkid = :business
                                 order by lower(name), pkid
                                 """)
-                        .param("owner", ownerPkid)
+                        .param("business", businessPkid)
                         .query((result, rowNumber) -> Arrays.<Object>asList(
                                 result.getString("name"),
                                 result.getString("description"),
@@ -156,7 +171,7 @@ public class DataExport {
                         .list());
     }
 
-    private CsvFile recurring(Long ownerPkid) {
+    private CsvFile recurring(Long businessPkid) {
         return CsvFile.of(
                 "recurring.csv",
                 List.of("Invoice", "Client", "Repeats", "First invoice", "Next invoice", "Ends on", "Most invoices",
@@ -166,10 +181,10 @@ public class DataExport {
                                        s.end_date, s.max_runs, s.runs_done, s.email_automatically, s.paused
                                 from recurring_schedules s
                                 join documents d on d.pkid = s.template_pkid
-                                where s.created_by_pkid = :owner
+                                where s.business_pkid = :business
                                 order by s.created_at, s.pkid
                                 """)
-                        .param("owner", ownerPkid)
+                        .param("business", businessPkid)
                         .query((result, rowNumber) -> Arrays.<Object>asList(
                                 result.getString("document_number"),
                                 result.getString("customer_name"),

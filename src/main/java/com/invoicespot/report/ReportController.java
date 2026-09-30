@@ -1,10 +1,11 @@
 package com.invoicespot.report;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.report.dto.OverviewResponse;
 import com.invoicespot.report.dto.ReportResponse;
-import com.invoicespot.user.User;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,21 +26,21 @@ public class ReportController {
 
     @GetMapping("/overview")
     public OverviewResponse overview(
-            @AuthenticationPrincipal User principal, @RequestParam(required = false) String currency) {
-        return overview.summary(principal.getPkid(), currency);
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @RequestParam(required = false) String currency) {
+        return overview.summary(access, currency);
     }
 
     @GetMapping
     public ReportResponse report(
-            @AuthenticationPrincipal User principal, @RequestParam(required = false) String period) {
-        return reportService.report(principal.getPkid(), period);
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @RequestParam(required = false) String period) {
+        return reportService.report(access, period);
     }
 
     @GetMapping("/csv/{section}")
     public ResponseEntity<byte[]> csv(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EXPORT_LISTS) BusinessAccess access,
             @PathVariable String section,
             @RequestParam(required = false) String period) {
-        return reportService.csv(principal.getPkid(), period, section).download();
+        return reportService.csv(access, period, section).download();
     }
 }

@@ -1,10 +1,9 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.BusinessSettingsRepository;
 import com.invoicespot.user.DemoAccountGuard;
-import com.invoicespot.user.User;
-import com.invoicespot.user.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -23,11 +22,11 @@ public class AutomaticReminders {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AutomaticReminders.class);
 
-    private record Due(Long ownerPkid, String documentId) {}
+    private record Due(Long businessPkid, String documentId) {}
 
     private final BusinessSettingsRepository settingsRepository;
     private final DocumentRepository documentRepository;
-    private final UserRepository userRepository;
+    private final BusinessService businessService;
     private final DocumentMailService documentMailService;
     private final DemoAccountGuard demoAccountGuard;
     private final TransactionTemplate readOnly;
@@ -35,13 +34,13 @@ public class AutomaticReminders {
     public AutomaticReminders(
             BusinessSettingsRepository settingsRepository,
             DocumentRepository documentRepository,
-            UserRepository userRepository,
+            BusinessService businessService,
             DocumentMailService documentMailService,
             DemoAccountGuard demoAccountGuard,
             PlatformTransactionManager transactionManager) {
         this.settingsRepository = settingsRepository;
         this.documentRepository = documentRepository;
-        this.userRepository = userRepository;
+        this.businessService = businessService;
         this.documentMailService = documentMailService;
         this.demoAccountGuard = demoAccountGuard;
         this.readOnly = new TransactionTemplate(transactionManager);
@@ -53,8 +52,8 @@ public class AutomaticReminders {
         int sent = 0;
         for (Due reminder : due) {
             try {
-                User owner = userRepository.findById(reminder.ownerPkid()).orElseThrow();
-                documentMailService.remindAutomatically(owner, reminder.documentId());
+                documentMailService.remindAutomatically(
+                        businessService.ownerAccess(reminder.businessPkid()), reminder.documentId());
                 sent++;
             } catch (Exception exception) {
                 LOGGER.warn("Automatic reminder for document {} failed", reminder.documentId(), exception);
@@ -66,18 +65,18 @@ public class AutomaticReminders {
     private List<Due> due(Instant now) {
         List<Due> due = new ArrayList<>();
         for (BusinessSettings settings : settingsRepository.findByRemindersEnabledTrue()) {
-            User owner = settings.getUser();
-            if (demoAccountGuard.isDemo(owner)) {
+            Long businessPkid = settings.getBusiness().getPkid();
+            if (demoAccountGuard.isDemo(businessService.owner(businessPkid))) {
                 continue;
             }
             ZoneId zone = ZoneId.of(settings.getTimeZone());
             LocalDate today = LocalDate.ofInstant(now, zone);
             for (Document invoice : documentRepository.findRemindable(
-                    owner.getPkid(), DocumentType.INVOICE, DocumentStatus.PAID, settings.getReminderMax())) {
+                    businessPkid, DocumentType.INVOICE, DocumentStatus.PAID, settings.getReminderMax())) {
                 CustomerSnapshot client = invoice.getCustomerSnapshot();
                 boolean reachable = client != null && client.getEmail() != null && !client.getEmail().isBlank();
                 if (reachable && ReminderPlanner.isDue(invoice, settings, today, zone)) {
-                    due.add(new Due(owner.getPkid(), invoice.getId().toString()));
+                    due.add(new Due(businessPkid, invoice.getId().toString()));
                 }
             }
         }

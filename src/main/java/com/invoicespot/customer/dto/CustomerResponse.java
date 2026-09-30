@@ -30,7 +30,7 @@ public record CustomerResponse(
     public static CustomerResponse from(Customer customer, Long documentCount, List<CustomerBalance> balances) {
         return new CustomerResponse(
                 customer.getId(),
-                customer.getCreatedBy().getId(),
+                customer.getCreatedBy() == null ? null : customer.getCreatedBy().getId(),
                 customer.getName(),
                 customer.getEmail(),
                 customer.getAccountNo(),

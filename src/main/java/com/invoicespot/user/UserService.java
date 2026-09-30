@@ -3,6 +3,7 @@ package com.invoicespot.user;
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.user.dto.AdminStatsResponse;
@@ -12,6 +13,7 @@ import com.invoicespot.user.dto.UserProfileResponse;
 import com.invoicespot.user.dto.UserSummaryResponse;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,7 @@ public class UserService {
     private final SessionService sessionService;
     private final AuditLog auditLog;
     private final AdminStats adminStats;
+    private final BusinessService businessService;
     private final Clock clock;
 
     public UserService(
@@ -41,19 +44,21 @@ public class UserService {
             SessionService sessionService,
             AuditLog auditLog,
             AdminStats adminStats,
+            BusinessService businessService,
             Clock clock) {
         this.userRepository = userRepository;
         this.demoAccountGuard = demoAccountGuard;
         this.sessionService = sessionService;
         this.auditLog = auditLog;
         this.adminStats = adminStats;
+        this.businessService = businessService;
         this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long pkid) {
         User user = require(pkid);
-        return UserProfileResponse.from(user, demoAccountGuard.isDemo(user));
+        return profileOf(user);
     }
 
     @Transactional
@@ -83,33 +88,22 @@ public class UserService {
         if (request.lastName() != null) {
             user.setLastName(request.lastName());
         }
-        if (request.avatar() != null) {
-            user.setAvatar(request.avatar());
-        }
-        if (request.businessName() != null) {
-            user.setBusinessName(request.businessName());
-        }
-        if (request.phoneNumber() != null) {
-            user.setPhoneNumber(request.phoneNumber());
-        }
-        if (request.address() != null) {
-            user.setAddress(request.address());
-        }
-        if (request.city() != null) {
-            user.setCity(request.city());
-        }
-        if (request.country() != null) {
-            user.setCountry(request.country());
-        }
         userRepository.save(user);
-        return UserProfileResponse.from(user, demoAccountGuard.isDemo(user));
+        return profileOf(user);
+    }
+
+    private UserProfileResponse profileOf(User user) {
+        return UserProfileResponse.from(
+                user, demoAccountGuard.isDemo(user), businessService.sharedOwnedBy(user.getPkid()));
     }
 
     @Transactional
     public void deleteOwnAccount(Long pkid) {
         User user = require(pkid);
         demoAccountGuard.requireNotDemo(user, "deleting it");
+        requireNoSharedBusinesses(user, "You own ", "Hand it over or remove them first");
         auditLog.record(AuditEventType.ACCOUNT_DELETED, user);
+        businessService.deleteOwnedBy(user);
         userRepository.delete(user);
     }
 
@@ -157,8 +151,10 @@ public class UserService {
         demoAccountGuard.requireNotDemoTarget(user, "deleted");
         requireSomeoneElse(user, admin, "Delete your own account from your profile");
         requireNotLastAdmin(user, "deleted");
+        requireNoSharedBusinesses(user, "This account owns ", "They must hand it over or remove the others first");
         String firstName = user.getFirstName();
         auditLog.record(AuditEventType.USER_DELETED, user, admin);
+        businessService.deleteOwnedBy(user);
         userRepository.delete(user);
         return firstName;
     }
@@ -171,6 +167,7 @@ public class UserService {
         demoAccountGuard.requireNotDemoTarget(user, "deactivated");
         requireSomeoneElse(user, admin, "You can't deactivate your own account");
         requireNotLastAdmin(user, "deactivated");
+        requireNoSharedBusinesses(user, "This account owns ", "They must hand it over or remove the others first");
         user.setActive(false);
         userRepository.save(user);
         sessionService.revokeAll(user);
@@ -212,6 +209,19 @@ public class UserService {
             auditLog.record(AuditEventType.ADMIN_REVOKED, user, admin);
         }
         return UserSummaryResponse.from(user, demoAccountGuard.isDemo(user));
+    }
+
+    // An account can't go while it owns a business that others work in; the
+    // business would be left without an owner.
+    private void requireNoSharedBusinesses(User user, String opening, String closing) {
+        List<String> shared = businessService.sharedOwnedBy(user.getPkid());
+        if (!shared.isEmpty()) {
+            String names = shared.size() == 1
+                    ? shared.get(0)
+                    : String.join(", ", shared.subList(0, shared.size() - 1)) + " and " + shared.getLast();
+            throw new ApiException(
+                    HttpStatus.CONFLICT, opening + names + ", which others work in. " + closing);
+        }
     }
 
     private static void requireSomeoneElse(User target, User admin, String message) {

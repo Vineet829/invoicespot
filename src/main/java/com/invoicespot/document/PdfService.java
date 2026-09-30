@@ -1,9 +1,9 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
-import com.invoicespot.user.User;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -40,31 +40,32 @@ public class PdfService {
         this.uploadService = uploadService;
     }
 
-    public byte[] render(Document document, User owner, BusinessSettings settings) {
-        return toPdf(html(document, owner, settings));
+    public byte[] render(Document document, Business seller, BusinessSettings settings) {
+        return toPdf(html(document, seller, settings));
     }
 
-    String html(Document document, User owner, BusinessSettings settings) {
+    String html(Document document, Business seller, BusinessSettings settings) {
         Context context = new Context(Locale.ENGLISH);
-        context.setVariable("pdf", view(document, owner, settings));
+        context.setVariable("pdf", view(document, seller, settings));
         return templateEngine.process("pdf/document", context);
     }
 
     byte[] renderReceipt(
-            Document document, Payment payment, String number, BigDecimal paidToDate, User owner) {
-        return toPdf(receiptHtml(document, payment, number, paidToDate, owner));
+            Document document, Payment payment, String number, BigDecimal paidToDate, Business seller) {
+        return toPdf(receiptHtml(document, payment, number, paidToDate, seller));
     }
 
     // A payment receipt: what was received, how, and what the document still
     // owed once this payment had been made.
-    String receiptHtml(Document document, Payment payment, String number, BigDecimal paidToDate, User owner) {
+    String receiptHtml(
+            Document document, Payment payment, String number, BigDecimal paidToDate, Business seller) {
         CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
         BigDecimal total = orZero(document.getTotal());
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("receipt", new ReceiptView(
-                logo(owner.getAvatar()),
-                senderName(owner),
-                senderLines(owner),
+                logo(seller.getLogo()),
+                senderName(seller),
+                senderLines(seller),
                 number,
                 DATE.format(payment.getDatePaid()),
                 value(client.getName()),
@@ -84,16 +85,16 @@ public class PdfService {
         return templateEngine.process("pdf/receipt", context);
     }
 
-    byte[] renderStatement(User owner, Customer customer, LocalDate day, List<Statements.Account> accounts) {
-        return toPdf(statementHtml(owner, customer, day, accounts));
+    byte[] renderStatement(Business seller, Customer customer, LocalDate day, List<Statements.Account> accounts) {
+        return toPdf(statementHtml(seller, customer, day, accounts));
     }
 
-    String statementHtml(User owner, Customer customer, LocalDate day, List<Statements.Account> accounts) {
+    String statementHtml(Business seller, Customer customer, LocalDate day, List<Statements.Account> accounts) {
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("statement", new StatementView(
-                logo(owner.getAvatar()),
-                senderName(owner),
-                senderLines(owner),
+                logo(seller.getLogo()),
+                senderName(seller),
+                senderLines(seller),
                 DATE.format(day),
                 value(customer.getName()),
                 lines(
@@ -106,11 +107,8 @@ public class PdfService {
         return templateEngine.process("pdf/statement", context);
     }
 
-    static String senderName(User owner) {
-        if (owner.getBusinessName() != null && !owner.getBusinessName().isBlank()) {
-            return owner.getBusinessName();
-        }
-        return (value(owner.getFirstName()) + " " + value(owner.getLastName())).trim();
+    static String senderName(Business seller) {
+        return value(seller.getName());
     }
 
     public record View(
@@ -193,7 +191,7 @@ public class PdfService {
                 account.overdue().signum() > 0);
     }
 
-    private View view(Document document, User owner, BusinessSettings settings) {
+    private View view(Document document, Business seller, BusinessSettings settings) {
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         DocumentType type = document.getDocumentType();
         String currency = value(document.getCurrency());
@@ -225,9 +223,9 @@ public class PdfService {
         }
 
         return new View(
-                logo(owner.getAvatar()),
-                senderName(owner),
-                senderLines(owner),
+                logo(seller.getLogo()),
+                senderName(seller),
+                senderLines(seller),
                 type.getValue(),
                 value(document.getDocumentNumber()),
                 date(document.getCreatedAt(), zone),
@@ -251,11 +249,28 @@ public class PdfService {
                 blankToNull(document.getTermsConditions()));
     }
 
-    private static List<String> senderLines(User owner) {
+    // The legal name shows when it differs from the name the business trades
+    // under.
+    static List<String> senderLines(Business seller) {
         return lines(
-                owner.getEmail(),
-                owner.getPhoneNumber(),
-                joined(owner.getAddress(), owner.getCity(), owner.getCountry()));
+                legalName(seller),
+                seller.getEmail(),
+                seller.getPhoneNumber(),
+                joined(
+                        seller.getAddress(),
+                        seller.getCity(),
+                        String.join(" ", lines(seller.getState(), seller.getPostalCode())),
+                        seller.getCountry()),
+                isBlank(seller.getTaxId()) ? null : "Tax ID " + seller.getTaxId());
+    }
+
+    private static String legalName(Business seller) {
+        String legal = seller.getLegalName();
+        return isBlank(legal) || legal.trim().equalsIgnoreCase(value(seller.getName()).trim()) ? null : legal;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String logo(String avatar) {

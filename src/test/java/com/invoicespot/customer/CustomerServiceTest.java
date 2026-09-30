@@ -7,6 +7,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
+import com.invoicespot.business.BusinessRole;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.settings.SettingsService;
@@ -29,6 +33,7 @@ class CustomerServiceTest {
 
     @Mock private CustomerRepository customerRepository;
     @Mock private UserRepository userRepository;
+    @Mock private BusinessRepository businessRepository;
     @Mock private CustomerDirectory customerDirectory;
     @Mock private SettingsService settingsService;
     private CustomerService service;
@@ -36,7 +41,12 @@ class CustomerServiceTest {
     @BeforeEach
     void setUp() {
         service = new CustomerService(
-                customerRepository, userRepository, customerDirectory, settingsService, Clock.systemUTC());
+                customerRepository,
+                userRepository,
+                businessRepository,
+                customerDirectory,
+                settingsService,
+                Clock.systemUTC());
     }
 
     private static User userWithPkid(long pkid) {
@@ -46,6 +56,16 @@ class CustomerServiceTest {
         return user;
     }
 
+    private static Business businessWithPkid(long pkid) {
+        Business business = new Business();
+        business.setPkid(pkid);
+        return business;
+    }
+
+    private static BusinessAccess access(long businessPkid, long userPkid) {
+        return new BusinessAccess(businessPkid, UUID.randomUUID(), BusinessRole.OWNER, userWithPkid(userPkid));
+    }
+
     private static CreateCustomerRequest request(String name, String email, String phone) {
         return new CreateCustomerRequest(name, email, phone, "29ABCDE1234F1Z5", "addr", "city", "country");
     }
@@ -53,18 +73,18 @@ class CustomerServiceTest {
     @Test
     @DisplayName("a customer needs a name, email and phone number")
     void rejectsIncompleteCustomer() {
-        assertThatThrownBy(() -> service.create(1L, request("Acme", "a@b.com", null)))
+        assertThatThrownBy(() -> service.create(access(1L, 1L), request("Acme", "a@b.com", null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A Customer must have at least a name, email and phone number");
         verify(customerRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("a customer email the user already has is refused")
+    @DisplayName("a customer email the business already has is refused")
     void rejectsDuplicateEmail() {
-        when(customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(1L, "a@b.com")).thenReturn(true);
+        when(customerRepository.existsByBusinessPkidAndEmailIgnoreCase(1L, "a@b.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(1L, request("Acme", "A@B.com", "+15551112222")))
+        assertThatThrownBy(() -> service.create(access(1L, 1L), request("Acme", "A@B.com", "+15551112222")))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("You already have a customer with that email address")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -72,32 +92,35 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("a created customer gets a generated account number and the owner attached")
+    @DisplayName("a created customer gets a generated account number, its business and its author")
     void createsCustomerWithAccountNumber() {
-        User owner = userWithPkid(7L);
-        when(customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(7L, "a@b.com")).thenReturn(false);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(owner));
+        User author = userWithPkid(7L);
+        Business business = businessWithPkid(3L);
+        when(customerRepository.existsByBusinessPkidAndEmailIgnoreCase(3L, "a@b.com")).thenReturn(false);
+        when(userRepository.getReferenceById(7L)).thenReturn(author);
+        when(businessRepository.getReferenceById(3L)).thenReturn(business);
 
-        service.create(7L, request("Acme", "A@B.com", "+15551112222"));
+        service.create(access(3L, 7L), request("Acme", "A@B.com", "+15551112222"));
 
         ArgumentCaptor<Customer> captor = ArgumentCaptor.forClass(Customer.class);
         verify(customerRepository).save(captor.capture());
         Customer saved = captor.getValue();
         assertThat(saved.getEmail()).isEqualTo("a@b.com");
         assertThat(saved.getAccountNo()).startsWith("CUS-");
-        assertThat(saved.getCreatedBy()).isSameAs(owner);
+        assertThat(saved.getCreatedBy()).isSameAs(author);
+        assertThat(saved.getBusiness()).isSameAs(business);
         assertThat(saved.getVatTinNo()).isEqualTo("29ABCDE1234F1Z5");
     }
 
     @Test
-    @DisplayName("viewing another user's customer is forbidden")
+    @DisplayName("viewing another business's customer is forbidden")
     void forbidsForeignCustomerAccess() {
         Customer customer = new Customer();
-        customer.setCreatedBy(userWithPkid(99L));
+        customer.setBusiness(businessWithPkid(99L));
         UUID id = UUID.randomUUID();
         when(customerRepository.findByExternalId(id)).thenReturn(Optional.of(customer));
 
-        assertThatThrownBy(() -> service.getOne(1L, id.toString()))
+        assertThatThrownBy(() -> service.getOne(access(1L, 1L), id.toString()))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not authorized to view this customer")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -110,7 +133,7 @@ class CustomerServiceTest {
         UUID id = UUID.randomUUID();
         when(customerRepository.findByExternalId(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getOne(1L, id.toString()))
+        assertThatThrownBy(() -> service.getOne(access(1L, 1L), id.toString()))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);

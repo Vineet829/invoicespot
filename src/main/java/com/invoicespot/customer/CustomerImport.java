@@ -2,6 +2,7 @@ package com.invoicespot.customer;
 
 import static java.util.Map.entry;
 
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.ImportPreviewResponse;
@@ -76,21 +77,21 @@ public class CustomerImport {
     }
 
     @Transactional(readOnly = true)
-    public ImportPreviewResponse preview(Long ownerPkid, MultipartFile file) {
-        List<ImportRow> rows = read(ownerPkid, file);
+    public ImportPreviewResponse preview(BusinessAccess access, MultipartFile file) {
+        List<ImportRow> rows = read(access.businessPkid(), file);
         return new ImportPreviewResponse(true, rows.size(), (int) rows.stream().filter(ImportRow::ready).count(), rows);
     }
 
     // Adds every row that is ready and skips the rest; nothing is added when
     // no row is ready.
     @Transactional
-    public ImportResultResponse importAll(Long ownerPkid, MultipartFile file) {
-        List<ImportRow> rows = read(ownerPkid, file);
+    public ImportResultResponse importAll(BusinessAccess access, MultipartFile file) {
+        List<ImportRow> rows = read(access.businessPkid(), file);
         List<ImportRow> ready = rows.stream().filter(ImportRow::ready).toList();
         if (ready.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "No row in the file can be added");
         }
-        ready.forEach(row -> customerService.create(ownerPkid, row.request()));
+        ready.forEach(row -> customerService.create(access, row.request()));
         int skipped = rows.size() - ready.size();
         return new ImportResultResponse(
                 true,
@@ -99,7 +100,7 @@ public class CustomerImport {
                 skipped);
     }
 
-    private List<ImportRow> read(Long ownerPkid, MultipartFile file) {
+    private List<ImportRow> read(Long businessPkid, MultipartFile file) {
         String text = decode(file);
         // Blank lines stay records, so each record's number is its row in the
         // sheet; blank rows are left out after.
@@ -125,7 +126,7 @@ public class CustomerImport {
         if (clients.size() > MOST_ROWS) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Import at most 1,000 clients at a time");
         }
-        Set<String> existing = customerRepository.findByCreatedByPkidOrderByCreatedAtDesc(ownerPkid).stream()
+        Set<String> existing = customerRepository.findByBusinessPkidOrderByCreatedAtDesc(businessPkid).stream()
                 .map(customer -> customer.getEmail().toLowerCase(Locale.ROOT))
                 .collect(Collectors.toSet());
         Map<String, Integer> seen = new HashMap<>();

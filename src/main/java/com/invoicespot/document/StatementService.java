@@ -1,10 +1,10 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.settings.SettingsService;
-import com.invoicespot.user.User;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -39,14 +39,14 @@ public class StatementService {
     }
 
     @Transactional(readOnly = true)
-    public DocumentEnvelope envelope(User owner, String customerId) {
-        return envelope(requireOwned(owner, customerId));
+    public DocumentEnvelope envelope(BusinessAccess access, String customerId) {
+        return envelope(requireInBusiness(access, customerId));
     }
 
     @Transactional(readOnly = true)
-    public DocumentPdf render(User owner, String customerId) {
-        Customer customer = requireOwned(owner, customerId);
-        ZoneId zone = ZoneId.of(settingsService.forUser(owner.getPkid()).getTimeZone());
+    public DocumentPdf render(BusinessAccess access, String customerId) {
+        Customer customer = requireInBusiness(access, customerId);
+        ZoneId zone = ZoneId.of(settingsService.forBusiness(access.businessPkid()).getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         List<Statements.Account> accounts = Statements.accounts(
                 documentRepository.findForStatement(customer.getPkid(), DocumentType.INVOICE),
@@ -54,7 +54,7 @@ public class StatementService {
                 today.atStartOfDay(zone).toInstant());
         return new DocumentPdf(
                 fileName(customer, today),
-                pdfService.renderStatement(owner, customer, today, accounts),
+                pdfService.renderStatement(customer.getBusiness(), customer, today, accounts),
                 envelope(customer));
     }
 
@@ -70,7 +70,7 @@ public class StatementService {
         return "Statement-" + (safe.isEmpty() ? "client" : safe) + "-" + day + ".pdf";
     }
 
-    private Customer requireOwned(User owner, String customerId) {
+    private Customer requireInBusiness(BusinessAccess access, String customerId) {
         UUID id;
         try {
             id = UUID.fromString(customerId);
@@ -79,7 +79,7 @@ public class StatementService {
         }
         Customer customer = customerRepository.findByExternalId(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Customer not found"));
-        if (!customer.getCreatedBy().getPkid().equals(owner.getPkid())) {
+        if (!customer.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only see statements for your own clients");
         }
         return customer;

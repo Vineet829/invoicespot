@@ -17,10 +17,13 @@ public class DocumentNumbering {
         this.documentRepository = documentRepository;
     }
 
+    // Each business numbers its own documents. Its settings row is locked
+    // while a number is handed out, so members creating documents at once
+    // take turns.
     @Transactional(propagation = Propagation.MANDATORY)
-    public String next(Long ownerPkid, DocumentType type) {
-        settingsRepository.insertDefaultsIfMissing(ownerPkid);
-        BusinessSettings settings = settingsRepository.findForUpdateByUserPkid(ownerPkid).orElseThrow();
+    public String next(Long businessPkid, DocumentType type) {
+        settingsRepository.insertDefaultsIfMissing(businessPkid);
+        BusinessSettings settings = settingsRepository.findForUpdateByBusinessPkid(businessPkid).orElseThrow();
         String prefix = switch (type) {
             case INVOICE -> settings.getInvoicePrefix();
             case QUOTATION -> settings.getQuotationPrefix();
@@ -31,7 +34,7 @@ public class DocumentNumbering {
             case QUOTATION -> settings.getNextQuotationNumber();
             case RECEIPT -> settings.getNextReceiptNumber();
         };
-        while (documentRepository.existsByCreatedByPkidAndDocumentNumber(ownerPkid, format(prefix, number))) {
+        while (documentRepository.existsByBusinessPkidAndDocumentNumber(businessPkid, format(prefix, number))) {
             number++;
         }
         switch (type) {

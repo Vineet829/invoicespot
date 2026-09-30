@@ -1,5 +1,6 @@
 package com.invoicespot.report;
 
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
 import com.invoicespot.settings.BusinessSettings;
@@ -40,22 +41,23 @@ public class Overview {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public OverviewResponse summary(Long ownerPkid, String requested) {
-        BusinessSettings settings = settingsService.forUser(ownerPkid);
+    public OverviewResponse summary(BusinessAccess access, String requested) {
+        Long businessPkid = access.businessPkid();
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
-        List<String> currencies = currencies(ownerPkid, settings.getDefaultCurrency());
+        List<String> currencies = currencies(businessPkid, settings.getDefaultCurrency());
         String currency = currencies.contains(requested)
                 ? requested
                 : currencies.isEmpty() ? settings.getDefaultCurrency() : currencies.get(0);
-        Money money = money(ownerPkid, currency);
-        Counts counts = counts(ownerPkid, LocalDate.now(clock.withZone(zone)).atStartOfDay(zone));
+        Money money = money(businessPkid, currency);
+        Counts counts = counts(businessPkid, LocalDate.now(clock.withZone(zone)).atStartOfDay(zone));
         return new OverviewResponse(
                 true,
                 currencies,
                 currency,
                 counts.documents(),
-                jdbc.sql("select count(*) from customers where created_by_pkid = :owner")
-                        .param("owner", ownerPkid)
+                jdbc.sql("select count(*) from customers where business_pkid = :business")
+                        .param("business", businessPkid)
                         .query(Long.class)
                         .single(),
                 money.expected(),
@@ -65,17 +67,17 @@ public class Overview {
                 counts.partial(),
                 counts.unpaid(),
                 counts.overdue(),
-                payments(ownerPkid, currency));
+                payments(businessPkid, currency));
     }
 
-    // The currencies of the owner's invoices and receipts, their default first.
-    private List<String> currencies(Long ownerPkid, String defaultCurrency) {
+    // The currencies of the business's invoices and receipts, its default first.
+    private List<String> currencies(Long businessPkid, String defaultCurrency) {
         List<String> found = jdbc.sql("""
                         select distinct coalesce(currency, '') as currency from documents
-                        where created_by_pkid = :owner and document_type <> 'Quotation'
+                        where business_pkid = :business and document_type <> 'Quotation'
                         order by 1
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .query(String.class)
                 .list();
         List<String> currencies = new ArrayList<>();
@@ -86,15 +88,15 @@ public class Overview {
         return currencies;
     }
 
-    private Money money(Long ownerPkid, String currency) {
+    private Money money(Long businessPkid, String currency) {
         return jdbc.sql("""
                         select coalesce(sum(total), 0) as expected,
                                coalesce(sum(total_amount_received), 0) as received
                         from documents
-                        where created_by_pkid = :owner and document_type <> 'Quotation'
+                        where business_pkid = :business and document_type <> 'Quotation'
                           and coalesce(currency, '') = :currency
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> new Money(
                         result.getBigDecimal("expected").setScale(2),
@@ -103,7 +105,7 @@ public class Overview {
     }
 
     // Overdue matches the documents list: an unpaid invoice due before today.
-    private Counts counts(Long ownerPkid, ZonedDateTime startOfToday) {
+    private Counts counts(Long businessPkid, ZonedDateTime startOfToday) {
         return jdbc.sql("""
                         select count(*) as documents,
                                count(*) filter (where status = 'Paid') as paid,
@@ -112,9 +114,9 @@ public class Overview {
                                count(*) filter (where document_type = 'Invoice' and status <> 'Paid'
                                    and due_date < :startOfToday) as overdue
                         from documents
-                        where created_by_pkid = :owner
+                        where business_pkid = :business
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("startOfToday", Timestamp.from(startOfToday.toInstant()))
                 .query((result, rowNumber) -> new Counts(
                         result.getLong("documents"),
@@ -125,17 +127,17 @@ public class Overview {
                 .single();
     }
 
-    private List<OverviewPayment> payments(Long ownerPkid, String currency) {
+    private List<OverviewPayment> payments(Long businessPkid, String currency) {
         return jdbc.sql("""
                         select p.id, p.paid_by, p.date_paid, p.payment_method, p.additional_info, p.amount_paid,
                                d.id as document_id, d.document_type, d.document_number, d.total, d.status,
                                d.due_date
                         from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.created_by_pkid = :owner and coalesce(d.currency, '') = :currency
+                        where d.business_pkid = :business and coalesce(d.currency, '') = :currency
                         order by p.date_paid desc, p.pkid desc
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> {
                     Timestamp due = result.getTimestamp("due_date");

@@ -1,5 +1,7 @@
 package com.invoicespot.customer;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.CsvFile;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
@@ -10,7 +12,6 @@ import com.invoicespot.customer.dto.CustomerSummaryResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
-import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -39,6 +40,7 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final BusinessRepository businessRepository;
     private final CustomerDirectory customerDirectory;
     private final SettingsService settingsService;
     private final Clock clock;
@@ -47,34 +49,33 @@ public class CustomerService {
     public CustomerService(
             CustomerRepository customerRepository,
             UserRepository userRepository,
+            BusinessRepository businessRepository,
             CustomerDirectory customerDirectory,
             SettingsService settingsService,
             Clock clock) {
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
+        this.businessRepository = businessRepository;
         this.customerDirectory = customerDirectory;
         this.settingsService = settingsService;
         this.clock = clock;
     }
 
     @Transactional
-    public CustomerResponse create(Long ownerPkid, CreateCustomerRequest request) {
+    public CustomerResponse create(BusinessAccess access, CreateCustomerRequest request) {
         if (isBlank(request.name()) || isBlank(request.email()) || isBlank(request.phoneNumber())) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "A Customer must have at least a name, email and phone number");
         }
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        if (customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(ownerPkid, email)) {
+        if (customerRepository.existsByBusinessPkidAndEmailIgnoreCase(access.businessPkid(), email)) {
             throw duplicateEmail();
         }
 
-        User owner = userRepository
-                .findById(ownerPkid)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
-
         Customer customer = new Customer();
-        customer.setCreatedBy(owner);
+        customer.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
+        customer.setCreatedBy(userRepository.getReferenceById(access.userPkid()));
         customer.setName(request.name().trim());
         customer.setEmail(email);
         customer.setPhoneNumber(request.phoneNumber().trim());
@@ -82,15 +83,15 @@ public class CustomerService {
         customer.setAddress(request.address());
         customer.setCity(request.city());
         customer.setCountry(request.country());
-        customer.setAccountNo(newAccountNo(ownerPkid));
+        customer.setAccountNo(newAccountNo(access.businessPkid()));
         customerRepository.save(customer);
         return CustomerResponse.from(customer);
     }
 
     @Transactional(readOnly = true)
-    public CustomerListResponse listMine(Long ownerPkid, CustomerSearch search) {
-        String currency = settingsService.forUser(ownerPkid).getDefaultCurrency();
-        Page<CustomerDirectory.Row> rows = customerDirectory.search(ownerPkid, search, currency);
+    public CustomerListResponse listMine(BusinessAccess access, CustomerSearch search) {
+        String currency = settingsService.forBusiness(access.businessPkid()).getDefaultCurrency();
+        Page<CustomerDirectory.Row> rows = customerDirectory.search(access.businessPkid(), search, currency);
         List<Long> pkids = rows.getContent().stream().map(CustomerDirectory.Row::pkid).toList();
         Map<Long, Customer> customers = customerRepository.findAllById(pkids).stream()
                 .collect(Collectors.toMap(Customer::getPkid, Function.identity()));
@@ -115,12 +116,13 @@ public class CustomerService {
     // Every client the list's search matches, in its order, with one column
     // for what they owe in each currency.
     @Transactional(readOnly = true)
-    public CsvFile csv(Long ownerPkid, CustomerSearch search) {
-        BusinessSettings settings = settingsService.forUser(ownerPkid);
+    public CsvFile csv(BusinessAccess access, CustomerSearch search) {
+        Long businessPkid = access.businessPkid();
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         List<CustomerDirectory.Contact> contacts =
-                customerDirectory.contacts(ownerPkid, search, settings.getDefaultCurrency());
-        Map<Long, Map<String, BigDecimal>> owed = customerDirectory.balancesOf(ownerPkid).stream()
+                customerDirectory.contacts(businessPkid, search, settings.getDefaultCurrency());
+        Map<Long, Map<String, BigDecimal>> owed = customerDirectory.balancesOf(businessPkid).stream()
                 .collect(Collectors.groupingBy(
                         CustomerDirectory.Balance::customerPkid,
                         Collectors.toMap(
@@ -162,25 +164,25 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public CustomerSummaryResponse summary(Long ownerPkid, String id) {
-        Customer customer = requireOwned(ownerPkid, id, "Customer not found",
+    public CustomerSummaryResponse summary(BusinessAccess access, String id) {
+        Customer customer = requireInBusiness(access, id, "Customer not found",
                 "You are not authorized to view this customer's information. He/She is not your"
                         + " customer");
-        ZoneId zone = ZoneId.of(settingsService.forUser(ownerPkid).getTimeZone());
+        ZoneId zone = ZoneId.of(settingsService.forBusiness(access.businessPkid()).getTimeZone());
         Instant startOfToday = LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
         return new CustomerSummaryResponse(true, customerDirectory.totals(customer.getPkid(), startOfToday));
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getOne(Long ownerPkid, String id) {
-        return CustomerResponse.from(requireOwned(ownerPkid, id, "Customer not found",
+    public CustomerResponse getOne(BusinessAccess access, String id) {
+        return CustomerResponse.from(requireInBusiness(access, id, "Customer not found",
                 "You are not authorized to view this customer's information. He/She is not your"
                         + " customer"));
     }
 
     @Transactional
-    public CustomerResponse update(Long ownerPkid, String id, UpdateCustomerRequest request) {
-        Customer customer = requireOwned(ownerPkid, id, "That Customer does not exist",
+    public CustomerResponse update(BusinessAccess access, String id, UpdateCustomerRequest request) {
+        Customer customer = requireInBusiness(access, id, "That Customer does not exist",
                 "You are not authorized to update this customer's information. He/She is not your"
                         + " customer");
         if (request.name() != null) {
@@ -194,8 +196,8 @@ public class CustomerService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Customer email cannot be blank");
             }
             String email = request.email().trim().toLowerCase(Locale.ROOT);
-            if (customerRepository.existsByCreatedByPkidAndEmailIgnoreCaseAndPkidNot(
-                    ownerPkid, email, customer.getPkid())) {
+            if (customerRepository.existsByBusinessPkidAndEmailIgnoreCaseAndPkidNot(
+                    access.businessPkid(), email, customer.getPkid())) {
                 throw duplicateEmail();
             }
             customer.setEmail(email);
@@ -223,33 +225,33 @@ public class CustomerService {
     }
 
     @Transactional
-    public void delete(Long ownerPkid, String id) {
-        Customer customer = requireOwned(ownerPkid, id, "That customer does not exist!",
+    public void delete(BusinessAccess access, String id) {
+        Customer customer = requireInBusiness(access, id, "That customer does not exist!",
                 "You are not authorized to delete this customer's information. He/She is not your"
                         + " customer!");
         customerRepository.delete(customer);
     }
 
-    private Customer requireOwned(
-            Long ownerPkid, String id, String notFoundMessage, String forbiddenMessage) {
+    private Customer requireInBusiness(
+            BusinessAccess access, String id, String notFoundMessage, String forbiddenMessage) {
         Customer customer = externalId(id)
                 .flatMap(customerRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, notFoundMessage));
-        if (!customer.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!customer.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
         return customer;
     }
 
-    // Account numbers are unique for each owner; a clash, likelier when many
+    // Account numbers are unique in each business; a clash, likelier when many
     // clients are imported at once, draws a new one.
-    private String newAccountNo(Long ownerPkid) {
+    private String newAccountNo(Long businessPkid) {
         String accountNo;
         do {
             byte[] material = new byte[3];
             random.nextBytes(material);
             accountNo = "CUS-" + HexFormat.of().formatHex(material).toUpperCase(Locale.ROOT);
-        } while (customerRepository.findByCreatedByPkidAndAccountNo(ownerPkid, accountNo).isPresent());
+        } while (customerRepository.findByBusinessPkidAndAccountNo(businessPkid, accountNo).isPresent());
         return accountNo;
     }
 

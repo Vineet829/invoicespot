@@ -1,5 +1,6 @@
 package com.invoicespot.notification;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.document.Document;
 import com.invoicespot.user.User;
 import jakarta.persistence.Column;
@@ -36,6 +37,10 @@ public class Notification {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_pkid", nullable = false, updatable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "business_pkid", nullable = false, updatable = false)
+    private Business business;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_pkid", updatable = false)

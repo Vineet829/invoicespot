@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.DemoProperties;
 import com.invoicespot.user.dto.UpdateProfileRequest;
@@ -34,6 +35,7 @@ class UserServiceTest {
     @Mock private SessionService sessionService;
     @Mock private AuditLog auditLog;
     @Mock private AdminStats adminStats;
+    @Mock private BusinessService businessService;
     private UserService service;
 
     @BeforeEach
@@ -44,20 +46,17 @@ class UserServiceTest {
                 sessionService,
                 auditLog,
                 adminStats,
+                businessService,
                 Clock.systemUTC());
     }
 
     private static UpdateProfileRequest onlyAllowed() {
-        return new UpdateProfileRequest(
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                "Bengaluru", null);
+        return new UpdateProfileRequest(null, null, null, null, null, null, null, null, "Grace", null);
     }
 
     private static UpdateProfileRequest with(
             String password, String email, java.util.Set<String> roles) {
-        return new UpdateProfileRequest(
-                password, null, email, null, null, roles, null, null, null, null, null, null, null,
-                null, null, null);
+        return new UpdateProfileRequest(password, null, email, null, null, roles, null, null, null, null);
     }
 
     @Test
@@ -86,7 +85,7 @@ class UserServiceTest {
 
         var response = service.updateProfile(1L, onlyAllowed());
 
-        assertThat(response.city()).isEqualTo("Bengaluru");
+        assertThat(response.firstName()).isEqualTo("Grace");
         verify(userRepository).save(user);
     }
 

@@ -1,5 +1,7 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.document.dto.DocumentLink;
 import com.invoicespot.document.dto.RecurringListResponse;
@@ -9,7 +11,6 @@ import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.DemoAccountGuard;
-import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,7 +35,7 @@ public class RecurringService {
     private static final Logger LOGGER = LoggerFactory.getLogger(RecurringService.class);
     private static final int MOST_PER_RUN = 12;
 
-    private record Made(Long ownerPkid, String documentId, Long runPkid, boolean email) {}
+    private record Made(Long businessPkid, String documentId, Long runPkid, boolean email) {}
 
     private final RecurringScheduleRepository scheduleRepository;
     private final RecurringRunRepository runRepository;
@@ -44,6 +45,7 @@ public class RecurringService {
     private final SettingsService settingsService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final BusinessService businessService;
     private final DemoAccountGuard demoAccountGuard;
     private final TransactionTemplate transaction;
     private final Clock clock;
@@ -57,6 +59,7 @@ public class RecurringService {
             SettingsService settingsService,
             NotificationService notificationService,
             UserRepository userRepository,
+            BusinessService businessService,
             DemoAccountGuard demoAccountGuard,
             PlatformTransactionManager transactionManager,
             Clock clock) {
@@ -68,14 +71,15 @@ public class RecurringService {
         this.settingsService = settingsService;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
+        this.businessService = businessService;
         this.demoAccountGuard = demoAccountGuard;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
     @Transactional
-    public RecurringResponse create(Long ownerPkid, RecurringRequest request) {
-        Document invoice = requireOwnedDocument(ownerPkid, request.documentId());
+    public RecurringResponse create(BusinessAccess access, RecurringRequest request) {
+        Document invoice = requireDocumentInBusiness(access, request.documentId());
         if (invoice.getDocumentType() != DocumentType.INVOICE) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an invoice can repeat");
         }
@@ -83,48 +87,49 @@ public class RecurringService {
             throw new ApiException(HttpStatus.CONFLICT, "This invoice already repeats");
         }
         RecurringSchedule schedule = new RecurringSchedule();
-        schedule.setCreatedBy(invoice.getCreatedBy());
+        schedule.setBusiness(invoice.getBusiness());
+        schedule.setCreatedBy(userRepository.getReferenceById(access.userPkid()));
         schedule.setTemplate(invoice);
-        apply(schedule, request, today(ownerPkid));
+        apply(schedule, request, today(access.businessPkid()));
         scheduleRepository.save(schedule);
         return respond(schedule);
     }
 
     @Transactional(readOnly = true)
-    public RecurringListResponse list(Long ownerPkid) {
+    public RecurringListResponse list(BusinessAccess access) {
         return new RecurringListResponse(
                 true,
-                scheduleRepository.findByCreatedByPkidOrderByCreatedAtDescPkidDesc(ownerPkid).stream()
+                scheduleRepository.findByBusinessPkidOrderByCreatedAtDescPkidDesc(access.businessPkid()).stream()
                         .map(this::respond)
                         .toList());
     }
 
     @Transactional(readOnly = true)
-    public Optional<RecurringResponse> forDocument(Long ownerPkid, String documentId) {
-        return scheduleRepository.findByTemplate(requireOwnedDocument(ownerPkid, documentId)).map(this::respond);
+    public Optional<RecurringResponse> forDocument(BusinessAccess access, String documentId) {
+        return scheduleRepository.findByTemplate(requireDocumentInBusiness(access, documentId)).map(this::respond);
     }
 
     // Changing a schedule counts its dates from the new first one; invoices
     // already made still count toward the most allowed.
     @Transactional
-    public RecurringResponse update(Long ownerPkid, String id, RecurringRequest request) {
-        RecurringSchedule schedule = requireOwned(ownerPkid, id);
-        apply(schedule, request, today(ownerPkid));
+    public RecurringResponse update(BusinessAccess access, String id, RecurringRequest request) {
+        RecurringSchedule schedule = requireInBusiness(access, id);
+        apply(schedule, request, today(access.businessPkid()));
         return respond(schedule);
     }
 
     // A schedule resumed after its date has passed makes that invoice at the
     // next daily run.
     @Transactional
-    public RecurringResponse setPaused(Long ownerPkid, String id, boolean paused) {
-        RecurringSchedule schedule = requireOwned(ownerPkid, id);
+    public RecurringResponse setPaused(BusinessAccess access, String id, boolean paused) {
+        RecurringSchedule schedule = requireInBusiness(access, id);
         schedule.setPaused(paused);
         return respond(schedule);
     }
 
     @Transactional
-    public void delete(Long ownerPkid, String id) {
-        scheduleRepository.delete(requireOwned(ownerPkid, id));
+    public void delete(BusinessAccess access, String id) {
+        scheduleRepository.delete(requireInBusiness(access, id));
     }
 
     // Makes every invoice that is due, one schedule at a time, catching up
@@ -159,12 +164,13 @@ public class RecurringService {
         if (schedule == null || schedule.isPaused() || schedule.getNextRun() == null) {
             return Optional.empty();
         }
-        User owner = schedule.getCreatedBy();
-        ZoneId zone = ZoneId.of(settingsService.forUser(owner.getPkid()).getTimeZone());
+        Long businessPkid = schedule.getBusiness().getPkid();
+        ZoneId zone = ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone());
         if (schedule.getNextRun().isAfter(LocalDate.ofInstant(now, zone))) {
             return Optional.empty();
         }
-        Document invoice = documentService.createRecurring(schedule.getTemplate(), schedule.getFrequency());
+        Document invoice = documentService.createRecurring(
+                schedule.getTemplate(), schedule.getFrequency(), schedule.getCreatedBy());
         RecurringRun run = new RecurringRun();
         run.setSchedule(schedule);
         run.setRunDate(schedule.getNextRun());
@@ -175,20 +181,20 @@ public class RecurringService {
         schedule.setNextRun(nextRun(schedule));
         CustomerSnapshot client = invoice.getCustomerSnapshot();
         notificationService.notify(
-                owner,
                 invoice,
                 NotificationType.RECURRING_CREATED,
                 "Invoice " + invoice.getDocumentNumber()
                         + (client == null || client.getName() == null ? "" : " for " + client.getName())
                         + " was made by its " + schedule.getFrequency().label() + " schedule");
-        boolean email = schedule.isEmailAutomatically() && !demoAccountGuard.isDemo(owner);
-        return Optional.of(new Made(owner.getPkid(), invoice.getId().toString(), run.getPkid(), email));
+        boolean email = schedule.isEmailAutomatically()
+                && !demoAccountGuard.isDemo(businessService.owner(businessPkid));
+        return Optional.of(new Made(businessPkid, invoice.getId().toString(), run.getPkid(), email));
     }
 
     private void email(Made invoice) {
         try {
-            User owner = userRepository.findById(invoice.ownerPkid()).orElseThrow();
-            documentMailService.emailAutomatically(owner, invoice.documentId());
+            BusinessAccess access = businessService.ownerAccess(invoice.businessPkid());
+            documentMailService.emailAutomatically(access, invoice.documentId());
             transaction.executeWithoutResult(status -> runRepository.markEmailed(invoice.runPkid()));
         } catch (Exception exception) {
             LOGGER.warn("Recurring invoice {} could not be emailed", invoice.documentId(), exception);
@@ -253,25 +259,25 @@ public class RecurringService {
                 last);
     }
 
-    private LocalDate today(Long ownerPkid) {
-        return LocalDate.now(clock.withZone(ZoneId.of(settingsService.forUser(ownerPkid).getTimeZone())));
+    private LocalDate today(Long businessPkid) {
+        return LocalDate.now(clock.withZone(ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone())));
     }
 
-    private Document requireOwnedDocument(Long ownerPkid, String id) {
+    private Document requireDocumentInBusiness(BusinessAccess access, String id) {
         Document document = parse(id)
                 .flatMap(documentRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
-        if (!document.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only repeat your own invoices");
         }
         return document;
     }
 
-    private RecurringSchedule requireOwned(Long ownerPkid, String id) {
+    private RecurringSchedule requireInBusiness(BusinessAccess access, String id) {
         RecurringSchedule schedule = parse(id)
                 .flatMap(scheduleRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That schedule does not exist"));
-        if (!schedule.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!schedule.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only change your own schedules");
         }
         return schedule;

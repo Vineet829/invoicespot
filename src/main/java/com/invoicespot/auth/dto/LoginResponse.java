@@ -6,5 +6,4 @@ public record LoginResponse(
         String lastName,
         String username,
         String provider,
-        String avatar,
         String accessToken) {}

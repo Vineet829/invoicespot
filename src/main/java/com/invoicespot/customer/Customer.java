@@ -1,5 +1,6 @@
 package com.invoicespot.customer;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.common.BaseEntity;
 import com.invoicespot.user.User;
 import jakarta.persistence.Column;
@@ -18,7 +19,12 @@ import lombok.Setter;
 public class Customer extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "created_by_pkid", nullable = false)
+    @JoinColumn(name = "business_pkid", nullable = false, updatable = false)
+    private Business business;
+
+    // The member who made it, forgotten if their account is deleted.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_pkid", updatable = false)
     private User createdBy;
 
     @Column(name = "name", nullable = false)

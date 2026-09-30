@@ -1,5 +1,6 @@
 package com.invoicespot.audit;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,6 +45,11 @@ public class AuditEvent {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "actor_pkid")
     private User actor;
+
+    // The business an event happened in, when it is about one.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "business_pkid", updatable = false)
+    private Business business;
 
     @Column(name = "email", length = 254, updatable = false)
     private String email;

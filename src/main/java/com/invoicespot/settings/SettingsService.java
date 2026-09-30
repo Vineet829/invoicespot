@@ -1,9 +1,10 @@
 package com.invoicespot.settings;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
-import com.invoicespot.user.UserRepository;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import org.springframework.http.HttpStatus;
@@ -14,28 +15,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class SettingsService {
 
     private final BusinessSettingsRepository settingsRepository;
-    private final UserRepository userRepository;
+    private final BusinessRepository businessRepository;
 
-    public SettingsService(BusinessSettingsRepository settingsRepository, UserRepository userRepository) {
+    public SettingsService(BusinessSettingsRepository settingsRepository, BusinessRepository businessRepository) {
         this.settingsRepository = settingsRepository;
-        this.userRepository = userRepository;
+        this.businessRepository = businessRepository;
+    }
+
+    // A business that never saved its settings works with the defaults.
+    @Transactional(readOnly = true)
+    public BusinessSettings forBusiness(Long businessPkid) {
+        return settingsRepository.findByBusinessPkid(businessPkid).orElseGet(BusinessSettings::new);
     }
 
     @Transactional(readOnly = true)
-    public BusinessSettings forUser(Long userPkid) {
-        return settingsRepository.findByUserPkid(userPkid).orElseGet(BusinessSettings::new);
-    }
-
-    @Transactional(readOnly = true)
-    public SettingsResponse get(Long userPkid) {
-        return SettingsResponse.from(forUser(userPkid));
+    public SettingsResponse get(BusinessAccess access) {
+        return SettingsResponse.from(forBusiness(access.businessPkid()));
     }
 
     @Transactional
-    public SettingsResponse update(Long userPkid, UpdateSettingsRequest request) {
-        BusinessSettings settings = settingsRepository.findByUserPkid(userPkid).orElseGet(() -> {
+    public SettingsResponse update(BusinessAccess access, UpdateSettingsRequest request) {
+        BusinessSettings settings = settingsRepository.findByBusinessPkid(access.businessPkid()).orElseGet(() -> {
             BusinessSettings created = new BusinessSettings();
-            created.setUser(userRepository.getReferenceById(userPkid));
+            created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
             return created;
         });
         settings.setDefaultCurrency(request.defaultCurrency());

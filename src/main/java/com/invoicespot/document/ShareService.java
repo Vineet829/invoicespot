@@ -1,5 +1,7 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
@@ -12,7 +14,6 @@ import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
-import com.invoicespot.user.User;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
@@ -63,8 +64,8 @@ public class ShareService {
     // Only the token's hash is kept, so the link is shown this once. A new
     // link replaces the document's current one.
     @Transactional
-    public ShareLinkResponse create(Long ownerPkid, String id) {
-        Document document = requireOwned(ownerPkid, id);
+    public ShareLinkResponse create(BusinessAccess access, String id) {
+        Document document = requireInBusiness(access, id);
         Instant now = Instant.now(clock);
         shareLinkRepository.findByDocumentAndRevokedAtIsNull(document).ifPresent(active -> {
             active.setRevokedAt(now);
@@ -76,28 +77,28 @@ public class ShareService {
         link.setTokenHash(SecretTokens.hash(token));
         link.setCreatedAt(now);
         shareLinkRepository.save(link);
-        activity.record(document, DocumentEventType.SHARED, null);
+        activity.record(document, DocumentEventType.SHARED, null, access.user());
         return new ShareLinkResponse(true, properties.site().clientUrl() + "/p/" + token, now);
     }
 
     @Transactional(readOnly = true)
-    public ShareStatusResponse status(Long ownerPkid, String id) {
-        return shareLinkRepository.findByDocumentAndRevokedAtIsNull(requireOwned(ownerPkid, id))
+    public ShareStatusResponse status(BusinessAccess access, String id) {
+        return shareLinkRepository.findByDocumentAndRevokedAtIsNull(requireInBusiness(access, id))
                 .map(link -> new ShareStatusResponse(
                         true, true, link.getCreatedAt(), link.getLastViewedAt(), link.getViewCount()))
                 .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0));
     }
 
     @Transactional
-    public void revoke(Long ownerPkid, String id) {
-        Document document = requireOwned(ownerPkid, id);
+    public void revoke(BusinessAccess access, String id) {
+        Document document = requireInBusiness(access, id);
         ShareLink link = shareLinkRepository.findByDocumentAndRevokedAtIsNull(document)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "This document has no share link"));
         link.setRevokedAt(Instant.now(clock));
-        activity.record(document, DocumentEventType.SHARE_REVOKED, null);
+        activity.record(document, DocumentEventType.SHARE_REVOKED, null, access.user());
     }
 
-    // A view is counted every time, but the timeline and the owner hear of it
+    // A view is counted every time, but the timeline and the business hear of it
     // at most once an hour, so a client reloading the page doesn't flood them.
     @Transactional
     public PublicDocumentResponse view(String token) {
@@ -105,9 +106,8 @@ public class ShareService {
         Instant now = Instant.now(clock);
         if (link.getLastViewedAt() == null || link.getLastViewedAt().isBefore(now.minus(VIEW_GAP))) {
             Document document = link.getDocument();
-            activity.record(document, DocumentEventType.VIEWED, null);
+            activity.record(document, DocumentEventType.VIEWED, null, null);
             notificationService.notify(
-                    document.getCreatedBy(),
                     document,
                     NotificationType.DOCUMENT_VIEWED,
                     clientName(document) + " viewed " + title(document));
@@ -120,10 +120,10 @@ public class ShareService {
     @Transactional(readOnly = true)
     public DocumentPdf pdf(String token) {
         Document document = requireLink(token).getDocument();
-        User owner = document.getCreatedBy();
+        Business seller = document.getBusiness();
         return new DocumentPdf(
                 DocumentService.pdfFileName(document),
-                pdfService.render(document, owner, settingsService.forUser(owner.getPkid())),
+                pdfService.render(document, seller, settingsService.forBusiness(seller.getPkid())),
                 null);
     }
 
@@ -135,9 +135,8 @@ public class ShareService {
         }
         if (document.getAcceptedAt() == null) {
             document.setAcceptedAt(Instant.now(clock));
-            activity.record(document, DocumentEventType.ACCEPTED, null);
+            activity.record(document, DocumentEventType.ACCEPTED, null, null);
             notificationService.notify(
-                    document.getCreatedBy(),
                     document,
                     NotificationType.QUOTATION_ACCEPTED,
                     clientName(document) + " accepted " + title(document));
@@ -146,8 +145,8 @@ public class ShareService {
     }
 
     private PublicDocumentResponse publicView(Document document) {
-        User owner = document.getCreatedBy();
-        BusinessSettings settings = settingsService.forUser(owner.getPkid());
+        Business seller = document.getBusiness();
+        BusinessSettings settings = settingsService.forBusiness(seller.getPkid());
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         Instant startOfToday = LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
         CustomerSnapshot client = Objects.requireNonNullElseGet(document.getCustomerSnapshot(), CustomerSnapshot::new);
@@ -163,11 +162,7 @@ public class ShareService {
                 document.getCreatedAt(),
                 document.getDueDate(),
                 document.getCurrency(),
-                new PublicParty(
-                        PdfService.senderName(owner),
-                        owner.getAvatar(),
-                        lines(owner.getEmail(), owner.getPhoneNumber(), owner.getAddress(), owner.getCity(),
-                                owner.getCountry())),
+                new PublicParty(PdfService.senderName(seller), seller.getLogo(), PdfService.senderLines(seller)),
                 new PublicParty(
                         client.getName(),
                         null,
@@ -205,7 +200,7 @@ public class ShareService {
         return document.getDocumentType().getValue() + " " + document.getDocumentNumber();
     }
 
-    private Document requireOwned(Long ownerPkid, String id) {
+    private Document requireInBusiness(BusinessAccess access, String id) {
         UUID externalId;
         try {
             externalId = UUID.fromString(id);
@@ -214,7 +209,7 @@ public class ShareService {
         }
         Document document = documentRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
-        if (!document.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only share your own documents");
         }
         return document;

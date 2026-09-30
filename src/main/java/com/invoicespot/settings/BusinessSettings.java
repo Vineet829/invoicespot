@@ -1,7 +1,7 @@
 package com.invoicespot.settings;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.common.BaseEntity;
-import com.invoicespot.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -19,8 +19,8 @@ import lombok.Setter;
 public class BusinessSettings extends BaseEntity {
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_pkid", nullable = false, unique = true)
-    private User user;
+    @JoinColumn(name = "business_pkid", nullable = false, unique = true, updatable = false)
+    private Business business;
 
     @Column(name = "default_currency", nullable = false, length = 3)
     private String defaultCurrency = "USD";

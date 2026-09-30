@@ -24,7 +24,7 @@ class CustomerDirectory {
             "balance", "balance");
 
     private static final String MATCHING = """
-            c.created_by_pkid = :owner
+            c.business_pkid = :business
               and (lower(c.name) like :pattern escape '!'
                    or lower(c.email) like :pattern escape '!'
                    or lower(coalesce(c.account_no, '')) like :pattern escape '!')
@@ -53,7 +53,7 @@ class CustomerDirectory {
         this.jdbc = jdbc;
     }
 
-    Page<Row> search(Long ownerPkid, CustomerSearch search, String currency) {
+    Page<Row> search(Long businessPkid, CustomerSearch search, String currency) {
         String direction = search.ascending() ? "asc" : "desc";
         String pattern = SearchText.containing(search.query());
         List<Row> rows = jdbc.sql("""
@@ -69,7 +69,7 @@ class CustomerDirectory {
                         order by %s %s, c.pkid %s
                         limit :limit offset :offset
                         """.formatted(MATCHING, ORDER_BY.get(search.sort()), direction, direction))
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("pattern", pattern)
                 .param("currency", currency)
                 .param("limit", search.size())
@@ -77,7 +77,7 @@ class CustomerDirectory {
                 .query((result, rowNumber) -> new Row(result.getLong("pkid"), result.getLong("documents")))
                 .list();
         long total = jdbc.sql("select count(*) from customers c where " + MATCHING)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("pattern", pattern)
                 .query(Long.class)
                 .single();
@@ -85,7 +85,7 @@ class CustomerDirectory {
     }
 
     // Every client the search matches, in its order, with their details.
-    List<Contact> contacts(Long ownerPkid, CustomerSearch search, String currency) {
+    List<Contact> contacts(Long businessPkid, CustomerSearch search, String currency) {
         String direction = search.ascending() ? "asc" : "desc";
         return jdbc.sql("""
                         select c.pkid, c.name, c.email, c.phone_number, c.account_no, c.vat_tin_no, c.address,
@@ -100,7 +100,7 @@ class CustomerDirectory {
                         group by c.pkid
                         order by %s %s, c.pkid %s
                         """.formatted(MATCHING, ORDER_BY.get(search.sort()), direction, direction))
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("pattern", SearchText.containing(search.query()))
                 .param("currency", currency)
                 .query((result, rowNumber) -> new Contact(
@@ -118,17 +118,17 @@ class CustomerDirectory {
                 .list();
     }
 
-    // What each of an owner's clients still owes, per currency.
-    List<Balance> balancesOf(Long ownerPkid) {
+    // What each of a business's clients still owes, per currency.
+    List<Balance> balancesOf(Long businessPkid) {
         return jdbc.sql("""
                         select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
                         from documents d
-                        where d.created_by_pkid = :owner and d.customer_pkid is not null
+                        where d.business_pkid = :business and d.customer_pkid is not null
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         group by d.customer_pkid, d.currency
                         having sum(d.total - d.total_amount_received) > 0
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .query((result, rowNumber) -> new Balance(
                         result.getLong("customer_pkid"),
                         result.getString("currency"),

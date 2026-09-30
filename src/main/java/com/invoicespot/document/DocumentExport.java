@@ -1,5 +1,6 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.CsvFile;
 import com.invoicespot.settings.SettingsService;
 import java.time.Clock;
@@ -39,12 +40,12 @@ public class DocumentExport {
     // Every document the list's filters match, in the list's order. A
     // quotation is an offer, so nothing is paid or owed on it.
     @Transactional(readOnly = true)
-    public CsvFile documents(Long ownerPkid, DocumentSearch search) {
-        ZoneId zone = zoneOf(ownerPkid);
+    public CsvFile documents(BusinessAccess access, DocumentSearch search) {
+        ZoneId zone = zoneOf(access.businessPkid());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Instant startOfToday = today.atStartOfDay(zone).toInstant();
         List<Document> documents = documentRepository.findAll(
-                DocumentSpecifications.matching(ownerPkid, search, startOfToday, zone), search.sort());
+                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday, zone), search.sort());
         return CsvFile.of(
                 "invoice-spot-documents-" + today + ".csv",
                 List.of("Number", "Type", "Status", "Client", "Client email", "Currency", "Subtotal", "Tax", "Total",
@@ -76,19 +77,19 @@ public class DocumentExport {
 
     // Every payment recorded on the owner's documents, newest first.
     @Transactional(readOnly = true)
-    public CsvFile payments(Long ownerPkid) {
+    public CsvFile payments(BusinessAccess access) {
         return CsvFile.of(
-                "invoice-spot-payments-" + LocalDate.now(clock.withZone(zoneOf(ownerPkid))) + ".csv",
+                "invoice-spot-payments-" + LocalDate.now(clock.withZone(zoneOf(access.businessPkid()))) + ".csv",
                 List.of("Date", "Document", "Type", "Client", "Currency", "Amount", "Method", "Paid by", "Notes"),
                 jdbc.sql("""
                                 select p.date_paid, d.document_number, d.document_type, d.customer_name, d.currency,
                                        p.amount_paid, p.payment_method, p.paid_by, p.additional_info
                                 from payments p
                                 join documents d on d.pkid = p.document_pkid
-                                where d.created_by_pkid = :owner
+                                where d.business_pkid = :business
                                 order by p.date_paid desc, p.pkid desc
                                 """)
-                        .param("owner", ownerPkid)
+                        .param("business", access.businessPkid())
                         .query((result, rowNumber) -> Arrays.<Object>asList(
                                 result.getObject("date_paid", LocalDate.class),
                                 result.getString("document_number"),
@@ -102,7 +103,7 @@ public class DocumentExport {
                         .list());
     }
 
-    private ZoneId zoneOf(Long ownerPkid) {
-        return ZoneId.of(settingsService.forUser(ownerPkid).getTimeZone());
+    private ZoneId zoneOf(Long businessPkid) {
+        return ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone());
     }
 }

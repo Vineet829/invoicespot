@@ -1,5 +1,7 @@
 package com.invoicespot.demo;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.customer.CustomerService;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
@@ -49,6 +51,7 @@ public class DemoDataSeeder {
     };
 
     private final UserRepository userRepository;
+    private final BusinessService businessService;
     private final CustomerRepository customerRepository;
     private final BusinessSettingsRepository settingsRepository;
     private final SettingsService settingsService;
@@ -64,6 +67,7 @@ public class DemoDataSeeder {
 
     public DemoDataSeeder(
             UserRepository userRepository,
+            BusinessService businessService,
             CustomerRepository customerRepository,
             BusinessSettingsRepository settingsRepository,
             SettingsService settingsService,
@@ -74,6 +78,7 @@ public class DemoDataSeeder {
             TransactionTemplate transactionTemplate,
             Clock clock) {
         this.userRepository = userRepository;
+        this.businessService = businessService;
         this.customerRepository = customerRepository;
         this.settingsRepository = settingsRepository;
         this.settingsService = settingsService;
@@ -97,16 +102,16 @@ public class DemoDataSeeder {
         if (demo.isEmpty()) {
             return Result.skipped("the demo account " + demoEmail + " does not exist");
         }
-        Long owner = demo.get().getPkid();
-        if (customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(owner, DemoData.MARKER_EMAIL)) {
+        BusinessAccess owner = businessService.ownerAccess(businessService.ownedBy(demo.get().getPkid()).getPkid());
+        if (customerRepository.existsByBusinessPkidAndEmailIgnoreCase(owner.businessPkid(), DemoData.MARKER_EMAIL)) {
             return Result.skipped("the demo account already has the sample data");
         }
         return transactionTemplate.execute(status -> seed(owner));
     }
 
-    private Result seed(Long owner) {
+    private Result seed(BusinessAccess owner) {
         ZoneId zone = ZoneId.of(ZONE);
-        if (settingsRepository.findByUserPkid(owner).isEmpty()) {
+        if (settingsRepository.findByBusinessPkid(owner.businessPkid()).isEmpty()) {
             settingsService.update(owner, new UpdateSettingsRequest(
                     "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS, DemoData.EMAIL_MESSAGE,
                     ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null));
@@ -155,7 +160,7 @@ public class DemoDataSeeder {
         return plans;
     }
 
-    private int create(Long owner, Plan plan, String clientId, LocalDate today, ZoneId zone, Random random) {
+    private int create(BusinessAccess owner, Plan plan, String clientId, LocalDate today, ZoneId zone, Random random) {
         DocumentResponse document = documentService.create(owner, new CreateDocumentRequest(
                 clientId,
                 null,
@@ -197,7 +202,7 @@ public class DemoDataSeeder {
     }
 
     private List<LocalDate> pay(
-            Long owner, DocumentResponse document, LocalDate issued, LocalDate today, Random random) {
+            BusinessAccess owner, DocumentResponse document, LocalDate issued, LocalDate today, Random random) {
         long age = today.toEpochDay() - issued.toEpochDay();
         int roll = random.nextInt(100);
         boolean full = age > 60 ? roll < 95 : age > 30 ? roll < 60 : roll < 25;
@@ -223,7 +228,12 @@ public class DemoDataSeeder {
     }
 
     private void recordPayment(
-            Long owner, DocumentResponse document, LocalDate date, BigDecimal amount, String note, Random random) {
+            BusinessAccess owner,
+            DocumentResponse document,
+            LocalDate date,
+            BigDecimal amount,
+            String note,
+            Random random) {
         documentService.addPayment(owner, document.id().toString(), new CreatePaymentRequest(
                 date.toString(), amount, METHODS[random.nextInt(METHODS.length)].getValue(), note));
     }

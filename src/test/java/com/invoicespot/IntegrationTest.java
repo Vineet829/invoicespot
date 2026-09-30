@@ -2,8 +2,15 @@ package com.invoicespot;
 
 import com.invoicespot.auth.JwtService;
 import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.business.ActiveBusinesses;
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessMember;
+import com.invoicespot.business.BusinessMemberRepository;
+import com.invoicespot.business.BusinessRole;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +62,15 @@ public abstract class IntegrationTest {
     @Autowired
     protected SessionService sessionService;
 
+    @Autowired
+    protected BusinessService businessService;
+
+    @Autowired
+    protected BusinessMemberRepository businessMemberRepository;
+
+    @Autowired
+    protected ActiveBusinesses activeBusinesses;
+
     @MockBean
     protected JavaMailSender mailSender;
 
@@ -66,7 +82,7 @@ public abstract class IntegrationTest {
         user.setFirstName("Test");
         user.setLastName("User");
         user.setEmailVerified(true);
-        return userRepository.save(user);
+        return withBusiness(userRepository.save(user));
     }
 
     protected User demoUser() {
@@ -77,7 +93,7 @@ public abstract class IntegrationTest {
             user.setFirstName("Demo");
             user.setLastName("User");
             user.setEmailVerified(true);
-            return userRepository.save(user);
+            return withBusiness(userRepository.save(user));
         });
     }
 
@@ -87,8 +103,37 @@ public abstract class IntegrationTest {
         return userRepository.save(user);
     }
 
+    // Every account starts with a business of its own, as a sign-up does.
+    private User withBusiness(User user) {
+        businessService.createPersonal(user);
+        return user;
+    }
+
+    protected Business businessOf(User user) {
+        return businessService.ownedBy(user.getPkid());
+    }
+
     // A header for a new session of the user's.
     protected String bearer(User user) {
         return "Bearer " + jwtService.issueAccessToken(user, sessionService.start(user).session().getId());
+    }
+
+    // A header for a new session of the user's, working in the given business.
+    protected String bearer(User user, Business business) {
+        UUID session = sessionService.start(user).session().getId();
+        activeBusinesses.use(user, session, business.getId());
+        return "Bearer " + jwtService.issueAccessToken(user, session);
+    }
+
+    // Someone with a business of their own who also works in this one.
+    protected User createMember(Business business, BusinessRole role) {
+        User user = createUser();
+        BusinessMember member = new BusinessMember();
+        member.setBusiness(business);
+        member.setUser(user);
+        member.setRole(role);
+        member.setJoinedAt(Instant.now());
+        businessMemberRepository.save(member);
+        return user;
     }
 }

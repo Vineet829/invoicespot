@@ -1,6 +1,7 @@
 package com.invoicespot.audit;
 
 import com.invoicespot.auth.session.CurrentSession;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,11 +25,17 @@ public class AuditLog {
 
     private final AuditEventRepository repository;
     private final UserRepository userRepository;
+    private final BusinessRepository businessRepository;
     private final Clock clock;
 
-    public AuditLog(AuditEventRepository repository, UserRepository userRepository, Clock clock) {
+    public AuditLog(
+            AuditEventRepository repository,
+            UserRepository userRepository,
+            BusinessRepository businessRepository,
+            Clock clock) {
         this.repository = repository;
         this.userRepository = userRepository;
+        this.businessRepository = businessRepository;
         this.clock = clock;
     }
 
@@ -49,10 +56,34 @@ public class AuditLog {
         record(type, user, actor, email, detail, null);
     }
 
+    // Something that happened in a business, to a member of it or to the
+    // business itself.
+    public void recordForBusiness(AuditEventType type, Long businessPkid, User user, User actor, String detail) {
+        save(type, businessPkid, user, actor, null, detail, null);
+    }
+
+    // For someone who may not have an account yet, such as a person invited.
+    public void recordForBusiness(
+            AuditEventType type, Long businessPkid, User user, User actor, String email, String detail) {
+        save(type, businessPkid, user, actor, email, detail, null);
+    }
+
     // The session is the request's own unless another is named, as when a
     // sign-in starts one.
     public void record(AuditEventType type, User user, User actor, String email, String detail, UUID sessionId) {
+        save(type, null, user, actor, email, detail, sessionId);
+    }
+
+    private void save(
+            AuditEventType type,
+            Long businessPkid,
+            User user,
+            User actor,
+            String email,
+            String detail,
+            UUID sessionId) {
         AuditEvent event = new AuditEvent();
+        event.setBusiness(businessPkid == null ? null : businessRepository.getReferenceById(businessPkid));
         event.setType(type);
         event.setUser(user == null ? null : userRepository.getReferenceById(user.getPkid()));
         event.setActor(actor == null ? null : userRepository.getReferenceById(actor.getPkid()));

@@ -1,5 +1,6 @@
 package com.invoicespot.document;
 
+import com.invoicespot.user.User;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -22,16 +23,19 @@ public class DocumentActivity {
         this.clock = clock;
     }
 
-    void record(Document document, DocumentEventType type, String detail) {
-        record(document, type, detail, null);
+    // What happened to a document, and the member who did it: null when it
+    // was the client or an automatic run.
+    void record(Document document, DocumentEventType type, String detail, User actor) {
+        record(document, type, detail, null, actor);
     }
 
-    void record(Document document, DocumentEventType type, String detail, Long paymentPkid) {
+    void record(Document document, DocumentEventType type, String detail, Long paymentPkid, User actor) {
         DocumentEvent event = new DocumentEvent();
         event.setDocument(document);
         event.setType(type);
         event.setDetail(detail);
         event.setPaymentPkid(paymentPkid);
+        event.setActor(actor);
         event.setOccurredAt(Instant.now(clock));
         eventRepository.save(event);
     }

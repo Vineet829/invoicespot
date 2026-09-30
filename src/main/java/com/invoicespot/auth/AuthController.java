@@ -121,7 +121,6 @@ public class AuthController {
                 user.getLastName(),
                 user.getUsername(),
                 user.getProvider(),
-                user.getAvatar(),
                 bundle.accessToken());
     }
 

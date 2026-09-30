@@ -1,6 +1,7 @@
 package com.invoicespot.auth;
 
 import com.invoicespot.auth.dto.RegisterRequest;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -21,6 +22,7 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService tokenService;
     private final MailService mailService;
+    private final BusinessService businessService;
     private final AppProperties.Site site;
 
     public RegistrationService(
@@ -28,11 +30,13 @@ public class RegistrationService {
             PasswordEncoder passwordEncoder,
             VerificationTokenService tokenService,
             MailService mailService,
+            BusinessService businessService,
             AppProperties properties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.mailService = mailService;
+        this.businessService = businessService;
         this.site = properties.site();
     }
 
@@ -69,6 +73,7 @@ public class RegistrationService {
         user.setLastName(request.lastName().trim());
         user.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(user);
+        businessService.createPersonal(user);
 
         sendVerification(user);
         return "A new user "

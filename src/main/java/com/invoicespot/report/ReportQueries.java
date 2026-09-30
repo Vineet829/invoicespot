@@ -30,15 +30,15 @@ class ReportQueries {
         this.jdbc = jdbc;
     }
 
-    List<Billed> billed(long ownerPkid, Instant from, Instant to) {
+    List<Billed> billed(long businessPkid, Instant from, Instant to) {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency, d.document_type, d.created_at, d.total
                         from documents d
-                        where d.created_by_pkid = :owner
+                        where d.business_pkid = :business
                           and d.document_type in ('Invoice', 'Receipt')
                           and d.created_at >= :from and d.created_at < :to
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("from", Timestamp.from(from))
                 .param("to", Timestamp.from(to))
                 .query((result, rowNumber) -> new Billed(
@@ -49,16 +49,16 @@ class ReportQueries {
                 .list();
     }
 
-    List<Paid> paid(long ownerPkid, LocalDate from, LocalDate to) {
+    List<Paid> paid(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency, p.date_paid, p.amount_paid, p.payment_method
                         from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.created_by_pkid = :owner
+                        where d.business_pkid = :business
                           and d.document_type = 'Invoice'
                           and p.date_paid between :from and :to
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
                 .query((result, rowNumber) -> new Paid(
@@ -69,15 +69,15 @@ class ReportQueries {
                 .list();
     }
 
-    List<Unpaid> unpaid(long ownerPkid) {
+    List<Unpaid> unpaid(long businessPkid) {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency, d.due_date,
                                d.total - d.total_amount_received as outstanding
                         from documents d
-                        where d.created_by_pkid = :owner
+                        where d.business_pkid = :business
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .query((result, rowNumber) -> {
                     Timestamp due = result.getTimestamp("due_date");
                     return new Unpaid(
@@ -89,7 +89,7 @@ class ReportQueries {
     }
 
     // A client that was deleted is still named on its documents.
-    List<Client> clients(long ownerPkid, Instant from, Instant to) {
+    List<Client> clients(long businessPkid, Instant from, Instant to) {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency, c.id as customer_id,
                                coalesce(c.name, d.customer_name) as name,
@@ -98,13 +98,13 @@ class ReportQueries {
                                sum(d.total_amount_received) as paid
                         from documents d
                         left join customers c on c.pkid = d.customer_pkid
-                        where d.created_by_pkid = :owner
+                        where d.business_pkid = :business
                           and d.document_type in ('Invoice', 'Receipt')
                           and d.created_at >= :from and d.created_at < :to
                         group by 1, 2, 3
                         order by billed desc, lower(coalesce(c.name, d.customer_name))
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .param("from", Timestamp.from(from))
                 .param("to", Timestamp.from(to))
                 .query((result, rowNumber) -> new Client(
@@ -117,24 +117,24 @@ class ReportQueries {
                 .list();
     }
 
-    Optional<Instant> firstDocument(long ownerPkid) {
+    Optional<Instant> firstDocument(long businessPkid) {
         return jdbc.sql("""
                         select min(d.created_at) from documents d
-                        where d.created_by_pkid = :owner and d.document_type in ('Invoice', 'Receipt')
+                        where d.business_pkid = :business and d.document_type in ('Invoice', 'Receipt')
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .query(Timestamp.class)
                 .optional()
                 .map(Timestamp::toInstant);
     }
 
-    Optional<LocalDate> firstPayment(long ownerPkid) {
+    Optional<LocalDate> firstPayment(long businessPkid) {
         return jdbc.sql("""
                         select min(p.date_paid) from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.created_by_pkid = :owner and d.document_type = 'Invoice'
+                        where d.business_pkid = :business and d.document_type = 'Invoice'
                         """)
-                .param("owner", ownerPkid)
+                .param("business", businessPkid)
                 .query((result, rowNumber) -> result.getObject(1, LocalDate.class))
                 .optional();
     }

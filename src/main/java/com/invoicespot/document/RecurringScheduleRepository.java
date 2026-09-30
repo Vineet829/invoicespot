@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 public interface RecurringScheduleRepository extends JpaRepository<RecurringSchedule, Long> {
 
     @EntityGraph(attributePaths = {"template", "createdBy"})
-    List<RecurringSchedule> findByCreatedByPkidOrderByCreatedAtDescPkidDesc(Long createdByPkid);
+    List<RecurringSchedule> findByBusinessPkidOrderByCreatedAtDescPkidDesc(Long businessPkid);
 
     @EntityGraph(attributePaths = {"template", "createdBy"})
     @Query("select s from RecurringSchedule s where s.id = :externalId")
@@ -24,7 +24,7 @@ public interface RecurringScheduleRepository extends JpaRepository<RecurringSche
     Optional<RecurringSchedule> findByTemplate(Document template);
 
     // Schedules with a run on or before the latest possible local date; the
-    // caller checks each against its owner's own calendar.
+    // caller checks each against its business's own calendar.
     @Query("""
             select s.pkid from RecurringSchedule s
             where s.paused = false and s.nextRun is not null and s.nextRun <= :latest

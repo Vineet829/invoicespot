@@ -62,6 +62,9 @@ public class UserSession {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+    @Column(name = "business_pkid")
+    private Long businessPkid;
+
     public boolean isActiveAt(Instant now) {
         return revokedAt == null && expiresAt.isAfter(now);
     }

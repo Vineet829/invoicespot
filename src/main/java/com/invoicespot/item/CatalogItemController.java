@@ -1,14 +1,15 @@
 package com.invoicespot.item;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.item.dto.CreateItemRequest;
 import com.invoicespot.item.dto.ItemListResponse;
 import com.invoicespot.item.dto.ItemResultResponse;
 import com.invoicespot.item.dto.UpdateItemRequest;
-import com.invoicespot.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,31 +33,31 @@ public class CatalogItemController {
 
     @GetMapping
     public ItemListResponse list(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "50") int size) {
-        return itemService.list(principal.getPkid(), query, page, size);
+        return itemService.list(access, query, page, size);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ItemResultResponse create(
-            @AuthenticationPrincipal User principal, @Valid @RequestBody CreateItemRequest request) {
-        return new ItemResultResponse(true, "Item saved", itemService.create(principal.getPkid(), request));
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @Valid @RequestBody CreateItemRequest request) {
+        return new ItemResultResponse(true, "Item saved", itemService.create(access, request));
     }
 
     @PatchMapping("/{id}")
     public ItemResultResponse update(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @Valid @RequestBody UpdateItemRequest request) {
-        return new ItemResultResponse(true, "Item updated", itemService.update(principal.getPkid(), id, request));
+        return new ItemResultResponse(true, "Item updated", itemService.update(access, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public MessageResponse delete(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        itemService.delete(principal.getPkid(), id);
+    public MessageResponse delete(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        itemService.delete(access, id);
         return new MessageResponse(true, "Item deleted");
     }
 }

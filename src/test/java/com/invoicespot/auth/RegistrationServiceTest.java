@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.invoicespot.auth.dto.RegisterRequest;
+import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -31,6 +32,7 @@ class RegistrationServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private VerificationTokenService tokenService;
     @Mock private MailService mailService;
+    @Mock private BusinessService businessService;
 
     private RegistrationService service;
 
@@ -44,7 +46,7 @@ class RegistrationServiceTest {
     @BeforeEach
     void setUp() {
         service = new RegistrationService(
-                userRepository, passwordEncoder, tokenService, mailService, PROPERTIES);
+                userRepository, passwordEncoder, tokenService, mailService, businessService, PROPERTIES);
     }
 
     private static RegisterRequest request(String password, String confirm) {
@@ -63,6 +65,7 @@ class RegistrationServiceTest {
 
         assertThat(message).startsWith("A new user Ada has been registered!");
         verify(userRepository).save(any(User.class));
+        verify(businessService).createPersonal(any(User.class));
         verify(tokenService).issue(any(User.class));
         verify(mailService).send(anyString(), anyString(), anyString());
     }
@@ -80,7 +83,6 @@ class RegistrationServiceTest {
         verify(userRepository).save(captor.capture());
 
         assertThat(captor.getValue().getEmail()).isEqualTo("ada@example.com");
-        assertThat(captor.getValue().getPhoneNumber()).isNull();
     }
 
     @Test

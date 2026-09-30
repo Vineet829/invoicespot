@@ -1,11 +1,12 @@
 package com.invoicespot.document;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.document.dto.ShareLinkResponse;
 import com.invoicespot.document.dto.ShareStatusResponse;
-import com.invoicespot.user.User;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,18 +27,19 @@ public class ShareController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ShareLinkResponse create(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        return shareService.create(principal.getPkid(), id);
+    public ShareLinkResponse create(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return shareService.create(access, id);
     }
 
     @GetMapping
-    public ShareStatusResponse status(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        return shareService.status(principal.getPkid(), id);
+    public ShareStatusResponse status(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return shareService.status(access, id);
     }
 
     @DeleteMapping
-    public MessageResponse revoke(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        shareService.revoke(principal.getPkid(), id);
+    public MessageResponse revoke(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        shareService.revoke(access, id);
         return new MessageResponse(true, "The share link was turned off.");
     }
 }

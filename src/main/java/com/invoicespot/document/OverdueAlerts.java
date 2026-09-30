@@ -33,7 +33,7 @@ public class OverdueAlerts {
         int raised = 0;
         for (Document invoice : documentRepository.findUnalertedOverdue(
                 DocumentType.INVOICE, DocumentStatus.PAID, now)) {
-            ZoneId zone = ZoneId.of(settingsService.forUser(invoice.getCreatedBy().getPkid()).getTimeZone());
+            ZoneId zone = ZoneId.of(settingsService.forBusiness(invoice.getBusiness().getPkid()).getTimeZone());
             if (!DocumentTotals.isOverdue(invoice, LocalDate.ofInstant(now, zone).atStartOfDay(zone).toInstant())) {
                 continue;
             }
@@ -41,7 +41,6 @@ public class OverdueAlerts {
             CustomerSnapshot client = invoice.getCustomerSnapshot();
             BigDecimal owed = invoice.getTotal().subtract(invoice.getTotalAmountReceived());
             notificationService.notify(
-                    invoice.getCreatedBy(),
                     invoice,
                     NotificationType.INVOICE_OVERDUE,
                     "Invoice " + invoice.getDocumentNumber()

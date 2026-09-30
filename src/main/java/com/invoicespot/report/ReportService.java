@@ -1,5 +1,6 @@
 package com.invoicespot.report;
 
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.CsvFile;
 import com.invoicespot.report.dto.AgeingTotals;
@@ -67,18 +68,18 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public ReportResponse report(Long ownerPkid, String periodKey) {
-        return build(ownerPkid, periodKey, TOP_CLIENTS);
+    public ReportResponse report(BusinessAccess access, String periodKey) {
+        return build(access.businessPkid(), periodKey, TOP_CLIENTS);
     }
 
     // One section of the report for every currency, with every client ranked
     // rather than the top few. The amounts are plain numbers.
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public CsvFile csv(Long ownerPkid, String periodKey, String section) {
+    public CsvFile csv(BusinessAccess access, String periodKey, String section) {
         if (!SECTIONS.contains(section)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "That report does not exist");
         }
-        ReportResponse report = build(ownerPkid, periodKey, Integer.MAX_VALUE);
+        ReportResponse report = build(access.businessPkid(), periodKey, Integer.MAX_VALUE);
         String period = report.from() + "-to-" + report.to();
         List<CurrencyReport> currencies = report.currencies();
         return switch (section) {
@@ -120,8 +121,8 @@ public class ReportService {
         return currencies.stream().flatMap(rows).toList();
     }
 
-    private ReportResponse build(Long ownerPkid, String periodKey, int topClients) {
-        BusinessSettings settings = settingsService.forUser(ownerPkid);
+    private ReportResponse build(Long businessPkid, String periodKey, int topClients) {
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         ReportPeriod period = ReportPeriod.of(periodKey, today);
@@ -129,10 +130,10 @@ public class ReportService {
         Instant to = period.to().plusDays(1).atStartOfDay(zone).toInstant();
 
         Rows rows = new Rows(
-                byCurrency(queries.billed(ownerPkid, from, to), ReportQueries.Billed::currency),
-                byCurrency(queries.paid(ownerPkid, period.from(), period.to()), ReportQueries.Paid::currency),
-                byCurrency(queries.unpaid(ownerPkid), ReportQueries.Unpaid::currency),
-                byCurrency(queries.clients(ownerPkid, from, to), ReportQueries.Client::currency));
+                byCurrency(queries.billed(businessPkid, from, to), ReportQueries.Billed::currency),
+                byCurrency(queries.paid(businessPkid, period.from(), period.to()), ReportQueries.Paid::currency),
+                byCurrency(queries.unpaid(businessPkid), ReportQueries.Unpaid::currency),
+                byCurrency(queries.clients(businessPkid, from, to), ReportQueries.Client::currency));
 
         TreeSet<String> currencies = new TreeSet<>();
         Stream.of(rows.billed(), rows.paid(), rows.unpaid()).forEach(found -> currencies.addAll(found.keySet()));
@@ -147,7 +148,7 @@ public class ReportService {
                 period.from(),
                 period.to(),
                 today,
-                years(ownerPkid, zone, today),
+                years(businessPkid, zone, today),
                 ordered.stream()
                         .map(currency -> currencyReport(currency, rows, period, zone, today, topClients))
                         .toList());
@@ -195,7 +196,7 @@ public class ReportService {
                 methods(payments));
     }
 
-    // An invoice is overdue from the day after its due date, by the owner's
+    // An invoice is overdue from the day after its due date, by the business's
     // calendar; one without a due date is never overdue.
     private static List<AgeingTotals> ageing(List<ReportQueries.Unpaid> invoices, ZoneId zone, LocalDate today) {
         long[] counts = new long[AGEING_KEYS.size()];
@@ -240,10 +241,10 @@ public class ReportService {
 
     // The years before this one, back to the first invoice, receipt or
     // payment, for the period picker.
-    private List<Integer> years(Long ownerPkid, ZoneId zone, LocalDate today) {
+    private List<Integer> years(Long businessPkid, ZoneId zone, LocalDate today) {
         OptionalInt first = Stream.of(
-                        queries.firstDocument(ownerPkid).map(instant -> instant.atZone(zone).getYear()),
-                        queries.firstPayment(ownerPkid).map(LocalDate::getYear))
+                        queries.firstDocument(businessPkid).map(instant -> instant.atZone(zone).getYear()),
+                        queries.firstPayment(businessPkid).map(LocalDate::getYear))
                 .flatMap(Optional::stream)
                 .mapToInt(Integer::intValue)
                 .min();

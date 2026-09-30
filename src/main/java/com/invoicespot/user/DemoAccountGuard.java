@@ -15,7 +15,11 @@ public class DemoAccountGuard {
     }
 
     public boolean isDemo(User user) {
-        return !demoEmail.isEmpty() && user.getEmail() != null && user.getEmail().equalsIgnoreCase(demoEmail);
+        return isDemoEmail(user.getEmail());
+    }
+
+    public boolean isDemoEmail(String email) {
+        return !demoEmail.isEmpty() && email != null && email.trim().equalsIgnoreCase(demoEmail);
     }
 
     public void requireNotDemo(User user, String action) {

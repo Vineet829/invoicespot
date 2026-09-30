@@ -2,11 +2,11 @@ package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
-import com.invoicespot.user.User;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,15 +53,13 @@ class PdfServiceTest {
         service = new PdfService(engine, new UploadService(properties));
     }
 
-    private static User owner(String businessName) {
-        User user = new User();
-        user.setFirstName("Ada");
-        user.setLastName("Lovelace");
-        user.setEmail("ada@x.com");
-        user.setCity("Pune");
-        user.setCountry("India");
-        user.setBusinessName(businessName);
-        return user;
+    private static Business seller(String name) {
+        Business business = new Business();
+        business.setName(name);
+        business.setEmail("ada@x.com");
+        business.setCity("Pune");
+        business.setCountry("India");
+        return business;
     }
 
     private static BillingItem item(String name, String price, int quantity, String discount) {
@@ -104,7 +102,7 @@ class PdfServiceTest {
     @Test
     @DisplayName("an invoice lists line amounts, what was paid and the balance due, text escaped")
     void invoiceHtml() {
-        String html = service.html(sampleDocument(DocumentType.INVOICE), owner("Ada Analytics"), SETTINGS);
+        String html = service.html(sampleDocument(DocumentType.INVOICE), seller("Ada Analytics"), SETTINGS);
 
         assertThat(html)
                 .contains("Prototype &amp; &lt;review&gt;")
@@ -126,7 +124,7 @@ class PdfServiceTest {
     @Test
     @DisplayName("a quotation shows a validity date and its total, with no payment status")
     void quotationHtml() {
-        String html = service.html(sampleDocument(DocumentType.QUOTATION), owner("Ada Analytics"), SETTINGS);
+        String html = service.html(sampleDocument(DocumentType.QUOTATION), seller("Ada Analytics"), SETTINGS);
 
         assertThat(html).contains("Valid until").contains("USD 1,445.50");
         assertThat(html).doesNotContain("Amount paid").doesNotContain("Balance due").doesNotContain("Partially paid");
@@ -142,7 +140,7 @@ class PdfServiceTest {
         payment.setAdditionalInfo("Deposit & <thanks>");
 
         String html = service.receiptHtml(
-                document, payment, "2026-September-ABC123-P1", new BigDecimal("445.50"), owner("Ada Analytics"));
+                document, payment, "2026-September-ABC123-P1", new BigDecimal("445.50"), seller("Ada Analytics"));
 
         assertThat(html)
                 .contains("Payment receipt 2026-September-ABC123-P1")
@@ -183,7 +181,7 @@ class PdfServiceTest {
     @DisplayName("a statement lists each invoice and payment with the running balance and the amount due")
     void statementHtml() {
         String html = service.statementHtml(
-                owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "1000.00")));
+                seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "1000.00")));
 
         assertThat(html)
                 .contains("Statement for Beta &amp; &lt;Sons&gt;")
@@ -202,13 +200,13 @@ class PdfServiceTest {
     @DisplayName("a settled statement shows no overdue line, and several currencies are labelled")
     void statementCurrencies() {
         String settled = service.statementHtml(
-                owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "0")));
+                seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "0")));
         String mixed = service.statementHtml(
-                owner("Ada Analytics"),
+                seller("Ada Analytics"),
                 client(),
                 LocalDate.of(2026, 9, 30),
                 List.of(account("USD", "0"), account("EUR", "0")));
-        String empty = service.statementHtml(owner("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of());
+        String empty = service.statementHtml(seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of());
 
         assertThat(settled).doesNotContain("Overdue");
         assertThat(mixed).contains("<div class=\"label\">EUR</div>");
@@ -219,10 +217,10 @@ class PdfServiceTest {
     @DisplayName("a logo uploaded to this server is embedded; a remote one is never fetched")
     void logo() throws Exception {
         Files.write(uploads.resolve("brand.png"), PNG);
-        User local = owner("Ada Analytics");
-        local.setAvatar("/uploads/brand.png");
-        User remote = owner("Ada Analytics");
-        remote.setAvatar("https://example.com/brand.png");
+        Business local = seller("Ada Analytics");
+        local.setLogo("/uploads/brand.png");
+        Business remote = seller("Ada Analytics");
+        remote.setLogo("https://example.com/brand.png");
 
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), local, SETTINGS)).contains("data:image/png;base64,");
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), remote, SETTINGS)).doesNotContain("example.com");
@@ -230,10 +228,20 @@ class PdfServiceTest {
     }
 
     @Test
-    @DisplayName("the sender is the business name, or the owner's full name without one")
-    void senderName() {
-        assertThat(PdfService.senderName(owner("Ada Analytics"))).isEqualTo("Ada Analytics");
-        assertThat(PdfService.senderName(owner(" "))).isEqualTo("Ada Lovelace");
+    @DisplayName("the sender is the business, with its legal name when it differs, its address and tax ID")
+    void sender() {
+        Business business = seller("Ada Analytics");
+        business.setLegalName("Ada Analytics Private Limited");
+        business.setState("Maharashtra");
+        business.setPostalCode("411001");
+        business.setTaxId("27AAPFU0939F1ZV");
+
+        assertThat(PdfService.senderName(business)).isEqualTo("Ada Analytics");
+        assertThat(PdfService.senderLines(business)).containsExactly(
+                "Ada Analytics Private Limited", "ada@x.com", "Pune, Maharashtra 411001, India", "Tax ID 27AAPFU0939F1ZV");
+
+        business.setLegalName("ada analytics");
+        assertThat(PdfService.senderLines(business)).doesNotContain("ada analytics");
     }
 
     @Test
@@ -245,7 +253,7 @@ class PdfServiceTest {
         Document document = sampleDocument(DocumentType.INVOICE);
         document.setCreatedAt(Instant.parse("2026-09-30T20:00:00Z"));
 
-        String html = service.html(document, owner("Ada Analytics"), settings);
+        String html = service.html(document, seller("Ada Analytics"), settings);
 
         assertThat(html).contains("GST (18%)").contains("Oct 1, 2026").doesNotContain("Tax (18%)");
     }

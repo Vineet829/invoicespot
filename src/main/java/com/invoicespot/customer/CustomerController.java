@@ -1,6 +1,9 @@
 package com.invoicespot.customer;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.CreatedCustomerResponse;
 import com.invoicespot.customer.dto.CustomerListResponse;
@@ -11,11 +14,9 @@ import com.invoicespot.customer.dto.ImportResultResponse;
 import com.invoicespot.customer.dto.SingleCustomerResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
 import com.invoicespot.customer.dto.UpdatedCustomerResponse;
-import com.invoicespot.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -41,8 +42,9 @@ public class CustomerController {
 
     @PostMapping("/create")
     public CreatedCustomerResponse create(
-            @AuthenticationPrincipal User principal, @Valid @RequestBody CreateCustomerRequest request) {
-        CustomerResponse created = customerService.create(principal.getPkid(), request);
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @Valid @RequestBody CreateCustomerRequest request) {
+        CustomerResponse created = customerService.create(access, request);
         return new CreatedCustomerResponse(
                 true,
                 "Your customer named: " + created.name() + ", was created successfully",
@@ -51,64 +53,65 @@ public class CustomerController {
 
     @GetMapping("/all")
     public CustomerListResponse listMine(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "sort", defaultValue = "createdAt") String sort,
             @RequestParam(name = "dir", defaultValue = "desc") String direction) {
         return customerService.listMine(
-                principal.getPkid(), CustomerSearch.of(query, sort, direction, page, size));
+                access, CustomerSearch.of(query, sort, direction, page, size));
     }
 
     @GetMapping("/csv")
     public ResponseEntity<byte[]> csv(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EXPORT_LISTS) BusinessAccess access,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "sort", defaultValue = "createdAt") String sort,
             @RequestParam(name = "dir", defaultValue = "desc") String direction) {
-        return customerService.csv(principal.getPkid(), CustomerSearch.of(query, sort, direction, 1, 1)).download();
+        return customerService.csv(access, CustomerSearch.of(query, sort, direction, 1, 1)).download();
     }
 
     @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ImportPreviewResponse previewImport(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @RequestParam(name = "file", required = false) MultipartFile file) {
-        return customerImport.preview(principal.getPkid(), file);
+        return customerImport.preview(access, file);
     }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ImportResultResponse importClients(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @RequestParam(name = "file", required = false) MultipartFile file) {
-        return customerImport.importAll(principal.getPkid(), file);
+        return customerImport.importAll(access, file);
     }
 
     @GetMapping("/{id}")
     public SingleCustomerResponse getOne(
-            @AuthenticationPrincipal User principal, @PathVariable String id) {
-        return new SingleCustomerResponse(true, customerService.getOne(principal.getPkid(), id));
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return new SingleCustomerResponse(true, customerService.getOne(access, id));
     }
 
     @GetMapping("/{id}/summary")
-    public CustomerSummaryResponse summary(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        return customerService.summary(principal.getPkid(), id);
+    public CustomerSummaryResponse summary(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return customerService.summary(access, id);
     }
 
     @PatchMapping("/{id}")
     public UpdatedCustomerResponse update(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @Valid @RequestBody UpdateCustomerRequest request) {
-        CustomerResponse updated = customerService.update(principal.getPkid(), id, request);
+        CustomerResponse updated = customerService.update(access, id, request);
         return new UpdatedCustomerResponse(
                 true, updated.name() + "'s info was successfully updated", updated);
     }
 
     @DeleteMapping("/{id}")
     public MessageResponse delete(
-            @AuthenticationPrincipal User principal, @PathVariable String id) {
-        customerService.delete(principal.getPkid(), id);
+            @Requires(Permission.DELETE_RECORDS) BusinessAccess access, @PathVariable String id) {
+        customerService.delete(access, id);
         return new MessageResponse(true, "Your customer has been deleted");
     }
 }

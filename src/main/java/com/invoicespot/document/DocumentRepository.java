@@ -22,10 +22,10 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     Page<Document> findAll(Specification<Document> specification, Pageable pageable);
 
     @EntityGraph(attributePaths = {"billingItems"})
-    List<Document> findByCreatedByPkidOrderByCreatedAtDesc(Long createdByPkid);
+    List<Document> findByBusinessPkidOrderByCreatedAtDesc(Long businessPkid);
 
     @EntityGraph(attributePaths = {"customer"})
-    Page<Document> findByCreatedByPkid(Long createdByPkid, Pageable pageable);
+    Page<Document> findByBusinessPkid(Long businessPkid, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer", "billingItems"})
     @Query("select d from Document d where d.id = :externalId")
@@ -42,7 +42,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     List<Document> findBySourceOrderByCreatedAtAscPkidAsc(Document source);
 
     // Unpaid invoices due before a moment that nobody was yet told about.
-    @EntityGraph(attributePaths = {"createdBy"})
+    @EntityGraph(attributePaths = {"business"})
     @Query("""
             select d from Document d
             where d.documentType = :invoice and d.status <> :paid
@@ -56,18 +56,18 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     // Unpaid invoices that may still get an automatic reminder.
     @Query("""
             select d from Document d
-            where d.createdBy.pkid = :ownerPkid and d.documentType = :invoice and d.status <> :paid
+            where d.business.pkid = :businessPkid and d.documentType = :invoice and d.status <> :paid
               and d.dueDate is not null and d.remindersSent < :most
             """)
     List<Document> findRemindable(
-            @Param("ownerPkid") Long ownerPkid,
+            @Param("businessPkid") Long businessPkid,
             @Param("invoice") DocumentType invoice,
             @Param("paid") DocumentStatus paid,
             @Param("most") int most);
 
     Optional<Document> findFirstBySourceAndDocumentType(Document source, DocumentType documentType);
 
-    boolean existsByCreatedByPkidAndDocumentNumber(Long createdByPkid, String documentNumber);
+    boolean existsByBusinessPkidAndDocumentNumber(Long businessPkid, String documentNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from Document d where d.id = :externalId")

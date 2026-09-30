@@ -3,6 +3,7 @@ package com.invoicespot.audit;
 import com.invoicespot.audit.dto.ActivityEventResponse;
 import com.invoicespot.audit.dto.AuditEventResponse;
 import com.invoicespot.audit.dto.EventPageResponse;
+import com.invoicespot.audit.dto.TeamActivityResponse;
 import com.invoicespot.auth.session.DeviceName;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SearchText;
@@ -19,9 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Reads the audit log: an account's own sign-ins and changes, and the whole
-// log for admins. The shared demo account sees only what the visitor did in
-// this session, never another visitor's addresses.
+// Reads the audit log: an account's own sign-ins and changes, a business's
+// team changes for its owner and admins, and the whole log for admins. The
+// shared demo account sees only what the visitor did in this session, never
+// another visitor's addresses.
 @Service
 public class AuditActivity {
 
@@ -38,8 +40,9 @@ public class AuditActivity {
 
     @Transactional(readOnly = true)
     public EventPageResponse<ActivityEventResponse> mine(User user, UUID currentSession, int page, int size) {
-        Specification<AuditEvent> mine =
-                (root, query, builder) -> builder.equal(root.get("user").get("pkid"), user.getPkid());
+        Specification<AuditEvent> mine = (root, query, builder) -> builder.and(
+                builder.equal(root.get("user").get("pkid"), user.getPkid()),
+                builder.not(root.get("type").in(AuditEventType.aboutABusiness())));
         if (demoAccountGuard.isDemo(user)) {
             mine = mine.and((root, query, builder) -> currentSession == null
                     ? builder.disjunction()
@@ -53,6 +56,15 @@ public class AuditActivity {
                 DeviceName.of(event.getUserAgent()),
                 event.getOccurredAt(),
                 event.getSessionId() != null && event.getSessionId().equals(currentSession)));
+    }
+
+    // Who was invited, joined, left or changed role in a business, and who
+    // handed it over, newest first.
+    @Transactional(readOnly = true)
+    public EventPageResponse<TeamActivityResponse> team(Long businessPkid, int page, int size) {
+        Specification<AuditEvent> inBusiness = (root, query, builder) ->
+                builder.equal(root.get("business").get("pkid"), businessPkid);
+        return page(inBusiness, page, size, TeamActivityResponse::from);
     }
 
     // The whole log, newest first, by email and kind of event.
@@ -73,6 +85,7 @@ public class AuditActivity {
                 event.getType().name(),
                 event.getEmail(),
                 event.getActor() == null ? null : event.getActor().getEmail(),
+                event.getBusiness() == null ? null : event.getBusiness().getName(),
                 event.getDetail(),
                 event.getIp(),
                 DeviceName.of(event.getUserAgent()),

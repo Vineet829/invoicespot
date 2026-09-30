@@ -12,17 +12,17 @@ public interface CatalogItemRepository extends JpaRepository<CatalogItem, Long> 
 
     @Query("""
             select i from CatalogItem i
-            where i.createdBy.pkid = :ownerPkid
+            where i.business.pkid = :businessPkid
               and (lower(i.name) like :pattern escape '!'
                    or lower(coalesce(i.description, '')) like :pattern escape '!')
             """)
     Page<CatalogItem> search(
-            @Param("ownerPkid") Long ownerPkid, @Param("pattern") String pattern, Pageable pageable);
+            @Param("businessPkid") Long businessPkid, @Param("pattern") String pattern, Pageable pageable);
 
     @Query("select i from CatalogItem i where i.id = :externalId")
     Optional<CatalogItem> findByExternalId(@Param("externalId") UUID externalId);
 
-    boolean existsByCreatedByPkidAndNameIgnoreCase(Long createdByPkid, String name);
+    boolean existsByBusinessPkidAndNameIgnoreCase(Long businessPkid, String name);
 
-    boolean existsByCreatedByPkidAndNameIgnoreCaseAndPkidNot(Long createdByPkid, String name, Long pkid);
+    boolean existsByBusinessPkidAndNameIgnoreCaseAndPkidNot(Long businessPkid, String name, Long pkid);
 }

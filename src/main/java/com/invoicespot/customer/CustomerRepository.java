@@ -11,17 +11,17 @@ import org.springframework.data.repository.query.Param;
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     @EntityGraph(attributePaths = {"createdBy"})
-    List<Customer> findByCreatedByPkidOrderByCreatedAtDesc(Long createdByPkid);
+    List<Customer> findByBusinessPkidOrderByCreatedAtDesc(Long businessPkid);
 
     @EntityGraph(attributePaths = {"createdBy"})
     @Query("select c from Customer c where c.id = :externalId")
     Optional<Customer> findByExternalId(@Param("externalId") UUID externalId);
 
-    boolean existsByCreatedByPkidAndEmailIgnoreCase(Long createdByPkid, String email);
+    boolean existsByBusinessPkidAndEmailIgnoreCase(Long businessPkid, String email);
 
-    boolean existsByCreatedByPkidAndEmailIgnoreCaseAndPkidNot(Long createdByPkid, String email, Long pkid);
+    boolean existsByBusinessPkidAndEmailIgnoreCaseAndPkidNot(Long businessPkid, String email, Long pkid);
 
-    boolean existsByCreatedByPkid(Long createdByPkid);
+    boolean existsByBusinessPkid(Long businessPkid);
 
-    Optional<Customer> findByCreatedByPkidAndAccountNo(Long createdByPkid, String accountNo);
+    Optional<Customer> findByBusinessPkidAndAccountNo(Long businessPkid, String accountNo);
 }

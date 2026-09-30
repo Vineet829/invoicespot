@@ -1,5 +1,6 @@
 package com.invoicespot.document;
 
+import com.invoicespot.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,6 +40,12 @@ public class DocumentEvent {
 
     @Column(name = "payment_pkid")
     private Long paymentPkid;
+
+    // The member who did it. None for the client, an automatic run, an
+    // account since deleted, or an event from before actors were kept.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actor_pkid", updatable = false)
+    private User actor;
 
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;

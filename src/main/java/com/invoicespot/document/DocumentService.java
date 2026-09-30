@@ -1,5 +1,7 @@
 package com.invoicespot.document;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
@@ -48,6 +50,7 @@ public class DocumentService {
     private final UserRepository userRepository;
     private final PdfService pdfService;
     private final SettingsService settingsService;
+    private final BusinessRepository businessRepository;
     private final DocumentNumbering documentNumbering;
     private final DocumentActivity activity;
     private final NotificationService notificationService;
@@ -59,6 +62,7 @@ public class DocumentService {
             UserRepository userRepository,
             PdfService pdfService,
             SettingsService settingsService,
+            BusinessRepository businessRepository,
             DocumentNumbering documentNumbering,
             DocumentActivity activity,
             NotificationService notificationService,
@@ -68,6 +72,7 @@ public class DocumentService {
         this.userRepository = userRepository;
         this.pdfService = pdfService;
         this.settingsService = settingsService;
+        this.businessRepository = businessRepository;
         this.documentNumbering = documentNumbering;
         this.activity = activity;
         this.notificationService = notificationService;
@@ -75,15 +80,13 @@ public class DocumentService {
     }
 
     @Transactional
-    public DocumentResponse create(Long ownerPkid, CreateDocumentRequest request) {
-        Customer customer = findCustomer(ownerPkid, request.customerId(), request.customer())
+    public DocumentResponse create(BusinessAccess access, CreateDocumentRequest request) {
+        Customer customer = findCustomer(access.businessPkid(), request.customerId(), request.customer())
                 .orElseThrow(DocumentService::customerNotFound);
-        User owner = userRepository
-                .findById(ownerPkid)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
 
         Document document = new Document();
-        document.setCreatedBy(owner);
+        document.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
+        document.setCreatedBy(actor(access));
         document.setCustomer(customer);
         document.setCustomerSnapshot(snapshotOf(customer));
         document.setDocumentType(documentType(request.documentType()));
@@ -93,19 +96,19 @@ public class DocumentService {
         document.setRates(percentage(request.rates(), "Tax rate"));
         document.setCurrency(request.currency());
         document.setBillingItems(toBillingItems(request.billingItems()));
-        document.setDocumentNumber(documentNumbering.next(ownerPkid, document.getDocumentType()));
+        document.setDocumentNumber(documentNumbering.next(access.businessPkid(), document.getDocumentType()));
         DocumentTotals.apply(document);
         documentRepository.save(document);
-        activity.record(document, DocumentEventType.CREATED, null);
+        activity.record(document, DocumentEventType.CREATED, null, actor(access));
         return respond(document);
     }
 
     @Transactional(readOnly = true)
-    public DocumentListResponse listMine(Long ownerPkid, DocumentSearch search) {
-        ZoneId zone = zoneOf(ownerPkid);
+    public DocumentListResponse listMine(BusinessAccess access, DocumentSearch search) {
+        ZoneId zone = zoneOf(access.businessPkid());
         Instant startOfToday = startOfToday(zone);
         Page<Document> result = documentRepository.findAll(
-                DocumentSpecifications.matching(ownerPkid, search, startOfToday, zone),
+                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday, zone),
                 PageRequest.of(search.page() - 1, search.size(), search.sort()));
         return new DocumentListResponse(
                 true,
@@ -118,8 +121,12 @@ public class DocumentService {
                         .toList());
     }
 
-    private ZoneId zoneOf(Long ownerPkid) {
-        return ZoneId.of(settingsService.forUser(ownerPkid).getTimeZone());
+    private User actor(BusinessAccess access) {
+        return userRepository.getReferenceById(access.userPkid());
+    }
+
+    private ZoneId zoneOf(Long businessPkid) {
+        return ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone());
     }
 
     private Instant startOfToday(ZoneId zone) {
@@ -129,34 +136,35 @@ public class DocumentService {
     private DocumentResponse respond(Document document) {
         return DocumentResponse.detail(
                 document,
-                startOfToday(zoneOf(document.getCreatedBy().getPkid())),
+                startOfToday(zoneOf(document.getBusiness().getPkid())),
                 documentRepository.findBySourceOrderByCreatedAtAscPkidAsc(document));
     }
 
     @Transactional(readOnly = true)
-    public DocumentResponse getOne(Long ownerPkid, String id) {
-        return respond(requireOwned(
-                ownerPkid, id, "document not found",
+    public DocumentResponse getOne(BusinessAccess access, String id) {
+        return respond(requireInBusiness(
+                access, id, "document not found",
                 "You are not authorized to view this document. It's not yours"));
     }
 
     @Transactional(readOnly = true)
-    public DocumentPdf renderPdf(User owner, String id) {
-        Document document = requireReadable(owner, id);
+    public DocumentPdf renderPdf(BusinessAccess access, String id) {
+        Document document = requireReadable(access, id);
         return new DocumentPdf(
                 pdfFileName(document),
-                pdfService.render(document, owner, settingsService.forUser(owner.getPkid())),
+                pdfService.render(
+                        document, document.getBusiness(), settingsService.forBusiness(access.businessPkid())),
                 envelope(document));
     }
 
     @Transactional(readOnly = true)
-    public DocumentEnvelope envelope(User owner, String id) {
-        return envelope(requireReadable(owner, id));
+    public DocumentEnvelope envelope(BusinessAccess access, String id) {
+        return envelope(requireReadable(access, id));
     }
 
-    private Document requireReadable(User owner, String id) {
-        return requireOwned(
-                owner.getPkid(), id, "document not found",
+    private Document requireReadable(BusinessAccess access, String id) {
+        return requireInBusiness(
+                access, id, "document not found",
                 "You are not authorized to view this document. It's not yours");
     }
 
@@ -172,17 +180,17 @@ public class DocumentService {
     }
 
     @Transactional
-    public DocumentResponse update(Long ownerPkid, String id, UpdateDocumentRequest request) {
-        Document document = requireOwned(
-                ownerPkid, id, "That document does not exist",
+    public DocumentResponse update(BusinessAccess access, String id, UpdateDocumentRequest request) {
+        Document document = requireInBusiness(
+                access, id, "That document does not exist",
                 "You are not authorized to update this document. It's not yours");
         if (request.customerId() != null) {
-            Customer customer = findCustomer(ownerPkid, request.customerId(), null)
+            Customer customer = findCustomer(access.businessPkid(), request.customerId(), null)
                     .orElseThrow(DocumentService::customerNotFound);
             document.setCustomer(customer);
             document.setCustomerSnapshot(snapshotOf(customer));
         } else if (request.customer() != null) {
-            Optional<Customer> customer = findCustomer(ownerPkid, null, request.customer());
+            Optional<Customer> customer = findCustomer(access.businessPkid(), null, request.customer());
             document.setCustomer(customer.orElse(null));
             document.setCustomerSnapshot(customer.map(DocumentService::snapshotOf)
                     .orElseGet(() -> toSnapshot(request.customer())));
@@ -210,29 +218,30 @@ public class DocumentService {
         }
         DocumentTotals.apply(document);
         requireConsistentPayments(document);
-        if (!DocumentTotals.isOverdue(document, startOfToday(zoneOf(ownerPkid)))) {
+        if (!DocumentTotals.isOverdue(document, startOfToday(zoneOf(access.businessPkid())))) {
             document.setOverdueAlertedAt(null);
         }
         documentRepository.save(document);
-        activity.record(document, DocumentEventType.EDITED, null);
+        activity.record(document, DocumentEventType.EDITED, null, actor(access));
         return respond(document);
     }
 
     @Transactional
-    public DocumentResponse duplicate(Long ownerPkid, String id) {
-        Document original = requireOwned(
-                ownerPkid, id, "That document does not exist",
+    public DocumentResponse duplicate(BusinessAccess access, String id) {
+        Document original = requireInBusiness(
+                access, id, "That document does not exist",
                 "You are not authorized to copy this document. It's not yours");
-        Document copy = copyOf(original, original.getDocumentType(), true);
-        activity.record(copy, DocumentEventType.COPIED_FROM, original.getDocumentNumber());
-        activity.record(original, DocumentEventType.COPIED_TO, copy.getDocumentNumber());
+        User actor = actor(access);
+        Document copy = copyOf(original, original.getDocumentType(), true, actor);
+        activity.record(copy, DocumentEventType.COPIED_FROM, original.getDocumentNumber(), actor);
+        activity.record(original, DocumentEventType.COPIED_TO, copy.getDocumentNumber(), actor);
         return respond(copy);
     }
 
     @Transactional
-    public DocumentResponse convert(Long ownerPkid, String id) {
-        Document quotation = requireOwned(
-                ownerPkid, id, "That document does not exist",
+    public DocumentResponse convert(BusinessAccess access, String id) {
+        Document quotation = requireInBusiness(
+                access, id, "That document does not exist",
                 "You are not authorized to convert this document. It's not yours");
         if (quotation.getDocumentType() != DocumentType.QUOTATION) {
             throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can become an invoice");
@@ -241,29 +250,35 @@ public class DocumentService {
             throw new ApiException(
                     HttpStatus.CONFLICT, "This quotation is already invoice " + invoice.getDocumentNumber());
         });
-        Document invoice = copyOf(quotation, DocumentType.INVOICE, true);
-        activity.record(invoice, DocumentEventType.CONVERTED_FROM, quotation.getDocumentNumber());
-        activity.record(quotation, DocumentEventType.CONVERTED_TO, invoice.getDocumentNumber());
+        User actor = actor(access);
+        Document invoice = copyOf(quotation, DocumentType.INVOICE, true, actor);
+        activity.record(invoice, DocumentEventType.CONVERTED_FROM, quotation.getDocumentNumber(), actor);
+        activity.record(quotation, DocumentEventType.CONVERTED_TO, invoice.getDocumentNumber(), actor);
         return respond(invoice);
     }
 
-    // The next invoice of a recurring schedule. It isn't linked to the
-    // template as a copy, or a monthly template would list every month.
-    Document createRecurring(Document template, RecurringFrequency frequency) {
-        Document invoice = copyOf(template, DocumentType.INVOICE, false);
+    // The next invoice of a recurring schedule, made in the name of whoever
+    // set up the schedule. It isn't linked to the template as a copy, or a
+    // monthly template would list every month.
+    Document createRecurring(Document template, RecurringFrequency frequency, User author) {
+        Document invoice = copyOf(template, DocumentType.INVOICE, false, author);
         activity.record(
-                invoice, DocumentEventType.RECURRING, template.getDocumentNumber() + " · " + frequency.label());
+                invoice,
+                DocumentEventType.RECURRING,
+                template.getDocumentNumber() + " · " + frequency.label(),
+                null);
         return invoice;
     }
 
     // A new document with the original's client and lines, a fresh number,
     // and a due date from the business's payment terms. Payments stay behind.
-    private Document copyOf(Document original, DocumentType type, boolean linkSource) {
-        Long ownerPkid = original.getCreatedBy().getPkid();
-        BusinessSettings settings = settingsService.forUser(ownerPkid);
+    private Document copyOf(Document original, DocumentType type, boolean linkSource, User author) {
+        Long businessPkid = original.getBusiness().getPkid();
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         Document copy = new Document();
-        copy.setCreatedBy(original.getCreatedBy());
+        copy.setBusiness(original.getBusiness());
+        copy.setCreatedBy(author);
         copy.setSource(linkSource ? original : null);
         copy.setCustomer(original.getCustomer());
         copy.setCustomerSnapshot(original.getCustomer() == null
@@ -280,7 +295,7 @@ public class DocumentService {
         copy.setRates(original.getRates());
         copy.setCurrency(original.getCurrency());
         copy.setBillingItems(original.getBillingItems().stream().map(DocumentService::copyOf).toList());
-        copy.setDocumentNumber(documentNumbering.next(ownerPkid, type));
+        copy.setDocumentNumber(documentNumbering.next(businessPkid, type));
         DocumentTotals.apply(copy);
         return documentRepository.save(copy);
     }
@@ -311,16 +326,16 @@ public class DocumentService {
     }
 
     @Transactional
-    public void delete(Long ownerPkid, String id) {
-        Document document = requireOwned(
-                ownerPkid, id, "That document does not exist!",
+    public void delete(BusinessAccess access, String id) {
+        Document document = requireInBusiness(
+                access, id, "That document does not exist!",
                 "You are not authorized to delete this document. It's not yours");
         documentRepository.delete(document);
     }
 
     @Transactional
-    public DocumentResponse addPayment(Long ownerPkid, String id, CreatePaymentRequest request) {
-        Document document = requireOwnedForPayment(ownerPkid, id);
+    public DocumentResponse addPayment(BusinessAccess access, String id, CreatePaymentRequest request) {
+        Document document = requireInBusinessForPayment(access, id);
         if (document.getDocumentType() == DocumentType.QUOTATION) {
             throw new ApiException(HttpStatus.CONFLICT, "A quotation can't take payments");
         }
@@ -343,14 +358,15 @@ public class DocumentService {
                 document,
                 DocumentEventType.PAYMENT_RECORDED,
                 DocumentActivity.paymentDetail(document, payment),
-                payment.getPkid());
+                payment.getPkid(),
+                actor(access));
         return respond(document);
     }
 
     @Transactional
     public DocumentResponse updatePayment(
-            Long ownerPkid, String id, String paymentId, UpdatePaymentRequest request) {
-        Document document = requireOwnedForPayment(ownerPkid, id);
+            BusinessAccess access, String id, String paymentId, UpdatePaymentRequest request) {
+        Document document = requireInBusinessForPayment(access, id);
         Payment payment = requirePayment(document, paymentId);
         if (request.datePaid() != null) {
             payment.setDatePaid(paymentDate(request.datePaid()));
@@ -371,47 +387,50 @@ public class DocumentService {
                 document,
                 DocumentEventType.PAYMENT_EDITED,
                 DocumentActivity.paymentDetail(document, payment),
-                payment.getPkid());
+                payment.getPkid(),
+                actor(access));
         return respond(document);
     }
 
     @Transactional
-    public DocumentResponse deletePayment(Long ownerPkid, String id, String paymentId) {
-        Document document = requireOwnedForPayment(ownerPkid, id);
+    public DocumentResponse deletePayment(BusinessAccess access, String id, String paymentId) {
+        Document document = requireInBusinessForPayment(access, id);
         Payment payment = requirePayment(document, paymentId);
         document.getPayments().remove(payment);
         DocumentTotals.apply(document);
         activity.record(
-                document, DocumentEventType.PAYMENT_DELETED, DocumentActivity.paymentDetail(document, payment));
+                document,
+                DocumentEventType.PAYMENT_DELETED,
+                DocumentActivity.paymentDetail(document, payment),
+                actor(access));
         return respond(document);
     }
 
     @Transactional(readOnly = true)
-    public ActivityResponse activity(Long ownerPkid, String id) {
-        Document document = requireOwned(
-                ownerPkid, id, "document not found",
+    public ActivityResponse activity(BusinessAccess access, String id) {
+        Document document = requireInBusiness(
+                access, id, "document not found",
                 "You are not authorized to view this document. It's not yours");
         return new ActivityResponse(
                 true,
                 activity.history(document).stream()
-                        .map(event -> new ActivityEntry(
-                                event.getType().name(), event.getDetail(), event.getOccurredAt()))
+                        .map(event -> ActivityEntry.from(event, access.userPkid()))
                         .toList());
     }
 
     @Transactional
-    public void recordEmailed(User owner, String id, String to) {
-        activity.record(requireReadable(owner, id), DocumentEventType.EMAILED, "to " + to);
+    public void recordEmailed(BusinessAccess access, String id, String to) {
+        activity.record(requireReadable(access, id), DocumentEventType.EMAILED, "to " + to, actor(access));
     }
 
     @Transactional
-    public void recordEmailedAutomatically(User owner, String id, String to) {
-        activity.record(requireReadable(owner, id), DocumentEventType.EMAILED, "automatically to " + to);
+    public void recordEmailedAutomatically(BusinessAccess access, String id, String to) {
+        activity.record(requireReadable(access, id), DocumentEventType.EMAILED, "automatically to " + to, null);
     }
 
     @Transactional(readOnly = true)
-    public DocumentPdf renderReceipt(User owner, String id, String paymentId) {
-        Document document = requireReadable(owner, id);
+    public DocumentPdf renderReceipt(BusinessAccess access, String id, String paymentId) {
+        Document document = requireReadable(access, id);
         Payment payment = requirePayment(document, paymentId);
         List<Payment> paidSoFar = document.getPayments().subList(0, document.getPayments().indexOf(payment) + 1);
         String number = receiptNumber(document, payment);
@@ -422,30 +441,31 @@ public class DocumentService {
                         payment,
                         number,
                         paidSoFar.stream().map(Payment::getAmountPaid).reduce(BigDecimal.ZERO, BigDecimal::add),
-                        owner),
+                        document.getBusiness()),
                 receiptEnvelope(document, number));
     }
 
     @Transactional(readOnly = true)
-    public DocumentEnvelope receiptEnvelope(User owner, String id, String paymentId) {
-        Document document = requireReadable(owner, id);
+    public DocumentEnvelope receiptEnvelope(BusinessAccess access, String id, String paymentId) {
+        Document document = requireReadable(access, id);
         return receiptEnvelope(document, receiptNumber(document, requirePayment(document, paymentId)));
     }
 
     @Transactional
-    public void recordReceiptEmailed(User owner, String id, String paymentId, String to) {
-        Document document = requireReadable(owner, id);
+    public void recordReceiptEmailed(BusinessAccess access, String id, String paymentId, String to) {
+        Document document = requireReadable(access, id);
         Payment payment = requirePayment(document, paymentId);
         activity.record(
                 document,
                 DocumentEventType.RECEIPT_EMAILED,
                 receiptNumber(document, payment) + " to " + to,
-                payment.getPkid());
+                payment.getPkid(),
+                actor(access));
     }
 
     @Transactional(readOnly = true)
-    public ReminderFacts reminderFacts(User owner, String id) {
-        Document document = requireReadable(owner, id);
+    public ReminderFacts reminderFacts(BusinessAccess access, String id) {
+        Document document = requireReadable(access, id);
         if (document.getDocumentType() != DocumentType.INVOICE || document.getStatus() == DocumentStatus.PAID) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an unpaid invoice needs a reminder");
         }
@@ -453,7 +473,7 @@ public class DocumentService {
     }
 
     ReminderFacts reminderFacts(Document document) {
-        ZoneId zone = zoneOf(document.getCreatedBy().getPkid());
+        ZoneId zone = zoneOf(document.getBusiness().getPkid());
         CustomerSnapshot customer = document.getCustomerSnapshot();
         BigDecimal total = document.getTotal() == null ? BigDecimal.ZERO : document.getTotal();
         BigDecimal received =
@@ -468,14 +488,17 @@ public class DocumentService {
     }
 
     @Transactional
-    public void recordReminder(User owner, String id, String to, boolean automatic) {
-        Document document = requireReadable(owner, id);
+    public void recordReminder(BusinessAccess access, String id, String to, boolean automatic) {
+        Document document = requireReadable(access, id);
         document.setRemindersSent(document.getRemindersSent() + 1);
         document.setLastRemindedAt(Instant.now(clock));
-        activity.record(document, DocumentEventType.REMINDED, (automatic ? "automatically " : "") + "to " + to);
+        activity.record(
+                document,
+                DocumentEventType.REMINDED,
+                (automatic ? "automatically " : "") + "to " + to,
+                automatic ? null : actor(access));
         if (automatic) {
             notificationService.notify(
-                    document.getCreatedBy(),
                     document,
                     NotificationType.REMINDER_SENT,
                     "Reminder sent to " + to + " for " + document.getDocumentType().getValue() + " "
@@ -496,11 +519,11 @@ public class DocumentService {
                 customer == null ? null : customer.getEmail());
     }
 
-    private Document requireOwnedForPayment(Long ownerPkid, String id) {
+    private Document requireInBusinessForPayment(BusinessAccess access, String id) {
         Document document = externalId(id)
                 .flatMap(documentRepository::findForUpdateByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist!"));
-        if (!document.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(
                     HttpStatus.FORBIDDEN, "You are not authorized to update this document. It's not yours");
         }
@@ -564,25 +587,25 @@ public class DocumentService {
         }
     }
 
-    private Document requireOwned(
-            Long ownerPkid, String id, String notFoundMessage, String forbiddenMessage) {
+    private Document requireInBusiness(
+            BusinessAccess access, String id, String notFoundMessage, String forbiddenMessage) {
         Document document = externalId(id)
                 .flatMap(documentRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, notFoundMessage));
-        if (!document.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
         return document;
     }
 
-    private Optional<Customer> findCustomer(Long ownerPkid, String customerId, DocumentCustomerDto snapshot) {
+    private Optional<Customer> findCustomer(Long businessPkid, String customerId, DocumentCustomerDto snapshot) {
         if (customerId != null) {
             return externalId(customerId)
                     .flatMap(customerRepository::findByExternalId)
-                    .filter(customer -> customer.getCreatedBy().getPkid().equals(ownerPkid));
+                    .filter(customer -> customer.getBusiness().getPkid().equals(businessPkid));
         }
         if (snapshot != null && snapshot.accountNo() != null && !snapshot.accountNo().isBlank()) {
-            return customerRepository.findByCreatedByPkidAndAccountNo(ownerPkid, snapshot.accountNo());
+            return customerRepository.findByBusinessPkidAndAccountNo(businessPkid, snapshot.accountNo());
         }
         return Optional.empty();
     }

@@ -9,6 +9,7 @@ public record AuditEventResponse(
         String type,
         String email,
         String actorEmail,
+        String business,
         String detail,
         String ip,
         String device,

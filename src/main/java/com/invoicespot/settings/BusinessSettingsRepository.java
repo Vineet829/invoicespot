@@ -12,19 +12,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface BusinessSettingsRepository extends JpaRepository<BusinessSettings, Long> {
 
-    Optional<BusinessSettings> findByUserPkid(Long userPkid);
+    Optional<BusinessSettings> findByBusinessPkid(Long businessPkid);
 
-    @EntityGraph(attributePaths = {"user"})
+    @EntityGraph(attributePaths = {"business"})
     List<BusinessSettings> findByRemindersEnabledTrue();
 
     @Modifying
     @Query(
-            value = "insert into business_settings (id, user_pkid) values (gen_random_uuid(), :userPkid)"
-                    + " on conflict (user_pkid) do nothing",
+            value = "insert into business_settings (id, business_pkid) values (gen_random_uuid(), :businessPkid)"
+                    + " on conflict (business_pkid) do nothing",
             nativeQuery = true)
-    void insertDefaultsIfMissing(@Param("userPkid") Long userPkid);
+    void insertDefaultsIfMissing(@Param("businessPkid") Long businessPkid);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select s from BusinessSettings s where s.user.pkid = :userPkid")
-    Optional<BusinessSettings> findForUpdateByUserPkid(@Param("userPkid") Long userPkid);
+    @Query("select s from BusinessSettings s where s.business.pkid = :businessPkid")
+    Optional<BusinessSettings> findForUpdateByBusinessPkid(@Param("businessPkid") Long businessPkid);
 }

@@ -2,6 +2,7 @@ package com.invoicespot.user.dto;
 
 import com.invoicespot.user.User;
 import java.time.Instant;
+import java.util.List;
 
 public record UserProfileResponse(
         String email,
@@ -10,18 +11,15 @@ public record UserProfileResponse(
         String lastName,
         boolean isEmailVerified,
         String provider,
-        String avatar,
-        String businessName,
-        String phoneNumber,
-        String address,
-        String city,
-        String country,
         boolean active,
         boolean demo,
+        List<String> sharedBusinesses,
         Instant createdAt,
         Instant updatedAt) {
 
-    public static UserProfileResponse from(User user, boolean demo) {
+    // `sharedBusinesses` are the businesses it owns that others work in, which
+    // keep the account from being deleted until they are handed over.
+    public static UserProfileResponse from(User user, boolean demo, List<String> sharedBusinesses) {
         return new UserProfileResponse(
                 user.getEmail(),
                 user.getUsername(),
@@ -29,14 +27,9 @@ public record UserProfileResponse(
                 user.getLastName(),
                 user.isEmailVerified(),
                 user.getProvider(),
-                user.getAvatar(),
-                user.getBusinessName(),
-                user.getPhoneNumber(),
-                user.getAddress(),
-                user.getCity(),
-                user.getCountry(),
                 user.isActive(),
                 demo,
+                sharedBusinesses,
                 user.getCreatedAt(),
                 user.getUpdatedAt());
     }

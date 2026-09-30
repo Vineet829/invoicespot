@@ -77,9 +77,14 @@ class RequestValidationIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("profile fields longer than their columns are refused")
+    @DisplayName("profile and business fields longer than their columns are refused")
     void profileFields() throws Exception {
         send(patch("/api/v1/user/profile"), createUser(), """
+                        {"firstName": "%s"}
+                        """.formatted("A".repeat(61)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("First names can be at most 60 characters"));
+        send(patch("/api/v1/business"), createUser(), """
                         {"phoneNumber": "%s"}
                         """.formatted("9".repeat(31)))
                 .andExpect(status().isBadRequest())

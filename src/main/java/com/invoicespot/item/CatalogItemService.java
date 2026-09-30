@@ -1,5 +1,7 @@
 package com.invoicespot.item;
 
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.item.dto.CreateItemRequest;
@@ -24,18 +26,23 @@ public class CatalogItemService {
 
     private final CatalogItemRepository itemRepository;
     private final UserRepository userRepository;
+    private final BusinessRepository businessRepository;
 
-    public CatalogItemService(CatalogItemRepository itemRepository, UserRepository userRepository) {
+    public CatalogItemService(
+            CatalogItemRepository itemRepository,
+            UserRepository userRepository,
+            BusinessRepository businessRepository) {
         this.itemRepository = itemRepository;
         this.userRepository = userRepository;
+        this.businessRepository = businessRepository;
     }
 
     @Transactional(readOnly = true)
-    public ItemListResponse list(Long ownerPkid, String query, int pageNumber, int pageSize) {
+    public ItemListResponse list(BusinessAccess access, String query, int pageNumber, int pageSize) {
         int page = Math.max(pageNumber, 1);
         int size = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         Page<CatalogItem> result = itemRepository.search(
-                ownerPkid,
+                access.businessPkid(),
                 SearchText.containing(query),
                 PageRequest.of(page - 1, size, Sort.by("name").ascending().and(Sort.by("pkid"))));
         return new ItemListResponse(
@@ -46,13 +53,14 @@ public class CatalogItemService {
     }
 
     @Transactional
-    public ItemResponse create(Long ownerPkid, CreateItemRequest request) {
+    public ItemResponse create(BusinessAccess access, CreateItemRequest request) {
         String name = requireName(request.name());
-        if (itemRepository.existsByCreatedByPkidAndNameIgnoreCase(ownerPkid, name)) {
+        if (itemRepository.existsByBusinessPkidAndNameIgnoreCase(access.businessPkid(), name)) {
             throw duplicateName();
         }
         CatalogItem item = new CatalogItem();
-        item.setCreatedBy(userRepository.getReferenceById(ownerPkid));
+        item.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
+        item.setCreatedBy(userRepository.getReferenceById(access.userPkid()));
         item.setName(name);
         item.setDescription(blankToNull(request.description()));
         item.setUnitPrice(request.unitPrice() == null ? BigDecimal.ZERO : request.unitPrice());
@@ -61,11 +69,12 @@ public class CatalogItemService {
     }
 
     @Transactional
-    public ItemResponse update(Long ownerPkid, String id, UpdateItemRequest request) {
-        CatalogItem item = requireOwned(ownerPkid, id);
+    public ItemResponse update(BusinessAccess access, String id, UpdateItemRequest request) {
+        CatalogItem item = requireInBusiness(access, id);
         if (request.name() != null) {
             String name = requireName(request.name());
-            if (itemRepository.existsByCreatedByPkidAndNameIgnoreCaseAndPkidNot(ownerPkid, name, item.getPkid())) {
+            if (itemRepository.existsByBusinessPkidAndNameIgnoreCaseAndPkidNot(
+                    access.businessPkid(), name, item.getPkid())) {
                 throw duplicateName();
             }
             item.setName(name);
@@ -80,15 +89,15 @@ public class CatalogItemService {
     }
 
     @Transactional
-    public void delete(Long ownerPkid, String id) {
-        itemRepository.delete(requireOwned(ownerPkid, id));
+    public void delete(BusinessAccess access, String id) {
+        itemRepository.delete(requireInBusiness(access, id));
     }
 
-    private CatalogItem requireOwned(Long ownerPkid, String id) {
+    private CatalogItem requireInBusiness(BusinessAccess access, String id) {
         CatalogItem item = externalId(id)
                 .flatMap(itemRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That item does not exist"));
-        if (!item.getCreatedBy().getPkid().equals(ownerPkid)) {
+        if (!item.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You are not authorized to change this item. It's not yours");
         }
         return item;

@@ -1,15 +1,16 @@
 package com.invoicespot.document;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.document.dto.EmailDocumentRequest;
 import com.invoicespot.document.dto.EmailDraftResponse;
-import com.invoicespot.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,8 +31,9 @@ public class PdfController {
     }
 
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<byte[]> pdf(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        return inline(documentService.renderPdf(principal, id));
+    public ResponseEntity<byte[]> pdf(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return inline(documentService.renderPdf(access, id));
     }
 
     static ResponseEntity<byte[]> inline(DocumentPdf pdf) {
@@ -46,55 +48,61 @@ public class PdfController {
 
     @GetMapping("/{id}/payment/{paymentId}/receipt")
     public ResponseEntity<byte[]> receipt(
-            @AuthenticationPrincipal User principal, @PathVariable String id, @PathVariable String paymentId) {
-        return inline(documentService.renderReceipt(principal, id, paymentId));
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @PathVariable String paymentId) {
+        return inline(documentService.renderReceipt(access, id, paymentId));
     }
 
     @GetMapping("/{id}/payment/{paymentId}/receipt/email")
     public EmailDraftResponse receiptDraft(
-            @AuthenticationPrincipal User principal, @PathVariable String id, @PathVariable String paymentId) {
-        EmailDraft draft = documentMailService.receiptDraft(principal, id, paymentId);
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @PathVariable String paymentId) {
+        EmailDraft draft = documentMailService.receiptDraft(access, id, paymentId);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
     }
 
     @PostMapping("/{id}/payment/{paymentId}/receipt/email")
     public MessageResponse emailReceipt(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @PathVariable String paymentId,
             @Valid @RequestBody(required = false) EmailDocumentRequest request) {
         documentMailService.emailReceipt(
-                principal, id, paymentId, request == null ? EmailDocumentRequest.DEFAULTS : request);
+                access, id, paymentId, request == null ? EmailDocumentRequest.DEFAULTS : request);
         return new MessageResponse(true, "Receipt sent successfully.");
     }
 
     @GetMapping("/{id}/remind")
-    public EmailDraftResponse reminderDraft(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        EmailDraft draft = documentMailService.reminderDraft(principal, id);
+    public EmailDraftResponse reminderDraft(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        EmailDraft draft = documentMailService.reminderDraft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
     }
 
     @PostMapping("/{id}/remind")
     public MessageResponse remind(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @Valid @RequestBody(required = false) EmailDocumentRequest request) {
-        documentMailService.remind(principal, id, request == null ? EmailDocumentRequest.DEFAULTS : request);
+        documentMailService.remind(access, id, request == null ? EmailDocumentRequest.DEFAULTS : request);
         return new MessageResponse(true, "Reminder sent successfully.");
     }
 
     @GetMapping("/{id}/email")
-    public EmailDraftResponse emailDraft(@AuthenticationPrincipal User principal, @PathVariable String id) {
-        EmailDraft draft = documentMailService.draft(principal, id);
+    public EmailDraftResponse emailDraft(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+        EmailDraft draft = documentMailService.draft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
     }
 
     @PostMapping("/{id}/email")
     public MessageResponse email(
-            @AuthenticationPrincipal User principal,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @Valid @RequestBody(required = false) EmailDocumentRequest request) {
-        documentMailService.email(principal, id, request == null ? EmailDocumentRequest.DEFAULTS : request);
+        documentMailService.email(access, id, request == null ? EmailDocumentRequest.DEFAULTS : request);
         return new MessageResponse(true, "Document sent successfully.");
     }
 }

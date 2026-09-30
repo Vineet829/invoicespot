@@ -33,6 +33,7 @@ class DocumentPdfIntegrationTest extends IntegrationTest {
 
     private Document documentFor(User owner, String clientEmail) {
         Document document = new Document();
+        document.setBusiness(businessOf(owner));
         document.setCreatedBy(owner);
         CustomerSnapshot customer = new CustomerSnapshot();
         customer.setName("Beta LLC");

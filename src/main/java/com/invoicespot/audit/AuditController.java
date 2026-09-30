@@ -3,7 +3,11 @@ package com.invoicespot.audit;
 import com.invoicespot.audit.dto.ActivityEventResponse;
 import com.invoicespot.audit.dto.AuditEventResponse;
 import com.invoicespot.audit.dto.EventPageResponse;
+import com.invoicespot.audit.dto.TeamActivityResponse;
 import com.invoicespot.auth.session.CurrentSession;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Permission;
+import com.invoicespot.business.Requires;
 import com.invoicespot.user.User;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +30,14 @@ public class AuditController {
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size) {
         return auditActivity.mine(principal, CurrentSession.id().orElse(null), page, size);
+    }
+
+    @GetMapping("/api/v1/business/activity")
+    public EventPageResponse<TeamActivityResponse> team(
+            @Requires(Permission.VIEW_TEAM_ACTIVITY) BusinessAccess access,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        return auditActivity.team(access.businessPkid(), page, size);
     }
 
     @GetMapping("/api/v1/admin/audit")

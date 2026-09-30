@@ -86,7 +86,7 @@ class DataExportIntegrationTest extends IntegrationTest {
 
         assertThat(files.keySet()).containsExactly(
                 "README.txt", "documents.csv", "line-items.csv", "payments.csv", "clients.csv", "items.csv",
-                "recurring.csv", "settings.json", "profile.json");
+                "recurring.csv", "settings.json", "business.json", "profile.json");
         assertThat(files.get("README.txt")).startsWith("Invoice Spot export, made on " + today + ".");
         assertThat(lines(files.get("documents.csv"))).hasSize(2).last().asString()
                 .startsWith("INV-0001,Invoice,Partially paid,Acme,");
@@ -104,6 +104,7 @@ class DataExportIntegrationTest extends IntegrationTest {
                         + "Emailed automatically,Paused",
                 "INV-0001,Acme,monthly,%s,%s,,3,0,No,No".formatted(today.plusDays(1), today.plusDays(1)));
         assertThat((String) JsonPath.read(files.get("settings.json"), "$.defaultCurrency")).isEqualTo("USD");
+        assertThat((String) JsonPath.read(files.get("business.json"), "$.name")).isEqualTo("Test User");
         assertThat((String) JsonPath.read(files.get("profile.json"), "$.email")).isEqualTo(owner.getEmail());
         assertThat(files.get("profile.json")).doesNotContain("password");
 

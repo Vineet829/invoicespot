@@ -1,10 +1,11 @@
 package com.invoicespot.notification;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Requires;
+import com.invoicespot.business.Permission;
 import com.invoicespot.notification.dto.MarkReadRequest;
 import com.invoicespot.notification.dto.NotificationListResponse;
-import com.invoicespot.user.User;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,14 +23,15 @@ public class NotificationController {
     }
 
     @GetMapping
-    public NotificationListResponse latest(@AuthenticationPrincipal User principal) {
-        return notificationService.latest(principal.getPkid());
+    public NotificationListResponse latest(@Requires(Permission.VIEW_RECORDS) BusinessAccess access) {
+        return notificationService.latest(access);
     }
 
     @PostMapping("/read")
     public MessageResponse markRead(
-            @AuthenticationPrincipal User principal, @RequestBody(required = false) MarkReadRequest request) {
-        notificationService.markRead(principal.getPkid(), request == null ? null : request.id());
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @RequestBody(required = false) MarkReadRequest request) {
+        notificationService.markRead(access, request == null ? null : request.id());
         return new MessageResponse(true, "Marked as read.");
     }
 }

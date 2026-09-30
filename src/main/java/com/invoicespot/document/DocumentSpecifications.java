@@ -13,10 +13,10 @@ final class DocumentSpecifications {
     private DocumentSpecifications() {}
 
     static Specification<Document> matching(
-            Long ownerPkid, DocumentSearch search, Instant startOfToday, ZoneId zone) {
+            Long businessPkid, DocumentSearch search, Instant startOfToday, ZoneId zone) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("createdBy").get("pkid"), ownerPkid));
+            predicates.add(cb.equal(root.get("business").get("pkid"), businessPkid));
             if (search.query() != null && !search.query().isBlank()) {
                 String like = SearchText.containing(search.query());
                 predicates.add(cb.or(
