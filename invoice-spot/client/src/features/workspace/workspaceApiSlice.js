@@ -50,9 +50,6 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
         responseHandler: "text",
       }),
     }),
-    sendDocumentEmail: builder.mutation({
-      query: (body) => ({ url: "/document/send-pdf", method: "POST", body }),
-    }),
   }),
 });
 
@@ -60,5 +57,4 @@ export const {
   useGetWorkspaceCustomersQuery,
   useGetWorkspaceUsersQuery,
   useUploadProfileLogoMutation,
-  useSendDocumentEmailMutation,
 } = workspaceApiSlice;
