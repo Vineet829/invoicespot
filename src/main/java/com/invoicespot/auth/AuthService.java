@@ -1,11 +1,14 @@
 package com.invoicespot.auth;
 
+import com.invoicespot.audit.AuditEventType;
+import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.auth.twofactor.TwoFactorService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,106 +20,107 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final SessionService sessionService;
+    private final TwoFactorService twoFactorService;
+    private final AuditLog auditLog;
 
     public AuthService(
-            UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            SessionService sessionService,
+            TwoFactorService twoFactorService,
+            AuditLog auditLog) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.sessionService = sessionService;
+        this.twoFactorService = twoFactorService;
+        this.auditLog = auditLog;
     }
 
+    // A sign-in starts a session; one the browser still had is ended. With
+    // two-factor sign-in on, a correct password only earns a challenge.
     @Transactional
-    public TokenBundle login(String email, String password, String presentedRefreshToken) {
+    public LoginOutcome login(String email, String password, String presentedRefreshToken) {
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Please provide an email and password");
         }
 
-        User user = userRepository.findByEmailIgnoreCase(email.trim())
-                .filter(candidate -> candidate.getPassword() != null
-                        && passwordEncoder.matches(password, candidate.getPassword()))
-                .orElseThrow(
-                        () -> new ApiException(HttpStatus.UNAUTHORIZED, "Incorrect email or password"));
+        Optional<User> account = userRepository.findByEmailIgnoreCase(email.trim());
+        if (account.isEmpty()
+                || account.get().getPassword() == null
+                || !passwordEncoder.matches(password, account.get().getPassword())) {
+            auditLog.signInFailed(
+                    email, account.orElse(null), account.isEmpty() ? "No account with this email" : "Wrong password");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Incorrect email or password");
+        }
+        User user = account.get();
 
         if (!user.isEmailVerified()) {
+            auditLog.signInFailed(email, user, "Email not verified");
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "You are not verified. Check your email, a verification email link was"
                             + " sent when you registered");
         }
         if (!user.isActive()) {
+            auditLog.signInFailed(email, user, "Account deactivated");
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "You have been deactivated by the admin and login is impossible. Contact us"
                             + " for enquiries");
         }
 
-        Set<String> retained = new HashSet<>(user.getRefreshTokens());
-        if (presentedRefreshToken != null && !presentedRefreshToken.isBlank()) {
-            retained.remove(presentedRefreshToken);
-            if (userRepository.findByRefreshToken(presentedRefreshToken).isEmpty()) {
-                retained.clear();
-            }
+        if (user.isTwoFactorEnabled()) {
+            return new LoginOutcome.TwoFactorChallenge(jwtService.issueTwoFactorChallenge(user));
         }
-        return rotate(user, retained);
+        return startSession(user, presentedRefreshToken, null);
     }
 
+    // The second step of a two-factor sign-in: the challenge from the first,
+    // and a code from the app or a recovery code.
+    @Transactional
+    public TokenBundle completeTwoFactor(String challenge, String code, String presentedRefreshToken) {
+        User user = jwtService.readTwoFactorChallenge(challenge)
+                .flatMap(userRepository::findByExternalId)
+                .filter(candidate -> candidate.isActive() && candidate.isTwoFactorEnabled())
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Your sign-in timed out. Log in again"));
+        Optional<TwoFactorService.Method> method = twoFactorService.verify(user, code);
+        if (method.isEmpty()) {
+            auditLog.signInFailed(user.getEmail(), user, "Wrong two-factor code");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "That code didn't work");
+        }
+        return startSession(user, presentedRefreshToken, method.get().description());
+    }
+
+    private TokenBundle startSession(User user, String presentedRefreshToken, String detail) {
+        if (presentedRefreshToken != null && !presentedRefreshToken.isBlank()) {
+            sessionService.end(presentedRefreshToken);
+        }
+        SessionService.Continued started = sessionService.start(user);
+        UUID sessionId = started.session().getId();
+        auditLog.record(AuditEventType.SIGN_IN, user, null, null, detail, sessionId);
+        return new TokenBundle(jwtService.issueAccessToken(user, sessionId), started.refreshToken(), user);
+    }
+
+    // A new access token for the session, and its next refresh token unless a
+    // refresh a moment ago already swapped it.
     @Transactional
     public Optional<TokenBundle> refresh(String presentedRefreshToken) {
-        Optional<User> owner = userRepository.findByRefreshToken(presentedRefreshToken);
-        if (owner.isEmpty()) {
-            revokeCompromisedSessions(presentedRefreshToken);
-            return Optional.empty();
-        }
-
-        User user = owner.get();
-        Set<String> retained = new HashSet<>(user.getRefreshTokens());
-        retained.remove(presentedRefreshToken);
-
-        Optional<JwtService.TokenClaims> claims = jwtService.readRefreshClaims(presentedRefreshToken);
-        if (claims.isEmpty()) {
-            user.setRefreshTokens(retained);
-            userRepository.save(user);
-            return Optional.empty();
-        }
-        if (!user.getId().equals(claims.get().subject())) {
-            return Optional.empty();
-        }
-        if (!user.acceptsTokenIssuedAt(claims.get().issuedAt())) {
-            user.setRefreshTokens(user.isActive() ? retained : new HashSet<>());
-            userRepository.save(user);
-            return Optional.empty();
-        }
-        return Optional.of(rotate(user, retained));
+        return sessionService.refresh(presentedRefreshToken).map(continued -> {
+            User user = continued.session().getUser();
+            return new TokenBundle(
+                    jwtService.issueAccessToken(user, continued.session().getId()), continued.refreshToken(), user);
+        });
     }
 
     @Transactional
     public Optional<String> logout(String presentedRefreshToken) {
-        Optional<User> owner = userRepository.findByRefreshToken(presentedRefreshToken);
-        if (owner.isEmpty()) {
-            return Optional.empty();
-        }
-        User user = owner.get();
-        user.getRefreshTokens().remove(presentedRefreshToken);
-        userRepository.save(user);
-        return Optional.of(user.getFirstName() + ",you have been logged out successfully");
-    }
-
-    private void revokeCompromisedSessions(String presentedRefreshToken) {
-        jwtService.readRefreshClaims(presentedRefreshToken).ifPresent(claims -> userRepository
-                .findByExternalId(claims.subject())
-                .filter(owner -> owner.acceptsTokenIssuedAt(claims.issuedAt()))
-                .ifPresent(compromised -> {
-                    compromised.getRefreshTokens().clear();
-                    userRepository.save(compromised);
-                }));
-    }
-
-    private TokenBundle rotate(User user, Set<String> retained) {
-        String accessToken = jwtService.issueAccessToken(user);
-        String refreshToken = jwtService.issueRefreshToken(user);
-        retained.add(refreshToken);
-        user.setRefreshTokens(retained);
-        userRepository.save(user);
-        return new TokenBundle(accessToken, refreshToken, user);
+        return sessionService.end(presentedRefreshToken).map(session -> {
+            User user = session.getUser();
+            auditLog.record(AuditEventType.SIGN_OUT, user, null, null, null, session.getId());
+            return user.getFirstName() + ",you have been logged out successfully";
+        });
     }
 }

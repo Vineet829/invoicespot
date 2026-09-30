@@ -35,7 +35,7 @@ class RegistrationServiceTest {
     private RegistrationService service;
 
     private static final AppProperties PROPERTIES = new AppProperties(
-            new AppProperties.Jwt("a", "b", Duration.ofMinutes(10), Duration.ofDays(1)),
+            new AppProperties.Jwt("a", Duration.ofMinutes(10), Duration.ofDays(1)),
             new AppProperties.Cookie("jwt", "/", "None", true),
             new AppProperties.Site("Invoice Spot", "http://localhost:3000", "http://localhost:8080", "from@invoicespot.local"),
             new AppProperties.Verification(Duration.ofMinutes(15)),

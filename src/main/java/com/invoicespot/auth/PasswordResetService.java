@@ -1,6 +1,9 @@
 package com.invoicespot.auth;
 
+import com.invoicespot.audit.AuditEventType;
+import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.dto.ResetPasswordRequest;
+import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -21,6 +24,8 @@ public class PasswordResetService {
     private final VerificationTokenService tokenService;
     private final MailService mailService;
     private final AppProperties.Site site;
+    private final SessionService sessionService;
+    private final AuditLog auditLog;
     private final Clock clock;
 
     public PasswordResetService(
@@ -29,12 +34,16 @@ public class PasswordResetService {
             VerificationTokenService tokenService,
             MailService mailService,
             AppProperties properties,
+            SessionService sessionService,
+            AuditLog auditLog,
             Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.mailService = mailService;
         this.site = properties.site();
+        this.sessionService = sessionService;
+        this.auditLog = auditLog;
         this.clock = clock;
     }
 
@@ -95,9 +104,10 @@ public class PasswordResetService {
         User user = token.getUser();
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setPasswordChangedAt(clock.instant());
-        user.getRefreshTokens().clear();
         userRepository.save(user);
+        sessionService.revokeAll(user);
         tokenService.revokeAll(user);
+        auditLog.record(AuditEventType.PASSWORD_RESET, user);
 
         mailService.send(
                 user.getEmail(),

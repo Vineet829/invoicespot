@@ -3,6 +3,8 @@ package com.invoicespot.auth;
 import com.invoicespot.auth.dto.LoginRequest;
 import com.invoicespot.auth.dto.LoginResponse;
 import com.invoicespot.auth.dto.LogoutResponse;
+import com.invoicespot.auth.dto.TwoFactorChallengeResponse;
+import com.invoicespot.auth.dto.TwoFactorSignInRequest;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.ratelimit.RateLimit;
@@ -42,7 +44,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(
+    public ResponseEntity<Object> login(
             @Valid @RequestBody LoginRequest request,
             @CookieValue(name = "jwt", required = false) String refreshCookie,
             HttpServletRequest http,
@@ -50,14 +52,30 @@ public class AuthController {
         String attempt = http.getRemoteAddr() + "|"
                 + (request.email() == null ? "" : request.email().trim().toLowerCase(Locale.ROOT));
         rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN, attempt);
-        TokenBundle bundle;
+        LoginOutcome outcome;
         try {
-            bundle = authService.login(request.email(), request.password(), refreshCookie);
+            outcome = authService.login(request.email(), request.password(), refreshCookie);
         } catch (ApiException exception) {
             rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, attempt);
             throw exception;
         }
         rateLimiter.reset(RateLimit.FAILED_SIGN_IN, attempt);
+        return switch (outcome) {
+            case LoginOutcome.TwoFactorChallenge challenge ->
+                    ResponseEntity.ok(new TwoFactorChallengeResponse(true, true, challenge.challenge()));
+            case TokenBundle bundle -> signedIn(bundle, response);
+        };
+    }
+
+    @PostMapping("/login/two-factor")
+    public ResponseEntity<Object> completeTwoFactor(
+            @Valid @RequestBody TwoFactorSignInRequest request,
+            @CookieValue(name = "jwt", required = false) String refreshCookie,
+            HttpServletResponse response) {
+        return signedIn(authService.completeTwoFactor(request.challenge(), request.code(), refreshCookie), response);
+    }
+
+    private ResponseEntity<Object> signedIn(TokenBundle bundle, HttpServletResponse response) {
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
         return ResponseEntity.ok(bodyOf(bundle));
     }
@@ -69,13 +87,16 @@ public class AuthController {
         if (refreshCookie == null || refreshCookie.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        response.addHeader(HttpHeaders.SET_COOKIE, clearedCookie().toString());
-        Optional<TokenBundle> rotated = authService.refresh(refreshCookie);
-        if (rotated.isEmpty()) {
+        Optional<TokenBundle> refreshed = authService.refresh(refreshCookie);
+        if (refreshed.isEmpty()) {
+            response.addHeader(HttpHeaders.SET_COOKIE, clearedCookie().toString());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        TokenBundle bundle = rotated.get();
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
+        // A refresh within moments of another keeps the cookie the other set.
+        TokenBundle bundle = refreshed.get();
+        if (bundle.refreshToken() != null) {
+            response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
+        }
         return ResponseEntity.ok(bodyOf(bundle));
     }
 

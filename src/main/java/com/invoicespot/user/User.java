@@ -72,10 +72,18 @@ public class User extends BaseEntity {
     @Column(name = "role", nullable = false, length = 30)
     private Set<String> roles = new HashSet<>(Set.of("User"));
 
-    @ElementCollection
-    @CollectionTable(name = "user_refresh_tokens", joinColumns = @JoinColumn(name = "user_pkid"))
-    @Column(name = "token", nullable = false, columnDefinition = "text")
-    private Set<String> refreshTokens = new HashSet<>();
+    @Column(name = "two_factor_secret")
+    private String twoFactorSecret;
+
+    @Column(name = "two_factor_enabled_at")
+    private Instant twoFactorEnabledAt;
+
+    @Column(name = "two_factor_last_step")
+    private Long twoFactorLastStep;
+
+    public boolean isTwoFactorEnabled() {
+        return twoFactorEnabledAt != null;
+    }
 
     public boolean acceptsTokenIssuedAt(Instant issuedAt) {
         return active

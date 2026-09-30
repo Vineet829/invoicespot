@@ -7,10 +7,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.invoicespot.audit.AuditEventType;
+import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.DemoProperties;
 import com.invoicespot.user.dto.UpdateProfileRequest;
+import java.time.Clock;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,11 +31,20 @@ import org.springframework.http.HttpStatus;
 class UserServiceTest {
 
     @Mock private UserRepository userRepository;
+    @Mock private SessionService sessionService;
+    @Mock private AuditLog auditLog;
+    @Mock private AdminStats adminStats;
     private UserService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userRepository, new DemoAccountGuard(new DemoProperties("demo@example.test")));
+        service = new UserService(
+                userRepository,
+                new DemoAccountGuard(new DemoProperties("demo@example.test")),
+                sessionService,
+                auditLog,
+                adminStats,
+                Clock.systemUTC());
     }
 
     private static UpdateProfileRequest onlyAllowed() {
@@ -80,7 +96,7 @@ class UserServiceTest {
         UUID id = UUID.randomUUID();
         when(userRepository.findByExternalId(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.deleteUser(id.toString()))
+        assertThatThrownBy(() -> service.deleteUser(id.toString(), new User()))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("User not found")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -88,17 +104,45 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("deactivating a user flips the active flag and persists")
+    @DisplayName("deactivating a user flips the active flag, persists and is recorded with the admin who did it")
     void deactivatesUser() {
         User user = new User();
+        user.setPkid(1L);
         user.setActive(true);
+        User admin = new User();
+        admin.setPkid(2L);
         UUID id = UUID.randomUUID();
         when(userRepository.findByExternalId(id)).thenReturn(Optional.of(user));
 
-        var summary = service.deactivateUser(id.toString());
+        var summary = service.deactivateUser(id.toString(), admin);
 
         assertThat(summary.active()).isFalse();
         assertThat(user.isActive()).isFalse();
         verify(userRepository).save(user);
+        verify(sessionService).revokeAll(user);
+        verify(auditLog).record(AuditEventType.USER_DEACTIVATED, user, admin);
+    }
+
+    @Test
+    @DisplayName("the last active admin can't be made a regular user, deactivated or deleted")
+    void keepsLastAdmin() {
+        User last = new User();
+        last.setPkid(1L);
+        last.setRoles(new HashSet<>(Set.of("User", "Admin")));
+        User admin = new User();
+        admin.setPkid(2L);
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByExternalId(id)).thenReturn(Optional.of(last));
+        when(userRepository.lockActiveAdmins()).thenReturn(List.of(last));
+
+        assertThatThrownBy(() -> service.setAdmin(id.toString(), admin, false))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The last admin can't be made a regular user");
+        assertThatThrownBy(() -> service.deactivateUser(id.toString(), admin))
+                .hasMessage("The last admin can't be deactivated");
+        assertThatThrownBy(() -> service.deleteUser(id.toString(), admin))
+                .hasMessage("The last admin can't be deleted");
+        assertThat(last.getRoles()).contains("Admin");
+        verify(userRepository, never()).delete(any(User.class));
     }
 }

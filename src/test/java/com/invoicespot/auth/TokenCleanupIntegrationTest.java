@@ -33,25 +33,31 @@ class TokenCleanupIntegrationTest extends IntegrationTest {
                 Timestamp.from(now.plus(fromNow)));
     }
 
-    private List<String> tokens(String table, User user) {
+    private List<String> tokens(User user) {
         return jdbcTemplate.queryForList(
-                "select token from " + table + " where user_pkid = ?", String.class, user.getPkid());
+                "select token from verify_reset_tokens where user_pkid = ?", String.class, user.getPkid());
+    }
+
+    private List<UUID> sessions(User user) {
+        return jdbcTemplate.queryForList(
+                "select id from user_sessions where user_pkid = ?", UUID.class, user.getPkid());
     }
 
     @Test
-    @DisplayName("expired email links and refresh tokens that no longer work are removed; the rest stay")
+    @DisplayName("expired email links, and sessions that were signed out or ran out, are removed; the rest stay")
     void removesExpired() {
         User user = createUser();
         emailToken(user, "expired-link", Duration.ofMinutes(-5));
         emailToken(user, "live-link", Duration.ofMinutes(15));
-        String live = jwtService.issueRefreshToken(user);
-        jdbcTemplate.update("insert into user_refresh_tokens (user_pkid, token) values (?, ?)", user.getPkid(), live);
-        jdbcTemplate.update(
-                "insert into user_refresh_tokens (user_pkid, token) values (?, ?)", user.getPkid(), "not-a-token");
+        UUID live = sessionService.start(user).session().getId();
+        UUID signedOut = sessionService.start(user).session().getId();
+        UUID ranOut = sessionService.start(user).session().getId();
+        jdbcTemplate.update("update user_sessions set revoked_at = now() where id = ?", signedOut);
+        jdbcTemplate.update("update user_sessions set expires_at = now() - interval '1 minute' where id = ?", ranOut);
 
-        assertThat(tokenCleanup.removeExpired()).isGreaterThanOrEqualTo(2);
+        assertThat(tokenCleanup.removeExpired()).isGreaterThanOrEqualTo(3);
 
-        assertThat(tokens("verify_reset_tokens", user)).containsExactly("live-link");
-        assertThat(tokens("user_refresh_tokens", user)).containsExactly(live);
+        assertThat(tokens(user)).containsExactly("live-link");
+        assertThat(sessions(user)).containsExactly(live);
     }
 }

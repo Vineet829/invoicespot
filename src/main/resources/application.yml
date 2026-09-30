@@ -63,9 +63,10 @@ management:
 app:
   jwt:
     access-secret: ${JWT_ACCESS_SECRET_KEY}
-    refresh-secret: ${JWT_REFRESH_SECRET_KEY}
     access-token-ttl: PT10M
     refresh-token-ttl: P1D
+  two-factor:
+    encryption-key: ${APP_ENCRYPTION_KEY:}
   cookie:
     refresh-name: jwt
     path: /

@@ -7,11 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AppProperties(
         Jwt jwt, Cookie cookie, Site site, Verification verification, Upload upload) {
 
-    public record Jwt(
-            String accessSecret,
-            String refreshSecret,
-            Duration accessTokenTtl,
-            Duration refreshTokenTtl) {}
+    public record Jwt(String accessSecret, Duration accessTokenTtl, Duration refreshTokenTtl) {}
 
     public record Cookie(String refreshName, String path, String sameSite, boolean secure) {}
 

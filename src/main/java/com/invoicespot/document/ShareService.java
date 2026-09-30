@@ -1,6 +1,7 @@
 package com.invoicespot.document;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.document.dto.PublicDocumentResponse;
@@ -13,17 +14,11 @@ import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -45,7 +40,6 @@ public class ShareService {
     private final NotificationService notificationService;
     private final AppProperties properties;
     private final Clock clock;
-    private final SecureRandom random = new SecureRandom();
 
     public ShareService(
             DocumentRepository documentRepository,
@@ -76,12 +70,10 @@ public class ShareService {
             active.setRevokedAt(now);
             shareLinkRepository.saveAndFlush(active);
         });
-        byte[] secret = new byte[32];
-        random.nextBytes(secret);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+        String token = SecretTokens.generate();
         ShareLink link = new ShareLink();
         link.setDocument(document);
-        link.setTokenHash(hash(token));
+        link.setTokenHash(SecretTokens.hash(token));
         link.setCreatedAt(now);
         shareLinkRepository.save(link);
         activity.record(document, DocumentEventType.SHARED, null);
@@ -232,20 +224,12 @@ public class ShareService {
         if (token == null || token.isBlank() || token.length() > 100) {
             throw linkGone();
         }
-        return shareLinkRepository.findByTokenHashAndRevokedAtIsNull(hash(token)).orElseThrow(ShareService::linkGone);
+        return shareLinkRepository.findByTokenHashAndRevokedAtIsNull(SecretTokens.hash(token))
+                .orElseThrow(ShareService::linkGone);
     }
 
     private static ApiException linkGone() {
         return new ApiException(HttpStatus.NOT_FOUND, "This link doesn't work anymore");
-    }
-
-    private static String hash(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
     }
 
     private static List<String> lines(String... values) {

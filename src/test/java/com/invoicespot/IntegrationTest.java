@@ -1,6 +1,7 @@
 package com.invoicespot;
 
 import com.invoicespot.auth.JwtService;
+import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.util.HashSet;
@@ -21,7 +22,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest(
         properties = {
             "app.jwt.access-secret=integration-test-access-secret-0123456789abcdef",
-            "app.jwt.refresh-secret=integration-test-refresh-secret-0123456789abcdef",
+            "app.two-factor.encryption-key=aW50ZWdyYXRpb24tdGVzdC1rZXktMzItYnl0ZXMhISE=",
             "management.health.mail.enabled=false",
             "app.jobs.enabled=false",
             "app.demo.email=" + IntegrationTest.DEMO_EMAIL
@@ -50,6 +51,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected JwtService jwtService;
+
+    @Autowired
+    protected SessionService sessionService;
 
     @MockBean
     protected JavaMailSender mailSender;
@@ -83,7 +87,8 @@ public abstract class IntegrationTest {
         return userRepository.save(user);
     }
 
+    // A header for a new session of the user's.
     protected String bearer(User user) {
-        return "Bearer " + jwtService.issueAccessToken(user);
+        return "Bearer " + jwtService.issueAccessToken(user, sessionService.start(user).session().getId());
     }
 }

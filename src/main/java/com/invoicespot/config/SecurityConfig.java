@@ -17,7 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({AppProperties.class, DemoProperties.class})
+@EnableConfigurationProperties({AppProperties.class, DemoProperties.class, TwoFactorProperties.class})
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -43,6 +43,7 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/uploads/**",
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/login/two-factor",
                                 "/api/v1/auth/new_access_token",
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/register",

@@ -5,6 +5,8 @@ import java.time.Duration;
 
 public enum RateLimit {
     FAILED_SIGN_IN(5, Duration.ofMinutes(15), "Too many sign-in attempts"),
+    WRONG_PASSWORD(5, Duration.ofMinutes(15), "Too many wrong passwords"),
+    WRONG_TWO_FACTOR_CODE(5, Duration.ofMinutes(15), "Too many wrong codes"),
     SIGN_UP(5, Duration.ofHours(1), "Too many sign-ups from this network"),
     PASSWORD_RESET(5, Duration.ofHours(1), "Too many password reset requests"),
     VERIFICATION_EMAIL(5, Duration.ofHours(1), "Too many verification emails requested"),

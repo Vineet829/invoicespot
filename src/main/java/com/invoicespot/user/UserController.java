@@ -1,6 +1,8 @@
 package com.invoicespot.user;
 
 import com.invoicespot.auth.dto.MessageResponse;
+import com.invoicespot.user.dto.AdminRoleRequest;
+import com.invoicespot.user.dto.AdminStatsResponse;
 import com.invoicespot.user.dto.ProfileResponse;
 import com.invoicespot.user.dto.UpdateProfileRequest;
 import com.invoicespot.user.dto.UpdatedProfileResponse;
@@ -50,20 +52,44 @@ public class UserController {
 
     @GetMapping("/all")
     @PreAuthorize("hasAuthority('Admin')")
-    public UserPageResponse listUsers(@RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber) {
-        return userService.listUsers(pageNumber);
+    public UserPageResponse listUsers(
+            @RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "q", required = false) String query) {
+        return userService.listUsers(pageNumber, size, query);
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAuthority('Admin')")
+    public AdminStatsResponse stats() {
+        return userService.stats();
+    }
+
+    @PatchMapping("/{id}/reactivate")
+    @PreAuthorize("hasAuthority('Admin')")
+    public UserSummaryResponse reactivateUser(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return userService.reactivateUser(id, principal);
+    }
+
+    @PatchMapping("/{id}/admin")
+    @PreAuthorize("hasAuthority('Admin')")
+    public UserSummaryResponse setAdmin(
+            @AuthenticationPrincipal User principal,
+            @PathVariable String id,
+            @Valid @RequestBody AdminRoleRequest request) {
+        return userService.setAdmin(id, principal, request.admin());
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('Admin')")
-    public MessageResponse deleteUser(@PathVariable String id) {
-        String firstName = userService.deleteUser(id);
+    public MessageResponse deleteUser(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        String firstName = userService.deleteUser(id, principal);
         return new MessageResponse(true, "User " + firstName + " deleted successfully");
     }
 
     @PatchMapping("/{id}/deactivate")
     @PreAuthorize("hasAuthority('Admin')")
-    public UserSummaryResponse deactivateUser(@PathVariable String id) {
-        return userService.deactivateUser(id);
+    public UserSummaryResponse deactivateUser(@AuthenticationPrincipal User principal, @PathVariable String id) {
+        return userService.deactivateUser(id, principal);
     }
 }

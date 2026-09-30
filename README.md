@@ -4,17 +4,21 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 
 ## Features
 
-- **Create Invoices**: Easily create and customize invoices with client details, and tax information.
-- **Manage Clients**: Store and manage client information for quick access when generating invoices.
-- **Track Payments**: Monitor payment statuses and history for each invoice.
-- **Send Invoices**: Email invoices directly to clients from within the app.
-- **User Authentication**: Secure login system to protect your data.
-- **Password Management**: Reset and manage user passwords securely.
-- **Account Management**: Update user profiles and manage user accounts.
-- **Customer Management**: Create, update, and delete customer information efficiently.
-- **Document Handling**: Generate, update, and delete invoices and related documents.
-- **PDF Generation**: Generate PDF versions of invoices for easy sharing and printing.
-- **Email Verification**: Ensure secure user registration with email verification and re-verification options.
+- **Invoices, Quotations and Receipts**: Create documents with line items, discounts and tax; the server works out every total to the cent, and each type is numbered in order (INV-0001, QUO-0001, REC-0001).
+- **Clients**: Keep client details, see what each client owes in every currency, and send a statement of account.
+- **Payments and Receipts**: Record, edit and remove payments, and send a receipt for each one.
+- **PDFs and Email**: Download, print or email any document as a PDF.
+- **Share Links**: Send a client a link to view and download a document, and to accept a quotation.
+- **Reminders**: Remind clients about unpaid invoices yourself, or automatically before and after the due date.
+- **Recurring Invoices**: Repeat an invoice weekly, monthly, quarterly or yearly, and email each new one if you like.
+- **Notifications**: Hear when a client views or accepts a shared document, an invoice becomes overdue, or a recurring invoice is made.
+- **Search**: Find documents and clients by number, name, status, type or date, and jump to anything with ⌘K.
+- **Reports**: Income by month, unpaid invoices by age, top clients and payment methods, per currency, each downloadable as CSV.
+- **Import and Export**: Import clients from a CSV file after previewing every row; export documents, payments and clients as CSV, or everything as a ZIP file.
+- **Settings**: Defaults for currency, payment terms, tax, notes, numbering, reminders and time zone.
+- **Account Security**: Change your password, sign in with a code from an authenticator app, see and sign out your devices, and review your security activity.
+- **Administration**: Search accounts, see how many are active, deactivate and reactivate them, manage admins, and read the audit log.
+- **Demo Account**: Try the app as a guest, with sample data.
 
 ### Authentication
 
@@ -34,6 +38,9 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 - **Password Reset:**
   Request a password reset if you've forgotten your password.
   Follow the instructions sent to your email to reset your password.
+
+- **Two-Factor Sign-In:**
+  Add a code from an authenticator app to your sign-in, with recovery codes in case you lose your phone.
 
  <p align="center">
     <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png" alt="alt text 1" width="850" />
@@ -65,7 +72,13 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
   Remove customer entries when they are no longer needed.
 
 - **Retrieve Customer Information:**
-  View all customers or a specific customer's details.
+  View all customers or a specific customer's details, with what each owes and their documents.
+
+- **Statements:**
+  Download or email a client's statement of account.
+
+- **Import and Export:**
+  Import clients from a CSV file, or export them as one.
 
  <p align="center">
     <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png" alt="alt text 1" width="850" />
@@ -90,6 +103,18 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 
 - **Generate PDF:**
   Create PDF versions of invoices for easy sharing.
+
+- **Copy and Convert:**
+  Duplicate any document, or turn a quotation into an invoice.
+
+- **Share:**
+  Send a link where the client can view the document and accept a quotation.
+
+- **Remind and Repeat:**
+  Send payment reminders, automatically if you like, and make invoices repeat on a schedule.
+
+- **Timeline:**
+  See when each document was created, sent, viewed, reminded and paid.
 
 
  <p align="center">
@@ -131,6 +156,23 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 - **Record Payments:**
   Record payments and track the payment status of invoices.
 
+- **Edit and Remove Payments:**
+  Correct a payment or remove it, and the invoice's status follows.
+
+- **Receipts:**
+  Download or email a receipt for each payment.
+
+### Reports and Data
+
+- **Reports:**
+  Income by month, unpaid invoices by age, top clients and payment methods, for the last few months or any year.
+
+- **CSV Files:**
+  Download each report, and your documents, payments and clients, as CSV files.
+
+- **Export Everything:**
+  Download all your records, settings and profile in one ZIP file.
+
 ### User Account Management
 
 - **View User Profile:**
@@ -141,6 +183,9 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 
 - **Delete Account:**
   Delete your account if you no longer wish to use the app.
+
+- **Security:**
+  Change your password, turn on two-factor sign-in, sign out other devices and review your recent sign-ins.
 
 
    <p align="center">
@@ -174,10 +219,29 @@ Invoice Spot is an app for managing invoices, featuring client management, payme
 - **Delete User:**
   Remove user accounts that are no longer needed.
 
+- **Search and Reactivate:**
+  Find accounts by name or email, and let deactivated accounts sign in again.
+
+- **Admins:**
+  Make an account an admin or a regular user. You can never change your own role, or remove the last admin.
+
+- **Audit Log:**
+  Read every sign-in, security change and admin action.
+
 
  <p align="center">
     <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice11.png" alt="alt text 1" width="850" />
 
 </p>
 
+## Configuration
 
+The backend's settings are in `src/main/resources/application.yml`. Besides the database, mail and
+`JWT_ACCESS_SECRET_KEY` settings there, it reads:
+
+- `APP_ENCRYPTION_KEY`: 32 random bytes, base64-encoded (for example `openssl rand -base64 32`), which
+  two-factor secrets are encrypted with. Without it the app runs, but two-factor sign-in can't be turned on.
+- `JOBS_ENABLED`, `JOBS_CRON` and `JOBS_ZONE`: the daily run that makes recurring invoices, sends automatic
+  reminders, raises overdue alerts and removes expired sign-ins. It is on by default, at 07:00 UTC.
+
+`JWT_REFRESH_SECRET_KEY` is no longer used: each sign-in is kept as a session.
