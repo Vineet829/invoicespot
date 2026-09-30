@@ -30,7 +30,7 @@ const CustomersPage = () => {
     refetchOnMountOrArgChange: 60,
   });
   const rows = query.data?.myCustomers || [];
-  const pagination = usePagination(rows);
+  const pagination = usePagination(rows, 10);
   const [selected, setSelected] = useState(null);
   const [deleteCustomer, { isLoading: deleting }] = useDeleteCustomerMutation();
   const remove = async () => {
@@ -91,7 +91,7 @@ const CustomersPage = () => {
     },
   ];
   return (
-    <WorkspacePage section="Clients">
+    <WorkspacePage section="Clients" fill>
       <PageHeader
         title="Clients"
         description="The people behind your work. Keep their details close at hand."
@@ -106,12 +106,13 @@ const CustomersPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel title="Your clients">
+        <Panel title="Your clients" fill={rows.length > 0}>
           {rows.length ? (
             <>
               <DataTable
                 columns={columns}
                 rows={pagination.rows}
+                fillRows={pagination.fullPage}
                 label="Clients"
               />
               <Pagination pagination={pagination} />

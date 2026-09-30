@@ -199,13 +199,13 @@ const CARD_TONES = {
 };
 
 export const financePanel =
-  "grid min-w-0 animate-ov-rise grid-rows-[36px_minmax(0,1fr)] gap-[18px] rounded-[30px] border border-white/90 bg-white/[.66] p-6 shadow-panel backdrop-blur-[16px] [--rise-delay:80ms] compact:grid-rows-[30px_minmax(0,1fr)] compact:gap-3 compact:p-[18px] max-[1359px]:grid-rows-[auto_minmax(0,1fr)] max-[1359px]:p-5 max-[700px]:gap-4 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
+  "grid min-w-0 animate-ov-rise grid-rows-[36px_minmax(0,1fr)] gap-[18px] rounded-[30px] border border-white/90 bg-white/[.66] p-6 shadow-panel backdrop-blur-[16px] [--rise-delay:80ms] compact:grid-rows-[30px_minmax(0,1fr)] compact:gap-2 compact:px-[18px] compact:py-3.5 max-[1359px]:grid-rows-[auto_minmax(0,1fr)] max-[1359px]:p-5 max-[700px]:gap-4 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
 export const financePanelHeading =
   "flex min-w-0 items-center justify-between gap-4 px-1 max-[1359px]:flex-wrap max-[1359px]:gap-x-4 max-[1359px]:gap-y-1 max-[700px]:p-0";
 export const financeCards =
   "grid min-h-0 grid-cols-3 gap-4 max-[1359px]:gap-3 max-[700px]:grid-cols-1";
 const financeCard = (tone) =>
-  `flex min-w-0 flex-col justify-between gap-[18px] rounded-[22px] p-6 [container-name:finance-card] [container-type:inline-size] compact:gap-2.5 compact:p-[18px] max-[1359px]:p-[18px] max-[700px]:min-h-[240px] max-[700px]:p-[22px] ${CARD_TONES[tone].card}`;
+  `flex min-w-0 flex-col justify-between gap-[18px] rounded-[22px] p-6 [container-name:finance-card] [container-type:inline-size] compact:gap-2.5 compact:px-3.5 compact:py-[18px] max-[1359px]:p-[18px] max-[700px]:min-h-[240px] max-[700px]:p-[22px] ${CARD_TONES[tone].card}`;
 
 export const FinancialCard = ({
   label,
@@ -223,7 +223,7 @@ export const FinancialCard = ({
     >
       <header className="flex items-center justify-between gap-2.5">
         <h3
-          className={`rounded-full bg-white/70 px-4 py-2 font-ui text-[15px] font-normal ${colors.label}`}
+          className={`rounded-full bg-white/70 px-4 py-2 font-ui text-[15px] font-normal [@container_finance-card_(min-width:162px)]:text-[16px] ${colors.label}`}
         >
           {label}
         </h3>
@@ -243,14 +243,14 @@ export const FinancialCard = ({
         {/* When a description wraps, every card reserves two lines so the
             three figures stay level. */}
         <p
-          className={`mt-3 text-[15px] [@container_finance-card_(max-width:270px)]:min-h-[2lh] ${colors.muted}`}
+          className={`mt-3 text-[15px] [@container_finance-card_(max-width:270px)]:min-h-[2lh] [@container_finance-card_(min-width:162px)]:text-[16px] ${colors.muted}`}
         >
           {detail}
         </p>
       </div>
       {fill != null && (
         <div
-          className={`h-2 shrink-0 overflow-hidden rounded-full ${colors.track}`}
+          className={`h-2.5 shrink-0 overflow-hidden rounded-full ${colors.track}`}
           aria-hidden="true"
         >
           <span
@@ -395,14 +395,14 @@ export const DocumentStatus = ({ snapshot, total }) => {
               onMouseEnter={() => setActive(index)}
               onMouseLeave={() => setActive(null)}
             >
-              <dt className="flex min-w-0 items-start gap-3 text-[15px]">
+              <dt className="flex min-w-0 items-start gap-3 text-[16px]">
                 <span
                   className={`mt-1 size-[11px] shrink-0 rounded-full ${STATUS_DOTS[index]}`}
                   aria-hidden="true"
                 />
                 <span>
                   <span>{label}</span>
-                  <small className="mt-0.5 block text-[12.5px] text-spot-muted">
+                  <small className="mt-0.5 block text-[13px] text-spot-muted">
                     {detail}
                   </small>
                 </span>
@@ -441,12 +441,16 @@ export const DocumentStatus = ({ snapshot, total }) => {
   );
 };
 
+// The status column grows from 360px in a 1360px-wide window to 540px at
+// 1680px, so the finance cards never get narrower than they are at 1360px.
 export const overviewLayout =
-  "grid min-h-[724px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(360px,25vw,480px)] gap-6 compact:min-h-[635px] compact:gap-5 max-[1359px]:min-h-0 max-[1359px]:grid-cols-[minmax(0,1fr)] max-[700px]:gap-5";
-// Extra height is shared in the design's 380 : 394 ratio; the minimums are
-// the smallest the panels may get before the page scrolls.
+  "grid min-h-[724px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(360px,calc(56.25vw_-_405px),540px)] gap-6 compact:min-h-[635px] compact:gap-5 max-[1359px]:min-h-0 max-[1359px]:grid-cols-[minmax(0,1fr)] max-[700px]:gap-5";
+// Extra height is shared in the design's 380 : 394 ratio. On short windows
+// the payment history comes first, up to 385px, and the financial summary
+// takes the rest. The minimums are the smallest the panels may get before
+// the page scrolls.
 export const mainColumn =
-  "grid min-h-0 min-w-0 grid-rows-[minmax(340px,380fr)_minmax(362px,394fr)] gap-[22px] compact:grid-rows-[minmax(275px,380fr)_minmax(344px,394fr)] compact:gap-4 max-[1359px]:grid-rows-[340px_394px] max-[700px]:flex max-[700px]:flex-col max-[700px]:gap-5";
+  "grid min-h-0 min-w-0 grid-rows-[minmax(340px,380fr)_minmax(362px,394fr)] gap-[22px] compact:grid-rows-[1fr_minmax(344px,385px)] compact:gap-4 max-[1359px]:grid-rows-[340px_394px] max-[700px]:flex max-[700px]:flex-col max-[700px]:gap-5";
 export const historyPanel =
   "relative flex min-h-0 min-w-0 animate-ov-rise flex-col gap-1.5 rounded-[30px] border border-white/90 bg-white/60 px-7 pb-[18px] pt-[22px] backdrop-blur-[16px] [--rise-delay:160ms] compact:px-[22px] compact:pb-3.5 compact:pt-4 max-[1359px]:px-5 max-[700px]:gap-3 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
 export const historyHeading =
@@ -467,12 +471,12 @@ export const DashboardLoading = () => (
         <div className={financeCards}>
           {["blue", "lilac", "peach"].map((tone) => (
             <div className={financeCard(tone)} key={tone}>
-              <Skeleton className="h-[35px] w-[150px] rounded-full" />
+              <Skeleton className="h-[37px] w-[150px] rounded-full" />
               <div>
                 <Skeleton className="h-14 w-[82%] rounded-md" />
                 <Skeleton className="mt-3 h-[13px] w-[70%] rounded-md" />
               </div>
-              <Skeleton className="h-2 w-full rounded-md" />
+              <Skeleton className="h-2.5 w-full rounded-md" />
             </div>
           ))}
         </div>

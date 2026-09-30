@@ -34,7 +34,7 @@ const DocumentsPage = () => {
     refetchOnMountOrArgChange: 60,
   });
   const rows = query.data?.myDocuments || [];
-  const pagination = usePagination(rows);
+  const pagination = usePagination(rows, 10);
   const [selected, setSelected] = useState(null);
   const [deleteDoc, { isLoading: deleting }] = useDeleteDocMutation();
   const remove = async () => {
@@ -100,7 +100,7 @@ const DocumentsPage = () => {
     },
   ];
   return (
-    <WorkspacePage section="Documents">
+    <WorkspacePage section="Documents" fill>
       <PageHeader
         title="Documents"
         description="Invoices, quotations, and receipts. All your paperwork in one place."
@@ -115,12 +115,13 @@ const DocumentsPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel title="Your documents">
+        <Panel title="Your documents" fill={rows.length > 0}>
           {rows.length ? (
             <>
               <DataTable
                 columns={columns}
                 rows={pagination.rows}
+                fillRows={pagination.fullPage}
                 label="Documents"
               />
               <Pagination pagination={pagination} />

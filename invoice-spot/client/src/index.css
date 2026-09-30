@@ -77,6 +77,14 @@
 	}
 }
 
+/* Toast status colours from the pastel palette. */
+:root {
+	--toastify-color-info: #3f79b0;
+	--toastify-color-success: #5f9d70;
+	--toastify-color-warning: #d9a441;
+	--toastify-color-error: #c9643f;
+}
+
 /* Reduced motion shows every animation's final state. */
 @media (prefers-reduced-motion: reduce) {
 	.dashboard-app *,

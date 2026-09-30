@@ -38,7 +38,7 @@ const PaymentAmount = ({ amount }) => {
   const formatted = formatMoney(amount);
   return (
     <span
-      className="font-display font-light tracking-[-0.03em] [font-size:min(19px,calc(130px_/_(var(--chars)_*_0.57)))]"
+      className="font-display font-light tracking-[-0.03em] [font-size:min(19px,calc(130px_/_(var(--chars)_*_0.57)))] [@container_(min-width:650px)]:[font-size:min(20px,calc(130px_/_(var(--chars)_*_0.57)))]"
       style={{ "--chars": formatted.length }}
     >
       {formatted.slice(0, -3)}
@@ -84,13 +84,11 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
   const start = rowsPerPage === -1 ? 0 : page * rowsPerPage;
   const visibleRows =
     rowsPerPage === -1 ? rows : rows.slice(start, start + rowsPerPage);
-  // At five rows per page the rows share the table's height on desktop, and
-  // a short last page keeps the same row height. Longer pages keep 46px rows
-  // and scroll inside the panel.
+  // On desktop every row is a fifth of the table's height, so five rows fill
+  // it at any page size: longer pages scroll inside the panel without
+  // resizing the rows, and a short last page keeps the same row height.
   const rowHeight =
-    rowsPerPage === 5
-      ? "h-[46px] min-[1360px]:[height:max(40px,calc((100cqh_-_34px)_/_5))]"
-      : "h-[46px]";
+    "h-[46px] min-[1360px]:[height:max(40px,calc((100cqh_-_34px)_/_5))]";
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -121,10 +119,11 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
             <caption className="sr-only">Recorded payment history</caption>
             {/* Column widths follow the table's width: the design's
                 144/164/130px at full width, narrowing in proportion so
-                Additional info keeps room. */}
+                Additional info keeps room. Tables 650px and wider use
+                larger text, so Date paid starts at 106px there. */}
             <colgroup className="max-[700px]:hidden">
               <col className="w-1/4" />
-              <col className="w-[clamp(96px,13.66cqi,144px)] max-[1359px]:w-[110px]" />
+              <col className="w-[clamp(96px,13.66cqi,144px)] max-[1359px]:w-[110px] min-[1360px]:[@container_(min-width:650px)]:w-[clamp(106px,13.66cqi,144px)]" />
               <col className="w-[clamp(110px,15.56cqi,164px)] max-[1359px]:w-[110px]" />
               <col />
               <col className="w-[clamp(90px,12.34cqi,130px)] max-[1359px]:w-[100px]" />
@@ -151,7 +150,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
             <tbody className="before:table-row before:h-1.5 before:content-[''] max-[700px]:block max-[700px]:before:hidden">
               {visibleRows.map((payment, index) => {
                 const document = paymentDocuments?.get(payment.id);
-                const rowCell = `${cell} text-[13px] ${index > 0 ? "border-t border-[#23273512]" : ""} max-[700px]:min-w-0 max-[700px]:border-0 max-[700px]:p-0 max-[700px]:text-left`;
+                const rowCell = `${cell} text-[13px] [@container_(min-width:650px)]:text-[14.5px] ${index > 0 ? "border-t border-[#23273512]" : ""} max-[700px]:min-w-0 max-[700px]:border-0 max-[700px]:p-0 max-[700px]:text-left`;
                 return (
                   <tr
                     key={payment.id}
@@ -168,7 +167,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
                       scope="row"
                       className={`${rowCell} text-spot-ink max-[700px]:col-start-1 max-[700px]:row-start-1`}
                     >
-                      <span className="flex items-center gap-3 text-[14.5px] font-medium">
+                      <span className="flex items-center gap-3 text-[14.5px] font-medium [@container_(min-width:650px)]:text-[16px]">
                         <span
                           className={`grid size-8 shrink-0 place-items-center rounded-[11px] text-[11px] font-normal ${AVATAR_TONES[(start + index) % 4]}`}
                           aria-hidden="true"

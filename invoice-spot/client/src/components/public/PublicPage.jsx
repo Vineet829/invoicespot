@@ -18,7 +18,7 @@ export const PublicFooter = () => (
 );
 
 // Public pages share the workspace's canvas: header, content, footer.
-export const pageFrame = `${appSurface} flex min-h-dvh flex-col gap-6 px-8 pb-6 pt-4 compact:gap-4 max-[960px]:px-6 max-[700px]:px-4 max-[700px]:pb-5 max-[700px]:pt-2`;
+const pageFrame = `${appSurface} flex min-h-dvh flex-col gap-6 px-8 pb-6 pt-4 compact:gap-4 max-[960px]:px-6 max-[700px]:px-4 max-[700px]:pb-5 max-[700px]:pt-2`;
 
 // A single task on its own, such as resetting a password: one card in the
 // middle of the canvas.

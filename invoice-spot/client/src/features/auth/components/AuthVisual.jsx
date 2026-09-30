@@ -97,7 +97,8 @@ const ui = {
   streak2: `${streak} top-[66%] w-[200px] animate-auth-streak-late bg-[linear-gradient(90deg,transparent,#a996e066,transparent)]`,
   particle:
     "pointer-events-none absolute animate-auth-float rounded-full bg-spot-violet/50",
-  content: "relative z-[1] m-auto flex w-full max-w-[460px] flex-col",
+  content:
+    "relative z-[1] m-auto flex w-full max-w-[460px] flex-col min-[901px]:[zoom:1.4]",
   intro: "flex flex-col gap-6",
   headline:
     "text-balance font-display text-[46px] font-extralight leading-[1.04] tracking-[-0.055em] text-spot-ink",

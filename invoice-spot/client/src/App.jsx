@@ -90,7 +90,10 @@ const App = () => {
 					<Route path="*" element={<NotFound />} />
 				</Route>
 			</Routes>
-			<ToastContainer theme="dark" />
+			<ToastContainer
+				theme="light"
+				toastClassName="rounded-2xl border border-solid border-white font-ui text-[14px] text-spot-ink shadow-float"
+			/>
 		</>
 	);
 };
