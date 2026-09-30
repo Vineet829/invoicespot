@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { FiEdit2, FiMail } from "react-icons/fi";
-import { toast } from "react-toastify";
+import { FiDownload, FiEdit2, FiMail, FiPrinter } from "react-icons/fi";
 import useTitle from "../../../hooks/useTitle";
 import { useGetSingleDocQuery } from "../documentsApiSlice";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
-import { useSendDocumentEmailMutation } from "../../workspace/workspaceApiSlice";
+import { useDocumentPdf } from "../useDocumentPdf";
+import EmailDocumentDialog from "../components/EmailDocumentDialog";
 import {
   WorkspacePage,
   PageHeader,
@@ -16,9 +17,11 @@ import {
   LoadingState,
   ErrorState,
   dateLabel,
-  errorMessage,
 } from "../../../components/workspace/Workspace";
-import { primaryButton } from "../../../components/workspace/pastel";
+import {
+  primaryButton,
+  secondaryIconButton,
+} from "../../../components/workspace/pastel";
 import { lineAmount } from "./documentEditorModel";
 import PaymentForm from "./PaymentForm";
 
@@ -35,25 +38,13 @@ const SingleDocumentPage = () => {
   const profileQuery = useGetUserProfileQuery();
   const document = query.data?.document;
   const profile = profileQuery.data?.userProfile;
-  const [send, { isLoading: sending }] = useSendDocumentEmailMutation();
+  const [emailing, setEmailing] = useState(false);
+  const pdf = useDocumentPdf(document);
   useTitle(`${document?.documentNumber || "Document"} — Invoice Spot`);
   const totalAmountReceived = (document?.paymentRecords || []).reduce(
     (sum, payment) => sum + Number(payment.amountPaid || 0),
     0,
   );
-  const sendEmail = async () => {
-    try {
-      const result = await send({
-        profile,
-        document,
-        status: document.status,
-        totalAmountReceived,
-      }).unwrap();
-      toast.success(result.message || "Document sent successfully.");
-    } catch (error) {
-      toast.error(errorMessage(error, "The document could not be emailed."));
-    }
-  };
   const columns = [
     {
       label: "#",
@@ -98,12 +89,32 @@ const SingleDocumentPage = () => {
               </ActionLink>
               <button
                 type="button"
-                className={primaryButton}
-                onClick={sendEmail}
-                disabled={sending || !profile}
+                className={secondaryIconButton}
+                onClick={pdf.download}
+                disabled={Boolean(pdf.busy)}
+                aria-busy={pdf.busy === "download"}
+                aria-label="Download PDF"
+                title="Download PDF"
               >
-                <FiMail aria-hidden="true" />
-                {sending ? "Sending…" : "Email document"}
+                <FiDownload aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={secondaryIconButton}
+                onClick={pdf.print}
+                disabled={Boolean(pdf.busy)}
+                aria-busy={pdf.busy === "print"}
+                aria-label="Print"
+                title="Print"
+              >
+                <FiPrinter aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={() => setEmailing(true)}
+              >
+                <FiMail aria-hidden="true" /> Email document
               </button>
             </>
           )
@@ -280,6 +291,11 @@ const SingleDocumentPage = () => {
           </>
         )
       )}
+      <EmailDocumentDialog
+        documentId={id}
+        open={emailing}
+        onClose={() => setEmailing(false)}
+      />
     </WorkspacePage>
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiAlertCircle,
@@ -8,9 +8,9 @@ import {
   FiChevronsLeft,
   FiChevronsRight,
   FiInbox,
-  FiX,
 } from "react-icons/fi";
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
+import { Dialog } from "./Dialog";
 import { STATUS_LABELS } from "../../features/dashboard/dashboardModel";
 import {
   dangerButton,
@@ -19,7 +19,6 @@ import {
   errorTitle,
   fieldLabel,
   fileControl,
-  iconButton,
   inputControl,
   pageSizeSelect,
   pageSubtitle,
@@ -511,76 +510,35 @@ export const ConfirmDialog = ({
   onConfirm,
   onClose,
   busy,
-}) => {
-  const ref = useRef(null);
-  const cancelRef = useRef(null);
-  const titleId = useId();
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!open) {
-      if (dialog.open) dialog.close();
-      return undefined;
-    }
-    const previousFocus = document.activeElement;
-    const overflow = document.body.style.overflow;
-    if (!dialog.open) dialog.showModal();
-    cancelRef.current?.focus();
-    document.body.style.overflow = "hidden";
-    return () => {
-      if (dialog.open) dialog.close();
-      document.body.style.overflow = overflow;
-      if (previousFocus?.isConnected) previousFocus.focus();
-    };
-  }, [open]);
-  return (
-    <dialog
-      ref={ref}
-      className="m-auto max-h-[calc(100dvh_-_48px)] w-[min(460px,calc(100vw_-_32px))] max-w-none overflow-auto rounded-3xl border border-white bg-white p-0 text-spot-ink shadow-float backdrop:bg-[#23273566] backdrop:backdrop-blur-[5px]"
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!busy) onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
-      }}
-    >
-      <div className="relative p-7 max-[700px]:p-6">
-        <button
-          type="button"
-          className={`${iconButton} absolute right-3 top-3 size-9`}
-          aria-label="Close confirmation"
-          onClick={onClose}
-          disabled={busy}
-        >
-          <FiX aria-hidden="true" />
-        </button>
-        <h2 id={titleId} className={`${sectionTitle} pr-10`}>
-          {title}
-        </h2>
-        <p className="mt-3 text-[14px] leading-[1.6] text-spot-body [overflow-wrap:anywhere]">
-          {children}
-        </p>
-        <div className="mt-7 flex flex-wrap justify-end gap-2.5">
-          <button
-            ref={cancelRef}
-            type="button"
-            className={secondaryButton}
-            onClick={onClose}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={dangerButton}
-            onClick={onConfirm}
-            disabled={busy}
-          >
-            {busy ? "Please wait…" : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </dialog>
-  );
-};
+}) => (
+  <Dialog
+    open={open}
+    title={title}
+    onClose={onClose}
+    busy={busy}
+    closeLabel="Close confirmation"
+  >
+    <p className="mt-3 text-[14px] leading-[1.6] text-spot-body [overflow-wrap:anywhere]">
+      {children}
+    </p>
+    <div className="mt-7 flex flex-wrap justify-end gap-2.5">
+      <button
+        data-autofocus
+        type="button"
+        className={secondaryButton}
+        onClick={onClose}
+        disabled={busy}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        className={dangerButton}
+        onClick={onConfirm}
+        disabled={busy}
+      >
+        {busy ? "Please wait…" : confirmLabel}
+      </button>
+    </div>
+  </Dialog>
+);

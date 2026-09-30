@@ -51,6 +51,9 @@ export const buttonBase =
 export const primaryButton = `${buttonBase} bg-spot-night text-white hover:bg-[#433369] disabled:bg-spot-disabled`;
 export const secondaryButton = `${buttonBase} border border-spot-violet/15 bg-white/70 text-spot-night hover:bg-white disabled:bg-white/40 disabled:text-spot-disabled`;
 export const dangerButton = `${buttonBase} border border-overdue-icon/20 bg-overdue text-overdue-ink hover:bg-[#f8d4c4] disabled:text-overdue-muted`;
+// A square secondary button holding only an icon; give it an aria-label.
+export const secondaryIconButton =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-spot-violet/15 bg-white/70 text-spot-night transition-colors hover:bg-white disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:stroke-[1.8]";
 
 // Small actions inside tables and forms, such as View and Delete.
 const rowActionBase =
