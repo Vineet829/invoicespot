@@ -15,6 +15,7 @@ import {
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
 import { Dialog } from "./Dialog";
 import { parseDate } from "../../utils/dates";
+import { formatAmount } from "../../utils/money";
 import { STATUS_LABELS } from "../../features/dashboard/dashboardModel";
 import {
   dangerButton,
@@ -44,7 +45,7 @@ export const errorMessage = (
   fallback = "Something went wrong. Please try again.",
 ) => error?.data?.message || fallback;
 export const money = (value, currency = "") =>
-  `${currency ? `${currency} ` : ""}${new Intl.NumberFormat("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+  `${currency ? `${currency} ` : ""}${formatAmount(value, currency)}`;
 export const dateLabel = (value) =>
   value && Number.isFinite(parseDate(value).getTime())
     ? parseDate(value).toLocaleDateString("en", {
@@ -238,16 +239,19 @@ export const StatusBadge = ({ status }) => (
 );
 
 // An amount in the overview's figure style: light Sora, smaller decimals.
-// A custom className replaces the default weight and letter spacing.
+// A custom className replaces the default weight and letter spacing. The
+// currency sets how digits are grouped; hideCode leaves its code off, where a
+// column's other amounts already name it.
 export const Amount = ({
   value,
   currency,
+  hideCode = false,
   className = "font-light tracking-[-0.03em]",
 }) => {
-  const text = money(value);
+  const text = formatAmount(value, currency);
   return (
     <span className={`whitespace-nowrap font-display ${className}`}>
-      {currency && (
+      {currency && !hideCode && (
         <span className="mr-1.5 font-ui text-[0.6em] tracking-normal text-spot-muted">
           {currency}
         </span>

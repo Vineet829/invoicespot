@@ -1,6 +1,22 @@
 import { baseApiSlice } from "../api/baseApiSlice";
 import { fetchFile } from "../api/fetchFile";
 
+// The page shows a quotation as the answer left it.
+const showAnswer = async (token, { dispatch, queryFulfilled }) => {
+  try {
+    const { data } = await queryFulfilled;
+    dispatch(
+      publicApiSlice.util.updateQueryData(
+        "getSharedDocument",
+        token,
+        () => data,
+      ),
+    );
+  } catch {
+    // The page shows the error from the mutation itself.
+  }
+};
+
 // A document shared by link. No sign-in: the link itself is the key.
 export const publicApiSlice = baseApiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -12,20 +28,15 @@ export const publicApiSlice = baseApiSlice.injectEndpoints({
         url: `/public/share/${token}/accept`,
         method: "POST",
       }),
-      async onQueryStarted(token, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          dispatch(
-            publicApiSlice.util.updateQueryData(
-              "getSharedDocument",
-              token,
-              () => data,
-            ),
-          );
-        } catch {
-          // The page shows the error from the mutation itself.
-        }
-      },
+      onQueryStarted: (token, api) => showAnswer(token, api),
+    }),
+    declineSharedDocument: builder.mutation({
+      query: ({ token, reason }) => ({
+        url: `/public/share/${token}/decline`,
+        method: "POST",
+        body: { reason },
+      }),
+      onQueryStarted: ({ token }, api) => showAnswer(token, api),
     }),
     getSharedPdf: builder.mutation({
       queryFn: (token, _api, _extraOptions, baseQuery) =>
@@ -37,5 +48,6 @@ export const publicApiSlice = baseApiSlice.injectEndpoints({
 export const {
   useGetSharedDocumentQuery,
   useAcceptSharedDocumentMutation,
+  useDeclineSharedDocumentMutation,
   useGetSharedPdfMutation,
 } = publicApiSlice;

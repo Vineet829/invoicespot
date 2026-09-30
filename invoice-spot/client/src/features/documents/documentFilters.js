@@ -6,12 +6,16 @@ import {
 
 // The Documents list's search, filters, sort and page, as kept in the URL.
 
+// Payment statuses are an issued document's; drafts and void documents have
+// filters of their own.
 export const STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "unpaid", label: "Unpaid", status: "Not Paid" },
   { value: "partial", label: "Partially paid", status: "Not Fully Paid" },
   { value: "paid", label: "Paid", status: "Paid" },
   { value: "overdue", label: "Overdue" },
+  { value: "drafts", label: "Drafts", state: "draft" },
+  { value: "void", label: "Void", state: "void" },
 ];
 
 export const TYPE_FILTERS = [
@@ -109,6 +113,7 @@ export const documentFilterQuery = (
     dir,
     ...(q && { q }),
     ...(statusFilter?.status && { status: statusFilter.status }),
+    ...(statusFilter?.state && { state: statusFilter.state }),
     ...(status === "overdue" && { overdue: "true" }),
     ...(typeFilter?.type && { type: typeFilter.type }),
     ...periodRange(period, today),

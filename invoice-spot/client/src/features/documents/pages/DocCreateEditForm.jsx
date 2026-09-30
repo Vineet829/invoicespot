@@ -1,11 +1,18 @@
 import { useEffect, useId, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   FiBookmark,
   FiCheck,
+  FiFileText,
   FiLock,
   FiPlus,
   FiRepeat,
+  FiSlash,
   FiTrash2,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
@@ -14,8 +21,10 @@ import currencies from "../../../world_currencies.json";
 import {
   useCreateDocMutation,
   useGetSingleDocQuery,
+  useIssueDocMutation,
   useUpdateDocMutation,
 } from "../documentsApiSlice";
+import { isDraft, isVoid } from "../documentState";
 import { useGetWorkspaceCustomersQuery } from "../../workspace/workspaceApiSlice";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import NewClientDialog from "../../customers/components/NewClientDialog";
@@ -37,7 +46,6 @@ import {
   Amount,
   dateInput,
   dateInstant,
-  dateLabel,
   errorMessage,
   money,
 } from "../../../components/workspace/Workspace";
@@ -46,6 +54,7 @@ import {
   panelNote,
   primaryButton,
   rowAction,
+  secondaryButton,
 } from "../../../components/workspace/pastel";
 import {
   documentPayload,
@@ -71,7 +80,8 @@ const blankItem = () => ({
   discount: "",
 });
 // A new document starts from the business settings, and from a client when
-// it was started from their page; an existing one keeps its own values.
+// it was started from their page; a draft keeps its own values. Either is
+// saved as a draft, or saved and issued.
 const DocumentFields = ({
   doc,
   settings,
@@ -89,6 +99,7 @@ const DocumentFields = ({
   const [currency, setCurrency] = useState(
     doc?.currency || settings?.defaultCurrency || currencies[0].code,
   );
+  const [issueDate, setIssueDate] = useState(doc?.issueDate || "");
   const [dueDate, setDueDate] = useState(
     dateInput(
       doc?.dueDate || Date.now() + (settings?.paymentTermsDays ?? 7) * 86400000,
@@ -175,6 +186,7 @@ const DocumentFields = ({
             documentPayload({
               customer,
               documentType,
+              issueDate,
               dueDate: dateInstant(dueDate),
               rates,
               currency,
@@ -182,6 +194,7 @@ const DocumentFields = ({
               additionalInfo,
               termsConditions,
             }),
+            { issue: event.nativeEvent.submitter?.value !== "draft" },
           );
         }}
       >
@@ -289,6 +302,20 @@ const DocumentFields = ({
                 </div>
                 <div className="flex min-w-0 flex-col gap-5">
                   <Field
+                    label="Issue date"
+                    type="date"
+                    required={Boolean(doc?.issueDate)}
+                    value={issueDate}
+                    max={dateInput()}
+                    onChange={(event) => setIssueDate(event.target.value)}
+                    hint={
+                      doc?.issueDate
+                        ? "The day the document is dated. It can’t be later than today."
+                        : "Leave it empty to date it the day it’s issued. It can’t be later than today."
+                    }
+                    disabled={busy}
+                  />
+                  <Field
                     label="Due date"
                     type="date"
                     required
@@ -301,12 +328,6 @@ const DocumentFields = ({
                       <dt className={panelNote}>Payment status</dt>
                       <dd className="mt-1.5">
                         <StatusBadge status={status} />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={panelNote}>Date of issue</dt>
-                      <dd className="mt-1 text-[15px] text-spot-ink">
-                        {dateLabel(doc?.createdAt || new Date())}
                       </dd>
                     </div>
                   </dl>
@@ -384,6 +405,8 @@ const DocumentFields = ({
                       <strong className="flex h-11 items-center justify-end font-normal text-spot-ink items-md:justify-start">
                         <Amount
                           value={lineAmount(item)}
+                          currency={currency}
+                          hideCode
                           className="text-[17px] font-light tracking-[-0.03em]"
                         />
                       </strong>
@@ -521,14 +544,23 @@ const DocumentFields = ({
                 })}
               </dl>
             </Panel>
-            <div className="flex">
+            <div className="flex flex-wrap gap-2.5">
               <button
                 type="submit"
+                value="draft"
+                className={`${secondaryButton} flex-1`}
+                disabled={busy}
+              >
+                <FiFileText aria-hidden="true" /> Save draft
+              </button>
+              <button
+                type="submit"
+                value="issue"
                 className={`${primaryButton} flex-1`}
                 disabled={busy}
               >
                 <FiCheck aria-hidden="true" />
-                {busy ? "Saving…" : doc ? "Save document" : "Create document"}
+                {busy ? "Saving…" : "Save and issue"}
               </button>
             </div>
           </aside>
@@ -554,14 +586,25 @@ const DocCreateEditForm = () => {
   const settings = useGetSettingsQuery();
   const [create, { isLoading: creating }] = useCreateDocMutation();
   const [update, { isLoading: updating }] = useUpdateDocMutation();
-  const save = async (payload) => {
+  const [issueDoc, { isLoading: issuing }] = useIssueDocMutation();
+  const doc = query.data?.document;
+  // A draft saved and issued is changed first, then issued as saved.
+  const save = async (payload, { issue }) => {
     try {
-      const result = id
-        ? await update({ id, ...payload }).unwrap()
-        : await create(payload).unwrap();
-      toast.success(
-        result.message || "Your document was created successfully.",
-      );
+      let message;
+      if (!id) {
+        const result = await create({ ...payload, draft: !issue }).unwrap();
+        message = issue
+          ? result.message || "Your document was created successfully."
+          : "Your draft was saved.";
+      } else {
+        const result = await update({ id, ...payload }).unwrap();
+        message = issue
+          ? (await issueDoc({ id }).unwrap()).message
+          : "Your draft was saved.";
+        if (!message) message = result.message;
+      }
+      toast.success(message || "Your document was saved.");
       navigate(clientId ? `/single-customer/${clientId}` : "/documents");
     } catch (error) {
       toast.error(errorMessage(error, "The document could not be saved."));
@@ -590,6 +633,28 @@ const DocCreateEditForm = () => {
             clients.refetch();
           }}
         />
+      ) : isVoid(doc) ? (
+        <EmptyState
+          title="This document is void."
+          text="A void document can’t be changed. Duplicate it to start again."
+          icon={FiSlash}
+          action={
+            <Link className={secondaryButton} to={`/document/${id}`}>
+              Back to the document
+            </Link>
+          }
+        />
+      ) : doc && !isDraft(doc) ? (
+        <EmptyState
+          title="This document is issued."
+          text="It keeps its client, lines and amounts as it went out. Change its due date, notes or terms from its page, or void it and duplicate it."
+          icon={FiLock}
+          action={
+            <Link className={secondaryButton} to={`/document/${id}`}>
+              Back to the document
+            </Link>
+          }
+        />
       ) : (
         (!id || query.data?.document) && (
           <DocumentFields
@@ -601,7 +666,7 @@ const DocCreateEditForm = () => {
               (client) => client._id === clientId,
             )}
             onSubmit={save}
-            busy={creating || updating}
+            busy={creating || updating || issuing}
           />
         )
       )}

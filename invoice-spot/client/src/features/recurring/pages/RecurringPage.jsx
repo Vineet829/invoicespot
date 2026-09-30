@@ -43,6 +43,9 @@ import { useBusiness } from "../../business/permissions";
 
 const NO_SCHEDULES = [];
 
+// A schedule can copy a draft, which has no number yet.
+const templateName = (schedule) => schedule.documentNumber || "Draft invoice";
+
 const RecurringPage = () => {
   useTitle("Recurring invoices — Invoice Spot");
   const query = useGetSchedulesQuery(undefined, {
@@ -82,7 +85,7 @@ const RecurringPage = () => {
       render: (schedule) => (
         <span className="flex flex-col gap-0.5">
           <Link className={textLink} to={`/document/${schedule.documentId}`}>
-            {schedule.documentNumber}
+            {templateName(schedule)}
           </Link>
           <span className="text-[12.5px] font-normal text-spot-muted">
             {schedule.clientName}
@@ -118,8 +121,13 @@ const RecurringPage = () => {
         `${schedule.runsDone}${schedule.maxRuns ? ` of ${schedule.maxRuns}` : ""}`,
     },
     {
-      label: "Emailed",
-      render: (schedule) => (schedule.emailAutomatically ? "Yes" : "No"),
+      label: "Each invoice",
+      render: (schedule) =>
+        !schedule.issueAutomatically
+          ? "Left as a draft"
+          : schedule.emailAutomatically
+            ? "Issued and emailed"
+            : "Issued",
     },
     {
       label: "Edit",
@@ -129,7 +137,7 @@ const RecurringPage = () => {
           type="button"
           className={rowAction}
           onClick={() => setEditing(schedule)}
-          aria-label={`Change how ${schedule.documentNumber} repeats`}
+          aria-label={`Change how ${templateName(schedule)} repeats`}
         >
           <FiEdit2 aria-hidden="true" />
           <span>Edit</span>
@@ -146,7 +154,7 @@ const RecurringPage = () => {
             className={rowAction}
             onClick={() => togglePause(schedule)}
             disabled={pausing}
-            aria-label={`${schedule.paused ? "Resume" : "Pause"} ${schedule.documentNumber}`}
+            aria-label={`${schedule.paused ? "Resume" : "Pause"} ${templateName(schedule)}`}
           >
             {schedule.paused ? (
               <FiPlay aria-hidden="true" />
@@ -165,7 +173,7 @@ const RecurringPage = () => {
           type="button"
           className={rowActionDanger}
           onClick={() => setRemoving(schedule)}
-          aria-label={`Stop repeating ${schedule.documentNumber}`}
+          aria-label={`Stop repeating ${templateName(schedule)}`}
         >
           <FiTrash2 aria-hidden="true" />
           <span>Stop</span>
@@ -233,8 +241,8 @@ const RecurringPage = () => {
         onClose={() => setRemoving(null)}
         busy={deleting}
       >
-        No more invoices will be made from {removing?.documentNumber}. The
-        invoices already made stay as they are.
+        No more invoices will be made from {removing && templateName(removing)}.
+        The invoices already made stay as they are.
       </ConfirmDialog>
     </WorkspacePage>
   );

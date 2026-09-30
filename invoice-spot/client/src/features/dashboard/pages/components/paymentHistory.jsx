@@ -34,8 +34,8 @@ const cell =
 const mobileField =
   "hidden max-[700px]:mb-1 max-[700px]:block max-[700px]:text-[11px] max-[700px]:text-spot-muted";
 
-const PaymentAmount = ({ amount }) => {
-  const formatted = formatMoney(amount);
+const PaymentAmount = ({ amount, currency }) => {
+  const formatted = formatMoney(amount, currency);
   return (
     <span
       className="font-display font-light tracking-[-0.03em] [font-size:min(19px,calc(130px_/_(var(--chars)_*_0.57)))] [@container_(min-width:650px)]:[font-size:min(20px,calc(130px_/_(var(--chars)_*_0.57)))]"
@@ -51,13 +51,13 @@ const PaymentAmount = ({ amount }) => {
 
 // The document a payment was recorded against: its type and number, total,
 // status and due date. Shown when a row is hovered.
-const PaymentDocument = ({ document }) => (
+const PaymentDocument = ({ document, currency }) => (
   <>
     <span className={hoverLabel}>{document.documentType || "Document"}</span>
     <strong className={hoverValue}>{document.documentNumber || "—"}</strong>
     <dl className="mt-2.5 grid gap-1">
       {[
-        ["Document total", formatMoney(document.total)],
+        ["Document total", formatMoney(document.total, currency)],
         ["Status", STATUS_LABELS[document.status] || document.status || "—"],
         ["Due date", formatDate(document.dueDate)],
       ].map(([term, value]) => (
@@ -70,7 +70,7 @@ const PaymentDocument = ({ document }) => (
   </>
 );
 
-const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
+const PaymentHistory = ({ sortPaymentHistory, paymentDocuments, currency }) => {
   const { containerRef, card, show, hide } = useHoverCard();
   const [requestedPage, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -158,7 +158,13 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
                     onMouseMove={
                       document
                         ? (event) =>
-                            show(event, <PaymentDocument document={document} />)
+                            show(
+                              event,
+                              <PaymentDocument
+                                document={document}
+                                currency={currency}
+                              />,
+                            )
                         : undefined
                     }
                     onMouseLeave={hide}
@@ -221,7 +227,10 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments }) => {
                       <span className={mobileField} aria-hidden="true">
                         Amount paid
                       </span>
-                      <PaymentAmount amount={payment.amountPaid} />
+                      <PaymentAmount
+                        amount={payment.amountPaid}
+                        currency={currency}
+                      />
                     </td>
                   </tr>
                 );

@@ -24,6 +24,11 @@ const ENDS = [
   { value: "count", label: "After a number of invoices" },
 ];
 
+const EACH = [
+  { value: true, label: "Issue it as it is made" },
+  { value: false, label: "Leave it as a draft to review and issue" },
+];
+
 const initial = (schedule) => {
   const today = dateInput();
   if (!schedule) {
@@ -33,6 +38,7 @@ const initial = (schedule) => {
       ends: "never",
       endDate: "",
       maxRuns: "12",
+      issueAutomatically: true,
       emailAutomatically: false,
     };
   }
@@ -45,6 +51,7 @@ const initial = (schedule) => {
     ends: schedule.endDate ? "date" : schedule.maxRuns ? "count" : "never",
     endDate: schedule.endDate || "",
     maxRuns: String(schedule.maxRuns || 12),
+    issueAutomatically: schedule.issueAutomatically,
     emailAutomatically: schedule.emailAutomatically,
   };
 };
@@ -72,7 +79,9 @@ const ScheduleForm = ({
       startDate: values.startDate,
       endDate: values.ends === "date" ? values.endDate : null,
       maxRuns: values.ends === "count" ? Number(values.maxRuns) : null,
-      emailAutomatically: values.emailAutomatically,
+      issueAutomatically: values.issueAutomatically,
+      emailAutomatically:
+        values.issueAutomatically && values.emailAutomatically,
     };
     try {
       const result = schedule
@@ -87,8 +96,9 @@ const ScheduleForm = ({
   return (
     <form className="mt-5 flex flex-col gap-5" onSubmit={submit}>
       <p className="text-[14px] leading-[1.6] text-spot-body">
-        Each new invoice copies {documentNumber}, with its own number and a due
-        date from your payment terms.
+        Each new invoice copies {documentNumber || "this draft"}, with a due
+        date from your payment terms, and takes its own number when it is
+        issued.
       </p>
       <div className="grid grid-cols-2 gap-4 max-[560px]:grid-cols-1">
         <Field
@@ -162,25 +172,51 @@ const ScheduleForm = ({
           />
         )}
       </fieldset>
+      <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
+        <legend className={`mb-2 ${fieldLabel}`}>Each new invoice</legend>
+        {EACH.map((each) => (
+          <label
+            key={String(each.value)}
+            className="flex items-center gap-3 text-[14px] text-spot-ink"
+          >
+            <input
+              type="radio"
+              name="schedule-each"
+              className="size-[18px] shrink-0 accent-spot-violet"
+              checked={values.issueAutomatically === each.value}
+              onChange={() =>
+                setValues((current) => ({
+                  ...current,
+                  issueAutomatically: each.value,
+                }))
+              }
+              disabled={busy}
+            />
+            {each.label}
+          </label>
+        ))}
+      </fieldset>
       <label className="flex items-start gap-3 text-[14px] text-spot-ink">
         <input
           type="checkbox"
           className="mt-0.5 size-[18px] shrink-0 accent-spot-violet"
-          checked={values.emailAutomatically}
+          checked={values.issueAutomatically && values.emailAutomatically}
           onChange={(event) =>
             setValues((current) => ({
               ...current,
               emailAutomatically: event.target.checked,
             }))
           }
-          disabled={busy || demo}
+          disabled={busy || demo || !values.issueAutomatically}
         />
         <span>
           Email each new invoice to the client
           <span className="mt-0.5 block text-[12.5px] text-spot-muted">
             {demo
               ? "Emailing is turned off for the shared demo account."
-              : "With your usual email message and the PDF attached."}
+              : values.issueAutomatically
+                ? "With your usual email message and the PDF attached."
+                : "A draft is emailed once you have issued it."}
           </span>
         </span>
       </label>

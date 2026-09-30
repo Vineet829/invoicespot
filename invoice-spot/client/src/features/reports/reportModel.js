@@ -21,11 +21,7 @@ export const axisTicks = (largest) => {
   return [0, 1, 2, 3, 4].map((index) => index * step);
 };
 
-const compact = new Intl.NumberFormat("en", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-export const compactAmount = (value) => compact.format(Number(value) || 0);
+export { compactAmount } from "../../utils/money";
 
 // A month is sent as "2026-09"; it names that month wherever the reader is.
 const firstDay = (month) => {

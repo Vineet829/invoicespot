@@ -14,6 +14,7 @@ import useListState from "../../../hooks/useListState";
 import useFileDownload from "../../../hooks/useFileDownload";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import DocumentsTabs from "../components/DocumentsTabs";
+import { DocumentStatusBadge, documentName, isDraft } from "../documentState";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
   useDeleteDocMutation,
@@ -46,7 +47,6 @@ import {
   LoadingState,
   ErrorState,
   Badge,
-  StatusBadge,
   Amount,
   DueDate,
   errorMessage,
@@ -116,7 +116,8 @@ const DocumentsPage = () => {
       label: "Document no.",
       type: "main",
       sortBy: "number",
-      render: (row) => row.documentNumber,
+      render: (row) =>
+        row.documentNumber || <span className="text-spot-muted">Draft</span>,
     },
     { label: "Type", render: (row) => <Badge>{row.documentType}</Badge> },
     {
@@ -136,8 +137,8 @@ const DocumentsPage = () => {
       render: (row) => <DueDate value={row.dueDate} overdue={row.overdue} />,
     },
     {
-      label: "Payment status",
-      render: (row) => <StatusBadge status={row.status} />,
+      label: "Status",
+      render: (row) => <DocumentStatusBadge document={row} />,
     },
     {
       label: "View",
@@ -146,7 +147,7 @@ const DocumentsPage = () => {
         <Link
           className={rowAction}
           to={`/document/${row._id}`}
-          aria-label={`View ${row.documentNumber}`}
+          aria-label={`View ${documentName(row)}`}
         >
           <FiEye aria-hidden="true" />
           <span>View</span>
@@ -156,22 +157,24 @@ const DocumentsPage = () => {
     {
       label: "Delete",
       type: "action",
-      render: (row) => (
-        <button
-          type="button"
-          className={rowActionDanger}
-          onClick={() => setSelected(row)}
-          aria-label={`Delete ${row.documentNumber}`}
-          disabled={Boolean(deleteRefusal)}
-          title={deleteRefusal}
-          aria-describedby={
-            deleteRefusal ? "document-delete-refusal" : undefined
-          }
-        >
-          <FiTrash2 aria-hidden="true" />
-          <span>Delete</span>
-        </button>
-      ),
+      // Only a draft is deleted; an issued document is voided from its page.
+      render: (row) =>
+        isDraft(row) && (
+          <button
+            type="button"
+            className={rowActionDanger}
+            onClick={() => setSelected(row)}
+            aria-label={`Delete ${documentName(row)}`}
+            disabled={Boolean(deleteRefusal)}
+            title={deleteRefusal}
+            aria-describedby={
+              deleteRefusal ? "document-delete-refusal" : undefined
+            }
+          >
+            <FiTrash2 aria-hidden="true" />
+            <span>Delete</span>
+          </button>
+        ),
     },
   ];
 
@@ -257,7 +260,7 @@ const DocumentsPage = () => {
             <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 compact:mb-4">
               <h2 className="sr-only">Your documents</h2>
               <fieldset className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
-                <legend className="sr-only">Payment status</legend>
+                <legend className="sr-only">Status</legend>
                 {STATUS_FILTERS.map((filter) => (
                   <label key={filter.value} className={filterChip}>
                     <input
@@ -342,7 +345,7 @@ const DocumentsPage = () => {
         onClose={() => setSelected(null)}
         busy={deleting}
       >
-        {selected?.documentNumber} will be permanently deleted.
+        {selected && documentName(selected)} will be permanently deleted.
       </ConfirmDialog>
     </WorkspacePage>
   );
