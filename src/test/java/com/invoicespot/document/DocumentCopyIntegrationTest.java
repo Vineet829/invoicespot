@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -39,15 +40,19 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
     }
 
     private String document(String type) throws Exception {
+        return document(type, false);
+    }
+
+    private String document(String type, boolean draft) throws Exception {
         String body = mockMvc.perform(post("/api/v1/document/create")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"customerId": "%s", "documentType": "%s", "currency": "EUR", "rates": "10",
-                                 "additionalInfo": "Thanks", "dueDate": "2026-01-15T12:00:00Z",
+                                 "additionalInfo": "Thanks", "dueDate": "2026-01-15T12:00:00Z", "draft": %s,
                                  "billingItems": [{"itemName": "Design", "unitPrice": 200, "quantity": 2,
                                                    "discount": "5"}]}
-                                """.formatted(client, type)))
+                                """.formatted(client, type, draft)))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -69,7 +74,7 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a copy keeps the client and lines, gets a new number and no payments, and links back")
+    @DisplayName("a copy is a draft with the client and lines, no number and no payments, and links back")
     void duplicate() throws Exception {
         String original = document("Invoice");
         mockMvc.perform(post("/api/v1/document/{id}/payment", original)
@@ -79,7 +84,8 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
 
         String body = action(original, "duplicate", owner)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.newDocument.documentNumber").value("INV-0002"))
+                .andExpect(jsonPath("$.newDocument.state").value("draft"))
+                .andExpect(jsonPath("$.newDocument.documentNumber").value(nullValue()))
                 .andExpect(jsonPath("$.newDocument.customerId").value(client))
                 .andExpect(jsonPath("$.newDocument.billingItems[0].itemName").value("Design"))
                 .andExpect(jsonPath("$.newDocument.total").value(418.0))
@@ -95,22 +101,24 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
                 .getContentAsString();
         String copy = JsonPath.read(body, "$.newDocument._id");
 
-        read(original).andExpect(jsonPath("$.document.copies[*].documentNumber", contains("INV-0002")));
         activity(copy).andExpect(jsonPath("$.events[0].type").value("COPIED_FROM"))
                 .andExpect(jsonPath("$.events[0].detail").value("INV-0001"));
         activity(original).andExpect(jsonPath("$.events[0].type").value("COPIED_TO"))
-                .andExpect(jsonPath("$.events[0].detail").value("INV-0002"));
+                .andExpect(jsonPath("$.events[0].detail").value(nullValue()));
+        action(copy, "issue", owner).andExpect(jsonPath("$.updatedDocument.documentNumber").value("INV-0002"));
+        read(original).andExpect(jsonPath("$.document.copies[*].documentNumber", contains("INV-0002")));
     }
 
     @Test
-    @DisplayName("a quotation becomes an invoice once, and each names the other")
+    @DisplayName("an issued quotation becomes a draft invoice once, and each names the other")
     void convert() throws Exception {
         String quotation = document("Quotation");
 
         String body = action(quotation, "convert", owner)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.newDocument.documentType").value("Invoice"))
-                .andExpect(jsonPath("$.newDocument.documentNumber").value("INV-0001"))
+                .andExpect(jsonPath("$.newDocument.state").value("draft"))
+                .andExpect(jsonPath("$.newDocument.documentNumber").value(nullValue()))
                 .andExpect(jsonPath("$.newDocument.source.documentNumber").value("QUO-0001"))
                 .andReturn()
                 .getResponse()
@@ -119,15 +127,23 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
 
         action(quotation, "convert", owner)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("This quotation is already invoice INV-0001"));
+                .andExpect(jsonPath("$.message").value("This quotation already has a draft invoice"));
         read(quotation).andExpect(jsonPath("$.document.copies[0].documentType").value("Invoice"));
         activity(invoice).andExpect(jsonPath("$.events[0].type").value("CONVERTED_FROM"));
         activity(quotation).andExpect(jsonPath("$.events[0].type").value("CONVERTED_TO"))
-                .andExpect(jsonPath("$.events[0].detail").value("INV-0001"));
+                .andExpect(jsonPath("$.events[0].detail").value(nullValue()));
+        action(invoice, "issue", owner).andExpect(jsonPath("$.updatedDocument.documentNumber").value("INV-0001"));
+        action(quotation, "convert", owner)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This quotation is already invoice INV-0001"));
+
+        action(document("Quotation", true), "convert", owner)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Issue this quotation before it becomes an invoice"));
     }
 
     @Test
-    @DisplayName("only quotations convert, only the owner can copy, and a deleted original leaves its copy")
+    @DisplayName("only quotations convert, only the owner can copy, and a deleted draft leaves its copy")
     void rules() throws Exception {
         String invoice = document("Invoice");
 
@@ -137,10 +153,11 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
         action(invoice, "duplicate", createUser()).andExpect(status().isForbidden());
         action(UUID.randomUUID().toString(), "duplicate", owner).andExpect(status().isNotFound());
 
+        String draft = document("Invoice", true);
         String copy = JsonPath.read(
-                action(invoice, "duplicate", owner).andReturn().getResponse().getContentAsString(),
+                action(draft, "duplicate", owner).andReturn().getResponse().getContentAsString(),
                 "$.newDocument._id");
-        mockMvc.perform(delete("/api/v1/document/{id}", invoice).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+        mockMvc.perform(delete("/api/v1/document/{id}", draft).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk());
         read(copy).andExpect(status().isOk()).andExpect(jsonPath("$.document.source").doesNotExist());
     }

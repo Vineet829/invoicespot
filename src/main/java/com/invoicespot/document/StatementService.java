@@ -50,7 +50,6 @@ public class StatementService {
         LocalDate today = LocalDate.now(clock.withZone(zone));
         List<Statements.Account> accounts = Statements.accounts(
                 documentRepository.findForStatement(customer.getPkid(), DocumentType.INVOICE),
-                zone,
                 today.atStartOfDay(zone).toInstant());
         return new DocumentPdf(
                 fileName(customer, today),

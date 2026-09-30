@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 public record CreateDocumentRequest(
@@ -18,4 +19,6 @@ public record CreateDocumentRequest(
         @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD") String currency,
         @NotEmpty(message = "Add at least one product or service")
                 @Size(max = 200, message = "A document can have at most 200 items")
-                List<@Valid BillingItemDto> billingItems) {}
+                List<@Valid BillingItemDto> billingItems,
+        LocalDate issueDate,
+        Boolean draft) {}

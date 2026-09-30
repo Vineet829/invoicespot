@@ -83,6 +83,8 @@ class PdfServiceTest {
         document.setCustomerSnapshot(customer);
         document.setDocumentNumber("2026-September-ABC123");
         document.setCreatedAt(Instant.parse("2026-09-30T06:00:00Z"));
+        document.setIssuedAt(Instant.parse("2026-09-30T06:00:00Z"));
+        document.setIssueDate(LocalDate.of(2026, 9, 30));
         document.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
         document.setCurrency("USD");
         document.setRates(new BigDecimal("18"));
@@ -245,16 +247,43 @@ class PdfServiceTest {
     }
 
     @Test
-    @DisplayName("the tax is named as in the settings, and dates are days in the owner's time zone")
+    @DisplayName("the tax is named as the document keeps it, and the due date is a day in the owner's time zone")
     void settingsApply() {
         BusinessSettings settings = new BusinessSettings();
-        settings.setTaxLabel("GST");
+        settings.setTaxLabel("VAT");
         settings.setTimeZone("Asia/Kolkata");
         Document document = sampleDocument(DocumentType.INVOICE);
-        document.setCreatedAt(Instant.parse("2026-09-30T20:00:00Z"));
+        document.setTaxLabel("GST");
+        document.setDueDate(Instant.parse("2026-10-15T20:00:00Z"));
 
         String html = service.html(document, seller("Ada Analytics"), settings);
 
-        assertThat(html).contains("GST (18%)").contains("Oct 1, 2026").doesNotContain("Tax (18%)");
+        assertThat(html).contains("GST (18%)").contains("Oct 16, 2026").doesNotContain("VAT (18%)");
+    }
+
+    @Test
+    @DisplayName("a document shows the business as it went out with it, whatever it is called now")
+    void keptSeller() {
+        Document document = sampleDocument(DocumentType.INVOICE);
+        document.setSeller(SellerSnapshot.of(seller("Ada Analytics")));
+        Payment payment = document.getPayments().get(0);
+        payment.setDatePaid(LocalDate.of(2026, 9, 12));
+        payment.setPaymentMethod(PaymentMethod.CASH);
+
+        assertThat(service.html(document, seller("Borealis Studio"), SETTINGS))
+                .contains("Ada Analytics")
+                .doesNotContain("Borealis Studio");
+        assertThat(service.receiptHtml(document, payment, "INV-1-P1", BigDecimal.TEN, seller("Borealis Studio")))
+                .contains("Ada Analytics")
+                .doesNotContain("Borealis Studio");
+    }
+
+    @Test
+    @DisplayName("a document shows the day it is dated, not the day it was typed in")
+    void issueDate() {
+        Document document = sampleDocument(DocumentType.INVOICE);
+        document.setIssueDate(LocalDate.of(2026, 9, 1));
+
+        assertThat(service.html(document, seller("Ada Analytics"), SETTINGS)).contains("Sep 1, 2026");
     }
 }

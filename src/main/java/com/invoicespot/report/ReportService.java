@@ -14,7 +14,6 @@ import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -126,14 +125,12 @@ public class ReportService {
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         ReportPeriod period = ReportPeriod.of(periodKey, today);
-        Instant from = period.from().atStartOfDay(zone).toInstant();
-        Instant to = period.to().plusDays(1).atStartOfDay(zone).toInstant();
 
         Rows rows = new Rows(
-                byCurrency(queries.billed(businessPkid, from, to), ReportQueries.Billed::currency),
+                byCurrency(queries.billed(businessPkid, period.from(), period.to()), ReportQueries.Billed::currency),
                 byCurrency(queries.paid(businessPkid, period.from(), period.to()), ReportQueries.Paid::currency),
                 byCurrency(queries.unpaid(businessPkid), ReportQueries.Unpaid::currency),
-                byCurrency(queries.clients(businessPkid, from, to), ReportQueries.Client::currency));
+                byCurrency(queries.clients(businessPkid, period.from(), period.to()), ReportQueries.Client::currency));
 
         TreeSet<String> currencies = new TreeSet<>();
         Stream.of(rows.billed(), rows.paid(), rows.unpaid()).forEach(found -> currencies.addAll(found.keySet()));
@@ -148,7 +145,7 @@ public class ReportService {
                 period.from(),
                 period.to(),
                 today,
-                years(businessPkid, zone, today),
+                years(businessPkid, today),
                 ordered.stream()
                         .map(currency -> currencyReport(currency, rows, period, zone, today, topClients))
                         .toList());
@@ -159,7 +156,7 @@ public class ReportService {
         Map<YearMonth, BigDecimal> billedByMonth = new HashMap<>();
         Map<YearMonth, BigDecimal> receivedByMonth = new HashMap<>();
         for (ReportQueries.Billed document : rows.billed().getOrDefault(currency, List.of())) {
-            YearMonth month = YearMonth.from(document.createdAt().atZone(zone));
+            YearMonth month = YearMonth.from(document.issueDate());
             billedByMonth.merge(month, document.total(), BigDecimal::add);
             if (document.receipt()) {
                 receivedByMonth.merge(month, document.total(), BigDecimal::add);
@@ -241,9 +238,9 @@ public class ReportService {
 
     // The years before this one, back to the first invoice, receipt or
     // payment, for the period picker.
-    private List<Integer> years(Long businessPkid, ZoneId zone, LocalDate today) {
+    private List<Integer> years(Long businessPkid, LocalDate today) {
         OptionalInt first = Stream.of(
-                        queries.firstDocument(businessPkid).map(instant -> instant.atZone(zone).getYear()),
+                        queries.firstDocument(businessPkid).map(LocalDate::getYear),
                         queries.firstPayment(businessPkid).map(LocalDate::getYear))
                 .flatMap(Optional::stream)
                 .mapToInt(Integer::intValue)

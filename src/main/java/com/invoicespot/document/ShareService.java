@@ -62,10 +62,12 @@ public class ShareService {
     }
 
     // Only the token's hash is kept, so the link is shown this once. A new
-    // link replaces the document's current one.
+    // link replaces the document's current one. A draft isn't shared.
     @Transactional
     public ShareLinkResponse create(BusinessAccess access, String id) {
         Document document = requireInBusiness(access, id);
+        DocumentService.requireIssued(document, "Issue this draft before sharing it");
+        DocumentService.requireNotVoid(document, "A void document can't be shared");
         Instant now = Instant.now(clock);
         shareLinkRepository.findByDocumentAndRevokedAtIsNull(document).ifPresent(active -> {
             active.setRevokedAt(now);
@@ -127,13 +129,20 @@ public class ShareService {
                 null);
     }
 
+    // A client answers a quotation once, while it is still valid. Giving the
+    // same answer again changes nothing.
     @Transactional
     public PublicDocumentResponse accept(String token) {
         Document document = requireLink(token).getDocument();
         if (document.getDocumentType() != DocumentType.QUOTATION) {
             throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can be accepted");
         }
+        DocumentService.requireNotVoid(document, "This quotation was withdrawn, so it can't be accepted");
+        if (document.getDeclinedAt() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "This quotation was declined");
+        }
         if (document.getAcceptedAt() == null) {
+            requireOpen(document);
             document.setAcceptedAt(Instant.now(clock));
             activity.record(document, DocumentEventType.ACCEPTED, null, null);
             notificationService.notify(
@@ -144,25 +153,78 @@ public class ShareService {
         return publicView(document);
     }
 
+    @Transactional
+    public PublicDocumentResponse decline(String token, String reason) {
+        Document document = requireLink(token).getDocument();
+        if (document.getDocumentType() != DocumentType.QUOTATION) {
+            throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can be declined");
+        }
+        DocumentService.requireNotVoid(document, "This quotation was withdrawn");
+        if (document.getAcceptedAt() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "This quotation was already accepted");
+        }
+        if (document.getDeclinedAt() == null) {
+            requireOpen(document);
+            String why = reason == null || reason.isBlank() ? null : reason.trim();
+            document.setDeclinedAt(Instant.now(clock));
+            document.setDeclineReason(why);
+            activity.record(document, DocumentEventType.DECLINED, why, null);
+            notificationService.notify(
+                    document,
+                    NotificationType.QUOTATION_DECLINED,
+                    clientName(document) + " declined " + title(document) + (why == null ? "" : ": " + why));
+        }
+        return publicView(document);
+    }
+
+    private void requireOpen(Document document) {
+        ZoneId zone = ZoneId.of(settingsService.forBusiness(document.getBusiness().getPkid()).getTimeZone());
+        if (document.isExpired(startOfToday(zone))) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "This quotation expired on " + PdfService.DATE.format(document.getDueDate().atZone(zone))
+                            + ". Ask " + sellerParty(document, document.getBusiness()).name() + " for a new one");
+        }
+    }
+
+    private Instant startOfToday(ZoneId zone) {
+        return LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
+    }
+
+    // The business as the document went out with it, or as it is now until the
+    // document keeps its own copy.
+    private static PublicParty sellerParty(Document document, Business business) {
+        SellerSnapshot kept = Objects.requireNonNullElseGet(document.getSeller(), () -> SellerSnapshot.of(business));
+        return new PublicParty(
+                Objects.requireNonNullElse(kept.getName(), ""), kept.getLogo(), PdfService.senderLines(kept));
+    }
+
     private PublicDocumentResponse publicView(Document document) {
         Business seller = document.getBusiness();
         BusinessSettings settings = settingsService.forBusiness(seller.getPkid());
         ZoneId zone = ZoneId.of(settings.getTimeZone());
-        Instant startOfToday = LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
+        Instant startOfToday = startOfToday(zone);
         CustomerSnapshot client = Objects.requireNonNullElseGet(document.getCustomerSnapshot(), CustomerSnapshot::new);
         BigDecimal total = orZero(document.getTotal());
         BigDecimal received = orZero(document.getTotalAmountReceived());
         boolean quotation = document.getDocumentType() == DocumentType.QUOTATION;
+        boolean voided = document.isVoid();
+        boolean expired = document.isExpired(startOfToday);
+        boolean answerable = quotation && !voided && !expired
+                && document.getAcceptedAt() == null && document.getDeclinedAt() == null;
         return new PublicDocumentResponse(
                 true,
                 document.getDocumentType(),
                 document.getDocumentNumber(),
+                document.state(),
+                document.getVoidedAt(),
+                document.getVoidReason(),
                 document.getStatus(),
                 DocumentTotals.isOverdue(document, startOfToday),
-                document.getCreatedAt(),
+                document.getIssueDate(),
                 document.getDueDate(),
                 document.getCurrency(),
-                new PublicParty(PdfService.senderName(seller), seller.getLogo(), PdfService.senderLines(seller)),
+                sellerParty(document, seller),
                 new PublicParty(
                         client.getName(),
                         null,
@@ -177,16 +239,19 @@ public class ShareService {
                                 DocumentTotals.lineTotal(item)))
                         .toList(),
                 document.getSubTotal(),
-                settings.getTaxLabel(),
+                document.getTaxLabel(),
                 orZero(document.getRates()).stripTrailingZeros().toPlainString(),
                 document.getSalesTax(),
                 total,
                 received,
-                quotation ? total : total.subtract(received).max(BigDecimal.ZERO),
+                quotation ? total : voided ? BigDecimal.ZERO : total.subtract(received).max(BigDecimal.ZERO),
                 document.getAdditionalInfo(),
                 document.getTermsConditions(),
                 document.getAcceptedAt(),
-                quotation && document.getAcceptedAt() == null);
+                document.getDeclinedAt(),
+                expired,
+                answerable,
+                answerable);
     }
 
     private static String clientName(Document document) {

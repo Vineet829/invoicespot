@@ -121,7 +121,7 @@ class ShareLinkIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.viewCount").value(2))
                 .andExpect(jsonPath("$.lastViewedAt", notNullValue()));
         activity(id).andExpect(
-                jsonPath("$.events[*].type", contains("VIEWED", "SHARED", "PAYMENT_RECORDED", "CREATED")));
+                jsonPath("$.events[*].type", contains("VIEWED", "SHARED", "PAYMENT_RECORDED", "ISSUED", "CREATED")));
     }
 
     @Test

@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.invoicespot.document.CustomerSnapshot;
 import com.invoicespot.document.Document;
+import com.invoicespot.document.DocumentState;
 import com.invoicespot.document.DocumentStatus;
 import com.invoicespot.document.DocumentTotals;
 import com.invoicespot.document.DocumentType;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,8 +19,14 @@ public record DocumentResponse(
         UUID createdBy,
         UUID customerId,
         DocumentCustomerDto customer,
+        @JsonInclude(JsonInclude.Include.NON_NULL) SellerResponse seller,
         DocumentType documentType,
         String documentNumber,
+        DocumentState state,
+        LocalDate issueDate,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant issuedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant voidedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String voidReason,
         Instant dueDate,
         String additionalInfo,
         String termsConditions,
@@ -26,6 +34,7 @@ public record DocumentResponse(
         boolean overdue,
         BigDecimal subTotal,
         BigDecimal salesTax,
+        String taxLabel,
         String rates,
         BigDecimal total,
         String currency,
@@ -37,6 +46,9 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) DocumentLink source,
         @JsonInclude(JsonInclude.Include.NON_NULL) List<DocumentLink> copies,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant acceptedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant declinedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String declineReason,
+        boolean expired,
         int remindersSent,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRemindedAt) {
 
@@ -81,8 +93,14 @@ public record DocumentResponse(
                 document.getCreatedBy() == null ? null : document.getCreatedBy().getId(),
                 document.getCustomer() == null ? null : document.getCustomer().getId(),
                 customer,
+                SellerResponse.from(document.getSeller()),
                 document.getDocumentType(),
                 document.getDocumentNumber(),
+                document.state(),
+                document.getIssueDate(),
+                document.getIssuedAt(),
+                document.getVoidedAt(),
+                document.getVoidReason(),
                 document.getDueDate(),
                 document.getAdditionalInfo(),
                 document.getTermsConditions(),
@@ -90,6 +108,7 @@ public record DocumentResponse(
                 DocumentTotals.isOverdue(document, startOfToday),
                 document.getSubTotal(),
                 document.getSalesTax(),
+                document.getTaxLabel(),
                 plain(document.getRates()),
                 document.getTotal(),
                 document.getCurrency(),
@@ -101,6 +120,9 @@ public record DocumentResponse(
                 copies == null || document.getSource() == null ? null : DocumentLink.from(document.getSource()),
                 copies,
                 document.getAcceptedAt(),
+                document.getDeclinedAt(),
+                document.getDeclineReason(),
+                document.isExpired(startOfToday),
                 document.getRemindersSent(),
                 document.getLastRemindedAt());
     }

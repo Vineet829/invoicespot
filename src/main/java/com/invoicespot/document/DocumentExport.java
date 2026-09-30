@@ -38,14 +38,15 @@ public class DocumentExport {
     }
 
     // Every document the list's filters match, in the list's order. A
-    // quotation is an offer, so nothing is paid or owed on it.
+    // quotation is an offer, a draft isn't billed yet and a void document no
+    // longer is, so nothing is paid or owed on them.
     @Transactional(readOnly = true)
     public CsvFile documents(BusinessAccess access, DocumentSearch search) {
         ZoneId zone = zoneOf(access.businessPkid());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Instant startOfToday = today.atStartOfDay(zone).toInstant();
         List<Document> documents = documentRepository.findAll(
-                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday, zone), search.sort());
+                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday), search.sort());
         return CsvFile.of(
                 "invoice-spot-documents-" + today + ".csv",
                 List.of("Number", "Type", "Status", "Client", "Client email", "Currency", "Subtotal", "Tax", "Total",
@@ -53,20 +54,25 @@ public class DocumentExport {
                 documents.stream()
                         .map(document -> {
                             CustomerSnapshot client = document.getCustomerSnapshot();
-                            boolean offer = document.getDocumentType() == DocumentType.QUOTATION;
+                            boolean unbilled = document.getDocumentType() == DocumentType.QUOTATION
+                                    || document.state() != DocumentState.ISSUED;
                             return Arrays.<Object>asList(
                                     document.getDocumentNumber(),
                                     document.getDocumentType().getValue(),
-                                    STATUS.get(document.getStatus()),
+                                    switch (document.state()) {
+                                        case DRAFT -> "Draft";
+                                        case VOID -> "Void";
+                                        case ISSUED -> STATUS.get(document.getStatus());
+                                    },
                                     client == null ? null : client.getName(),
                                     client == null ? null : client.getEmail(),
                                     document.getCurrency(),
                                     document.getSubTotal(),
                                     document.getSalesTax(),
                                     document.getTotal(),
-                                    offer ? null : document.getTotalAmountReceived(),
-                                    offer ? null : document.getTotal().subtract(document.getTotalAmountReceived()),
-                                    LocalDate.ofInstant(document.getCreatedAt(), zone),
+                                    unbilled ? null : document.getTotalAmountReceived(),
+                                    unbilled ? null : document.getTotal().subtract(document.getTotalAmountReceived()),
+                                    document.getIssueDate(),
                                     document.getDueDate() == null
                                             ? null
                                             : LocalDate.ofInstant(document.getDueDate(), zone),

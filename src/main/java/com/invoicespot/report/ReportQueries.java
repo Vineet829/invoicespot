@@ -1,5 +1,6 @@
 package com.invoicespot.report;
 
+import com.invoicespot.document.DocumentLedger;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -10,13 +11,14 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
-// Reports read invoices and receipts only; a quotation is an offer, not money
-// billed. A receipt is paid in full when it is issued, so the money it records
-// counts on its own date and payments are read from invoices.
+// Reports read issued invoices and receipts only; a quotation is an offer, not
+// money billed, and a draft isn't billed yet. A receipt is paid in full when it
+// is issued, so the money it records counts on its own date and payments are
+// read from invoices.
 @Repository
 class ReportQueries {
 
-    record Billed(String currency, boolean receipt, Instant createdAt, BigDecimal total) {}
+    record Billed(String currency, boolean receipt, LocalDate issueDate, BigDecimal total) {}
 
     record Paid(String currency, LocalDate datePaid, BigDecimal amount, String method) {}
 
@@ -30,21 +32,22 @@ class ReportQueries {
         this.jdbc = jdbc;
     }
 
-    List<Billed> billed(long businessPkid, Instant from, Instant to) {
+    // Documents count on the day they are dated.
+    List<Billed> billed(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
-                        select coalesce(d.currency, '') as currency, d.document_type, d.created_at, d.total
+                        select coalesce(d.currency, '') as currency, d.document_type, d.issue_date, d.total
                         from documents d
-                        where d.business_pkid = :business
+                        where d.business_pkid = :business and %s
                           and d.document_type in ('Invoice', 'Receipt')
-                          and d.created_at >= :from and d.created_at < :to
-                        """)
+                          and d.issue_date between :from and :to
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
-                .param("from", Timestamp.from(from))
-                .param("to", Timestamp.from(to))
+                .param("from", from)
+                .param("to", to)
                 .query((result, rowNumber) -> new Billed(
                         result.getString("currency"),
                         "Receipt".equals(result.getString("document_type")),
-                        result.getTimestamp("created_at").toInstant(),
+                        result.getObject("issue_date", LocalDate.class),
                         result.getBigDecimal("total")))
                 .list();
     }
@@ -54,10 +57,10 @@ class ReportQueries {
                         select coalesce(d.currency, '') as currency, p.date_paid, p.amount_paid, p.payment_method
                         from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.business_pkid = :business
+                        where d.business_pkid = :business and %s
                           and d.document_type = 'Invoice'
                           and p.date_paid between :from and :to
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
@@ -74,9 +77,9 @@ class ReportQueries {
                         select coalesce(d.currency, '') as currency, d.due_date,
                                d.total - d.total_amount_received as outstanding
                         from documents d
-                        where d.business_pkid = :business
+                        where d.business_pkid = :business and %s
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .query((result, rowNumber) -> {
                     Timestamp due = result.getTimestamp("due_date");
@@ -89,7 +92,7 @@ class ReportQueries {
     }
 
     // A client that was deleted is still named on its documents.
-    List<Client> clients(long businessPkid, Instant from, Instant to) {
+    List<Client> clients(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency, c.id as customer_id,
                                coalesce(c.name, d.customer_name) as name,
@@ -98,15 +101,15 @@ class ReportQueries {
                                sum(d.total_amount_received) as paid
                         from documents d
                         left join customers c on c.pkid = d.customer_pkid
-                        where d.business_pkid = :business
+                        where d.business_pkid = :business and %s
                           and d.document_type in ('Invoice', 'Receipt')
-                          and d.created_at >= :from and d.created_at < :to
+                          and d.issue_date between :from and :to
                         group by 1, 2, 3
                         order by billed desc, lower(coalesce(c.name, d.customer_name))
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
-                .param("from", Timestamp.from(from))
-                .param("to", Timestamp.from(to))
+                .param("from", from)
+                .param("to", to)
                 .query((result, rowNumber) -> new Client(
                         result.getString("currency"),
                         result.getObject("customer_id", UUID.class),
@@ -117,23 +120,22 @@ class ReportQueries {
                 .list();
     }
 
-    Optional<Instant> firstDocument(long businessPkid) {
+    Optional<LocalDate> firstDocument(long businessPkid) {
         return jdbc.sql("""
-                        select min(d.created_at) from documents d
-                        where d.business_pkid = :business and d.document_type in ('Invoice', 'Receipt')
-                        """)
+                        select min(d.issue_date) from documents d
+                        where d.business_pkid = :business and %s and d.document_type in ('Invoice', 'Receipt')
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
-                .query(Timestamp.class)
-                .optional()
-                .map(Timestamp::toInstant);
+                .query((result, rowNumber) -> result.getObject(1, LocalDate.class))
+                .optional();
     }
 
     Optional<LocalDate> firstPayment(long businessPkid) {
         return jdbc.sql("""
                         select min(p.date_paid) from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.business_pkid = :business and d.document_type = 'Invoice'
-                        """)
+                        where d.business_pkid = :business and %s and d.document_type = 'Invoice'
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .query((result, rowNumber) -> result.getObject(1, LocalDate.class))
                 .optional();

@@ -1,18 +1,20 @@
 package com.invoicespot.document;
 
 import com.invoicespot.business.Business;
+import com.invoicespot.common.MoneyFormat;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.upload.UploadService;
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,13 @@ import org.thymeleaf.context.Context;
 public class PdfService {
 
     static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
+
+    // Noto Sans, embedded in every PDF, so the rupee sign and names with
+    // accents print however the reader's machine is set up. The templates ask
+    // for it by this name.
+    private static final String FONT = "Noto Sans";
+    private static final byte[] REGULAR = font("fonts/NotoSans-Regular.ttf");
+    private static final byte[] BOLD = font("fonts/NotoSans-Bold.ttf");
 
     private final ITemplateEngine templateEngine;
     private final UploadService uploadService;
@@ -62,26 +72,26 @@ public class PdfService {
         CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
         BigDecimal total = orZero(document.getTotal());
         Context context = new Context(Locale.ENGLISH);
+        String documentTitle = document.getDocumentType().getValue() + " " + value(document.getDocumentNumber());
+        String currency = value(document.getCurrency());
         context.setVariable("receipt", new ReceiptView(
-                logo(seller.getLogo()),
-                senderName(seller),
-                senderLines(seller),
+                seller(document, seller),
                 number,
                 DATE.format(payment.getDatePaid()),
-                value(client.getName()),
-                lines(
+                new Party(null, value(client.getName()), lines(
                         client.getEmail(),
                         client.getPhoneNumber(),
                         joined(client.getAddress(), client.getCity(), client.getCountry()),
-                        client.getAccountNo() == null ? null : "Account no. " + client.getAccountNo()),
-                document.getDocumentType().getValue() + " " + value(document.getDocumentNumber()),
-                value(document.getCurrency()),
-                money(payment.getAmountPaid()),
+                        client.getAccountNo() == null ? null : "Account no. " + client.getAccountNo())),
+                documentTitle,
+                currency,
+                money(payment.getAmountPaid(), currency),
                 payment.getPaymentMethod().getValue(),
                 blankToNull(payment.getAdditionalInfo()),
-                money(total),
-                money(paidToDate),
-                money(total.subtract(paidToDate).max(BigDecimal.ZERO))));
+                List.of(
+                        new Total(documentTitle + " total", money(total, currency)),
+                        new Total("Paid to date", money(paidToDate, currency))),
+                money(total.subtract(paidToDate).max(BigDecimal.ZERO), currency)));
         return templateEngine.process("pdf/receipt", context);
     }
 
@@ -92,17 +102,14 @@ public class PdfService {
     String statementHtml(Business seller, Customer customer, LocalDate day, List<Statements.Account> accounts) {
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("statement", new StatementView(
-                logo(seller.getLogo()),
-                senderName(seller),
-                senderLines(seller),
+                seller(seller),
                 DATE.format(day),
-                value(customer.getName()),
-                lines(
+                new Party(null, value(customer.getName()), lines(
                         customer.getEmail(),
                         customer.getPhoneNumber(),
                         joined(customer.getAddress(), customer.getCity(), customer.getCountry()),
                         customer.getAccountNo() == null ? null : "Account no. " + customer.getAccountNo(),
-                        vatTin(customer.getVatTinNo())),
+                        vatTin(customer.getVatTinNo()))),
                 accounts.stream().map(PdfService::statementAccount).toList()));
         return templateEngine.process("pdf/statement", context);
     }
@@ -111,10 +118,16 @@ public class PdfService {
         return value(seller.getName());
     }
 
+    // Someone a PDF names, the business or its client: a logo, a name and the
+    // lines under it.
+    public record Party(String logo, String name, List<String> lines) {}
+
+    // A draft has no number yet, and is marked as one on every page; a void
+    // document is marked void, and says when and why.
     public record View(
-            String logo,
-            String sender,
-            List<String> senderLines,
+            String watermark,
+            String voidNote,
+            Party seller,
             String title,
             String number,
             String issued,
@@ -122,8 +135,7 @@ public class PdfService {
             String due,
             String status,
             String statusTone,
-            String clientName,
-            List<String> clientLines,
+            Party client,
             String currency,
             List<Line> items,
             List<Total> totals,
@@ -134,42 +146,30 @@ public class PdfService {
 
     public record Line(int index, String name, String quantity, String unitPrice, String discount, String amount) {}
 
-    public record Total(String label, String value) {}
+    // A row of amounts; the tone, when there is one, is its CSS class.
+    public record Total(String label, String value, String tone) {
+
+        public Total(String label, String value) {
+            this(label, value, null);
+        }
+    }
 
     public record ReceiptView(
-            String logo,
-            String sender,
-            List<String> senderLines,
+            Party seller,
             String number,
             String date,
-            String clientName,
-            List<String> clientLines,
+            Party client,
             String documentTitle,
             String currency,
             String amount,
             String method,
             String note,
-            String total,
-            String paidToDate,
+            List<Total> totals,
             String balance) {}
 
-    public record StatementView(
-            String logo,
-            String sender,
-            List<String> senderLines,
-            String date,
-            String clientName,
-            List<String> clientLines,
-            List<StatementAccount> accounts) {}
+    public record StatementView(Party seller, String date, Party client, List<StatementAccount> accounts) {}
 
-    public record StatementAccount(
-            String currency,
-            List<StatementLine> lines,
-            String charged,
-            String paid,
-            String due,
-            String overdue,
-            boolean hasOverdue) {}
+    public record StatementAccount(String currency, List<StatementLine> lines, List<Total> totals, String due) {}
 
     public record StatementLine(String date, String description, String charge, String payment, String balance) {}
 
@@ -180,15 +180,32 @@ public class PdfService {
                         .map(line -> new StatementLine(
                                 DATE.format(line.date()),
                                 line.description(),
-                                line.charge() == null ? "" : money(line.charge()),
-                                line.payment() == null ? "" : money(line.payment()),
-                                money(line.balance())))
+                                line.charge() == null ? "" : money(line.charge(), account.currency()),
+                                line.payment() == null ? "" : money(line.payment(), account.currency()),
+                                money(line.balance(), account.currency())))
                         .toList(),
-                money(account.charged()),
-                money(account.paid()),
-                money(account.due()),
-                money(account.overdue()),
-                account.overdue().signum() > 0);
+                Stream.of(
+                                new Total("Invoiced", money(account.charged(), account.currency())),
+                                new Total("Paid", money(account.paid(), account.currency())),
+                                account.overdue().signum() > 0
+                                        ? new Total("Overdue", money(account.overdue(), account.currency()), "overdue")
+                                        : null)
+                        .filter(Objects::nonNull)
+                        .toList(),
+                money(account.due(), account.currency()));
+    }
+
+    private Party seller(Business seller) {
+        return new Party(logo(seller.getLogo()), senderName(seller), senderLines(seller));
+    }
+
+    // A document shows the business as it went out with it. Until it keeps its
+    // own copy, it shows the business as it is now.
+    private Party seller(Document document, Business business) {
+        SellerSnapshot kept = document.getSeller();
+        return kept == null
+                ? seller(business)
+                : new Party(logo(kept.getLogo()), value(kept.getName()), senderLines(kept));
     }
 
     private View view(Document document, Business seller, BusinessSettings settings) {
@@ -205,53 +222,60 @@ public class PdfService {
                     index + 1,
                     value(item.getItemName()),
                     item.getQuantity() == null ? "0" : item.getQuantity().toString(),
-                    money(item.getUnitPrice()),
+                    money(item.getUnitPrice(), currency),
                     percent(item.getDiscount()),
-                    money(DocumentTotals.lineTotal(item))));
+                    money(DocumentTotals.lineTotal(item), currency)));
         }
 
         BigDecimal received = orZero(document.getTotalAmountReceived());
         BigDecimal total = orZero(document.getTotal());
+        boolean draft = document.isDraft();
+        boolean voided = document.isVoid();
         List<Total> totals = new ArrayList<>();
-        totals.add(new Total("Subtotal", money(document.getSubTotal())));
+        totals.add(new Total("Subtotal", money(document.getSubTotal(), currency)));
         totals.add(new Total(
-                settings.getTaxLabel() + " (" + percent(document.getRates()) + ")", money(document.getSalesTax())));
+                Objects.requireNonNullElse(document.getTaxLabel(), settings.getTaxLabel())
+                        + " (" + percent(document.getRates()) + ")",
+                money(document.getSalesTax(), currency)));
         boolean quotation = type == DocumentType.QUOTATION;
         if (!quotation) {
-            totals.add(new Total("Total", money(total)));
-            totals.add(new Total("Amount paid", money(received)));
+            totals.add(new Total("Total", money(total, currency)));
+            totals.add(new Total("Amount paid", money(received, currency)));
         }
 
         return new View(
-                logo(seller.getLogo()),
-                senderName(seller),
-                senderLines(seller),
+                draft ? "DRAFT" : voided ? "VOID" : null,
+                voided ? "Voided on " + date(document.getVoidedAt(), zone) + ": " + document.getVoidReason() : null,
+                seller(document, seller),
                 type.getValue(),
-                value(document.getDocumentNumber()),
-                date(document.getCreatedAt(), zone),
+                draft ? null : value(document.getDocumentNumber()),
+                document.getIssueDate() == null ? "On issue" : DATE.format(document.getIssueDate()),
                 quotation ? "Valid until" : "Due",
                 date(document.getDueDate(), zone),
-                quotation ? null : statusLabel(document.getStatus()),
+                quotation || draft || voided ? null : statusLabel(document.getStatus()),
                 statusTone(document.getStatus()),
-                value(client.getName()),
-                lines(
+                new Party(null, value(client.getName()), lines(
                         client.getEmail(),
                         client.getPhoneNumber(),
                         joined(client.getAddress(), client.getCity(), client.getCountry()),
                         client.getAccountNo() == null ? null : "Account no. " + client.getAccountNo(),
-                        vatTin(client.getVatTinNo())),
+                        vatTin(client.getVatTinNo()))),
                 currency,
                 items,
                 totals,
                 quotation ? "Total" : "Balance due",
-                money(quotation ? total : total.subtract(received)),
+                money(quotation ? total : voided ? BigDecimal.ZERO : total.subtract(received), currency),
                 blankToNull(document.getAdditionalInfo()),
                 blankToNull(document.getTermsConditions()));
     }
 
+    static List<String> senderLines(Business seller) {
+        return senderLines(SellerSnapshot.of(seller));
+    }
+
     // The legal name shows when it differs from the name the business trades
     // under.
-    static List<String> senderLines(Business seller) {
+    static List<String> senderLines(SellerSnapshot seller) {
         return lines(
                 legalName(seller),
                 seller.getEmail(),
@@ -264,7 +288,7 @@ public class PdfService {
                 isBlank(seller.getTaxId()) ? null : "Tax ID " + seller.getTaxId());
     }
 
-    private static String legalName(Business seller) {
+    private static String legalName(SellerSnapshot seller) {
         String legal = seller.getLegalName();
         return isBlank(legal) || legal.trim().equalsIgnoreCase(value(seller.getName()).trim()) ? null : legal;
     }
@@ -300,12 +324,25 @@ public class PdfService {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
+            builder.useFont(() -> new ByteArrayInputStream(REGULAR), FONT, 400, FontStyle.NORMAL, true);
+            builder.useFont(() -> new ByteArrayInputStream(BOLD), FONT, 700, FontStyle.NORMAL, true);
             builder.withHtmlContent(html, null);
             builder.toStream(out);
             builder.run();
             return out.toByteArray();
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to render PDF", exception);
+        }
+    }
+
+    private static byte[] font(String path) {
+        try (InputStream in = PdfService.class.getClassLoader().getResourceAsStream(path)) {
+            if (in == null) {
+                throw new IllegalStateException("The font " + path + " is missing");
+            }
+            return in.readAllBytes();
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
         }
     }
 
@@ -337,10 +374,8 @@ public class PdfService {
         return String.join(", ", lines(values));
     }
 
-    private static String money(BigDecimal amount) {
-        DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-        format.setRoundingMode(RoundingMode.HALF_UP);
-        return format.format(orZero(amount));
+    private static String money(BigDecimal amount, String currency) {
+        return MoneyFormat.format(amount, currency);
     }
 
     private static String percent(BigDecimal value) {

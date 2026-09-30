@@ -1,6 +1,8 @@
 package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,8 +124,10 @@ class RecurringIntegrationTest extends IntegrationTest {
         String made = JsonPath.read(
                 list().andReturn().getResponse().getContentAsString(), "$.schedules[0].lastInvoice._id");
         mockMvc.perform(get("/api/v1/document/{id}/activity", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(jsonPath("$.events[0].type").value("RECURRING"))
-                .andExpect(jsonPath("$.events[0].detail").value("INV-0001 · monthly"));
+                .andExpect(jsonPath("$.events[0].type").value("ISSUED"))
+                .andExpect(jsonPath("$.events[0].detail").value("INV-0002"))
+                .andExpect(jsonPath("$.events[1].type").value("RECURRING"))
+                .andExpect(jsonPath("$.events[1].detail").value("INV-0001 · monthly"));
         mockMvc.perform(get("/api/v1/document/{id}", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.document.source").doesNotExist())
                 .andExpect(jsonPath("$.document.paymentRecords").isEmpty());
@@ -185,6 +189,39 @@ class RecurringIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/v1/document/{id}/activity", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.events[0].type").value("EMAILED"))
                 .andExpect(jsonPath("$.events[0].detail").value("automatically to " + clientEmail));
+    }
+
+    @Test
+    @DisplayName("a schedule can leave each invoice as a draft to review, which is never emailed on its own")
+    void drafts() throws Exception {
+        schedule(document("Invoice"), """
+                "frequency": "monthly", "startDate": "%s", "issueAutomatically": false, "emailAutomatically": true
+                """.formatted(today))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Only an invoice that is issued as it is made can be emailed on its own"));
+        String template = document("Invoice");
+        scheduleId(template, "\"frequency\": \"monthly\", \"startDate\": \"%s\", \"issueAutomatically\": false"
+                .formatted(today));
+
+        recurring.makeDue(Instant.now());
+
+        verify(mailSender, never()).send(any(MimeMessage.class));
+        list()
+                .andExpect(jsonPath("$.schedules[0].issueAutomatically").value(false))
+                .andExpect(jsonPath("$.schedules[0].runsDone").value(1))
+                .andExpect(jsonPath("$.schedules[0].lastInvoice.state").value("draft"))
+                .andExpect(jsonPath("$.schedules[0].lastInvoice.documentNumber").value(nullValue()));
+        String made = JsonPath.read(
+                list().andReturn().getResponse().getContentAsString(), "$.schedules[0].lastInvoice._id");
+        mockMvc.perform(get("/api/v1/document/{id}/activity", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.events[*].type", contains("RECURRING")));
+        mockMvc.perform(get("/api/v1/notification").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.notifications[0].type").value("RECURRING_DRAFT"))
+                .andExpect(jsonPath("$.notifications[0].message")
+                        .value("A draft invoice for Beta LLC from its monthly schedule is ready to review"));
+        mockMvc.perform(post("/api/v1/document/{id}/issue", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.updatedDocument.documentNumber").value("INV-0003"));
     }
 
     @Test

@@ -23,7 +23,8 @@ class StatementsTest {
         invoice.setTotal(new BigDecimal(total));
         invoice.setTotalAmountReceived(BigDecimal.ZERO);
         invoice.setStatus(DocumentStatus.NOT_PAID);
-        invoice.setCreatedAt(LocalDate.parse(issued).atTime(10, 0).atZone(ZONE).toInstant());
+        invoice.setIssueDate(LocalDate.parse(issued));
+        invoice.setIssuedAt(LocalDate.parse(issued).atStartOfDay(ZONE).toInstant());
         invoice.setDueDate(LocalDate.parse(due).atTime(12, 0).atZone(ZONE).toInstant());
         return invoice;
     }
@@ -48,7 +49,7 @@ class StatementsTest {
         pay(first, "40.00", "2026-09-10", PaymentMethod.BANK_TRANSFER);
 
         Statements.Account account =
-                Statements.accounts(List.of(first, second), ZONE, START_OF_TODAY).get(0);
+                Statements.accounts(List.of(first, second), START_OF_TODAY).get(0);
 
         assertThat(account.lines())
                 .extracting(Statements.Line::description)
@@ -69,7 +70,7 @@ class StatementsTest {
         pay(dollars, "80.00", "2026-07-20", PaymentMethod.CASH);
         Document euros = invoice("INV-2", "EUR", "30.00", "2026-07-02", "2026-07-16");
 
-        List<Statements.Account> accounts = Statements.accounts(List.of(dollars, euros), ZONE, START_OF_TODAY);
+        List<Statements.Account> accounts = Statements.accounts(List.of(dollars, euros), START_OF_TODAY);
 
         assertThat(accounts).extracting(Statements.Account::currency).containsExactly("USD", "EUR");
         assertThat(accounts.get(0).due()).isEqualByComparingTo("0");
@@ -79,12 +80,12 @@ class StatementsTest {
     }
 
     @Test
-    @DisplayName("an invoice is dated by the business's calendar, not UTC")
-    void businessCalendar() {
+    @DisplayName("an invoice is listed on the day it is dated, not the day it was typed in")
+    void issueDate() {
         Document late = invoice("INV-1", "USD", "10.00", "2026-09-01", "2026-09-30");
-        late.setCreatedAt(Instant.parse("2026-08-31T20:00:00Z"));
+        late.setCreatedAt(Instant.parse("2026-09-20T10:00:00Z"));
 
-        Statements.Line line = Statements.accounts(List.of(late), ZONE, START_OF_TODAY)
+        Statements.Line line = Statements.accounts(List.of(late), START_OF_TODAY)
                 .get(0)
                 .lines()
                 .get(0);

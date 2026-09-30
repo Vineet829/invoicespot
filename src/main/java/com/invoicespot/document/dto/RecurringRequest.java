@@ -14,4 +14,5 @@ public record RecurringRequest(
         @Min(value = 1, message = "Repeat from 1 to 120 times")
                 @Max(value = 120, message = "Repeat from 1 to 120 times")
                 Integer maxRuns,
-        Boolean emailAutomatically) {}
+        Boolean emailAutomatically,
+        Boolean issueAutomatically) {}

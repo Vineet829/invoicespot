@@ -2,19 +2,19 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
 <meta charset="utf-8" />
-<title th:text="${'Statement for ' + statement.clientName()}">Statement</title>
+<title th:text="${'Statement for ' + statement.client().name()}">Statement</title>
 <style>
   @page {
     size: A4;
     margin: 16mm 16mm 18mm 16mm;
     @bottom-right {
       content: "Page " counter(page) " of " counter(pages);
-      font-family: sans-serif;
+      font-family: 'Noto Sans', sans-serif;
       font-size: 8pt;
       color: #6b7080;
     }
   }
-  body { margin: 0; font-family: sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
+  body { margin: 0; font-family: 'Noto Sans', sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
   table { border-collapse: collapse; width: 100%; }
   td, th { padding: 0; vertical-align: top; }
   .head td { padding-bottom: 22px; }
@@ -51,11 +51,7 @@
 <body>
   <table class="head">
     <tr>
-      <td>
-        <img th:if="${statement.logo() != null}" th:src="${statement.logo()}" class="logo" alt="" />
-        <div class="sender-name" th:text="${statement.sender()}">Business</div>
-        <div class="muted" th:each="line : ${statement.senderLines()}" th:text="${line}">Contact line</div>
-      </td>
+      <td th:replace="~{pdf/fragments/parties :: seller(${statement.seller()})}">Business</td>
       <td class="doc">
         <div class="title">Statement</div>
         <div class="subtitle">Account activity</div>
@@ -69,15 +65,7 @@
     </tr>
   </table>
 
-  <table class="band">
-    <tr>
-      <td>
-        <div class="label">Statement for</div>
-        <div class="client-name" th:text="${statement.clientName()}">Client</div>
-        <div th:each="line : ${statement.clientLines()}" th:text="${line}">Client line</div>
-      </td>
-    </tr>
-  </table>
+  <table th:replace="~{pdf/fragments/parties :: client('Statement for', ${statement.client()})}"></table>
 
   <div class="account" th:each="account : ${statement.accounts()}">
     <div class="label" th:if="${statement.accounts().size() > 1}" th:text="${account.currency()}">USD</div>
@@ -101,24 +89,8 @@
         </tr>
       </tbody>
     </table>
-    <table class="summary">
-      <tr>
-        <td>Invoiced</td>
-        <td class="v" th:text="${account.currency() + ' ' + account.charged()}">USD 0.00</td>
-      </tr>
-      <tr>
-        <td>Paid</td>
-        <td class="v" th:text="${account.currency() + ' ' + account.paid()}">USD 0.00</td>
-      </tr>
-      <tr class="overdue" th:if="${account.hasOverdue()}">
-        <td>Overdue</td>
-        <td class="v" th:text="${account.currency() + ' ' + account.overdue()}">USD 0.00</td>
-      </tr>
-      <tr class="balance">
-        <td>Amount due</td>
-        <td class="v" th:text="${account.currency() + ' ' + account.due()}">USD 0.00</td>
-      </tr>
-    </table>
+    <table th:replace="~{pdf/fragments/totals ::
+        totals(${account.currency()}, ${account.totals()}, 'Amount due', ${account.due()})}"></table>
   </div>
 
   <p class="muted empty" th:if="${statement.accounts().isEmpty()}">No invoices yet, so nothing is due.</p>

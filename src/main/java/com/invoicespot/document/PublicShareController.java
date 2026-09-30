@@ -1,13 +1,16 @@
 package com.invoicespot.document;
 
+import com.invoicespot.document.dto.DeclineRequest;
 import com.invoicespot.document.dto.PublicDocumentResponse;
 import com.invoicespot.ratelimit.RateLimit;
 import com.invoicespot.ratelimit.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,5 +42,14 @@ public class PublicShareController {
     public PublicDocumentResponse accept(@PathVariable String token, HttpServletRequest http) {
         rateLimiter.consume(RateLimit.SHARED_DOCUMENT, http.getRemoteAddr());
         return shareService.accept(token);
+    }
+
+    @PostMapping("/decline")
+    public PublicDocumentResponse decline(
+            @PathVariable String token,
+            @Valid @RequestBody(required = false) DeclineRequest request,
+            HttpServletRequest http) {
+        rateLimiter.consume(RateLimit.SHARED_DOCUMENT, http.getRemoteAddr());
+        return shareService.decline(token, request == null ? null : request.reason());
     }
 }

@@ -12,8 +12,6 @@ import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -82,9 +80,8 @@ class ReportIntegrationTest extends IntegrationTest {
                 .andExpect(status().is2xxSuccessful());
     }
 
-    private void issuedAt(String document, Instant at) {
-        jdbcTemplate.update(
-                "update documents set created_at = ? where id = ?", Timestamp.from(at), UUID.fromString(document));
+    private void issuedOn(String document, LocalDate day) {
+        jdbcTemplate.update("update documents set issue_date = ? where id = ?", day, UUID.fromString(document));
     }
 
     private static String noon(LocalDate day) {
@@ -105,7 +102,7 @@ class ReportIntegrationTest extends IntegrationTest {
         String client = client(owner, "Acme");
         pay(invoice(client, "100", today.plusDays(10)), "40", today, "Cash");
         String older = invoice(client, "200", today.plusDays(10));
-        issuedAt(older, lastMonth.atTime(12, 0).toInstant(ZoneOffset.UTC));
+        issuedOn(older, lastMonth);
         pay(older, "50", lastMonth.plusDays(1), "Bank Transfer");
         pay(older, "30", today, "Bank Transfer");
         document(owner, client, "Receipt", "USD", "70", today.plusDays(10));
@@ -140,23 +137,25 @@ class ReportIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("months follow the owner's time zone")
+    @DisplayName("documents count in the month they are dated, and today is the owner's today")
     void timeZone() throws Exception {
-        ZoneId zone = ZoneId.of("America/Los_Angeles");
+        ZoneId zone = ZoneId.of("Pacific/Kiritimati");
         mockMvc.perform(put("/api/v1/settings")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0,
-                                 "taxLabel": "Tax", "timeZone": "America/Los_Angeles"}
+                                 "taxLabel": "Tax", "timeZone": "Pacific/Kiritimati"}
                                 """))
                 .andExpect(status().isOk());
-        Instant monthStart = LocalDate.now(zone).withDayOfMonth(1).atStartOfDay(zone).toInstant();
+        LocalDate local = LocalDate.now(zone);
         String client = client(owner, "Acme");
-        issuedAt(invoice(client, "10", today.plusDays(10)), monthStart.minusSeconds(3600));
-        issuedAt(invoice(client, "20", today.plusDays(10)), monthStart.plusSeconds(3600));
+        issuedOn(invoice(client, "10", local.plusDays(10)), local.withDayOfMonth(1).minusDays(1));
+        invoice(client, "20", local.plusDays(10));
 
         report("3m")
+                .andExpect(jsonPath("$.today").value(local.toString()))
+                .andExpect(jsonPath("$.to").value(local.toString()))
                 .andExpect(jsonPath("$.currencies[0].months[1].billed").value(10.0))
                 .andExpect(jsonPath("$.currencies[0].months[2].billed").value(20.0));
     }
@@ -229,8 +228,7 @@ class ReportIntegrationTest extends IntegrationTest {
         report("12m").andExpect(jsonPath("$.currencies").isEmpty()).andExpect(jsonPath("$.years").isEmpty());
 
         int year = today.getYear() - 2;
-        issuedAt(invoice(client(owner, "Acme"), "25", today), LocalDate.of(year, 6, 15).atTime(12, 0)
-                .toInstant(ZoneOffset.UTC));
+        issuedOn(invoice(client(owner, "Acme"), "25", today), LocalDate.of(year, 6, 15));
 
         report("12m").andExpect(jsonPath("$.years[0]").value(year + 1)).andExpect(jsonPath("$.years[1]").value(year));
         report(String.valueOf(year))

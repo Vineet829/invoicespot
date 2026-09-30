@@ -1,14 +1,11 @@
 package com.invoicespot.document;
 
+import com.invoicespot.common.MoneyFormat;
 import com.invoicespot.user.User;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 
@@ -48,11 +45,10 @@ public class DocumentActivity {
         return amount(document, payment.getAmountPaid()) + " · " + payment.getPaymentMethod().getValue();
     }
 
-    // An amount in the document's currency, such as "USD 1,250.00".
+    // An amount in the document's currency, such as "USD 1,250.00" or
+    // "INR 1,25,000.00".
     static String amount(Document document, BigDecimal value) {
-        DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-        format.setRoundingMode(RoundingMode.HALF_UP);
         String currency = Objects.requireNonNullElse(document.getCurrency(), "");
-        return (currency + " " + format.format(Objects.requireNonNullElse(value, BigDecimal.ZERO))).trim();
+        return (currency + " " + MoneyFormat.format(value, currency)).trim();
     }
 }

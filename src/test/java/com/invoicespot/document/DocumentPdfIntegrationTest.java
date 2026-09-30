@@ -19,6 +19,8 @@ import com.invoicespot.user.User;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,15 +33,20 @@ class DocumentPdfIntegrationTest extends IntegrationTest {
     @Autowired
     private DocumentRepository documentRepository;
 
+    // An issued invoice, made out by the owner's business as it is now.
     private Document documentFor(User owner, String clientEmail) {
         Document document = new Document();
         document.setBusiness(businessOf(owner));
+        document.setSeller(SellerSnapshot.of(document.getBusiness()));
+        document.setTaxLabel("Tax");
+        document.setIssuedAt(Instant.parse("2026-09-30T06:00:00Z"));
         document.setCreatedBy(owner);
         CustomerSnapshot customer = new CustomerSnapshot();
         customer.setName("Beta LLC");
         customer.setEmail(clientEmail);
         document.setCustomerSnapshot(customer);
         document.setDocumentNumber("2026-September-ABC123");
+        document.setIssueDate(LocalDate.of(2026, 9, 30));
         document.setCurrency("USD");
         document.setSubTotal(new BigDecimal("100"));
         document.setSalesTax(new BigDecimal("18"));

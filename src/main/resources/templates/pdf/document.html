@@ -2,19 +2,19 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
 <meta charset="utf-8" />
-<title th:text="${pdf.title() + ' ' + pdf.number()}">Invoice</title>
+<title th:text="${pdf.number() == null ? pdf.title() : pdf.title() + ' ' + pdf.number()}">Invoice</title>
 <style>
   @page {
     size: A4;
     margin: 16mm 16mm 18mm 16mm;
     @bottom-right {
       content: "Page " counter(page) " of " counter(pages);
-      font-family: sans-serif;
+      font-family: 'Noto Sans', sans-serif;
       font-size: 8pt;
       color: #6b7080;
     }
   }
-  body { margin: 0; font-family: sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
+  body { margin: 0; font-family: 'Noto Sans', sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
   table { border-collapse: collapse; width: 100%; }
   td, th { padding: 0; vertical-align: top; }
   .head td { padding-bottom: 22px; }
@@ -32,6 +32,7 @@
   .badge.paid { background: #e5e1f8; color: #4a3a80; }
   .badge.partial { background: #eeeaf9; color: #4a3a80; }
   .badge.unpaid { background: #fbe3d8; color: #9c4526; }
+  .void-note { margin-top: 10px; color: #9c4526; }
   .band { background: #f3f2f8; border-radius: 12px; }
   .band td { padding: 14px 16px; }
   .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.8pt; color: #6b7080; margin-bottom: 5px; }
@@ -49,19 +50,17 @@
   .notes { margin-top: 26px; page-break-inside: avoid; }
   .notes p { margin: 0; white-space: pre-wrap; }
   .notes .block { margin-bottom: 16px; }
+  .watermark { position: fixed; z-index: -1; top: 105mm; left: 0; right: 0; text-align: center; font-size: 96pt; font-weight: bold; letter-spacing: 12pt; color: #ecebf1; transform: rotate(-30deg); }
 </style>
 </head>
 <body>
+  <div th:if="${pdf.watermark() != null}" class="watermark" th:text="${pdf.watermark()}">DRAFT</div>
   <table class="head">
     <tr>
-      <td>
-        <img th:if="${pdf.logo() != null}" th:src="${pdf.logo()}" class="logo" alt="" />
-        <div class="sender-name" th:text="${pdf.sender()}">Business</div>
-        <div class="muted" th:each="line : ${pdf.senderLines()}" th:text="${line}">Contact line</div>
-      </td>
+      <td th:replace="~{pdf/fragments/parties :: seller(${pdf.seller()})}">Business</td>
       <td class="doc">
         <div class="title" th:text="${pdf.title()}">Invoice</div>
-        <div class="number" th:text="${pdf.number()}">INV-0001</div>
+        <div th:if="${pdf.number() != null}" class="number" th:text="${pdf.number()}">INV-0001</div>
         <table class="meta">
           <tr>
             <td class="k">Issued</td>
@@ -73,67 +72,18 @@
           </tr>
         </table>
         <span th:if="${pdf.status() != null}" th:class="${'badge ' + pdf.statusTone()}" th:text="${pdf.status()}">Unpaid</span>
+        <div th:if="${pdf.voidNote() != null}" class="void-note" th:text="${pdf.voidNote()}">Voided on Oct 3, 2026: Sent to the wrong client</div>
       </td>
     </tr>
   </table>
 
-  <table class="band">
-    <tr>
-      <td>
-        <div class="label">Bill to</div>
-        <div class="client-name" th:text="${pdf.clientName()}">Client</div>
-        <div th:each="line : ${pdf.clientLines()}" th:text="${line}">Client line</div>
-      </td>
-    </tr>
-  </table>
+  <table th:replace="~{pdf/fragments/parties :: client('Bill to', ${pdf.client()})}"></table>
 
-  <table class="items">
-    <thead>
-      <tr>
-        <th class="index">#</th>
-        <th>Item</th>
-        <th class="num">Qty</th>
-        <th class="num">Unit price</th>
-        <th class="num">Discount</th>
-        <th class="num">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr th:each="item : ${pdf.items()}">
-        <td class="index" th:text="${item.index()}">1</td>
-        <td th:text="${item.name()}">Item</td>
-        <td class="num" th:text="${item.quantity()}">1</td>
-        <td class="num" th:text="${item.unitPrice()}">0.00</td>
-        <td class="num" th:text="${item.discount()}">0%</td>
-        <td class="num" th:text="${item.amount()}">0.00</td>
-      </tr>
-      <tr th:if="${pdf.items().isEmpty()}">
-        <td></td>
-        <td colspan="5" class="muted">No items</td>
-      </tr>
-    </tbody>
-  </table>
+  <table th:replace="~{pdf/fragments/items :: items(${pdf.items()})}"></table>
 
-  <table class="summary">
-    <tr th:each="row : ${pdf.totals()}">
-      <td th:text="${row.label()}">Subtotal</td>
-      <td class="v" th:text="${pdf.currency() + ' ' + row.value()}">USD 0.00</td>
-    </tr>
-    <tr class="balance">
-      <td th:text="${pdf.balanceLabel()}">Balance due</td>
-      <td class="v" th:text="${pdf.currency() + ' ' + pdf.balance()}">USD 0.00</td>
-    </tr>
-  </table>
+  <table th:replace="~{pdf/fragments/totals ::
+      totals(${pdf.currency()}, ${pdf.totals()}, ${pdf.balanceLabel()}, ${pdf.balance()})}"></table>
 
-  <div class="notes" th:if="${pdf.notes() != null or pdf.terms() != null}">
-    <div class="block" th:if="${pdf.notes() != null}">
-      <div class="label">Notes</div>
-      <p th:text="${pdf.notes()}">Notes</p>
-    </div>
-    <div class="block" th:if="${pdf.terms() != null}">
-      <div class="label">Terms &amp; conditions</div>
-      <p th:text="${pdf.terms()}">Terms</p>
-    </div>
-  </div>
+  <div th:replace="~{pdf/fragments/notes :: notes(${pdf.notes()}, ${pdf.terms()})}"></div>
 </body>
 </html>

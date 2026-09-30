@@ -1,6 +1,7 @@
 package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.document.DocumentLedger;
 import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
 import com.invoicespot.settings.BusinessSettings;
@@ -19,10 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-// The overview's figures. Income, received and pending are for one currency,
-// from invoices and receipts; a quotation is an offer, not income. Status
-// counts and totals cover every document. Payments are the currency's, most
-// recent first.
+// The overview's figures, from issued documents; a draft isn't billed yet.
+// Income, received and pending are for one currency, from invoices and
+// receipts; a quotation is an offer, not income. Status counts and totals
+// cover every issued document. Payments are the currency's, most recent first.
 @Service
 public class Overview {
 
@@ -73,10 +74,10 @@ public class Overview {
     // The currencies of the business's invoices and receipts, its default first.
     private List<String> currencies(Long businessPkid, String defaultCurrency) {
         List<String> found = jdbc.sql("""
-                        select distinct coalesce(currency, '') as currency from documents
-                        where business_pkid = :business and document_type <> 'Quotation'
+                        select distinct coalesce(d.currency, '') as currency from documents d
+                        where d.business_pkid = :business and %s and d.document_type <> 'Quotation'
                         order by 1
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .query(String.class)
                 .list();
@@ -90,12 +91,12 @@ public class Overview {
 
     private Money money(Long businessPkid, String currency) {
         return jdbc.sql("""
-                        select coalesce(sum(total), 0) as expected,
-                               coalesce(sum(total_amount_received), 0) as received
-                        from documents
-                        where business_pkid = :business and document_type <> 'Quotation'
-                          and coalesce(currency, '') = :currency
-                        """)
+                        select coalesce(sum(d.total), 0) as expected,
+                               coalesce(sum(d.total_amount_received), 0) as received
+                        from documents d
+                        where d.business_pkid = :business and %s and d.document_type <> 'Quotation'
+                          and coalesce(d.currency, '') = :currency
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> new Money(
@@ -113,9 +114,9 @@ public class Overview {
                                count(*) filter (where status = 'Not Paid') as unpaid,
                                count(*) filter (where document_type = 'Invoice' and status <> 'Paid'
                                    and due_date < :startOfToday) as overdue
-                        from documents
-                        where business_pkid = :business
-                        """)
+                        from documents d
+                        where d.business_pkid = :business and %s
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("startOfToday", Timestamp.from(startOfToday.toInstant()))
                 .query((result, rowNumber) -> new Counts(
@@ -134,9 +135,9 @@ public class Overview {
                                d.due_date
                         from payments p
                         join documents d on d.pkid = p.document_pkid
-                        where d.business_pkid = :business and coalesce(d.currency, '') = :currency
+                        where d.business_pkid = :business and %s and coalesce(d.currency, '') = :currency
                         order by p.date_paid desc, p.pkid desc
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> {

@@ -170,7 +170,9 @@ public class DemoDataSeeder {
                 DemoData.TERMS,
                 TAX_RATE.toPlainString(),
                 "USD",
-                lines(random)));
+                lines(random),
+                plan.issued(),
+                null));
         List<LocalDate> paymentDates = new ArrayList<>();
         if (plan.type() == DocumentType.INVOICE) {
             paymentDates.addAll(pay(owner, document, plan.issued(), today, random));
@@ -243,11 +245,13 @@ public class DemoDataSeeder {
     }
 
     // A document's history happens when the document and its payments did.
+    // It was issued as it was made.
     private void backdateHistory(UUID documentId) {
+        jdbcTemplate.update("update documents set issued_at = created_at where id = ?", documentId);
         jdbcTemplate.update("""
                 update document_events event set occurred_at = doc.created_at
                 from documents doc
-                where event.document_pkid = doc.pkid and doc.id = ? and event.type = 'CREATED'
+                where event.document_pkid = doc.pkid and doc.id = ? and event.type in ('CREATED', 'ISSUED')
                 """, documentId);
         jdbcTemplate.update("""
                 update document_events event set occurred_at = payment.created_at

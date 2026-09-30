@@ -51,7 +51,8 @@ class DocumentServiceTest {
     @Mock private PdfService pdfService;
     @Mock private SettingsService settingsService;
     @Mock private BusinessRepository businessRepository;
-    @Mock private DocumentNumbering documentNumbering;
+    @Mock private DocumentIssuer documentIssuer;
+    @Mock private RecurringScheduleRepository scheduleRepository;
     @Mock private DocumentActivity activity;
     @Mock private NotificationService notificationService;
     private DocumentService service;
@@ -65,7 +66,8 @@ class DocumentServiceTest {
                 pdfService,
                 settingsService,
                 businessRepository,
-                documentNumbering,
+                documentIssuer,
+                scheduleRepository,
                 activity,
                 notificationService,
                 CLOCK);
@@ -104,10 +106,14 @@ class DocumentServiceTest {
     }
 
     private static CreateDocumentRequest documentRequest(String type) {
+        return documentRequest(type, null);
+    }
+
+    private static CreateDocumentRequest documentRequest(String type, Boolean draft) {
         return new CreateDocumentRequest(
                 CUSTOMER_ID.toString(),
                 new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1"),
-                type, null, null, null, null, "USD", null);
+                type, null, null, null, null, "USD", null, null, draft);
     }
 
     @Test
@@ -124,10 +130,11 @@ class DocumentServiceTest {
     }
 
     @Test
-    @DisplayName("a created document gets a generated number and the type/status defaults")
+    @DisplayName("a created document takes the type/status defaults and is issued as it is made")
     void createsDocumentWithDefaults() {
         ownsCustomer(1L);
-        when(documentNumbering.next(1L, DocumentType.INVOICE)).thenReturn("INV-0001");
+        User member = userWithPkid(1L);
+        when(userRepository.getReferenceById(1L)).thenReturn(member);
 
         service.create(access(1L), documentRequest(null));
 
@@ -136,11 +143,22 @@ class DocumentServiceTest {
         Document saved = captor.getValue();
         assertThat(saved.getDocumentType()).isEqualTo(DocumentType.INVOICE);
         assertThat(saved.getStatus()).isEqualTo(DocumentStatus.NOT_PAID);
-        assertThat(saved.getDocumentNumber()).isEqualTo("INV-0001");
         assertThat(saved.getCustomer().getId()).isEqualTo(CUSTOMER_ID);
         assertThat(saved.getCustomerSnapshot().getName()).isEqualTo("Beta LLC");
         assertThat(saved.getCustomerSnapshot().getEmail()).isEqualTo("billing@beta.test");
         assertThat(saved.getBillingItems()).isEmpty();
+        verify(documentIssuer).issue(saved, null, member);
+    }
+
+    @Test
+    @DisplayName("a document saved as a draft isn't issued")
+    void savesDraft() {
+        ownsCustomer(1L);
+
+        service.create(access(1L), documentRequest(null, true));
+
+        verify(documentRepository).save(any());
+        verify(documentIssuer, never()).issue(any(), any(), any());
     }
 
     @Test
@@ -164,6 +182,23 @@ class DocumentServiceTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("a draft can't take a payment until it is issued")
+    void refusesPaymentOnDraft() {
+        Document draft = paidInvoice(null);
+        draft.setIssuedAt(null);
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findForUpdateByExternalId(id)).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> service.addPayment(
+                        access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Issue this draft before recording a payment")
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(draft.getPayments()).isEmpty();
     }
 
     @Test
@@ -196,7 +231,8 @@ class DocumentServiceTest {
                 CUSTOMER_ID.toString(),
                 new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1"),
                 "Invoice", null, null, null, rates, "USD",
-                List.of(new BillingItemDto("Design", new BigDecimal("100"), 1, discount)));
+                List.of(new BillingItemDto("Design", new BigDecimal("100"), 1, discount)),
+                null, null);
     }
 
     @Test
@@ -242,10 +278,12 @@ class DocumentServiceTest {
         assertThat(saved.getStatus()).isEqualTo(DocumentStatus.NOT_PAID);
     }
 
+    // An issued invoice, with a payment when one is given.
     private Document paidInvoice(BigDecimal paid) {
         Document document = new Document();
         document.setBusiness(businessWithPkid(1L));
         document.setCreatedBy(userWithPkid(1L));
+        document.setIssuedAt(Instant.parse("2026-09-01T10:00:00Z"));
         BillingItem item = new BillingItem();
         item.setItemName("Design");
         item.setUnitPrice(new BigDecimal("100"));
@@ -261,33 +299,29 @@ class DocumentServiceTest {
     }
 
     private static UpdateDocumentRequest update(String type, List<BillingItemDto> items) {
-        return new UpdateDocumentRequest(null, null, type, null, null, null, null, null, items);
+        return new UpdateDocumentRequest(null, null, type, null, null, null, null, null, items, null);
     }
 
     @Test
-    @DisplayName("an edit can't turn a document with payments into a quotation")
-    void refusesQuotationWithPayments() {
+    @DisplayName("an issued document's type and lines don't change; a void one doesn't change at all")
+    void refusesLockedChanges() {
         UUID id = UUID.randomUUID();
-        when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(paidInvoice(new BigDecimal("40"))));
+        Document issued = paidInvoice(new BigDecimal("40"));
+        when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(issued));
 
         assertThatThrownBy(() -> service.update(access(1L), id.toString(), update("Quotation", null)))
                 .isInstanceOf(ApiException.class)
-                .hasMessage("This document has payments, so it can't become a quotation")
+                .hasMessageStartingWith("An issued document keeps its client, lines, tax and issue date")
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
-        verify(documentRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("an edit can't bring the total below what was already received")
-    void refusesTotalBelowReceived() {
-        UUID id = UUID.randomUUID();
-        when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(paidInvoice(new BigDecimal("80"))));
-
         assertThatThrownBy(() -> service.update(
                         access(1L), id.toString(), update(null, List.of(new BillingItemDto("Design", new BigDecimal("50"), 1, "0")))))
                 .isInstanceOf(ApiException.class)
-                .hasMessage("The new total is less than the 80.00 already received");
+                .hasMessageStartingWith("An issued document keeps its client, lines, tax and issue date");
+        issued.setVoidedAt(Instant.parse("2026-09-20T10:00:00Z"));
+        assertThatThrownBy(() -> service.update(access(1L), id.toString(), update(null, null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A void document can't be changed");
         verify(documentRepository, never()).save(any());
     }
 }

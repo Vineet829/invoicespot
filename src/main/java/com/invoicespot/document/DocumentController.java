@@ -10,11 +10,13 @@ import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.CreatedDocumentResponse;
 import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
+import com.invoicespot.document.dto.IssueDocumentRequest;
 import com.invoicespot.document.dto.PaymentResultResponse;
 import com.invoicespot.document.dto.SingleDocumentResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.document.dto.UpdatedDocumentResponse;
+import com.invoicespot.document.dto.VoidDocumentRequest;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -56,6 +58,7 @@ public class DocumentController {
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
             @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "state", required = false) String state,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "overdue", required = false) Boolean overdue,
@@ -68,13 +71,15 @@ public class DocumentController {
             @RequestParam(name = "dir", defaultValue = "desc") String direction) {
         return documentService.listMine(
                 access,
-                DocumentSearch.of(query, status, type, overdue, customerId, from, to, sort, direction, page, size));
+                DocumentSearch.of(
+                        query, state, status, type, overdue, customerId, from, to, sort, direction, page, size));
     }
 
     @GetMapping("/csv")
     public ResponseEntity<byte[]> csv(
             @Requires(Permission.EXPORT_LISTS) BusinessAccess access,
             @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "state", required = false) String state,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "overdue", required = false) Boolean overdue,
@@ -88,7 +93,8 @@ public class DocumentController {
         return documentExport
                 .documents(
                         access,
-                        DocumentSearch.of(query, status, type, overdue, customerId, from, to, sort, direction, 1, 1))
+                        DocumentSearch.of(
+                                query, state, status, type, overdue, customerId, from, to, sort, direction, 1, 1))
                 .download();
     }
 
@@ -141,6 +147,27 @@ public class DocumentController {
     public CreatedDocumentResponse duplicate(
             @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         return new CreatedDocumentResponse(true, documentService.duplicate(access, id));
+    }
+
+    @PostMapping("/{id}/issue")
+    public UpdatedDocumentResponse issue(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @RequestBody(required = false) IssueDocumentRequest request) {
+        DocumentResponse issued = documentService.issue(
+                access, id, request == null ? new IssueDocumentRequest(null, null) : request);
+        return new UpdatedDocumentResponse(
+                true, issued.documentType().getValue() + " " + issued.documentNumber() + " was issued", issued);
+    }
+
+    @PostMapping("/{id}/void")
+    public UpdatedDocumentResponse voidDocument(
+            @Requires(Permission.DELETE_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @Valid @RequestBody VoidDocumentRequest request) {
+        DocumentResponse voided = documentService.voidDocument(access, id, request);
+        return new UpdatedDocumentResponse(
+                true, voided.documentType().getValue() + " " + voided.documentNumber() + " is void", voided);
     }
 
     @PostMapping("/{id}/convert")

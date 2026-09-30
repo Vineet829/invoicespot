@@ -90,13 +90,20 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
         activity(id, owner)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.events[*].type", contains(
-                        "EMAILED", "PAYMENT_DELETED", "PAYMENT_EDITED", "PAYMENT_RECORDED", "EDITED", "CREATED")))
+                        "EMAILED",
+                        "PAYMENT_DELETED",
+                        "PAYMENT_EDITED",
+                        "PAYMENT_RECORDED",
+                        "EDITED",
+                        "ISSUED",
+                        "CREATED")))
                 .andExpect(jsonPath("$.events[*].detail", contains(
                         "to accounts@beta.test",
                         "USD 50.00 · Bank Transfer",
                         "USD 50.00 · Bank Transfer",
                         "USD 40.00 · Bank Transfer",
                         null,
+                        "INV-0001",
                         null)))
                 .andExpect(jsonPath("$.events[*].actor", everyItem(is("Test User"))))
                 .andExpect(jsonPath("$.events[*].byYou", everyItem(is(true))));
@@ -129,15 +136,18 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         activity(id, owner)
-                .andExpect(jsonPath("$.events[*].type", contains("VIEWED", "SHARED", "PAYMENT_RECORDED", "CREATED")))
-                .andExpect(jsonPath("$.events[*].actor", contains(null, "Priya Shah", "Priya Shah", "Test User")))
-                .andExpect(jsonPath("$.events[*].byYou", contains(false, false, false, true)));
+                .andExpect(jsonPath(
+                        "$.events[*].type", contains("VIEWED", "SHARED", "PAYMENT_RECORDED", "ISSUED", "CREATED")))
+                .andExpect(jsonPath(
+                        "$.events[*].actor", contains(null, "Priya Shah", "Priya Shah", "Test User", "Test User")))
+                .andExpect(jsonPath("$.events[*].byYou", contains(false, false, false, true, true)));
         mockMvc.perform(get("/api/v1/document/{id}/activity", id).header(HttpHeaders.AUTHORIZATION, memberSession))
-                .andExpect(jsonPath("$.events[*].byYou", contains(false, true, true, false)));
+                .andExpect(jsonPath("$.events[*].byYou", contains(false, true, true, false, false)));
 
         mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, memberSession))
                 .andExpect(status().isOk());
-        activity(id, owner).andExpect(jsonPath("$.events[*].actor", contains(null, null, null, "Test User")));
+        activity(id, owner)
+                .andExpect(jsonPath("$.events[*].actor", contains(null, null, null, "Test User", "Test User")));
     }
 
     @Test
@@ -150,7 +160,7 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
 
         mockMvc.perform(post("/api/v1/document/{id}/email", id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isBadGateway());
-        activity(id, owner).andExpect(jsonPath("$.events[*].type", contains("CREATED")));
+        activity(id, owner).andExpect(jsonPath("$.events[*].type", contains("ISSUED", "CREATED")));
     }
 
     @Test

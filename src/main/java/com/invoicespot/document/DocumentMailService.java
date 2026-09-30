@@ -52,11 +52,11 @@ public class DocumentMailService {
     }
 
     public EmailDraft draft(BusinessAccess access, String id) {
-        return defaults(access, documentService.envelope(access, id));
+        return defaults(access, documentService.envelopeToSend(access, id));
     }
 
     public void email(BusinessAccess access, String id, EmailDocumentRequest request) {
-        send(access, () -> documentService.renderPdf(access, id), request,
+        send(access, () -> documentService.renderPdfToSend(access, id), request,
                 "This document's client has no email address", "document", id,
                 to -> documentService.recordEmailed(access, id, to));
     }
@@ -96,7 +96,7 @@ public class DocumentMailService {
     // A recurring invoice sent as it is made: the standard message, no rate
     // limit, and a failure thrown for the daily job to log.
     public void emailAutomatically(BusinessAccess access, String id) throws MessagingException {
-        DocumentPdf pdf = documentService.renderPdf(access, id);
+        DocumentPdf pdf = documentService.renderPdfToSend(access, id);
         EmailDraft draft = defaults(access, pdf.envelope());
         if (isBlank(draft.to())) {
             throw new MessagingException("The client of document " + id + " has no email address");

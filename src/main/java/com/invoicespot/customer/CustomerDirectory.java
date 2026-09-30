@@ -2,6 +2,7 @@ package com.invoicespot.customer;
 
 import com.invoicespot.common.SearchText;
 import com.invoicespot.customer.dto.CustomerTotals;
+import com.invoicespot.document.DocumentLedger;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -60,7 +61,7 @@ class CustomerDirectory {
                         select c.pkid,
                                count(d.pkid) as documents,
                                coalesce(sum(d.total - d.total_amount_received) filter (
-                                   where d.document_type = 'Invoice' and d.status <> 'Paid'
+                                   where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
                         from customers c
                         left join documents d on d.customer_pkid = c.pkid
@@ -68,7 +69,8 @@ class CustomerDirectory {
                         group by c.pkid
                         order by %s %s, c.pkid %s
                         limit :limit offset :offset
-                        """.formatted(MATCHING, ORDER_BY.get(search.sort()), direction, direction))
+                        """.formatted(DocumentLedger.COUNTED, MATCHING, ORDER_BY.get(search.sort()), direction,
+                                direction))
                 .param("business", businessPkid)
                 .param("pattern", pattern)
                 .param("currency", currency)
@@ -92,14 +94,15 @@ class CustomerDirectory {
                                c.city, c.country, c.created_at,
                                count(d.pkid) as documents,
                                coalesce(sum(d.total - d.total_amount_received) filter (
-                                   where d.document_type = 'Invoice' and d.status <> 'Paid'
+                                   where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
                         from customers c
                         left join documents d on d.customer_pkid = c.pkid
                         where %s
                         group by c.pkid
                         order by %s %s, c.pkid %s
-                        """.formatted(MATCHING, ORDER_BY.get(search.sort()), direction, direction))
+                        """.formatted(DocumentLedger.COUNTED, MATCHING, ORDER_BY.get(search.sort()), direction,
+                                direction))
                 .param("business", businessPkid)
                 .param("pattern", SearchText.containing(search.query()))
                 .param("currency", currency)
@@ -123,11 +126,11 @@ class CustomerDirectory {
         return jdbc.sql("""
                         select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
                         from documents d
-                        where d.business_pkid = :business and d.customer_pkid is not null
+                        where d.business_pkid = :business and d.customer_pkid is not null and %s
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         group by d.customer_pkid, d.currency
                         having sum(d.total - d.total_amount_received) > 0
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .query((result, rowNumber) -> new Balance(
                         result.getLong("customer_pkid"),
@@ -143,12 +146,12 @@ class CustomerDirectory {
         return jdbc.sql("""
                         select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
                         from documents d
-                        where d.customer_pkid in (:customers)
+                        where d.customer_pkid in (:customers) and %s
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         group by d.customer_pkid, d.currency
                         having sum(d.total - d.total_amount_received) > 0
                         order by outstanding desc, d.currency
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("customers", customerPkids)
                 .query((result, rowNumber) -> new Balance(
                         result.getLong("customer_pkid"),
@@ -171,10 +174,10 @@ class CustomerDirectory {
                                    filter (where d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.due_date < :startOfToday), 0) as overdue
                         from documents d
-                        where d.customer_pkid = :customer
+                        where d.customer_pkid = :customer and %s
                         group by d.currency
                         order by billed desc, d.currency
-                        """)
+                        """.formatted(DocumentLedger.COUNTED))
                 .param("customer", customerPkid)
                 .param("startOfToday", Timestamp.from(startOfToday))
                 .query((result, rowNumber) -> new CustomerTotals(

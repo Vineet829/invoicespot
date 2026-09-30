@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+  <!-- A document's lines. -->
+  <table class="items" th:fragment="items(lines)">
+    <thead>
+      <tr>
+        <th class="index">#</th>
+        <th>Item</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit price</th>
+        <th class="num">Discount</th>
+        <th class="num">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="item : ${lines}">
+        <td class="index" th:text="${item.index()}">1</td>
+        <td th:text="${item.name()}">Item</td>
+        <td class="num" th:text="${item.quantity()}">1</td>
+        <td class="num" th:text="${item.unitPrice()}">0.00</td>
+        <td class="num" th:text="${item.discount()}">0%</td>
+        <td class="num" th:text="${item.amount()}">0.00</td>
+      </tr>
+      <tr th:if="${lines.isEmpty()}">
+        <td></td>
+        <td colspan="5" class="muted">No items</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

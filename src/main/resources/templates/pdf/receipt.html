@@ -8,7 +8,7 @@
     size: A4;
     margin: 16mm 16mm 18mm 16mm;
   }
-  body { margin: 0; font-family: sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
+  body { margin: 0; font-family: 'Noto Sans', sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
   table { border-collapse: collapse; width: 100%; }
   td, th { padding: 0; vertical-align: top; }
   .head td { padding-bottom: 22px; }
@@ -40,11 +40,7 @@
 <body>
   <table class="head">
     <tr>
-      <td>
-        <img th:if="${receipt.logo() != null}" th:src="${receipt.logo()}" class="logo" alt="" />
-        <div class="sender-name" th:text="${receipt.sender()}">Business</div>
-        <div class="muted" th:each="line : ${receipt.senderLines()}" th:text="${line}">Contact line</div>
-      </td>
+      <td th:replace="~{pdf/fragments/parties :: seller(${receipt.seller()})}">Business</td>
       <td class="doc">
         <div class="title">Payment receipt</div>
         <div class="number" th:text="${receipt.number()}">INV-0001-P1</div>
@@ -62,15 +58,7 @@
     </tr>
   </table>
 
-  <table class="band">
-    <tr>
-      <td>
-        <div class="label">Received from</div>
-        <div class="client-name" th:text="${receipt.clientName()}">Client</div>
-        <div th:each="line : ${receipt.clientLines()}" th:text="${line}">Client line</div>
-      </td>
-    </tr>
-  </table>
+  <table th:replace="~{pdf/fragments/parties :: client('Received from', ${receipt.client()})}"></table>
 
   <table class="received">
     <tr>
@@ -83,20 +71,8 @@
     </tr>
   </table>
 
-  <table class="summary">
-    <tr>
-      <td th:text="${receipt.documentTitle() + ' total'}">Invoice total</td>
-      <td class="v" th:text="${receipt.currency() + ' ' + receipt.total()}">USD 0.00</td>
-    </tr>
-    <tr>
-      <td>Paid to date</td>
-      <td class="v" th:text="${receipt.currency() + ' ' + receipt.paidToDate()}">USD 0.00</td>
-    </tr>
-    <tr class="balance">
-      <td>Balance after this payment</td>
-      <td class="v" th:text="${receipt.currency() + ' ' + receipt.balance()}">USD 0.00</td>
-    </tr>
-  </table>
+  <table th:replace="~{pdf/fragments/totals ::
+      totals(${receipt.currency()}, ${receipt.totals()}, 'Balance after this payment', ${receipt.balance()})}"></table>
 
   <p class="thanks">Thank you for your payment.</p>
 </body>

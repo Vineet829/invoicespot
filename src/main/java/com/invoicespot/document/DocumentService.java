@@ -13,8 +13,10 @@ import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
+import com.invoicespot.document.dto.IssueDocumentRequest;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
+import com.invoicespot.document.dto.VoidDocumentRequest;
 import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.BusinessSettings;
@@ -31,6 +33,8 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -44,6 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DocumentService {
 
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
+    private static final String LOCKED = "An issued document keeps its client, lines, tax and issue date."
+            + " Void it and duplicate it to change them";
 
     private final DocumentRepository documentRepository;
     private final CustomerRepository customerRepository;
@@ -51,7 +57,8 @@ public class DocumentService {
     private final PdfService pdfService;
     private final SettingsService settingsService;
     private final BusinessRepository businessRepository;
-    private final DocumentNumbering documentNumbering;
+    private final DocumentIssuer documentIssuer;
+    private final RecurringScheduleRepository scheduleRepository;
     private final DocumentActivity activity;
     private final NotificationService notificationService;
     private final Clock clock;
@@ -63,7 +70,8 @@ public class DocumentService {
             PdfService pdfService,
             SettingsService settingsService,
             BusinessRepository businessRepository,
-            DocumentNumbering documentNumbering,
+            DocumentIssuer documentIssuer,
+            RecurringScheduleRepository scheduleRepository,
             DocumentActivity activity,
             NotificationService notificationService,
             Clock clock) {
@@ -73,12 +81,14 @@ public class DocumentService {
         this.pdfService = pdfService;
         this.settingsService = settingsService;
         this.businessRepository = businessRepository;
-        this.documentNumbering = documentNumbering;
+        this.documentIssuer = documentIssuer;
+        this.scheduleRepository = scheduleRepository;
         this.activity = activity;
         this.notificationService = notificationService;
         this.clock = clock;
     }
 
+    // A new document is issued as it is made, unless it is saved as a draft.
     @Transactional
     public DocumentResponse create(BusinessAccess access, CreateDocumentRequest request) {
         Customer customer = findCustomer(access.businessPkid(), request.customerId(), request.customer())
@@ -88,18 +98,57 @@ public class DocumentService {
         document.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
         document.setCreatedBy(actor(access));
         document.setCustomer(customer);
-        document.setCustomerSnapshot(snapshotOf(customer));
+        document.setCustomerSnapshot(CustomerSnapshot.of(customer));
         document.setDocumentType(documentType(request.documentType()));
+        document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
         document.setDueDate(request.dueDate());
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
         document.setRates(percentage(request.rates(), "Tax rate"));
         document.setCurrency(request.currency());
         document.setBillingItems(toBillingItems(request.billingItems()));
-        document.setDocumentNumber(documentNumbering.next(access.businessPkid(), document.getDocumentType()));
         DocumentTotals.apply(document);
         documentRepository.save(document);
         activity.record(document, DocumentEventType.CREATED, null, actor(access));
+        if (!Boolean.TRUE.equals(request.draft())) {
+            documentIssuer.issue(document, null, actor(access));
+        }
+        return respond(document);
+    }
+
+    // Voids an issued document instead of deleting it: it keeps its number,
+    // says why, and no longer counts toward anything owed. One with payments,
+    // or that a schedule copies, is refused.
+    @Transactional
+    public DocumentResponse voidDocument(BusinessAccess access, String id, VoidDocumentRequest request) {
+        Document document = lockInBusiness(access, id);
+        if (document.isDraft()) {
+            throw new ApiException(HttpStatus.CONFLICT, "A draft isn't issued, so delete it instead");
+        }
+        if (document.isVoid()) {
+            throw new ApiException(HttpStatus.CONFLICT, "This document is already void");
+        }
+        if (!document.getPayments().isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "Delete its payments before voiding it");
+        }
+        if (scheduleRepository.findByTemplate(document).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "This invoice repeats. Stop its schedule before voiding it");
+        }
+        document.setVoidedAt(Instant.now(clock));
+        document.setVoidReason(request.reason().trim());
+        document.setOverdueAlertedAt(null);
+        activity.record(document, DocumentEventType.VOIDED, document.getVoidReason(), actor(access));
+        return respond(document);
+    }
+
+    // Issues a draft: it takes its number, and the day and due date asked for.
+    @Transactional
+    public DocumentResponse issue(BusinessAccess access, String id, IssueDocumentRequest request) {
+        Document document = lockInBusiness(access, id);
+        if (document.isDraft() && request.dueDate() != null) {
+            document.setDueDate(request.dueDate());
+        }
+        documentIssuer.issue(document, issueDate(request.issueDate(), zoneOf(access.businessPkid())), actor(access));
         return respond(document);
     }
 
@@ -108,7 +157,7 @@ public class DocumentService {
         ZoneId zone = zoneOf(access.businessPkid());
         Instant startOfToday = startOfToday(zone);
         Page<Document> result = documentRepository.findAll(
-                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday, zone),
+                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday),
                 PageRequest.of(search.page() - 1, search.size(), search.sort()));
         return new DocumentListResponse(
                 true,
@@ -131,6 +180,15 @@ public class DocumentService {
 
     private Instant startOfToday(ZoneId zone) {
         return LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
+    }
+
+    // The day a document is to be dated, if one is chosen. A day still to
+    // come is refused; without one, a document is dated the day it is issued.
+    private LocalDate issueDate(LocalDate requested, ZoneId zone) {
+        if (requested != null && requested.isAfter(LocalDate.now(clock.withZone(zone)))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "A document can't be dated after today");
+        }
+        return requested;
     }
 
     private DocumentResponse respond(Document document) {
@@ -157,9 +215,36 @@ public class DocumentService {
                 envelope(document));
     }
 
+    // What an email of the document starts from. Only an issued document
+    // goes to a client, and a void one no longer does.
     @Transactional(readOnly = true)
-    public DocumentEnvelope envelope(BusinessAccess access, String id) {
-        return envelope(requireReadable(access, id));
+    public DocumentEnvelope envelopeToSend(BusinessAccess access, String id) {
+        Document document = requireReadable(access, id);
+        requireSendable(document);
+        return envelope(document);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentPdf renderPdfToSend(BusinessAccess access, String id) {
+        requireSendable(requireReadable(access, id));
+        return renderPdf(access, id);
+    }
+
+    private static void requireSendable(Document document) {
+        requireIssued(document, "Issue this draft before sending it");
+        requireNotVoid(document, "A void document isn't sent");
+    }
+
+    static void requireIssued(Document document, String refusal) {
+        if (document.isDraft()) {
+            throw new ApiException(HttpStatus.CONFLICT, refusal);
+        }
+    }
+
+    static void requireNotVoid(Document document, String refusal) {
+        if (document.isVoid()) {
+            throw new ApiException(HttpStatus.CONFLICT, refusal);
+        }
     }
 
     private Document requireReadable(BusinessAccess access, String id) {
@@ -179,24 +264,34 @@ public class DocumentService {
                 customer == null ? null : customer.getEmail());
     }
 
+    // A draft changes freely. An issued document keeps its client, lines,
+    // currency, tax and issue date: only its due date, notes and terms change,
+    // and its amounts stay as they went out.
     @Transactional
     public DocumentResponse update(BusinessAccess access, String id, UpdateDocumentRequest request) {
         Document document = requireInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to update this document. It's not yours");
+        requireNotVoid(document, "A void document can't be changed");
+        if (!document.isDraft()) {
+            requireOnlyDetails(document, request);
+        }
         if (request.customerId() != null) {
             Customer customer = findCustomer(access.businessPkid(), request.customerId(), null)
                     .orElseThrow(DocumentService::customerNotFound);
             document.setCustomer(customer);
-            document.setCustomerSnapshot(snapshotOf(customer));
+            document.setCustomerSnapshot(CustomerSnapshot.of(customer));
         } else if (request.customer() != null) {
             Optional<Customer> customer = findCustomer(access.businessPkid(), null, request.customer());
             document.setCustomer(customer.orElse(null));
-            document.setCustomerSnapshot(customer.map(DocumentService::snapshotOf)
+            document.setCustomerSnapshot(customer.map(CustomerSnapshot::of)
                     .orElseGet(() -> toSnapshot(request.customer())));
         }
         if (request.documentType() != null) {
             document.setDocumentType(documentType(request.documentType()));
+        }
+        if (request.issueDate() != null) {
+            document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
         }
         if (request.dueDate() != null) {
             document.setDueDate(request.dueDate());
@@ -216,8 +311,9 @@ public class DocumentService {
         if (request.billingItems() != null) {
             document.setBillingItems(toBillingItems(request.billingItems()));
         }
-        DocumentTotals.apply(document);
-        requireConsistentPayments(document);
+        if (document.isDraft()) {
+            DocumentTotals.apply(document);
+        }
         if (!DocumentTotals.isOverdue(document, startOfToday(zoneOf(access.businessPkid())))) {
             document.setOverdueAlertedAt(null);
         }
@@ -234,7 +330,7 @@ public class DocumentService {
         User actor = actor(access);
         Document copy = copyOf(original, original.getDocumentType(), true, actor);
         activity.record(copy, DocumentEventType.COPIED_FROM, original.getDocumentNumber(), actor);
-        activity.record(original, DocumentEventType.COPIED_TO, copy.getDocumentNumber(), actor);
+        activity.record(original, DocumentEventType.COPIED_TO, null, actor);
         return respond(copy);
     }
 
@@ -246,32 +342,43 @@ public class DocumentService {
         if (quotation.getDocumentType() != DocumentType.QUOTATION) {
             throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can become an invoice");
         }
+        if (quotation.isDraft()) {
+            throw new ApiException(HttpStatus.CONFLICT, "Issue this quotation before it becomes an invoice");
+        }
+        requireNotVoid(quotation, "This quotation is void");
         documentRepository.findFirstBySourceAndDocumentType(quotation, DocumentType.INVOICE).ifPresent(invoice -> {
             throw new ApiException(
-                    HttpStatus.CONFLICT, "This quotation is already invoice " + invoice.getDocumentNumber());
+                    HttpStatus.CONFLICT,
+                    invoice.isDraft()
+                            ? "This quotation already has a draft invoice"
+                            : "This quotation is already invoice " + invoice.getDocumentNumber());
         });
         User actor = actor(access);
         Document invoice = copyOf(quotation, DocumentType.INVOICE, true, actor);
         activity.record(invoice, DocumentEventType.CONVERTED_FROM, quotation.getDocumentNumber(), actor);
-        activity.record(quotation, DocumentEventType.CONVERTED_TO, invoice.getDocumentNumber(), actor);
+        activity.record(quotation, DocumentEventType.CONVERTED_TO, null, actor);
         return respond(invoice);
     }
 
     // The next invoice of a recurring schedule, made in the name of whoever
-    // set up the schedule. It isn't linked to the template as a copy, or a
-    // monthly template would list every month.
-    Document createRecurring(Document template, RecurringFrequency frequency, User author) {
+    // set up the schedule, and issued at once or left as a draft to review.
+    // It isn't linked to the template as a copy, or a monthly template would
+    // list every month.
+    Document createRecurring(Document template, RecurringFrequency frequency, User author, boolean issue) {
         Document invoice = copyOf(template, DocumentType.INVOICE, false, author);
         activity.record(
                 invoice,
                 DocumentEventType.RECURRING,
-                template.getDocumentNumber() + " · " + frequency.label(),
+                Objects.requireNonNullElse(template.getDocumentNumber(), "a draft") + " · " + frequency.label(),
                 null);
+        if (issue) {
+            documentIssuer.issue(invoice, null, null);
+        }
         return invoice;
     }
 
-    // A new document with the original's client and lines, a fresh number,
-    // and a due date from the business's payment terms. Payments stay behind.
+    // A new draft with the original's client and lines, due as the
+    // business's payment terms say from today. Payments stay behind.
     private Document copyOf(Document original, DocumentType type, boolean linkSource, User author) {
         Long businessPkid = original.getBusiness().getPkid();
         BusinessSettings settings = settingsService.forBusiness(businessPkid);
@@ -283,7 +390,7 @@ public class DocumentService {
         copy.setCustomer(original.getCustomer());
         copy.setCustomerSnapshot(original.getCustomer() == null
                 ? copyOf(original.getCustomerSnapshot())
-                : snapshotOf(original.getCustomer()));
+                : CustomerSnapshot.of(original.getCustomer()));
         copy.setDocumentType(type);
         copy.setDueDate(LocalDate.now(clock.withZone(zone))
                 .plusDays(settings.getPaymentTermsDays())
@@ -295,7 +402,6 @@ public class DocumentService {
         copy.setRates(original.getRates());
         copy.setCurrency(original.getCurrency());
         copy.setBillingItems(original.getBillingItems().stream().map(DocumentService::copyOf).toList());
-        copy.setDocumentNumber(documentNumbering.next(businessPkid, type));
         DocumentTotals.apply(copy);
         return documentRepository.save(copy);
     }
@@ -325,17 +431,28 @@ public class DocumentService {
         return snapshot;
     }
 
+    // Only a draft is deleted: an issued document keeps its number, and is
+    // voided instead.
     @Transactional
     public void delete(BusinessAccess access, String id) {
         Document document = requireInBusiness(
                 access, id, "That document does not exist!",
                 "You are not authorized to delete this document. It's not yours");
+        if (!document.isDraft()) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    document.isVoid()
+                            ? "A void document is kept with its number"
+                            : "An issued document can't be deleted. Void it instead");
+        }
         documentRepository.delete(document);
     }
 
     @Transactional
     public DocumentResponse addPayment(BusinessAccess access, String id, CreatePaymentRequest request) {
-        Document document = requireInBusinessForPayment(access, id);
+        Document document = lockInBusiness(access, id);
+        requireIssued(document, "Issue this draft before recording a payment");
+        requireNotVoid(document, "A void document can't take payments");
         if (document.getDocumentType() == DocumentType.QUOTATION) {
             throw new ApiException(HttpStatus.CONFLICT, "A quotation can't take payments");
         }
@@ -352,7 +469,7 @@ public class DocumentService {
         payment.setAdditionalInfo(request.additionalInfo());
         requireWithinBalance(document, payment.getAmountPaid());
         document.getPayments().add(payment);
-        DocumentTotals.apply(document);
+        DocumentTotals.settle(document);
         documentRepository.flush();
         activity.record(
                 document,
@@ -366,7 +483,7 @@ public class DocumentService {
     @Transactional
     public DocumentResponse updatePayment(
             BusinessAccess access, String id, String paymentId, UpdatePaymentRequest request) {
-        Document document = requireInBusinessForPayment(access, id);
+        Document document = lockInBusiness(access, id);
         Payment payment = requirePayment(document, paymentId);
         if (request.datePaid() != null) {
             payment.setDatePaid(paymentDate(request.datePaid()));
@@ -382,7 +499,7 @@ public class DocumentService {
             requireWithinBalance(document, amount.subtract(payment.getAmountPaid()));
             payment.setAmountPaid(amount);
         }
-        DocumentTotals.apply(document);
+        DocumentTotals.settle(document);
         activity.record(
                 document,
                 DocumentEventType.PAYMENT_EDITED,
@@ -394,10 +511,10 @@ public class DocumentService {
 
     @Transactional
     public DocumentResponse deletePayment(BusinessAccess access, String id, String paymentId) {
-        Document document = requireInBusinessForPayment(access, id);
+        Document document = lockInBusiness(access, id);
         Payment payment = requirePayment(document, paymentId);
         document.getPayments().remove(payment);
-        DocumentTotals.apply(document);
+        DocumentTotals.settle(document);
         activity.record(
                 document,
                 DocumentEventType.PAYMENT_DELETED,
@@ -466,6 +583,8 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public ReminderFacts reminderFacts(BusinessAccess access, String id) {
         Document document = requireReadable(access, id);
+        requireIssued(document, "Issue this draft before sending a reminder");
+        requireNotVoid(document, "A void document needs no reminder");
         if (document.getDocumentType() != DocumentType.INVOICE || document.getStatus() == DocumentStatus.PAID) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an unpaid invoice needs a reminder");
         }
@@ -519,7 +638,9 @@ public class DocumentService {
                 customer == null ? null : customer.getEmail());
     }
 
-    private Document requireInBusinessForPayment(BusinessAccess access, String id) {
+    // The document, locked until the transaction ends, so two changes to it
+    // take turns.
+    private Document lockInBusiness(BusinessAccess access, String id) {
         Document document = externalId(id)
                 .flatMap(documentRepository::findForUpdateByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist!"));
@@ -571,19 +692,27 @@ public class DocumentService {
         }
     }
 
-    private static void requireConsistentPayments(Document document) {
-        BigDecimal received = DocumentTotals.received(document);
-        if (received.signum() == 0 || document.getDocumentType() == DocumentType.RECEIPT) {
-            return;
+    // Only the due date, notes and terms of an issued document change; a
+    // receipt has no due date, and a quotation the client answered stays as
+    // it was. An expired quotation opens again with a later date.
+    private static void requireOnlyDetails(Document document, UpdateDocumentRequest request) {
+        if (document.getAcceptedAt() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "An accepted quotation can't be changed");
         }
-        if (document.getDocumentType() == DocumentType.QUOTATION) {
-            throw new ApiException(
-                    HttpStatus.CONFLICT, "This document has payments, so it can't become a quotation");
+        if (document.getDeclinedAt() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "A declined quotation can't be changed");
         }
-        if (document.getTotal().compareTo(received) < 0) {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "The new total is less than the " + received.toPlainString() + " already received");
+        if (request.customerId() != null
+                || request.customer() != null
+                || request.documentType() != null
+                || request.issueDate() != null
+                || request.rates() != null
+                || request.currency() != null
+                || request.billingItems() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, LOCKED);
+        }
+        if (request.dueDate() != null && document.getDocumentType() == DocumentType.RECEIPT) {
+            throw new ApiException(HttpStatus.CONFLICT, "A receipt has no due date");
         }
     }
 
@@ -613,19 +742,6 @@ public class DocumentService {
     private static ApiException customerNotFound() {
         return new ApiException(
                 HttpStatus.NOT_FOUND, "That customer does not exist for the currently logged in user");
-    }
-
-    private static CustomerSnapshot snapshotOf(Customer customer) {
-        CustomerSnapshot snapshot = new CustomerSnapshot();
-        snapshot.setName(customer.getName());
-        snapshot.setEmail(customer.getEmail());
-        snapshot.setAccountNo(customer.getAccountNo());
-        snapshot.setVatTinNo(customer.getVatTinNo());
-        snapshot.setAddress(customer.getAddress());
-        snapshot.setCity(customer.getCity());
-        snapshot.setCountry(customer.getCountry());
-        snapshot.setPhoneNumber(customer.getPhoneNumber());
-        return snapshot;
     }
 
     private static CustomerSnapshot toSnapshot(DocumentCustomerDto dto) {
@@ -683,6 +799,9 @@ public class DocumentService {
     }
 
     static String pdfFileName(Document document) {
+        if (document.isDraft()) {
+            return "Draft-" + document.getDocumentType().getValue().toLowerCase(Locale.ROOT) + ".pdf";
+        }
         String number = document.getDocumentNumber() == null
                 ? ""
                 : document.getDocumentNumber().replaceAll("[^A-Za-z0-9._-]", "-");

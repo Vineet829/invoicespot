@@ -18,6 +18,7 @@ public record RecurringResponse(
         LocalDate endDate,
         Integer maxRuns,
         int runsDone,
+        boolean issueAutomatically,
         boolean emailAutomatically,
         boolean paused,
         boolean finished,

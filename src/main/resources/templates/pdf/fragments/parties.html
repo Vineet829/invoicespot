@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+  <!-- The seller, at the top left: logo, name and contact lines. -->
+  <td th:fragment="seller(party)">
+    <img th:if="${party.logo() != null}" th:src="${party.logo()}" class="logo" alt="" />
+    <div class="sender-name" th:text="${party.name()}">Business</div>
+    <div class="muted" th:each="line : ${party.lines()}" th:text="${line}">Contact line</div>
+  </td>
+
+  <!-- Who the PDF is for, in a band across the page. -->
+  <table class="band" th:fragment="client(label, party)">
+    <tr>
+      <td>
+        <div class="label" th:text="${label}">Bill to</div>
+        <div class="client-name" th:text="${party.name()}">Client</div>
+        <div th:each="line : ${party.lines()}" th:text="${line}">Client line</div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

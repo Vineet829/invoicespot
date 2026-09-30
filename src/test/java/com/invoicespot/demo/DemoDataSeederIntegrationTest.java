@@ -39,6 +39,12 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
                                 + " where created_by_pkid = ?",
                         owner))
                 .isGreaterThanOrEqualTo(11);
+        assertThat(count("""
+                select count(*) from documents d
+                left join business_settings s on s.business_pkid = d.business_pkid
+                where d.created_by_pkid = ?
+                  and d.issue_date <> (d.created_at at time zone coalesce(s.time_zone, 'UTC'))::date
+                """, owner)).isZero();
         assertThat(count(
                         "select count(*) from documents where created_by_pkid = ? and document_number = 'INV-1001'",
                         owner))

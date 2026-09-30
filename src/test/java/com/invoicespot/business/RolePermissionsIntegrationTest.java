@@ -53,9 +53,14 @@ class RolePermissionsIntegrationTest extends IntegrationTest {
     }
 
     private String document() throws Exception {
+        return document(false);
+    }
+
+    private String document(boolean draft) throws Exception {
         String body = send(post("/api/v1/document/create"), owner, """
-                        {"customerId": "%s", "billingItems": [{"itemName": "Design", "unitPrice": 100, "quantity": 1}]}
-                        """.formatted(clientId))
+                        {"customerId": "%s", "draft": %s,
+                         "billingItems": [{"itemName": "Design", "unitPrice": 100, "quantity": 1}]}
+                        """.formatted(clientId, draft))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(body, "$.newDocument._id");
@@ -115,12 +120,13 @@ class RolePermissionsIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("an admin deletes records, changes settings and details, and downloads everything")
+    @DisplayName("an admin deletes drafts and clients, voids documents, changes settings and downloads everything")
     void admin() throws Exception {
         String admin = as(BusinessRole.ADMIN);
-        String document = document();
 
-        send(delete("/api/v1/document/" + document), admin, "").andExpect(status().isOk());
+        send(delete("/api/v1/document/" + document(true)), admin, "").andExpect(status().isOk());
+        send(post("/api/v1/document/" + document() + "/void"), admin, "{\"reason\": \"Wrong client\"}")
+                .andExpect(status().isOk());
         send(put("/api/v1/settings"), admin, SETTINGS).andExpect(status().isOk());
         send(patch("/api/v1/business"), admin, "{\"name\": \"Renamed\"}").andExpect(status().isOk());
         send(get("/api/v1/export/all"), admin, "").andExpect(status().isOk());

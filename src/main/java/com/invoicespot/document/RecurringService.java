@@ -83,6 +83,7 @@ public class RecurringService {
         if (invoice.getDocumentType() != DocumentType.INVOICE) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an invoice can repeat");
         }
+        DocumentService.requireNotVoid(invoice, "A void invoice can't repeat");
         if (scheduleRepository.findByTemplate(invoice).isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "This invoice already repeats");
         }
@@ -170,7 +171,10 @@ public class RecurringService {
             return Optional.empty();
         }
         Document invoice = documentService.createRecurring(
-                schedule.getTemplate(), schedule.getFrequency(), schedule.getCreatedBy());
+                schedule.getTemplate(),
+                schedule.getFrequency(),
+                schedule.getCreatedBy(),
+                schedule.isIssueAutomatically());
         RecurringRun run = new RecurringRun();
         run.setSchedule(schedule);
         run.setRunDate(schedule.getNextRun());
@@ -180,13 +184,22 @@ public class RecurringService {
         schedule.setRunsDone(schedule.getRunsDone() + 1);
         schedule.setNextRun(nextRun(schedule));
         CustomerSnapshot client = invoice.getCustomerSnapshot();
-        notificationService.notify(
-                invoice,
-                NotificationType.RECURRING_CREATED,
-                "Invoice " + invoice.getDocumentNumber()
-                        + (client == null || client.getName() == null ? "" : " for " + client.getName())
-                        + " was made by its " + schedule.getFrequency().label() + " schedule");
-        boolean email = schedule.isEmailAutomatically()
+        String forClient = client == null || client.getName() == null ? "" : " for " + client.getName();
+        if (invoice.isDraft()) {
+            notificationService.notify(
+                    invoice,
+                    NotificationType.RECURRING_DRAFT,
+                    "A draft invoice" + forClient + " from its " + schedule.getFrequency().label()
+                            + " schedule is ready to review");
+        } else {
+            notificationService.notify(
+                    invoice,
+                    NotificationType.RECURRING_CREATED,
+                    "Invoice " + invoice.getDocumentNumber() + forClient + " was made by its "
+                            + schedule.getFrequency().label() + " schedule");
+        }
+        boolean email = !invoice.isDraft()
+                && schedule.isEmailAutomatically()
                 && !demoAccountGuard.isDemo(businessService.owner(businessPkid));
         return Optional.of(new Made(businessPkid, invoice.getId().toString(), run.getPkid(), email));
     }
@@ -228,7 +241,14 @@ public class RecurringService {
         schedule.setStartDate(request.startDate());
         schedule.setEndDate(request.endDate());
         schedule.setMaxRuns(request.maxRuns());
-        schedule.setEmailAutomatically(Boolean.TRUE.equals(request.emailAutomatically()));
+        boolean issue = !Boolean.FALSE.equals(request.issueAutomatically());
+        boolean email = Boolean.TRUE.equals(request.emailAutomatically());
+        if (email && !issue) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Only an invoice that is issued as it is made can be emailed on its own");
+        }
+        schedule.setIssueAutomatically(issue);
+        schedule.setEmailAutomatically(email);
         schedule.setStartOffset(schedule.getRunsDone());
         schedule.setNextRun(nextRun(schedule));
     }
@@ -253,6 +273,7 @@ public class RecurringService {
                 schedule.getEndDate(),
                 schedule.getMaxRuns(),
                 schedule.getRunsDone(),
+                schedule.isIssueAutomatically(),
                 schedule.isEmailAutomatically(),
                 schedule.isPaused(),
                 schedule.getNextRun() == null,

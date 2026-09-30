@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Payment receipt INV-0042-P1</title>
+<style>
+@page {
+size: A4;
+margin: 16mm 16mm 18mm 16mm;
+}
+body {
+margin: 0;
+font-family: 'Noto Sans', sans-serif;
+font-size: 9.5pt;
+line-height: 1.45;
+color: #4f5566;
+}
+table {
+border-collapse: collapse;
+width: 100%;
+}
+td, th {
+padding: 0;
+vertical-align: top;
+}
+.head td {
+padding-bottom: 22px;
+}
+.logo {
+max-height: 56px;
+max-width: 150px;
+margin-bottom: 12px;
+}
+.sender-name {
+font-size: 13pt;
+color: #232735;
+font-weight: bold;
+margin-bottom: 4px;
+}
+.muted {
+color: #5d6170;
+}
+.doc {
+text-align: right;
+width: 46%;
+}
+.title {
+font-size: 28pt;
+font-weight: normal;
+color: #232735;
+letter-spacing: -0.5pt;
+line-height: 1.1;
+}
+.number {
+font-size: 10pt;
+color: #5b47a0;
+margin: 4px 0 12px;
+}
+.meta {
+width: auto;
+margin-left: auto;
+}
+.meta td {
+padding: 1px 0 1px 18px;
+}
+.meta .k {
+color: #6b7080;
+text-align: left;
+}
+.meta .v {
+color: #232735;
+text-align: right;
+}
+.band {
+background: #f3f2f8;
+border-radius: 12px;
+}
+.band td {
+padding: 14px 16px;
+}
+.label {
+font-size: 8pt;
+text-transform: uppercase;
+letter-spacing: 0.8pt;
+color: #6b7080;
+margin-bottom: 5px;
+}
+.client-name {
+font-size: 11pt;
+color: #232735;
+font-weight: bold;
+margin-bottom: 3px;
+}
+.received {
+margin-top: 22px;
+background: #e5e1f8;
+border-radius: 12px;
+}
+.received td {
+padding: 18px 20px;
+color: #261f3d;
+}
+.amount {
+font-size: 22pt;
+color: #261f3d;
+letter-spacing: -0.3pt;
+}
+.method {
+margin-top: 4px;
+color: #4a4262;
+}
+.summary {
+width: 46%;
+margin: 18px 0 0 auto;
+}
+.summary td {
+padding: 4px 0;
+}
+.summary .v {
+text-align: right;
+color: #232735;
+white-space: nowrap;
+}
+.summary .balance td {
+border-top: 1px solid #d9d8e2;
+padding-top: 10px;
+font-size: 11pt;
+color: #30234f;
+font-weight: bold;
+}
+.thanks {
+margin-top: 30px;
+color: #5d6170;
+}
+</style>
+</head>
+<body>
+<table class="head">
+<tr>
+<td>
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" class="logo" alt="" />
+<div class="sender-name">Ada Analytics</div>
+<div class="muted">Ada Analytics Private Limited</div>
+<div class="muted">accounts@ada.example</div>
+<div class="muted">+91 20 5555 0100</div>
+<div class="muted">12 MG Road, Pune, Maharashtra 411001, India</div>
+<div class="muted">Tax ID 27AAPFU0939F1ZV</div>
+</td>
+<td class="doc">
+<div class="title">Payment receipt</div>
+<div class="number">INV-0042-P1</div>
+<table class="meta">
+<tr>
+<td class="k">Paid on</td>
+<td class="v">Oct 2, 2026</td>
+</tr>
+<tr>
+<td class="k">For</td>
+<td class="v">Invoice INV-0042</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+<table class="band">
+<tr>
+<td>
+<div class="label">Received from</div>
+<div class="client-name">Beta &amp; &lt;Sons&gt; LLP</div>
+<div>accounts@beta.example</div>
+<div>+91 22 5555 0199</div>
+<div>4 Marine Drive, Mumbai, India</div>
+<div>Account no. CUS-100042</div>
+</td>
+</tr>
+</table>
+<table class="received">
+<tr>
+<td>
+<div class="label">Amount received</div>
+<div class="amount">INR 44,550.00</div>
+<div class="method">Paid by Bank Transfer</div>
+<div class="method">Deposit &amp; &lt;thanks&gt;</div>
+</td>
+</tr>
+</table>
+<table class="summary">
+<tr>
+<td>Invoice INV-0042 total</td>
+<td class="v">INR 1,44,550.00</td>
+</tr>
+<tr>
+<td>Paid to date</td>
+<td class="v">INR 44,550.00</td>
+</tr>
+<tr class="balance">
+<td>Balance after this payment</td>
+<td class="v">INR 1,00,000.00</td>
+</tr>
+</table>
+<p class="thanks">Thank you for your payment.</p>
+</body>
+</html>

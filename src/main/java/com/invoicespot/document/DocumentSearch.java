@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 
 public record DocumentSearch(
         String query,
+        DocumentState state,
         DocumentStatus status,
         DocumentType type,
         boolean overdueOnly,
@@ -31,6 +32,7 @@ public record DocumentSearch(
 
     public static DocumentSearch of(
             String query,
+            String state,
             String status,
             String type,
             Boolean overdueOnly,
@@ -43,6 +45,7 @@ public record DocumentSearch(
             int size) {
         return new DocumentSearch(
                 query,
+                state == null || state.isBlank() ? null : parse(() -> DocumentState.fromValue(state), "state"),
                 status == null || status.isBlank() ? null : parse(() -> DocumentStatus.fromValue(status), "status"),
                 type == null || type.isBlank() ? null : parse(() -> DocumentType.fromValue(type), "document type"),
                 Boolean.TRUE.equals(overdueOnly),

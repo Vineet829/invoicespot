@@ -3,7 +3,6 @@ package com.invoicespot.document;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -29,25 +28,25 @@ final class Statements {
 
     private Statements() {}
 
-    static List<Account> accounts(List<Document> invoices, ZoneId zone, Instant startOfToday) {
+    static List<Account> accounts(List<Document> invoices, Instant startOfToday) {
         Map<String, List<Document>> byCurrency = invoices.stream()
                 .collect(Collectors.groupingBy(
                         invoice -> Objects.requireNonNullElse(invoice.getCurrency(), ""),
                         LinkedHashMap::new,
                         Collectors.toList()));
         return byCurrency.entrySet().stream()
-                .map(currency -> account(currency.getKey(), currency.getValue(), zone, startOfToday))
+                .map(currency -> account(currency.getKey(), currency.getValue(), startOfToday))
                 .toList();
     }
 
-    private static Account account(String currency, List<Document> invoices, ZoneId zone, Instant startOfToday) {
+    private static Account account(String currency, List<Document> invoices, Instant startOfToday) {
         List<Entry> entries = new ArrayList<>();
         BigDecimal overdue = BigDecimal.ZERO;
         for (Document invoice : invoices) {
             String number = Objects.requireNonNullElse(invoice.getDocumentNumber(), "");
             BigDecimal total = orZero(invoice.getTotal());
             entries.add(new Entry(
-                    invoice.getCreatedAt().atZone(zone).toLocalDate(),
+                    invoice.getIssueDate(),
                     0,
                     entries.size(),
                     "Invoice " + number,

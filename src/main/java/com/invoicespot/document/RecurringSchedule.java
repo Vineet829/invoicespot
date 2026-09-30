@@ -56,6 +56,11 @@ public class RecurringSchedule extends BaseEntity {
     @Column(name = "start_offset", nullable = false)
     private int startOffset;
 
+    // Each invoice is issued as it is made, or left as a draft to review;
+    // only an issued one is emailed on its own.
+    @Column(name = "issue_automatically", nullable = false)
+    private boolean issueAutomatically = true;
+
     @Column(name = "email_automatically", nullable = false)
     private boolean emailAutomatically;
 

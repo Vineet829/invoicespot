@@ -35,17 +35,19 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     @Query("""
             select d from Document d
             where d.customer.pkid = :customerPkid and d.documentType = :type
-            order by d.createdAt, d.pkid
+              and d.issuedAt is not null and d.voidedAt is null
+            order by d.issueDate, d.createdAt, d.pkid
             """)
     List<Document> findForStatement(@Param("customerPkid") Long customerPkid, @Param("type") DocumentType type);
 
     List<Document> findBySourceOrderByCreatedAtAscPkidAsc(Document source);
 
-    // Unpaid invoices due before a moment that nobody was yet told about.
+    // Unpaid issued invoices due before a moment that nobody was yet told about.
     @EntityGraph(attributePaths = {"business"})
     @Query("""
             select d from Document d
-            where d.documentType = :invoice and d.status <> :paid
+            where d.documentType = :invoice and d.issuedAt is not null and d.voidedAt is null
+              and d.status <> :paid
               and d.dueDate < :before and d.overdueAlertedAt is null
             """)
     List<Document> findUnalertedOverdue(
@@ -53,11 +55,12 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             @Param("paid") DocumentStatus paid,
             @Param("before") Instant before);
 
-    // Unpaid invoices that may still get an automatic reminder.
+    // Unpaid issued invoices that may still get an automatic reminder.
     @Query("""
             select d from Document d
-            where d.business.pkid = :businessPkid and d.documentType = :invoice and d.status <> :paid
-              and d.dueDate is not null and d.remindersSent < :most
+            where d.business.pkid = :businessPkid and d.documentType = :invoice
+              and d.issuedAt is not null and d.voidedAt is null
+              and d.status <> :paid and d.dueDate is not null and d.remindersSent < :most
             """)
     List<Document> findRemindable(
             @Param("businessPkid") Long businessPkid,

@@ -17,5 +17,8 @@ public enum DocumentEventType {
     VIEWED,
     ACCEPTED,
     REMINDED,
-    RECURRING
+    RECURRING,
+    ISSUED,
+    VOIDED,
+    DECLINED
 }
