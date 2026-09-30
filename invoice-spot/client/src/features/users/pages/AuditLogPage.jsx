@@ -50,7 +50,7 @@ const AuditLogPage = () => {
     <WorkspacePage section="Administration" fill>
       <PageHeader
         title="Administration"
-        description="Sign-ins and security changes across every account."
+        description="Sign-ins, security and team changes across every account."
         actions={<AdminTabs />}
       />
       <Panel fill={events.length > 0}>
@@ -119,7 +119,15 @@ const AuditLogPage = () => {
                 {
                   label: "Account",
                   type: "email",
-                  render: (event) => event.email || "—",
+                  // A team change also names the business it happened in.
+                  render: (event) => (
+                    <span className="flex flex-col gap-0.5">
+                      {event.email || "—"}
+                      {event.business && (
+                        <span className={panelNote}>in {event.business}</span>
+                      )}
+                    </span>
+                  ),
                 },
                 {
                   label: "By",

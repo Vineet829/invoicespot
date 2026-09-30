@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { baseApiSlice } from "./baseApiSlice";
 import { logIn, logOut } from "../auth/authSlice";
+import { businessChanged } from "../business/businessSlice";
 
 vi.mock("@reduxjs/toolkit/query/react", () => ({
   fetchBaseQuery: vi.fn(() => vi.fn()),
@@ -112,4 +113,37 @@ it("returns a refusal with a message as it is, without a refresh", async () => {
   expect(request).toHaveBeenCalledTimes(1);
   expect(api.dispatch).not.toHaveBeenCalled();
   expect(api.getState().auth.user.accessToken).toBe("expired");
+});
+
+it.each([
+  [
+    "6f1c2d3e-0000-4000-8000-000000000001",
+    "6f1c2d3e-0000-4000-8000-000000000001",
+  ],
+  ["none", null],
+])(
+  "follows the business the server says the session is in: %s",
+  async (header, activeId) => {
+    request.mockResolvedValue({
+      error: { status: 409, data: { message: "Switched" } },
+      meta: {
+        response: { headers: new Headers({ "X-Active-Business": header }) },
+      },
+    });
+
+    await baseApiSlice.baseQuery("/customer/all", api, {});
+
+    expect(api.dispatch).toHaveBeenCalledWith(businessChanged(activeId));
+  },
+);
+
+it("leaves other conflicts alone", async () => {
+  request.mockResolvedValue({
+    error: { status: 409, data: { message: "That conflicts" } },
+    meta: { response: { headers: new Headers() } },
+  });
+
+  await baseApiSlice.baseQuery("/customer/create", api, {});
+
+  expect(api.dispatch).not.toHaveBeenCalled();
 });

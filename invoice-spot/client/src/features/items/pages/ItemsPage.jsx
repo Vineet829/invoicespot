@@ -23,6 +23,7 @@ import {
   rowAction,
   rowActionDanger,
 } from "../../../components/workspace/pastel";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 
 const ItemsPage = () => {
   useTitle("Items — Invoice Spot");
@@ -32,6 +33,7 @@ const ItemsPage = () => {
   // `editing` is the item being edited, or "new" for the add dialog.
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
+  const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const [deleteItem, { isLoading: deleting }] = useDeleteItemMutation();
   const remove = async () => {
     try {
@@ -89,6 +91,10 @@ const ItemsPage = () => {
       ),
     },
   ];
+  // Viewers see the items, but not the ways to change them.
+  const shown = editRefusal
+    ? columns.filter((column) => !["Edit", "Delete"].includes(column.label))
+    : columns;
   return (
     <WorkspacePage section="Items" fill>
       <PageHeader
@@ -99,11 +105,15 @@ const ItemsPage = () => {
             type="button"
             className={primaryButton}
             onClick={() => setEditing("new")}
+            disabled={Boolean(editRefusal)}
+            title={editRefusal}
+            aria-describedby={editRefusal ? "item-edit-refusal" : undefined}
           >
             <FiPlus aria-hidden="true" /> New item
           </button>
         }
       />
+      <RefusalNote id="item-edit-refusal" reason={editRefusal} />
       {query.isLoading ? (
         <LoadingState />
       ) : query.isError && !query.data ? (
@@ -113,7 +123,7 @@ const ItemsPage = () => {
           {rows.length ? (
             <>
               <DataTable
-                columns={columns}
+                columns={shown}
                 rows={pagination.rows}
                 fillRows={pagination.fullPage}
                 label="Items"

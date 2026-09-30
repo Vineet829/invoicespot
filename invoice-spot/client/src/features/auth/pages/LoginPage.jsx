@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import useTitle from "../../../hooks/useTitle";
+import { pendingInvitePath } from "../../business/pendingInvite";
 import { useLoginUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
 import AuthVisual from "../components/AuthVisual";
@@ -40,7 +41,10 @@ const LoginPage = () => {
   const dispatch = useDispatch();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || "/dashboard";
+  // An invitation opened before logging in waits for the account it was
+  // sent to, even across signing up and verifying the email.
+  const from =
+    location.state?.from?.pathname || pendingInvitePath() || "/dashboard";
 
   const [showPassword, setShowPassword] = useState(false);
   // With two-factor sign-in on, a correct password earns a challenge that a

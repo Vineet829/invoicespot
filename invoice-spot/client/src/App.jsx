@@ -26,6 +26,11 @@ import DocumentsPage from "./features/documents/pages/DocumentsPage";
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 import SettingsPage from "./features/settings/pages/SettingsPage";
 import SecurityPage from "./features/settings/pages/SecurityPage";
+import BusinessProfilePage from "./features/settings/pages/BusinessProfilePage";
+import BusinessGate from "./features/business/BusinessGate";
+import WelcomePage from "./features/business/pages/WelcomePage";
+import AcceptInvitePage from "./features/business/pages/AcceptInvitePage";
+import TeamPage from "./features/settings/pages/TeamPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
 import RecurringPage from "./features/recurring/pages/RecurringPage";
@@ -47,31 +52,40 @@ const App = () => {
           />
           <Route path="auth/reset_password" element={<PasswordResetPage />} />
           <Route path="p/:token" element={<SharedDocumentPage />} />
+          <Route path="invite/:token" element={<AcceptInvitePage />} />
           {/* Private Routes - Users */}
           <Route element={<AuthRequired allowedRoles={[ROLES.User]} />}>
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="settings/security" element={<SecurityPage />} />
-            <Route path="items" element={<ItemsPage />} />
             <Route path="edit-profile" element={<EditProfileForm />} />
-            <Route path="customers" element={<CustomersPage />} />
-            <Route path="create-customer" element={<CustomerCreateForm />} />
-            <Route
-              path="single-customer/:custId"
-              element={<SingleCustomerPage />}
-            />
-            <Route
-              path="edit-customer/:custId"
-              element={<CustomerEditForm />}
-            />
-
-            <Route path="documents" element={<DocumentsPage />} />
-            <Route path="recurring" element={<RecurringPage />} />
-            <Route path="create-doc" element={<DocCreateEditForm />} />
-            <Route path="edit-doc/:id" element={<DocCreateEditForm />} />
-            <Route path="document/:id" element={<SingleDocumentPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings/security" element={<SecurityPage />} />
+            <Route path="welcome" element={<WelcomePage />} />
+            {/* Pages that work in the session's business */}
+            <Route element={<BusinessGate />}>
+              <Route path="settings" element={<SettingsPage />} />
+              <Route
+                path="settings/business"
+                element={<BusinessProfilePage />}
+              />
+              <Route path="settings/team" element={<TeamPage />} />
+              <Route path="items" element={<ItemsPage />} />
+              <Route path="customers" element={<CustomersPage />} />
+              <Route path="create-customer" element={<CustomerCreateForm />} />
+              <Route
+                path="single-customer/:custId"
+                element={<SingleCustomerPage />}
+              />
+              <Route
+                path="edit-customer/:custId"
+                element={<CustomerEditForm />}
+              />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="recurring" element={<RecurringPage />} />
+              <Route path="create-doc" element={<DocCreateEditForm />} />
+              <Route path="edit-doc/:id" element={<DocCreateEditForm />} />
+              <Route path="document/:id" element={<SingleDocumentPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+            </Route>
           </Route>
 
           <Route element={<AuthRequired allowedRoles={[ROLES.Admin]} />}>

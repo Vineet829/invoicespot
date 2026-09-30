@@ -72,6 +72,11 @@ const moment = (value) =>
     minute: "2-digit",
   });
 
+// Who did it, when a member did. The client's views, automatic runs and
+// events from before this was kept name no one rather than a guess.
+const byline = (event) =>
+  event.byYou ? "by you" : event.actor ? `by ${event.actor}` : null;
+
 const ActivityTimeline = ({ documentId }) => {
   const query = useGetDocumentActivityQuery(documentId);
   const events = query.data?.events || [];
@@ -120,8 +125,9 @@ const ActivityTimeline = ({ documentId }) => {
               <p className="text-[14px] text-spot-ink [overflow-wrap:anywhere]">
                 {text(event.detail)}
               </p>
-              <p className="mt-0.5 text-[12.5px] text-spot-muted">
+              <p className="mt-0.5 text-[12.5px] text-spot-muted [overflow-wrap:anywhere]">
                 <time dateTime={event.at}>{moment(event.at)}</time>
+                {byline(event) && ` · ${byline(event)}`}
               </p>
             </div>
           </li>

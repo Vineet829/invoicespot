@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { FiCheck, FiUsers } from "react-icons/fi";
+import { FiCheck, FiLock, FiUsers } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import {
@@ -15,8 +15,10 @@ import {
   Field,
   LoadingState,
   ErrorState,
+  EmptyState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
+import { useBusiness } from "../../business/permissions";
 import {
   primaryButton,
   sectionTitle,
@@ -135,6 +137,7 @@ const CustomerForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   useTitle(`${custId ? "Edit client" : "Add client"} — Invoice Spot`);
+  const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const query = useGetSingleCustomerQuery(custId, { skip: !custId });
   const [create, { isLoading: creating }] = useCreateCustomerMutation();
   const [update, { isLoading: updating }] = useUpdateCustomerInfoMutation();
@@ -163,7 +166,13 @@ const CustomerForm = () => {
             : "A few details now make the next invoice easier."
         }
       />
-      {custId && query.isLoading ? (
+      {editRefusal ? (
+        <EmptyState
+          title="This business is view only for you."
+          text={`${editRefusal}.`}
+          icon={FiLock}
+        />
+      ) : custId && query.isLoading ? (
         <LoadingState />
       ) : custId && query.isError ? (
         <ErrorState error={query.error} retry={query.refetch} />

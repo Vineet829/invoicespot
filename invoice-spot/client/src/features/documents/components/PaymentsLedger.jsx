@@ -113,7 +113,7 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
 // The payments recorded on a document, each with its receipt, edit and
 // delete. The server recalculates the amount received and the status after
 // every change. Receipts are numbered by the payments' date order.
-const PaymentsLedger = ({ document, demo = false }) => {
+const PaymentsLedger = ({ document, demo = false, refusal }) => {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [emailingReceipt, setEmailingReceipt] = useState(null);
@@ -201,8 +201,8 @@ const PaymentsLedger = ({ document, demo = false }) => {
             type="button"
             className={rowAction}
             onClick={() => setEmailingReceipt(payment._id)}
-            disabled={demo}
-            title={demo ? DEMO_EMAIL_NOTE : "Email receipt"}
+            disabled={demo || Boolean(refusal)}
+            title={refusal || (demo ? DEMO_EMAIL_NOTE : "Email receipt")}
             aria-label={`Email the receipt for the payment of ${dateLabel(payment.datePaid)}`}
           >
             <FiMail aria-hidden="true" />
@@ -241,10 +241,15 @@ const PaymentsLedger = ({ document, demo = false }) => {
       ),
     },
   ];
+  // Viewers see the payments and their receipts, but not the ways to change
+  // them.
+  const shown = refusal
+    ? columns.filter((column) => !["Edit", "Delete"].includes(column.label))
+    : columns;
   return (
     <>
       <DataTable
-        columns={columns}
+        columns={shown}
         rows={document.paymentRecords || []}
         label="Payments"
       />
