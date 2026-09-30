@@ -9,6 +9,8 @@ import {
   FiGrid,
   FiLogOut,
   FiMenu,
+  FiPackage,
+  FiSettings,
   FiShield,
   FiUser,
   FiUsers,
@@ -141,7 +143,9 @@ const DashboardShell = ({
     { to: "/dashboard", label: "Overview", icon: FiGrid },
     { to: "/documents", label: "Documents", icon: FiFileText },
     { to: "/customers", label: "Clients", icon: FiUsers },
+    { to: "/items", label: "Items", icon: FiPackage },
     { to: "/profile", label: "Profile", icon: FiUser },
+    { to: "/settings", label: "Settings", icon: FiSettings },
     ...(isAdmin
       ? [{ to: "/users", label: "Administration", icon: FiShield }]
       : []),

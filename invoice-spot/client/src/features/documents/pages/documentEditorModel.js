@@ -56,3 +56,19 @@ export const documentPayload = ({
     discount: String(item.discount || "0"),
   })),
 });
+
+// Clients whose name, email or account number contains the query, by name.
+export const matchClients = (clients, query) => {
+  const term = query.trim().toLowerCase();
+  return clients
+    .filter(
+      (client) =>
+        !term ||
+        [client.name, client.email, client.accountNo].some((value) =>
+          String(value || "")
+            .toLowerCase()
+            .includes(term),
+        ),
+    )
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+};

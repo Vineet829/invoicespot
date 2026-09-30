@@ -23,9 +23,11 @@ import { auth, fieldError, passwordToggle, rise } from "../components/authForm";
 const loginSchema = Yup.object().shape({
   email: Yup.string()
     .email("Must be a valid email")
-    .max(255)
+    .max(254, "Must be a valid email")
     .required("Email is required"),
-  password: Yup.string().max(255).required("Password is required"),
+  password: Yup.string()
+    .max(128, "At most 128 characters")
+    .required("Password is required"),
 });
 
 const delay = (d) => ({ "--d": `${d}s` });

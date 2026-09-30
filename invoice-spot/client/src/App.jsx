@@ -23,80 +23,61 @@ import DocCreateEditForm from "./features/documents/pages/DocCreateEditForm";
 import DocumentsPage from "./features/documents/pages/DocumentsPage";
 
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
+import SettingsPage from "./features/settings/pages/SettingsPage";
+import ItemsPage from "./features/items/pages/ItemsPage";
 
 const App = () => {
-	return (
-		<>
-			<Routes>
-				<Route path="/">
-					<Route index element={<HomePage />} />
-					<Route path="register" element={<RegisterPage />} />
-					<Route path="auth/verify" element={<VerifiedPage />} />
-					<Route path="login" element={<LoginPage />} />
-					<Route path="resend" element={<ResendEmailTokenPage />} />
-					<Route
-						path="reset_password_request"
-						element={<PasswordResetRequestPage />}
-					/>
-					<Route
-						path="auth/reset_password"
-						element={<PasswordResetPage />}
-					/>
-					{/* Private Routes - Users */}
-					<Route
-						element={<AuthRequired allowedRoles={[ROLES.User]} />}
-					>
-						<Route path="profile" element={<ProfilePage />} />
-						<Route
-							path="edit-profile"
-							element={<EditProfileForm />}
-						/>
-						<Route path="customers" element={<CustomersPage />} />
-						<Route
-							path="create-customer"
-							element={<CustomerCreateForm />}
-						/>
-						<Route
-							path="single-customer/:custId"
-							element={<SingleCustomerPage />}
-						/>
-						<Route
-							path="edit-customer/:custId"
-							element={<CustomerEditForm />}
-						/>
+  return (
+    <>
+      <Routes>
+        <Route path="/">
+          <Route index element={<HomePage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="auth/verify" element={<VerifiedPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="resend" element={<ResendEmailTokenPage />} />
+          <Route
+            path="reset_password_request"
+            element={<PasswordResetRequestPage />}
+          />
+          <Route path="auth/reset_password" element={<PasswordResetPage />} />
+          {/* Private Routes - Users */}
+          <Route element={<AuthRequired allowedRoles={[ROLES.User]} />}>
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="items" element={<ItemsPage />} />
+            <Route path="edit-profile" element={<EditProfileForm />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="create-customer" element={<CustomerCreateForm />} />
+            <Route
+              path="single-customer/:custId"
+              element={<SingleCustomerPage />}
+            />
+            <Route
+              path="edit-customer/:custId"
+              element={<CustomerEditForm />}
+            />
 
-						<Route path="documents" element={<DocumentsPage />} />
-						<Route
-							path="create-doc"
-							element={<DocCreateEditForm />}
-						/>
-						<Route
-							path="edit-doc/:id"
-							element={<DocCreateEditForm />}
-						/>
-						<Route
-							path="document/:id"
-							element={<SingleDocumentPage />}
-						/>
-						<Route path="dashboard" element={<DashboardPage />} />
-					</Route>
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="create-doc" element={<DocCreateEditForm />} />
+            <Route path="edit-doc/:id" element={<DocCreateEditForm />} />
+            <Route path="document/:id" element={<SingleDocumentPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+          </Route>
 
-					<Route
-						element={<AuthRequired allowedRoles={[ROLES.Admin]} />}
-					>
-						<Route path="users" element={<UsersList />} />
-					</Route>
+          <Route element={<AuthRequired allowedRoles={[ROLES.Admin]} />}>
+            <Route path="users" element={<UsersList />} />
+          </Route>
 
-					<Route path="*" element={<NotFound />} />
-				</Route>
-			</Routes>
-			<ToastContainer
-				theme="light"
-				toastClassName="rounded-2xl border border-solid border-white font-ui text-[14px] text-spot-ink shadow-float"
-			/>
-		</>
-	);
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+      <ToastContainer
+        theme="light"
+        toastClassName="rounded-2xl border border-solid border-white font-ui text-[14px] text-spot-ink shadow-float"
+      />
+    </>
+  );
 };
-
 
 export default App;

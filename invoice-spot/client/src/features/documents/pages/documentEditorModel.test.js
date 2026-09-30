@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  matchClients,
   customerSnapshot,
   documentPayload,
   documentTotals,
@@ -108,4 +109,27 @@ it("links an unlinked older document by its copied details only", () => {
   const result = documentPayload({ ...input, customer: { name: "Avery" } });
   expect(result).not.toHaveProperty("customerId", expect.anything());
   expect(result.customer.name).toBe("Avery");
+});
+
+it("finds clients by name, email or account number, sorted by name", () => {
+  const clients = [
+    { name: "Northwind", email: "ap@northwind.test", accountNo: "CUS-2" },
+    { name: "Contoso", email: "billing@contoso.test", accountNo: "CUS-1" },
+    { name: "Fabrikam", email: "hello@fabrikam.test", accountNo: "CUS-3" },
+  ];
+  expect(matchClients(clients, "").map((c) => c.name)).toEqual([
+    "Contoso",
+    "Fabrikam",
+    "Northwind",
+  ]);
+  expect(matchClients(clients, "NORTH").map((c) => c.name)).toEqual([
+    "Northwind",
+  ]);
+  expect(matchClients(clients, "billing@").map((c) => c.name)).toEqual([
+    "Contoso",
+  ]);
+  expect(matchClients(clients, "cus-3").map((c) => c.name)).toEqual([
+    "Fabrikam",
+  ]);
+  expect(matchClients(clients, "nobody")).toEqual([]);
 });

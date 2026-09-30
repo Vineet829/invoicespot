@@ -29,8 +29,12 @@ const USERNAME_REGEX = /^[A-Za-z][A-Za-z0-9_-]{3,23}$/;
 
 // Mirrors RegistrationService.isStrongPassword on the backend.
 const registerSchema = Yup.object().shape({
-  firstName: Yup.string().max(255).required("First name is required"),
-  lastName: Yup.string().max(255).required("Last name is required"),
+  firstName: Yup.string()
+    .max(60, "At most 60 characters")
+    .required("First name is required"),
+  lastName: Yup.string()
+    .max(60, "At most 60 characters")
+    .required("Last name is required"),
   username: Yup.string()
     .required("Username is required")
     .matches(
@@ -39,10 +43,10 @@ const registerSchema = Yup.object().shape({
     ),
   email: Yup.string()
     .email("Must be a valid email")
-    .max(255)
+    .max(254, "Must be a valid email")
     .required("Email is required"),
   password: Yup.string()
-    .max(255)
+    .max(128, "At most 128 characters")
     .required("Password is required")
     .min(8, "At least 8 characters")
     .matches(/\p{Lu}/u, "Add an uppercase letter")

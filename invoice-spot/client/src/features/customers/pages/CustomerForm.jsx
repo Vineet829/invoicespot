@@ -36,7 +36,7 @@ const fields = [
     required: true,
     type: "email",
     autoComplete: "email",
-    maxLength: 255,
+    maxLength: 254,
   },
   {
     key: "phoneNumber",
@@ -44,7 +44,7 @@ const fields = [
     required: true,
     type: "tel",
     autoComplete: "tel",
-    maxLength: 20,
+    maxLength: 30,
     hint: "Include the country code, for example +1 555 010 0100.",
   },
   {
@@ -57,10 +57,21 @@ const fields = [
     key: "address",
     label: "Address",
     autoComplete: "street-address",
+    maxLength: 255,
     className: "col-span-full",
   },
-  { key: "city", label: "City", autoComplete: "address-level2" },
-  { key: "country", label: "Country", autoComplete: "country-name" },
+  {
+    key: "city",
+    label: "City",
+    autoComplete: "address-level2",
+    maxLength: 255,
+  },
+  {
+    key: "country",
+    label: "Country",
+    autoComplete: "country-name",
+    maxLength: 255,
+  },
 ];
 const CustomerFields = ({ customer, onSubmit, busy }) => {
   const [values, setValues] = useState(() =>
