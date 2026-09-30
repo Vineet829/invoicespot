@@ -1,13 +1,16 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiAlertCircle,
+  FiArrowDown,
   FiArrowLeft,
+  FiArrowUp,
   FiChevronLeft,
   FiChevronRight,
   FiChevronsLeft,
   FiChevronsRight,
   FiInbox,
+  FiSearch,
 } from "react-icons/fi";
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
 import { Dialog } from "./Dialog";
@@ -29,6 +32,7 @@ import {
   panelNote,
   primaryButton,
   retryButton,
+  searchControl,
   secondaryButton,
   sectionTitle,
   skeleton,
@@ -49,6 +53,24 @@ export const dateLabel = (value) =>
         year: "numeric",
       })
     : "—";
+// A due date. An overdue one takes the overview's overdue colour, with the
+// icon after the date so the dates in a column stay aligned.
+export const DueDate = ({ value, overdue = false }) =>
+  overdue ? (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap text-overdue-strong"
+      title="Overdue"
+    >
+      {dateLabel(value)}
+      <FiAlertCircle
+        aria-hidden="true"
+        className="size-[15px] shrink-0 stroke-[1.8]"
+      />
+      <span className="sr-only">, overdue</span>
+    </span>
+  ) : (
+    dateLabel(value)
+  );
 export const dateInput = (value) => {
   const date = value ? new Date(value) : new Date();
   return Number.isFinite(date.getTime())
@@ -259,7 +281,7 @@ export const Field = ({
     </div>
   );
 };
-export const EmptyState = ({ title, text, icon: Icon = FiInbox }) => (
+export const EmptyState = ({ title, text, icon: Icon = FiInbox, action }) => (
   <div className="flex min-h-[260px] flex-col items-center justify-center px-6 py-10 text-center">
     <span className="mb-4 grid size-14 place-items-center rounded-[18px] bg-white/80 text-spot-violet shadow-key [&>svg]:size-6 [&>svg]:stroke-[1.5]">
       <Icon aria-hidden="true" />
@@ -270,8 +292,51 @@ export const EmptyState = ({ title, text, icon: Icon = FiInbox }) => (
     <p className="mt-2 max-w-[340px] text-[13px] leading-[1.6] text-spot-muted">
       {text}
     </p>
+    {action && <div className="mt-5">{action}</div>}
   </div>
 );
+
+// A search box that searches once typing pauses, or at once on Enter. It
+// follows `value` when the search changes elsewhere, such as the back button.
+export const SearchField = ({
+  value,
+  onSearch,
+  label,
+  placeholder,
+  className = "",
+}) => {
+  const [text, setText] = useState(value);
+  const [shown, setShown] = useState(value);
+  if (value !== shown) {
+    setShown(value);
+    if (value !== text.trim()) setText(value);
+  }
+  useEffect(() => {
+    if (text.trim() === value) return undefined;
+    const timer = setTimeout(() => onSearch(text.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [text, value, onSearch]);
+  return (
+    <label className={`relative block min-w-0 ${className}`}>
+      <span className="sr-only">{label}</span>
+      <FiSearch
+        aria-hidden="true"
+        className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-spot-muted"
+      />
+      <input
+        type="search"
+        className={searchControl}
+        value={text}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") onSearch(text.trim());
+        }}
+      />
+    </label>
+  );
+};
 // Placeholders keep the panel in place and never show figures.
 export const LoadingState = () => (
   <div role="status">
@@ -330,7 +395,28 @@ export const usePagination = (rows = [], initialSize = 5) => {
     },
   };
 };
-export const Pagination = ({ pagination }) => {
+// The same shape as usePagination for a list the server pages. The caller
+// owns the page (from 0) and size; the rows and count come from the server.
+export const serverPagination = ({
+  rows = [],
+  count = 0,
+  page,
+  size,
+  setPage,
+  setSize,
+}) => ({
+  page,
+  size,
+  last: Math.max(0, Math.ceil(count / size) - 1),
+  start: page * size,
+  count,
+  fullPage: Math.min(size, count),
+  rows,
+  setPage,
+  setSize,
+});
+
+export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
   const { page, size, last, start, count, rows, setPage, setSize } = pagination;
   return (
     <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#23273512] pt-3 max-[700px]:flex-wrap">
@@ -341,7 +427,7 @@ export const Pagination = ({ pagination }) => {
           value={size}
           onChange={(event) => setSize(Number(event.target.value))}
         >
-          {[5, 10, 25, -1].map((n) => (
+          {sizes.map((n) => (
             <option key={n} value={n}>
               {n === -1 ? "All" : n}
             </option>
@@ -450,34 +536,66 @@ const FILL = {
   },
 };
 
+// A column with `sortBy` gets a header button when the table has `onSort`;
+// `sort` ({ field, dir }) marks the column the rows are sorted by. Cards
+// have no headers, so their list needs another way to sort.
 export const DataTable = ({
   columns,
   rows,
   label,
   rowKey = (row) => row._id,
   fillRows = 0,
+  sort,
+  onSort,
+  busy = false,
 }) => {
   // In a card, placing the first action in column 1 starts a new line.
   const firstAction = columns.findIndex(({ type }) => type === "action");
   const fill = fillRows > 0;
   return (
     <div
-      className={`[container-type:inline-size] ${columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""}`}
+      className={`relative transition-opacity [container-type:inline-size] ${columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""} ${busy ? "opacity-60" : ""}`}
       style={fill ? { "--fill-rows": Math.min(fillRows, 10) } : undefined}
+      aria-busy={busy || undefined}
     >
       <table className="w-full border-separate border-spacing-0 stacked:block">
         <caption className="sr-only">{label}</caption>
         <thead className="sticky top-0 z-[1] stacked:absolute stacked:size-px stacked:overflow-hidden stacked:whitespace-nowrap stacked:[clip-path:inset(50%)]">
           <tr>
-            {columns.map(({ label: heading, type = "text" }) => (
-              <th
-                key={heading}
-                scope="col"
-                className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[12px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th}`}
-              >
-                {heading}
-              </th>
-            ))}
+            {columns.map(({ label: heading, type = "text", sortBy }) => {
+              const sorted = sortBy && sort?.field === sortBy;
+              const SortIcon = sort?.dir === "asc" ? FiArrowUp : FiArrowDown;
+              return (
+                <th
+                  key={heading}
+                  scope="col"
+                  aria-sort={
+                    sorted
+                      ? sort.dir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
+                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[12px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th}`}
+                >
+                  {sortBy && onSort ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`inline-flex items-center gap-1 rounded-md bg-transparent p-0 transition-colors hover:text-spot-night stacked:hidden [&>svg]:size-3 [&>svg]:stroke-[2] ${sorted ? "text-spot-night" : "text-inherit"}`}
+                        onClick={() => onSort(sortBy)}
+                      >
+                        {heading}
+                        {sorted && <SortIcon aria-hidden="true" />}
+                      </button>
+                      <span className="hidden stacked:inline">{heading}</span>
+                    </>
+                  ) : (
+                    heading
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="before:table-row before:h-1.5 before:content-[''] stacked:block stacked:before:hidden">
