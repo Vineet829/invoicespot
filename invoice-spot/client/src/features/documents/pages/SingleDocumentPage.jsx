@@ -22,9 +22,10 @@ import {
   primaryButton,
   secondaryIconButton,
 } from "../../../components/workspace/pastel";
-import { lineAmount } from "./documentEditorModel";
 import PaymentForm from "./PaymentForm";
+import PaymentsLedger from "../components/PaymentsLedger";
 
+const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
 const partyHeading = "mb-3 text-[12.5px] font-normal text-spot-muted";
 const partyName = "mb-1.5 block text-[15px] font-medium text-spot-ink";
 const partyLine =
@@ -41,10 +42,7 @@ const SingleDocumentPage = () => {
   const [emailing, setEmailing] = useState(false);
   const pdf = useDocumentPdf(document);
   useTitle(`${document?.documentNumber || "Document"} — Invoice Spot`);
-  const totalAmountReceived = (document?.paymentRecords || []).reduce(
-    (sum, payment) => sum + Number(payment.amountPaid || 0),
-    0,
-  );
+  const totalAmountReceived = Number(document?.totalAmountReceived || 0);
   const columns = [
     {
       label: "#",
@@ -67,7 +65,7 @@ const SingleDocumentPage = () => {
       label: "Line total",
       type: "amount",
       render: (item) => (
-        <Amount value={lineAmount(item)} currency={document?.currency} />
+        <Amount value={item.lineTotal} currency={document?.currency} />
       ),
     },
   ];
@@ -113,9 +111,17 @@ const SingleDocumentPage = () => {
                 type="button"
                 className={primaryButton}
                 onClick={() => setEmailing(true)}
+                disabled={profile?.demo}
+                title={profile?.demo ? DEMO_EMAIL_NOTE : undefined}
+                aria-describedby={profile?.demo ? "demo-email-note" : undefined}
               >
                 <FiMail aria-hidden="true" /> Email document
               </button>
+              {profile?.demo && (
+                <span id="demo-email-note" className="sr-only">
+                  {DEMO_EMAIL_NOTE}
+                </span>
+              )}
             </>
           )
         }
@@ -135,15 +141,7 @@ const SingleDocumentPage = () => {
           <>
             <Panel
               title={document.documentType}
-              aside={
-                <StatusBadge
-                  status={
-                    totalAmountReceived >= document.total
-                      ? "Paid"
-                      : document.status
-                  }
-                />
-              }
+              aside={<StatusBadge status={document.status} />}
             >
               <div className="grid grid-cols-3 gap-8 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1 max-[700px]:gap-6">
                 <div className="min-w-0">
@@ -282,12 +280,23 @@ const SingleDocumentPage = () => {
                 </dl>
               </Panel>
             </div>
-            <Panel
-              title="Record payment"
-              description={`Record a payment from ${document.customer?.name || "your customer"}.`}
-            >
-              <PaymentForm document={document} />
-            </Panel>
+            {document.paymentRecords?.length > 0 && (
+              <Panel
+                title="Payments"
+                description="Payments recorded against this document."
+              >
+                <PaymentsLedger document={document} />
+              </Panel>
+            )}
+            {document.documentType === "Invoice" &&
+              document.status !== "Paid" && (
+                <Panel
+                  title="Record payment"
+                  description={`Record a payment from ${document.customer?.name || "your customer"}.`}
+                >
+                  <PaymentForm document={document} />
+                </Panel>
+              )}
           </>
         )
       )}

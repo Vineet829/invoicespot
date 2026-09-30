@@ -24,7 +24,7 @@ import {
 import { buttonBase, sectionTitle } from "../../../components/workspace/pastel";
 
 // The danger zone is already peach, so its button is white.
-const deleteAccountButton = `${buttonBase} border border-overdue-icon/25 bg-white/80 text-overdue-strong hover:bg-white`;
+const deleteAccountButton = `${buttonBase} border border-overdue-icon/25 bg-white/80 text-overdue-strong hover:enabled:bg-white disabled:bg-white/40 disabled:text-overdue-muted`;
 const ProfilePage = () => {
   useTitle("Profile — Invoice Spot");
   const query = useGetUserProfileQuery();
@@ -118,13 +118,16 @@ const ProfilePage = () => {
                   Delete account
                 </h2>
                 <p className="mt-1.5 text-[13.5px] text-overdue-muted">
-                  Permanently delete your Invoice Spot account.
+                  {profile.demo
+                    ? "The shared demo account can’t be deleted."
+                    : "Permanently delete your Invoice Spot account."}
                 </p>
               </div>
               <button
                 type="button"
                 className={deleteAccountButton}
                 onClick={() => setOpen(true)}
+                disabled={profile.demo}
               >
                 <FiTrash2 aria-hidden="true" /> Delete account
               </button>

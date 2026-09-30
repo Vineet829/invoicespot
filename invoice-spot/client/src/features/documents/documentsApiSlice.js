@@ -57,6 +57,21 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
         return { data: URL.createObjectURL(result.data) };
       },
     }),
+    updatePayment: builder.mutation({
+      query: ({ id, paymentId, ...payment }) => ({
+        url: `/document/${id}/payment/${paymentId}`,
+        method: "PATCH",
+        body: payment,
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    deletePayment: builder.mutation({
+      query: ({ id, paymentId }) => ({
+        url: `/document/${id}/payment/${paymentId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Document"],
+    }),
     createPayment: builder.mutation({
       query: ({ id, ...rest }) => ({
         url: `/document/${id}/payment`,
@@ -70,6 +85,8 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
 
 export const {
   useCreatePaymentMutation,
+  useDeletePaymentMutation,
+  useUpdatePaymentMutation,
   useEmailDocumentMutation,
   useGetEmailDraftQuery,
   useGetDocumentPdfMutation,

@@ -32,6 +32,8 @@ const keys = [
   "country",
   "avatar",
 ];
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
 const ProfileFields = ({ profile }) => {
   const navigate = useNavigate();
   const [values, setValues] = useState(() =>
@@ -55,6 +57,11 @@ const ProfileFields = ({ profile }) => {
   const uploadLogo = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_LOGO_BYTES) {
+      toast.error("Logos can be at most 2 MB.");
+      event.target.value = "";
+      return;
+    }
     const body = new FormData();
     body.append("logo", file);
     try {
@@ -172,6 +179,7 @@ const ProfileFields = ({ profile }) => {
                 label="Choose your logo"
                 type="file"
                 accept="image/*"
+                hint="An image of up to 2 MB."
                 onChange={uploadLogo}
                 disabled={busy}
                 className="col-span-full"

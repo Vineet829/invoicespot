@@ -50,9 +50,8 @@ const fields = [
   {
     key: "vatTinNo",
     label: "VAT / TIN number",
-    type: "number",
-    min: 0,
-    step: 1,
+    autoComplete: "off",
+    maxLength: 50,
   },
   {
     key: "address",
@@ -71,7 +70,7 @@ const CustomerFields = ({ customer, onSubmit, busy }) => {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ ...values, vatTinNo: Number(values.vatTinNo) || 0 });
+        onSubmit({ ...values, vatTinNo: String(values.vatTinNo).trim() });
       }}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6 compact:gap-5 max-[1359px]:grid-cols-1">

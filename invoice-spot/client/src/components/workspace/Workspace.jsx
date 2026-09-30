@@ -11,6 +11,7 @@ import {
 } from "react-icons/fi";
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
 import { Dialog } from "./Dialog";
+import { parseDate } from "../../utils/dates";
 import { STATUS_LABELS } from "../../features/dashboard/dashboardModel";
 import {
   dangerButton,
@@ -41,8 +42,8 @@ export const errorMessage = (
 export const money = (value, currency = "") =>
   `${currency ? `${currency} ` : ""}${new Intl.NumberFormat("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 export const dateLabel = (value) =>
-  value && Number.isFinite(new Date(value).getTime())
-    ? new Date(value).toLocaleDateString("en", {
+  value && Number.isFinite(parseDate(value).getTime())
+    ? parseDate(value).toLocaleDateString("en", {
         day: "numeric",
         month: "short",
         year: "numeric",

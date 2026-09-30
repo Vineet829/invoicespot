@@ -26,6 +26,7 @@ beforeEach(() => {
 it.each([
   { status: 403, data: null },
   { status: "PARSING_ERROR", originalStatus: 403 },
+  { status: "PARSING_ERROR", originalStatus: 403, data: "" },
 ])("refreshes and retries a rejected token: %j", async (error) => {
   request
     .mockResolvedValueOnce({ error })
@@ -37,7 +38,9 @@ it.each([
   expect(result).toEqual({ data: { customers: [] } });
   expect(api.getState().auth.user.accessToken).toBe("renewed");
   expect(request.mock.calls.map(([path]) => path)).toEqual([
-    "/customer/all", "/auth/new_access_token", "/customer/all",
+    "/customer/all",
+    "/auth/new_access_token",
+    "/customer/all",
   ]);
 });
 
@@ -60,7 +63,9 @@ it("shares one cookie rotation between concurrent dashboard requests", async () 
     { data: { resource: "/customer/all" } },
     { data: { resource: "/document/all" } },
   ]);
-  expect(request.mock.calls.filter(([path]) => path === "/auth/new_access_token")).toHaveLength(1);
+  expect(
+    request.mock.calls.filter(([path]) => path === "/auth/new_access_token"),
+  ).toHaveLength(1);
   expect(api.dispatch).toHaveBeenCalledTimes(1);
 });
 
@@ -77,10 +82,34 @@ it("clears the session when the refresh cookie is rejected", async () => {
 });
 
 it("returns an authentication error without retrying through another session", async () => {
-  request.mockResolvedValue({ error: { status: 403, data: { message: "Login failed" } } });
+  request.mockResolvedValue({
+    error: { status: 403, data: { message: "Login failed" } },
+  });
 
   await baseApiSlice.baseQuery({ url: "/auth/login", method: "POST" }, api, {});
 
   expect(request).toHaveBeenCalledTimes(1);
   expect(api.dispatch).not.toHaveBeenCalled();
+});
+
+it("returns a refusal with a message as it is, without a refresh", async () => {
+  const refusal = {
+    status: 403,
+    data: {
+      success: false,
+      message: "You are not authorized to view this document. It's not yours",
+    },
+  };
+  request.mockResolvedValue({ error: refusal });
+
+  const result = await baseApiSlice.baseQuery(
+    "/document/someone-elses",
+    api,
+    {},
+  );
+
+  expect(result).toEqual({ error: refusal });
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(api.dispatch).not.toHaveBeenCalled();
+  expect(api.getState().auth.user.accessToken).toBe("expired");
 });
