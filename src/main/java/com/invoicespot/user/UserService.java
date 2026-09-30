@@ -20,14 +20,17 @@ public class UserService {
     private static final int PAGE_SIZE = 10;
 
     private final UserRepository userRepository;
+    private final DemoAccountGuard demoAccountGuard;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, DemoAccountGuard demoAccountGuard) {
         this.userRepository = userRepository;
+        this.demoAccountGuard = demoAccountGuard;
     }
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long pkid) {
-        return UserProfileResponse.from(require(pkid));
+        User user = require(pkid);
+        return UserProfileResponse.from(user, demoAccountGuard.isDemo(user));
     }
 
     @Transactional
@@ -76,12 +79,14 @@ public class UserService {
             user.setCountry(request.country());
         }
         userRepository.save(user);
-        return UserProfileResponse.from(user);
+        return UserProfileResponse.from(user, demoAccountGuard.isDemo(user));
     }
 
     @Transactional
     public void deleteOwnAccount(Long pkid) {
-        userRepository.deleteById(pkid);
+        User user = require(pkid);
+        demoAccountGuard.requireNotDemo(user, "deleting it");
+        userRepository.delete(user);
     }
 
     @Transactional(readOnly = true)
@@ -93,7 +98,9 @@ public class UserService {
                 true,
                 result.getTotalElements(),
                 result.getTotalPages(),
-                result.getContent().stream().map(UserSummaryResponse::from).toList());
+                result.getContent().stream()
+                        .map(user -> UserSummaryResponse.from(user, demoAccountGuard.isDemo(user)))
+                        .toList());
     }
 
     @Transactional
@@ -101,6 +108,7 @@ public class UserService {
         User user = externalId(id)
                 .flatMap(userRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+        demoAccountGuard.requireNotDemoTarget(user, "deleted");
         String firstName = user.getFirstName();
         userRepository.delete(user);
         return firstName;
@@ -111,9 +119,11 @@ public class UserService {
         User user = externalId(id)
                 .flatMap(userRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "user was not found"));
+        demoAccountGuard.requireNotDemoTarget(user, "deactivated");
         user.setActive(false);
+        user.getRefreshTokens().clear();
         userRepository.save(user);
-        return UserSummaryResponse.from(user);
+        return UserSummaryResponse.from(user, false);
     }
 
     private User require(Long pkid) {

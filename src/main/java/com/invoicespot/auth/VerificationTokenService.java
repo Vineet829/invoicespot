@@ -3,6 +3,7 @@ package com.invoicespot.auth;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.user.User;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -15,12 +16,14 @@ public class VerificationTokenService {
 
     private final VerifyResetTokenRepository tokenRepository;
     private final Duration tokenTtl;
+    private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public VerificationTokenService(
-            VerifyResetTokenRepository tokenRepository, AppProperties properties) {
+            VerifyResetTokenRepository tokenRepository, AppProperties properties, Clock clock) {
         this.tokenRepository = tokenRepository;
         this.tokenTtl = properties.verification().tokenTtl();
+        this.clock = clock;
     }
 
     @Transactional
@@ -32,7 +35,7 @@ public class VerificationTokenService {
         VerifyResetToken entity = new VerifyResetToken();
         entity.setUser(user);
         entity.setToken(token);
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         entity.setCreatedAt(now);
         entity.setExpiresAt(now.plus(tokenTtl));
         tokenRepository.save(entity);
@@ -46,11 +49,16 @@ public class VerificationTokenService {
         }
         return tokenRepository
                 .findByToken(token)
-                .filter(entity -> entity.getExpiresAt().isAfter(Instant.now()));
+                .filter(entity -> entity.getExpiresAt().isAfter(clock.instant()));
     }
 
     @Transactional
     public void consume(VerifyResetToken token) {
         tokenRepository.delete(token);
+    }
+
+    @Transactional
+    public void revokeAll(User user) {
+        tokenRepository.deleteByUserPkid(user.getPkid());
     }
 }

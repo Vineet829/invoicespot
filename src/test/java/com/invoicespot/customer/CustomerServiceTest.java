@@ -42,7 +42,7 @@ class CustomerServiceTest {
     }
 
     private static CreateCustomerRequest request(String name, String email, String phone) {
-        return new CreateCustomerRequest(name, email, phone, 10L, "addr", "city", "country");
+        return new CreateCustomerRequest(name, email, phone, "29ABCDE1234F1Z5", "addr", "city", "country");
     }
 
     @Test
@@ -55,20 +55,22 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("a duplicate customer email is rejected")
+    @DisplayName("a customer email the user already has is refused")
     void rejectsDuplicateEmail() {
-        when(customerRepository.existsByEmailIgnoreCase("a@b.com")).thenReturn(true);
+        when(customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(1L, "a@b.com")).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(1L, request("Acme", "A@B.com", "+15551112222")))
                 .isInstanceOf(ApiException.class)
-                .hasMessage("That Customer already exists");
+                .hasMessage("You already have a customer with that email address")
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
     @DisplayName("a created customer gets a generated account number and the owner attached")
     void createsCustomerWithAccountNumber() {
         User owner = userWithPkid(7L);
-        when(customerRepository.existsByEmailIgnoreCase("a@b.com")).thenReturn(false);
+        when(customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(7L, "a@b.com")).thenReturn(false);
         when(userRepository.findById(7L)).thenReturn(Optional.of(owner));
 
         service.create(7L, request("Acme", "A@B.com", "+15551112222"));
@@ -79,6 +81,7 @@ class CustomerServiceTest {
         assertThat(saved.getEmail()).isEqualTo("a@b.com");
         assertThat(saved.getAccountNo()).startsWith("CUS-");
         assertThat(saved.getCreatedBy()).isSameAs(owner);
+        assertThat(saved.getVatTinNo()).isEqualTo("29ABCDE1234F1Z5");
     }
 
     @Test

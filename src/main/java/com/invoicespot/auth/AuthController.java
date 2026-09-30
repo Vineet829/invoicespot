@@ -3,10 +3,16 @@ package com.invoicespot.auth;
 import com.invoicespot.auth.dto.LoginRequest;
 import com.invoicespot.auth.dto.LoginResponse;
 import com.invoicespot.auth.dto.LogoutResponse;
+import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimiter;
 import com.invoicespot.user.User;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,21 +30,34 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimiter rateLimiter;
     private final AppProperties.Cookie cookieProperties;
     private final Duration refreshTokenTtl;
 
-    public AuthController(AuthService authService, AppProperties properties) {
+    public AuthController(AuthService authService, RateLimiter rateLimiter, AppProperties properties) {
         this.authService = authService;
+        this.rateLimiter = rateLimiter;
         this.cookieProperties = properties.cookie();
         this.refreshTokenTtl = properties.jwt().refreshTokenTtl();
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
-            @RequestBody LoginRequest request,
+            @Valid @RequestBody LoginRequest request,
             @CookieValue(name = "jwt", required = false) String refreshCookie,
+            HttpServletRequest http,
             HttpServletResponse response) {
-        TokenBundle bundle = authService.login(request.email(), request.password(), refreshCookie);
+        String attempt = http.getRemoteAddr() + "|"
+                + (request.email() == null ? "" : request.email().trim().toLowerCase(Locale.ROOT));
+        rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN, attempt);
+        TokenBundle bundle;
+        try {
+            bundle = authService.login(request.email(), request.password(), refreshCookie);
+        } catch (ApiException exception) {
+            rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, attempt);
+            throw exception;
+        }
+        rateLimiter.reset(RateLimit.FAILED_SIGN_IN, attempt);
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
         return ResponseEntity.ok(bodyOf(bundle));
     }

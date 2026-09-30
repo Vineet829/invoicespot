@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -45,7 +44,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(HttpServletRequest request, String token) {
-        Optional<User> user = jwtService.readAccessSubject(token).flatMap(userRepository::findByExternalId);
+        Optional<JwtService.TokenClaims> claims = jwtService.readAccessClaims(token);
+        Optional<User> user = claims.flatMap(found -> userRepository
+                .findByExternalId(found.subject())
+                .filter(candidate -> candidate.acceptsTokenIssuedAt(found.issuedAt())));
         if (user.isEmpty()) {
             return;
         }

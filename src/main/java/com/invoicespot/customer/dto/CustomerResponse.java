@@ -11,7 +11,7 @@ public record CustomerResponse(
         String name,
         String email,
         String accountNo,
-        Long vatTinNo,
+        String vatTinNo,
         String address,
         String city,
         String country,

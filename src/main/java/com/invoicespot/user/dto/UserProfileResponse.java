@@ -17,10 +17,11 @@ public record UserProfileResponse(
         String city,
         String country,
         boolean active,
+        boolean demo,
         Instant createdAt,
         Instant updatedAt) {
 
-    public static UserProfileResponse from(User user) {
+    public static UserProfileResponse from(User user, boolean demo) {
         return new UserProfileResponse(
                 user.getEmail(),
                 user.getUsername(),
@@ -35,6 +36,7 @@ public record UserProfileResponse(
                 user.getCity(),
                 user.getCountry(),
                 user.isActive(),
+                demo,
                 user.getCreatedAt(),
                 user.getUpdatedAt());
     }

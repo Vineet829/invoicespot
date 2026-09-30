@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
@@ -84,7 +83,7 @@ public class PdfService {
     private View view(Document document, User owner) {
         DocumentType type = document.getDocumentType();
         String currency = value(document.getCurrency());
-        CustomerSnapshot client = Optional.ofNullable(document.getCustomer()).orElseGet(CustomerSnapshot::new);
+        CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
 
         List<Line> items = new ArrayList<>();
         List<BillingItem> billingItems = document.getBillingItems();
@@ -96,15 +95,11 @@ public class PdfService {
                     item.getQuantity() == null ? "0" : item.getQuantity().toString(),
                     money(item.getUnitPrice()),
                     percent(item.getDiscount()),
-                    money(lineAmount(item))));
+                    money(DocumentTotals.lineTotal(item))));
         }
 
-        double received = document.getPaymentRecords().stream()
-                .map(PaymentRecord::getAmountPaid)
-                .filter(Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .sum();
-        double total = orZero(document.getTotal());
+        BigDecimal received = orZero(document.getTotalAmountReceived());
+        BigDecimal total = orZero(document.getTotal());
         List<Total> totals = new ArrayList<>();
         totals.add(new Total("Subtotal", money(document.getSubTotal())));
         totals.add(new Total("Tax (" + percent(document.getRates()) + ")", money(document.getSalesTax())));
@@ -139,7 +134,7 @@ public class PdfService {
                 items,
                 totals,
                 quotation ? "Total" : "Balance due",
-                money(quotation ? total : total - received),
+                money(quotation ? total : total.subtract(received)),
                 blankToNull(document.getAdditionalInfo()),
                 blankToNull(document.getTermsConditions()));
     }
@@ -180,11 +175,6 @@ public class PdfService {
         }
     }
 
-    private static double lineAmount(BillingItem item) {
-        double quantity = item.getQuantity() == null ? 0 : item.getQuantity();
-        return quantity * orZero(item.getUnitPrice()) * (1 - number(item.getDiscount()) / 100);
-    }
-
     private static String vatTin(String value) {
         return value == null || value.isBlank() || value.trim().equals("0") ? null : "VAT / TIN " + value;
     }
@@ -213,30 +203,22 @@ public class PdfService {
         return String.join(", ", lines(values));
     }
 
-    private static String money(Double amount) {
+    private static String money(BigDecimal amount) {
         DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
         format.setRoundingMode(RoundingMode.HALF_UP);
-        return format.format(BigDecimal.valueOf(orZero(amount)));
+        return format.format(orZero(amount));
     }
 
-    private static String percent(String value) {
-        return BigDecimal.valueOf(number(value)).stripTrailingZeros().toPlainString() + "%";
-    }
-
-    private static double number(String value) {
-        try {
-            return value == null || value.isBlank() ? 0 : Double.parseDouble(value.trim());
-        } catch (NumberFormatException exception) {
-            return 0;
-        }
+    private static String percent(BigDecimal value) {
+        return orZero(value).stripTrailingZeros().toPlainString() + "%";
     }
 
     private static String date(Instant instant) {
         return instant == null ? null : DATE.format(instant);
     }
 
-    private static double orZero(Double value) {
-        return value == null ? 0 : value;
+    private static BigDecimal orZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private static String value(String value) {

@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.user.User;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -38,11 +41,13 @@ class JwtServiceTest {
         jwtService = new JwtService(
                 propertiesFor(
                         "test-access-secret-test-access-secret-0123456789",
-                        "test-refresh-secret-test-refresh-secret-0123456789"));
+                        "test-refresh-secret-test-refresh-secret-0123456789"),
+                Clock.systemUTC());
         otherSecretsService = new JwtService(
                 propertiesFor(
                         "different-access-secret-different-access-0123456789",
-                        "different-refresh-secret-different-refresh-0123456789"));
+                        "different-refresh-secret-different-refresh-0123456789"),
+                Clock.systemUTC());
     }
 
     @Test
@@ -89,5 +94,22 @@ class JwtServiceTest {
         String tampered = token.substring(0, token.length() - 2) + (token.endsWith("a") ? "bb" : "aa");
         Optional<UUID> subject = jwtService.readAccessSubject(tampered);
         assertThat(subject).isEmpty();
+    }
+
+    @Test
+    @DisplayName("tokens follow the injected clock: valid within their lifetime, rejected after it")
+    void tokensExpireByTheClock() {
+        Instant issued = Instant.parse("2026-09-30T10:00:00Z");
+        AppProperties properties = propertiesFor(
+                "test-access-secret-test-access-secret-0123456789",
+                "test-refresh-secret-test-refresh-secret-0123456789");
+        UUID id = UUID.randomUUID();
+        String token = new JwtService(properties, Clock.fixed(issued, ZoneOffset.UTC)).issueAccessToken(userWithId(id));
+
+        JwtService nineMinutesLater = new JwtService(properties, Clock.fixed(issued.plusSeconds(540), ZoneOffset.UTC));
+        JwtService elevenMinutesLater = new JwtService(properties, Clock.fixed(issued.plusSeconds(660), ZoneOffset.UTC));
+
+        assertThat(nineMinutesLater.readAccessSubject(token)).contains(id);
+        assertThat(elevenMinutesLater.readAccessSubject(token)).isEmpty();
     }
 }

@@ -16,9 +16,10 @@ public record UserSummaryResponse(
         boolean active,
         boolean isEmailVerified,
         Set<String> roles,
+        boolean demo,
         Instant createdAt) {
 
-    public static UserSummaryResponse from(User user) {
+    public static UserSummaryResponse from(User user, boolean demo) {
         return new UserSummaryResponse(
                 user.getId(),
                 user.getEmail(),
@@ -29,6 +30,7 @@ public record UserSummaryResponse(
                 user.isActive(),
                 user.isEmailVerified(),
                 user.getRoles(),
+                demo,
                 user.getCreatedAt());
     }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.upload.UploadService;
 import com.invoicespot.user.User;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -57,12 +58,12 @@ class PdfServiceTest {
         return user;
     }
 
-    private static BillingItem item(String name, double price, int quantity, String discount) {
+    private static BillingItem item(String name, String price, int quantity, String discount) {
         BillingItem item = new BillingItem();
         item.setItemName(name);
-        item.setUnitPrice(price);
+        item.setUnitPrice(new BigDecimal(price));
         item.setQuantity(quantity);
-        item.setDiscount(discount);
+        item.setDiscount(new BigDecimal(discount));
         return item;
     }
 
@@ -75,21 +76,22 @@ class PdfServiceTest {
         customer.setEmail("beta@x.com");
         customer.setAccountNo("CUS-123456");
         customer.setVatTinNo("0");
-        document.setCustomer(customer);
+        document.setCustomerSnapshot(customer);
         document.setDocumentNumber("2026-September-ABC123");
         document.setCreatedAt(Instant.parse("2026-09-30T06:00:00Z"));
         document.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
         document.setCurrency("USD");
-        document.setRates("18");
-        document.setSubTotal(1225.0);
-        document.setSalesTax(220.5);
-        document.setTotal(1445.5);
+        document.setRates(new BigDecimal("18"));
+        document.setSubTotal(new BigDecimal("1225.00"));
+        document.setSalesTax(new BigDecimal("220.50"));
+        document.setTotal(new BigDecimal("1445.50"));
+        document.setTotalAmountReceived(new BigDecimal("445.50"));
         document.setAdditionalInfo("Thanks for your business.");
-        document.getBillingItems().add(item("Design sprint", 1000, 1, "0"));
-        document.getBillingItems().add(item("Prototype & <review>", 125, 2, "10"));
-        PaymentRecord payment = new PaymentRecord();
-        payment.setAmountPaid(445.5);
-        document.getPaymentRecords().add(payment);
+        document.getBillingItems().add(item("Design sprint", "1000", 1, "0"));
+        document.getBillingItems().add(item("Prototype & <review>", "125", 2, "10"));
+        Payment payment = new Payment();
+        payment.setAmountPaid(new BigDecimal("445.50"));
+        document.getPayments().add(payment);
         return document;
     }
 

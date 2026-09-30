@@ -1,3 +1,5 @@
 package com.invoicespot.auth.dto;
 
-public record EmailRequest(String email) {}
+import jakarta.validation.constraints.Size;
+
+public record EmailRequest(@Size(max = 254, message = "Enter a valid email address") String email) {}

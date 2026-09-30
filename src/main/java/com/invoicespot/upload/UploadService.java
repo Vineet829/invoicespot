@@ -15,6 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class UploadService {
 
+    public static final long MAX_BYTES = 2L * 1024 * 1024;
+    public static final String TOO_LARGE = "Logos can be at most 2 MB";
+
     private static final String PUBLIC_PREFIX = "/uploads/";
 
     private final Path uploadDir;
@@ -33,6 +36,9 @@ public class UploadService {
         }
         if (contentType.toLowerCase(Locale.ROOT).contains("svg")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "SVG files are not allowed");
+        }
+        if (file.getSize() > MAX_BYTES) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, TOO_LARGE);
         }
 
         String fileName = UUID.randomUUID() + extension(contentType, file.getOriginalFilename());

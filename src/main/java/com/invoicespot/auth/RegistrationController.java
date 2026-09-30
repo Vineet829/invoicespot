@@ -5,6 +5,10 @@ import com.invoicespot.auth.dto.MessageResponse;
 import com.invoicespot.auth.dto.RegisterRequest;
 import com.invoicespot.auth.dto.ResetPasswordRequest;
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,19 +25,23 @@ public class RegistrationController {
 
     private final RegistrationService registrationService;
     private final PasswordResetService passwordResetService;
+    private final RateLimiter rateLimiter;
     private final String clientUrl;
 
     public RegistrationController(
             RegistrationService registrationService,
             PasswordResetService passwordResetService,
+            RateLimiter rateLimiter,
             AppProperties properties) {
         this.registrationService = registrationService;
         this.passwordResetService = passwordResetService;
+        this.rateLimiter = rateLimiter;
         this.clientUrl = properties.site().clientUrl();
     }
 
     @PostMapping("/register")
-    public MessageResponse register(@RequestBody RegisterRequest request) {
+    public MessageResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest http) {
+        rateLimiter.consume(RateLimit.SIGN_UP, http.getRemoteAddr());
         return new MessageResponse(true, registrationService.register(request));
     }
 
@@ -47,17 +55,19 @@ public class RegistrationController {
     }
 
     @PostMapping("/resend_email_token")
-    public MessageResponse resend(@RequestBody EmailRequest request) {
+    public MessageResponse resend(@Valid @RequestBody EmailRequest request, HttpServletRequest http) {
+        rateLimiter.consume(RateLimit.VERIFICATION_EMAIL, http.getRemoteAddr());
         return new MessageResponse(true, registrationService.resend(request.email()));
     }
 
     @PostMapping("/reset_password_request")
-    public MessageResponse resetPasswordRequest(@RequestBody EmailRequest request) {
+    public MessageResponse resetPasswordRequest(@Valid @RequestBody EmailRequest request, HttpServletRequest http) {
+        rateLimiter.consume(RateLimit.PASSWORD_RESET, http.getRemoteAddr());
         return new MessageResponse(true, passwordResetService.requestReset(request.email()));
     }
 
     @PostMapping("/reset_password")
-    public MessageResponse resetPassword(@RequestBody ResetPasswordRequest request) {
+    public MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return new MessageResponse(true, passwordResetService.resetPassword(request));
     }
 }

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.config.DemoProperties;
 import com.invoicespot.user.dto.UpdateProfileRequest;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,7 +28,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userRepository);
+        service = new UserService(userRepository, new DemoAccountGuard(new DemoProperties("demo@example.test")));
     }
 
     private static UpdateProfileRequest onlyAllowed() {

@@ -6,7 +6,7 @@ import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,18 +21,21 @@ public class PasswordResetService {
     private final VerificationTokenService tokenService;
     private final MailService mailService;
     private final AppProperties.Site site;
+    private final Clock clock;
 
     public PasswordResetService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             VerificationTokenService tokenService,
             MailService mailService,
-            AppProperties properties) {
+            AppProperties properties,
+            Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.mailService = mailService;
         this.site = properties.site();
+        this.clock = clock;
     }
 
     @Transactional
@@ -78,11 +81,8 @@ public class PasswordResetService {
         if (!request.password().equals(request.passwordConfirm())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Passwords do not match");
         }
-        if (!RegistrationService.isStrongPassword(request.password())) {
-            throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
-                    "Password must be at least 8 characters long, with at least 1 uppercase and"
-                            + " lowercase letters and at least 1 symbol");
+        if (!PasswordPolicy.isStrong(request.password())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, PasswordPolicy.REQUIREMENTS);
         }
 
         VerifyResetToken token = tokenService
@@ -94,9 +94,10 @@ public class PasswordResetService {
 
         User user = token.getUser();
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setPasswordChangedAt(Instant.now());
+        user.setPasswordChangedAt(clock.instant());
+        user.getRefreshTokens().clear();
         userRepository.save(user);
-        tokenService.consume(token);
+        tokenService.revokeAll(user);
 
         mailService.send(
                 user.getEmail(),

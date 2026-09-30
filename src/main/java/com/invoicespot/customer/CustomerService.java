@@ -41,8 +41,8 @@ public class CustomerService {
                     "A Customer must have at least a name, email and phone number");
         }
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        if (customerRepository.existsByEmailIgnoreCase(email)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "That Customer already exists");
+        if (customerRepository.existsByCreatedByPkidAndEmailIgnoreCase(ownerPkid, email)) {
+            throw duplicateEmail();
         }
 
         User owner = userRepository
@@ -54,7 +54,7 @@ public class CustomerService {
         customer.setName(request.name().trim());
         customer.setEmail(email);
         customer.setPhoneNumber(request.phoneNumber().trim());
-        customer.setVatTinNo(request.vatTinNo() != null ? request.vatTinNo() : 0L);
+        customer.setVatTinNo(vatTinNo(request.vatTinNo()));
         customer.setAddress(request.address());
         customer.setCity(request.city());
         customer.setCountry(request.country());
@@ -98,7 +98,12 @@ public class CustomerService {
             if (request.email().isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Customer email cannot be blank");
             }
-            customer.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
+            String email = request.email().trim().toLowerCase(Locale.ROOT);
+            if (customerRepository.existsByCreatedByPkidAndEmailIgnoreCaseAndPkidNot(
+                    ownerPkid, email, customer.getPkid())) {
+                throw duplicateEmail();
+            }
+            customer.setEmail(email);
         }
         if (request.phoneNumber() != null) {
             if (request.phoneNumber().isBlank()) {
@@ -107,7 +112,7 @@ public class CustomerService {
             customer.setPhoneNumber(request.phoneNumber());
         }
         if (request.vatTinNo() != null) {
-            customer.setVatTinNo(request.vatTinNo());
+            customer.setVatTinNo(vatTinNo(request.vatTinNo()));
         }
         if (request.address() != null) {
             customer.setAddress(request.address());
@@ -153,6 +158,17 @@ public class CustomerService {
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    private static ApiException duplicateEmail() {
+        return new ApiException(HttpStatus.CONFLICT, "You already have a customer with that email address");
+    }
+
+    private static String vatTinNo(String value) {
+        if (value == null || value.isBlank() || value.trim().equals("0")) {
+            return null;
+        }
+        return value.trim();
     }
 
     private static boolean isBlank(String value) {

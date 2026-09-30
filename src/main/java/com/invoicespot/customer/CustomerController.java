@@ -9,6 +9,7 @@ import com.invoicespot.customer.dto.SingleCustomerResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
 import com.invoicespot.customer.dto.UpdatedCustomerResponse;
 import com.invoicespot.user.User;
+import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +33,7 @@ public class CustomerController {
 
     @PostMapping("/create")
     public CreatedCustomerResponse create(
-            @AuthenticationPrincipal User principal, @RequestBody CreateCustomerRequest request) {
+            @AuthenticationPrincipal User principal, @Valid @RequestBody CreateCustomerRequest request) {
         CustomerResponse created = customerService.create(principal.getPkid(), request);
         return new CreatedCustomerResponse(
                 true,
@@ -57,7 +58,7 @@ public class CustomerController {
     public UpdatedCustomerResponse update(
             @AuthenticationPrincipal User principal,
             @PathVariable String id,
-            @RequestBody UpdateCustomerRequest request) {
+            @Valid @RequestBody UpdateCustomerRequest request) {
         CustomerResponse updated = customerService.update(principal.getPkid(), id, request);
         return new UpdatedCustomerResponse(
                 true, updated.name() + "'s info was successfully updated", updated);

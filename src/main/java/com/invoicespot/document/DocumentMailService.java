@@ -3,6 +3,9 @@ package com.invoicespot.document;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.document.dto.EmailDocumentRequest;
 import com.invoicespot.mail.MailService;
+import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimiter;
+import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.User;
 import jakarta.mail.MessagingException;
 import org.slf4j.Logger;
@@ -18,10 +21,18 @@ public class DocumentMailService {
 
     private final DocumentService documentService;
     private final MailService mailService;
+    private final DemoAccountGuard demoAccountGuard;
+    private final RateLimiter rateLimiter;
 
-    public DocumentMailService(DocumentService documentService, MailService mailService) {
+    public DocumentMailService(
+            DocumentService documentService,
+            MailService mailService,
+            DemoAccountGuard demoAccountGuard,
+            RateLimiter rateLimiter) {
         this.documentService = documentService;
         this.mailService = mailService;
+        this.demoAccountGuard = demoAccountGuard;
+        this.rateLimiter = rateLimiter;
     }
 
     public EmailDraft draft(User owner, String id) {
@@ -29,6 +40,8 @@ public class DocumentMailService {
     }
 
     public void email(User owner, String id, EmailDocumentRequest request) {
+        demoAccountGuard.requireNotDemo(owner, "emailing");
+        rateLimiter.consume(RateLimit.OUTGOING_EMAIL, owner.getId().toString());
         DocumentPdf pdf = documentService.renderPdf(owner, id);
         EmailDraft defaults = defaults(owner, pdf.envelope());
         String to = isBlank(request.to()) ? defaults.to() : request.to().trim();

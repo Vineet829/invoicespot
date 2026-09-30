@@ -1,19 +1,19 @@
 package com.invoicespot.document.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
 public record UpdateDocumentRequest(
-        DocumentCustomerDto customer,
+        String customerId,
+        @Valid DocumentCustomerDto customer,
         String documentType,
         Instant dueDate,
-        String additionalInfo,
-        String termsConditions,
-        String status,
-        Double subTotal,
-        Double salesTax,
+        @Size(max = 5000, message = "Additional info can be at most 5,000 characters") String additionalInfo,
+        @Size(max = 5000, message = "Terms can be at most 5,000 characters") String termsConditions,
         String rates,
-        Double total,
-        String currency,
-        Double totalAmountReceived,
-        List<BillingItemDto> billingItems) {}
+        @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD") String currency,
+        @Size(max = 200, message = "A document can have at most 200 items")
+                List<@Valid BillingItemDto> billingItems) {}

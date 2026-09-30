@@ -2,6 +2,11 @@ spring:
   application:
     name: invoice-spot
 
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5442}/${POSTGRES_DB:invoicespot}
     username: ${POSTGRES_USER:invoicespot}
@@ -13,6 +18,7 @@ spring:
     open-in-view: false
     properties:
       hibernate:
+        default_batch_fetch_size: 50
         jdbc:
           time_zone: UTC
         format_sql: true
@@ -36,9 +42,12 @@ spring:
     default-property-inclusion: always
     serialization:
       write-dates-as-timestamps: false
+    generator:
+      write-bigdecimal-as-plain: true
 
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
   servlet:
     context-path: /
 
@@ -71,6 +80,8 @@ app:
     token-ttl: PT15M
   upload:
     dir: ${UPLOAD_DIR:uploads}
+  demo:
+    email: ${DEMO_EMAIL:guest@demo.invoicespot.local}
 
 logging:
   level:

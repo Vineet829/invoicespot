@@ -1,7 +1,9 @@
 package com.invoicespot.document;
 
 import com.invoicespot.common.BaseEntity;
+import com.invoicespot.customer.Customer;
 import com.invoicespot.user.User;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -10,8 +12,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +33,12 @@ public class Document extends BaseEntity {
     @JoinColumn(name = "created_by_pkid", nullable = false)
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_pkid")
+    private Customer customer;
+
     @Embedded
-    private CustomerSnapshot customer;
+    private CustomerSnapshot customerSnapshot;
 
     @Column(name = "document_type", nullable = false, length = 20)
     private DocumentType documentType = DocumentType.INVOICE;
@@ -49,31 +58,30 @@ public class Document extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private DocumentStatus status = DocumentStatus.NOT_PAID;
 
-    @Column(name = "sub_total")
-    private Double subTotal;
+    @Column(name = "sub_total", nullable = false, precision = 19, scale = 2)
+    private BigDecimal subTotal = BigDecimal.ZERO;
 
-    @Column(name = "sales_tax")
-    private Double salesTax;
+    @Column(name = "sales_tax", nullable = false, precision = 19, scale = 2)
+    private BigDecimal salesTax = BigDecimal.ZERO;
 
-    @Column(name = "rates")
-    private String rates;
+    @Column(name = "rates", nullable = false, precision = 7, scale = 4)
+    private BigDecimal rates = BigDecimal.ZERO;
 
-    @Column(name = "total")
-    private Double total;
+    @Column(name = "total", nullable = false, precision = 19, scale = 2)
+    private BigDecimal total = BigDecimal.ZERO;
 
     @Column(name = "currency", length = 10)
     private String currency;
 
-    @Column(name = "total_amount_received")
-    private Double totalAmountReceived;
+    @Column(name = "total_amount_received", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalAmountReceived = BigDecimal.ZERO;
 
     @ElementCollection
     @CollectionTable(name = "document_billing_items", joinColumns = @JoinColumn(name = "document_pkid"))
     @OrderColumn(name = "position")
     private List<BillingItem> billingItems = new ArrayList<>();
 
-    @ElementCollection
-    @CollectionTable(name = "document_payment_records", joinColumns = @JoinColumn(name = "document_pkid"))
-    @OrderColumn(name = "position")
-    private List<PaymentRecord> paymentRecords = new ArrayList<>();
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("datePaid ASC, pkid ASC")
+    private List<Payment> payments = new ArrayList<>();
 }

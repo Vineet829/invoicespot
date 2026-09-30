@@ -85,4 +85,19 @@ class UploadServiceTest {
         assertThat(service.localFile("/uploads/../secret.txt")).isEmpty();
         assertThat(service.localFile(null)).isEmpty();
     }
+
+    @Test
+    @DisplayName("a logo over 2 MB is refused before anything is written")
+    void refusesLargeFiles(@TempDir Path dir) {
+        UploadService service = serviceFor(dir);
+        MockMultipartFile large = new MockMultipartFile(
+                "logo", "big.png", "image/png", new byte[(int) UploadService.MAX_BYTES + 1]);
+
+        assertThatThrownBy(() -> service.store(large))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Logos can be at most 2 MB")
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(dir.toFile().listFiles()).isEmpty();
+    }
 }

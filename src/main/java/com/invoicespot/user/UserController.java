@@ -7,6 +7,7 @@ import com.invoicespot.user.dto.UpdatedProfileResponse;
 import com.invoicespot.user.dto.UserPageResponse;
 import com.invoicespot.user.dto.UserProfileResponse;
 import com.invoicespot.user.dto.UserSummaryResponse;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,7 +36,7 @@ public class UserController {
 
     @PatchMapping("/profile")
     public UpdatedProfileResponse updateProfile(
-            @AuthenticationPrincipal User principal, @RequestBody UpdateProfileRequest request) {
+            @AuthenticationPrincipal User principal, @Valid @RequestBody UpdateProfileRequest request) {
         UserProfileResponse updated = userService.updateProfile(principal.getPkid(), request);
         return new UpdatedProfileResponse(
                 true, updated.firstName() + ", your profile was successfully updated", updated);

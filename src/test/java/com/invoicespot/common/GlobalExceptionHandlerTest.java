@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTest {
@@ -81,8 +82,22 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.statusCode").value(500));
     }
 
+    @Test
+    @DisplayName("an upload over the size limit is a 413 with the limit in the message")
+    void uploadTooLarge() throws Exception {
+        mockMvc.perform(get("/probe/too-large"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.message").value("Logos can be at most 2 MB"))
+                .andExpect(jsonPath("$.statusCode").value(413));
+    }
+
     @RestController
     static class ProbeController {
+
+        @GetMapping("/probe/too-large")
+        String tooLarge() {
+            throw new MaxUploadSizeExceededException(2L * 1024 * 1024);
+        }
 
         @GetMapping("/probe/conflict")
         String conflict() {

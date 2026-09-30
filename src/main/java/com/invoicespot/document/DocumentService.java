@@ -1,6 +1,7 @@
 package com.invoicespot.document;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.document.dto.BillingItemDto;
 import com.invoicespot.document.dto.CreateDocumentRequest;
@@ -9,11 +10,16 @@ import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
+import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -32,51 +38,49 @@ import org.springframework.transaction.annotation.Transactional;
 public class DocumentService {
 
     private static final int PAGE_SIZE = 10;
+    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final DocumentRepository documentRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
     private final PdfService pdfService;
+    private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public DocumentService(
             DocumentRepository documentRepository,
             CustomerRepository customerRepository,
             UserRepository userRepository,
-            PdfService pdfService) {
+            PdfService pdfService,
+            Clock clock) {
         this.documentRepository = documentRepository;
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
         this.pdfService = pdfService;
+        this.clock = clock;
     }
 
     @Transactional
     public DocumentResponse create(Long ownerPkid, CreateDocumentRequest request) {
-        if (!customerRepository.existsByCreatedByPkid(ownerPkid)) {
-            throw new ApiException(
-                    HttpStatus.NOT_FOUND,
-                    "That customer does not exist for the currently logged in user");
-        }
+        Customer customer = findCustomer(ownerPkid, request.customerId(), request.customer())
+                .orElseThrow(DocumentService::customerNotFound);
         User owner = userRepository
                 .findById(ownerPkid)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
 
         Document document = new Document();
         document.setCreatedBy(owner);
-        document.setCustomer(toSnapshot(request.customer()));
+        document.setCustomer(customer);
+        document.setCustomerSnapshot(snapshotOf(customer));
         document.setDocumentType(documentType(request.documentType()));
-        document.setStatus(documentStatus(request.status()));
         document.setDueDate(request.dueDate());
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
-        document.setSubTotal(request.subTotal());
-        document.setSalesTax(request.salesTax());
-        document.setRates(request.rates());
-        document.setTotal(request.total());
+        document.setRates(percentage(request.rates(), "Tax rate"));
         document.setCurrency(request.currency());
-        document.setTotalAmountReceived(request.totalAmountReceived());
         document.setBillingItems(toBillingItems(request.billingItems()));
         document.setDocumentNumber(generateDocumentNumber());
+        DocumentTotals.apply(document);
         documentRepository.save(document);
         return DocumentResponse.from(document);
     }
@@ -119,7 +123,7 @@ public class DocumentService {
     }
 
     private static DocumentEnvelope envelope(Document document) {
-        CustomerSnapshot customer = document.getCustomer();
+        CustomerSnapshot customer = document.getCustomerSnapshot();
         String title = document.getDocumentNumber() == null
                 ? document.getDocumentType().getValue()
                 : document.getDocumentType().getValue() + " " + document.getDocumentNumber();
@@ -134,14 +138,19 @@ public class DocumentService {
         Document document = requireOwned(
                 ownerPkid, id, "That document does not exist",
                 "You are not authorized to update this document. It's not yours");
-        if (request.customer() != null) {
-            document.setCustomer(toSnapshot(request.customer()));
+        if (request.customerId() != null) {
+            Customer customer = findCustomer(ownerPkid, request.customerId(), null)
+                    .orElseThrow(DocumentService::customerNotFound);
+            document.setCustomer(customer);
+            document.setCustomerSnapshot(snapshotOf(customer));
+        } else if (request.customer() != null) {
+            Optional<Customer> customer = findCustomer(ownerPkid, null, request.customer());
+            document.setCustomer(customer.orElse(null));
+            document.setCustomerSnapshot(customer.map(DocumentService::snapshotOf)
+                    .orElseGet(() -> toSnapshot(request.customer())));
         }
         if (request.documentType() != null) {
             document.setDocumentType(documentType(request.documentType()));
-        }
-        if (request.status() != null) {
-            document.setStatus(documentStatus(request.status()));
         }
         if (request.dueDate() != null) {
             document.setDueDate(request.dueDate());
@@ -152,27 +161,17 @@ public class DocumentService {
         if (request.termsConditions() != null) {
             document.setTermsConditions(request.termsConditions());
         }
-        if (request.subTotal() != null) {
-            document.setSubTotal(request.subTotal());
-        }
-        if (request.salesTax() != null) {
-            document.setSalesTax(request.salesTax());
-        }
         if (request.rates() != null) {
-            document.setRates(request.rates());
-        }
-        if (request.total() != null) {
-            document.setTotal(request.total());
+            document.setRates(percentage(request.rates(), "Tax rate"));
         }
         if (request.currency() != null) {
             document.setCurrency(request.currency());
         }
-        if (request.totalAmountReceived() != null) {
-            document.setTotalAmountReceived(request.totalAmountReceived());
-        }
         if (request.billingItems() != null) {
             document.setBillingItems(toBillingItems(request.billingItems()));
         }
+        DocumentTotals.apply(document);
+        requireConsistentPayments(document);
         documentRepository.save(document);
         return DocumentResponse.from(document);
     }
@@ -186,21 +185,126 @@ public class DocumentService {
     }
 
     @Transactional
-    public void addPayment(Long ownerPkid, String id, CreatePaymentRequest request) {
-        Document document = requireOwned(
-                ownerPkid, id, "That document does not exist!",
-                "You are not authorized to update this document. It's not yours");
-        PaymentRecord payment = new PaymentRecord();
-        payment.setPaidBy(document.getCustomer() == null ? null : document.getCustomer().getName());
-        payment.setDatePaid(request.datePaid());
-        payment.setAmountPaid(request.amountPaid());
+    public DocumentResponse addPayment(Long ownerPkid, String id, CreatePaymentRequest request) {
+        Document document = requireOwnedForPayment(ownerPkid, id);
+        if (document.getDocumentType() == DocumentType.QUOTATION) {
+            throw new ApiException(HttpStatus.CONFLICT, "A quotation can't take payments");
+        }
+        if (document.getDocumentType() == DocumentType.RECEIPT) {
+            throw new ApiException(HttpStatus.CONFLICT, "A receipt is already paid in full");
+        }
+        Payment payment = new Payment();
+        payment.setDocument(document);
+        CustomerSnapshot customer = document.getCustomerSnapshot();
+        payment.setPaidBy(customer == null ? null : customer.getName());
+        payment.setDatePaid(paymentDate(request.datePaid()));
+        payment.setAmountPaid(paymentAmount(request.amountPaid()));
         payment.setPaymentMethod(paymentMethod(request.paymentMethod()));
         payment.setAdditionalInfo(request.additionalInfo());
-        Instant now = Instant.now();
-        payment.setCreatedAt(now);
-        payment.setUpdatedAt(now);
-        document.getPaymentRecords().add(payment);
+        requireWithinBalance(document, payment.getAmountPaid());
+        document.getPayments().add(payment);
+        DocumentTotals.apply(document);
         documentRepository.save(document);
+        return DocumentResponse.from(document);
+    }
+
+    @Transactional
+    public DocumentResponse updatePayment(
+            Long ownerPkid, String id, String paymentId, UpdatePaymentRequest request) {
+        Document document = requireOwnedForPayment(ownerPkid, id);
+        Payment payment = requirePayment(document, paymentId);
+        if (request.datePaid() != null) {
+            payment.setDatePaid(paymentDate(request.datePaid()));
+        }
+        if (request.paymentMethod() != null) {
+            payment.setPaymentMethod(paymentMethod(request.paymentMethod()));
+        }
+        if (request.additionalInfo() != null) {
+            payment.setAdditionalInfo(request.additionalInfo());
+        }
+        if (request.amountPaid() != null) {
+            BigDecimal amount = paymentAmount(request.amountPaid());
+            requireWithinBalance(document, amount.subtract(payment.getAmountPaid()));
+            payment.setAmountPaid(amount);
+        }
+        DocumentTotals.apply(document);
+        return DocumentResponse.from(document);
+    }
+
+    @Transactional
+    public DocumentResponse deletePayment(Long ownerPkid, String id, String paymentId) {
+        Document document = requireOwnedForPayment(ownerPkid, id);
+        document.getPayments().remove(requirePayment(document, paymentId));
+        DocumentTotals.apply(document);
+        return DocumentResponse.from(document);
+    }
+
+    private Document requireOwnedForPayment(Long ownerPkid, String id) {
+        Document document = externalId(id)
+                .flatMap(documentRepository::findForUpdateByExternalId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist!"));
+        if (!document.getCreatedBy().getPkid().equals(ownerPkid)) {
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN, "You are not authorized to update this document. It's not yours");
+        }
+        return document;
+    }
+
+    private static Payment requirePayment(Document document, String paymentId) {
+        return externalId(paymentId)
+                .flatMap(external -> document.getPayments().stream()
+                        .filter(payment -> external.equals(payment.getId()))
+                        .findFirst())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That payment does not exist"));
+    }
+
+    private static void requireWithinBalance(Document document, BigDecimal extra) {
+        BigDecimal owed = document.getTotal().subtract(DocumentTotals.received(document));
+        if (extra.compareTo(owed) > 0) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "That is more than the " + owed.max(BigDecimal.ZERO).setScale(2).toPlainString()
+                            + " still owed");
+        }
+    }
+
+    private static BigDecimal paymentAmount(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter an amount greater than zero");
+        }
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "An amount can have at most 2 decimals");
+        }
+        return amount.setScale(2);
+    }
+
+    private LocalDate paymentDate(String value) {
+        if (value == null || value.isBlank()) {
+            return LocalDate.now(clock);
+        }
+        try {
+            return value.length() == 10
+                    ? LocalDate.parse(value)
+                    : LocalDate.ofInstant(Instant.parse(value), ZoneOffset.UTC);
+        } catch (DateTimeParseException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter the payment date as YYYY-MM-DD");
+        }
+    }
+
+    private static void requireConsistentPayments(Document document) {
+        BigDecimal received = DocumentTotals.received(document);
+        if (received.signum() == 0 || document.getDocumentType() == DocumentType.RECEIPT) {
+            return;
+        }
+        if (document.getDocumentType() == DocumentType.QUOTATION) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT, "This document has payments, so it can't become a quotation");
+        }
+        if (document.getTotal().compareTo(received) < 0) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "The new total is less than the " + received.toPlainString() + " already received");
+        }
     }
 
     private Document requireOwned(
@@ -212,6 +316,36 @@ public class DocumentService {
             throw new ApiException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
         return document;
+    }
+
+    private Optional<Customer> findCustomer(Long ownerPkid, String customerId, DocumentCustomerDto snapshot) {
+        if (customerId != null) {
+            return externalId(customerId)
+                    .flatMap(customerRepository::findByExternalId)
+                    .filter(customer -> customer.getCreatedBy().getPkid().equals(ownerPkid));
+        }
+        if (snapshot != null && snapshot.accountNo() != null && !snapshot.accountNo().isBlank()) {
+            return customerRepository.findByCreatedByPkidAndAccountNo(ownerPkid, snapshot.accountNo());
+        }
+        return Optional.empty();
+    }
+
+    private static ApiException customerNotFound() {
+        return new ApiException(
+                HttpStatus.NOT_FOUND, "That customer does not exist for the currently logged in user");
+    }
+
+    private static CustomerSnapshot snapshotOf(Customer customer) {
+        CustomerSnapshot snapshot = new CustomerSnapshot();
+        snapshot.setName(customer.getName());
+        snapshot.setEmail(customer.getEmail());
+        snapshot.setAccountNo(customer.getAccountNo());
+        snapshot.setVatTinNo(customer.getVatTinNo());
+        snapshot.setAddress(customer.getAddress());
+        snapshot.setCity(customer.getCity());
+        snapshot.setCountry(customer.getCountry());
+        snapshot.setPhoneNumber(customer.getPhoneNumber());
+        return snapshot;
     }
 
     private static CustomerSnapshot toSnapshot(DocumentCustomerDto dto) {
@@ -240,10 +374,32 @@ public class DocumentService {
             item.setItemName(dto.itemName());
             item.setUnitPrice(dto.unitPrice());
             item.setQuantity(dto.quantity());
-            item.setDiscount(dto.discount());
+            item.setDiscount(percentage(dto.discount(), "Discount"));
             result.add(item);
         }
         return result;
+    }
+
+    private static BigDecimal percentage(String value, String label) {
+        if (value == null || value.isBlank()) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            BigDecimal number = new BigDecimal(value.trim());
+            if (number.signum() >= 0
+                    && number.compareTo(ONE_HUNDRED) <= 0
+                    && number.stripTrailingZeros().scale() <= 4) {
+                return number;
+            }
+        } catch (NumberFormatException exception) {
+            throw percentageError(label);
+        }
+        throw percentageError(label);
+    }
+
+    private static ApiException percentageError(String label) {
+        return new ApiException(
+                HttpStatus.BAD_REQUEST, label + " must be a number from 0 to 100, with up to 4 decimals");
     }
 
     private static String pdfFileName(Document document) {
@@ -273,17 +429,6 @@ public class DocumentService {
             return DocumentType.fromValue(value);
         } catch (IllegalArgumentException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid document type: " + value);
-        }
-    }
-
-    private static DocumentStatus documentStatus(String value) {
-        if (value == null) {
-            return DocumentStatus.NOT_PAID;
-        }
-        try {
-            return DocumentStatus.fromValue(value);
-        } catch (IllegalArgumentException exception) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid document status: " + value);
         }
     }
 

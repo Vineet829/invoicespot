@@ -22,7 +22,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     @Query("select c from Customer c where c.id = :externalId")
     Optional<Customer> findByExternalId(@Param("externalId") UUID externalId);
 
-    boolean existsByEmailIgnoreCase(String email);
+    boolean existsByCreatedByPkidAndEmailIgnoreCase(Long createdByPkid, String email);
+
+    boolean existsByCreatedByPkidAndEmailIgnoreCaseAndPkidNot(Long createdByPkid, String email, Long pkid);
 
     boolean existsByCreatedByPkid(Long createdByPkid);
+
+    Optional<Customer> findByCreatedByPkidAndAccountNo(Long createdByPkid, String accountNo);
 }

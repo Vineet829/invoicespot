@@ -24,14 +24,14 @@ public class Customer extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "email", nullable = false, unique = true, length = 254)
+    @Column(name = "email", nullable = false, length = 254)
     private String email;
 
     @Column(name = "account_no", length = 30)
     private String accountNo;
 
-    @Column(name = "vat_tin_no", nullable = false)
-    private Long vatTinNo = 0L;
+    @Column(name = "vat_tin_no", length = 50)
+    private String vatTinNo;
 
     @Column(name = "address")
     private String address;

@@ -3,6 +3,8 @@ package com.invoicespot;
 import com.invoicespot.auth.JwtService;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,11 +22,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
         properties = {
             "app.jwt.access-secret=integration-test-access-secret-0123456789abcdef",
             "app.jwt.refresh-secret=integration-test-refresh-secret-0123456789abcdef",
-            "management.health.mail.enabled=false"
+            "management.health.mail.enabled=false",
+            "app.demo.email=" + IntegrationTest.DEMO_EMAIL
         })
 @AutoConfigureMockMvc
 @Import(IntegrationTest.Database.class)
 public abstract class IntegrationTest {
+
+    protected static final String DEMO_EMAIL = "demo@invoicespot.test";
 
     @TestConfiguration(proxyBeanMethods = false)
     static class Database {
@@ -56,6 +61,24 @@ public abstract class IntegrationTest {
         user.setFirstName("Test");
         user.setLastName("User");
         user.setEmailVerified(true);
+        return userRepository.save(user);
+    }
+
+    protected User demoUser() {
+        return userRepository.findByEmailIgnoreCase(DEMO_EMAIL).orElseGet(() -> {
+            User user = new User();
+            user.setEmail(DEMO_EMAIL);
+            user.setUsername("demo-" + UUID.randomUUID().toString().substring(0, 8));
+            user.setFirstName("Demo");
+            user.setLastName("User");
+            user.setEmailVerified(true);
+            return userRepository.save(user);
+        });
+    }
+
+    protected User createAdmin() {
+        User user = createUser();
+        user.setRoles(new HashSet<>(Set.of("User", "Admin")));
         return userRepository.save(user);
     }
 

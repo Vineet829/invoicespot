@@ -50,7 +50,7 @@ public class User extends BaseEntity {
     private String businessName;
 
     @Column(name = "phone_number", length = 30)
-    private String phoneNumber = "+917332647538";
+    private String phoneNumber;
 
     @Column(name = "address")
     private String address;
@@ -76,4 +76,10 @@ public class User extends BaseEntity {
     @CollectionTable(name = "user_refresh_tokens", joinColumns = @JoinColumn(name = "user_pkid"))
     @Column(name = "token", nullable = false, columnDefinition = "text")
     private Set<String> refreshTokens = new HashSet<>();
+
+    public boolean acceptsTokenIssuedAt(Instant issuedAt) {
+        return active
+                && (passwordChangedAt == null
+                        || issuedAt.getEpochSecond() >= passwordChangedAt.getEpochSecond());
+    }
 }

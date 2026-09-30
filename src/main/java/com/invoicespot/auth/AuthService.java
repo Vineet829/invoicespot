@@ -6,7 +6,6 @@ import com.invoicespot.user.UserRepository;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -73,13 +72,18 @@ public class AuthService {
         Set<String> retained = new HashSet<>(user.getRefreshTokens());
         retained.remove(presentedRefreshToken);
 
-        Optional<UUID> subject = jwtService.readRefreshSubject(presentedRefreshToken);
-        if (subject.isEmpty()) {
+        Optional<JwtService.TokenClaims> claims = jwtService.readRefreshClaims(presentedRefreshToken);
+        if (claims.isEmpty()) {
             user.setRefreshTokens(retained);
             userRepository.save(user);
             return Optional.empty();
         }
-        if (!user.getId().equals(subject.get())) {
+        if (!user.getId().equals(claims.get().subject())) {
+            return Optional.empty();
+        }
+        if (!user.acceptsTokenIssuedAt(claims.get().issuedAt())) {
+            user.setRefreshTokens(user.isActive() ? retained : new HashSet<>());
+            userRepository.save(user);
             return Optional.empty();
         }
         return Optional.of(rotate(user, retained));
@@ -98,13 +102,13 @@ public class AuthService {
     }
 
     private void revokeCompromisedSessions(String presentedRefreshToken) {
-        jwtService
-                .readRefreshSubject(presentedRefreshToken)
-                .flatMap(userRepository::findByExternalId)
+        jwtService.readRefreshClaims(presentedRefreshToken).ifPresent(claims -> userRepository
+                .findByExternalId(claims.subject())
+                .filter(owner -> owner.acceptsTokenIssuedAt(claims.issuedAt()))
                 .ifPresent(compromised -> {
                     compromised.getRefreshTokens().clear();
                     userRepository.save(compromised);
-                });
+                }));
     }
 
     private TokenBundle rotate(User user, Set<String> retained) {

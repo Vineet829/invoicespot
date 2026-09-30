@@ -6,10 +6,13 @@ import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.CreatedDocumentResponse;
 import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
+import com.invoicespot.document.dto.PaymentResultResponse;
 import com.invoicespot.document.dto.SingleDocumentResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
+import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.document.dto.UpdatedDocumentResponse;
 import com.invoicespot.user.User;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,7 +38,7 @@ public class DocumentController {
 
     @PostMapping("/create")
     public CreatedDocumentResponse create(
-            @AuthenticationPrincipal User principal, @RequestBody CreateDocumentRequest request) {
+            @AuthenticationPrincipal User principal, @Valid @RequestBody CreateDocumentRequest request) {
         return new CreatedDocumentResponse(true, documentService.create(principal.getPkid(), request));
     }
 
@@ -48,12 +51,33 @@ public class DocumentController {
 
     @PostMapping("/{id}/payment")
     @ResponseStatus(HttpStatus.CREATED)
-    public MessageResponse addPayment(
+    public PaymentResultResponse addPayment(
             @AuthenticationPrincipal User principal,
             @PathVariable String id,
-            @RequestBody CreatePaymentRequest request) {
-        documentService.addPayment(principal.getPkid(), id, request);
-        return new MessageResponse(true, "Payment has been recorded successfully");
+            @Valid @RequestBody CreatePaymentRequest request) {
+        return new PaymentResultResponse(
+                true,
+                "Payment has been recorded successfully",
+                documentService.addPayment(principal.getPkid(), id, request));
+    }
+
+    @PatchMapping("/{id}/payment/{paymentId}")
+    public PaymentResultResponse updatePayment(
+            @AuthenticationPrincipal User principal,
+            @PathVariable String id,
+            @PathVariable String paymentId,
+            @Valid @RequestBody UpdatePaymentRequest request) {
+        return new PaymentResultResponse(
+                true,
+                "Payment has been updated",
+                documentService.updatePayment(principal.getPkid(), id, paymentId, request));
+    }
+
+    @DeleteMapping("/{id}/payment/{paymentId}")
+    public PaymentResultResponse deletePayment(
+            @AuthenticationPrincipal User principal, @PathVariable String id, @PathVariable String paymentId) {
+        return new PaymentResultResponse(
+                true, "Payment has been deleted", documentService.deletePayment(principal.getPkid(), id, paymentId));
     }
 
     @GetMapping("/{id}")
@@ -66,7 +90,7 @@ public class DocumentController {
     public UpdatedDocumentResponse update(
             @AuthenticationPrincipal User principal,
             @PathVariable String id,
-            @RequestBody UpdateDocumentRequest request) {
+            @Valid @RequestBody UpdateDocumentRequest request) {
         DocumentResponse updated = documentService.update(principal.getPkid(), id, request);
         return new UpdatedDocumentResponse(
                 true,

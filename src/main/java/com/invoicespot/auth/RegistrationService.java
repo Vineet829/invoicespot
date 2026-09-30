@@ -48,10 +48,8 @@ public class RegistrationService {
         if (!request.password().equals(request.passwordConfirm())) {
             throw badRequest("Passwords do not match");
         }
-        if (!isStrongPassword(request.password())) {
-            throw badRequest(
-                    "Password must be at least 8 characters long, with at least 1 uppercase and"
-                            + " lowercase letters and at least 1 symbol");
+        if (!PasswordPolicy.isStrong(request.password())) {
+            throw badRequest(PasswordPolicy.REQUIREMENTS);
         }
 
         String email = request.email().trim().toLowerCase(Locale.ROOT);
@@ -155,28 +153,6 @@ public class RegistrationService {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    static boolean isStrongPassword(String password) {
-        if (password.length() < 8) {
-            return false;
-        }
-        boolean lower = false;
-        boolean upper = false;
-        boolean digit = false;
-        boolean symbol = false;
-        for (char character : password.toCharArray()) {
-            if (Character.isLowerCase(character)) {
-                lower = true;
-            } else if (Character.isUpperCase(character)) {
-                upper = true;
-            } else if (Character.isDigit(character)) {
-                digit = true;
-            } else {
-                symbol = true;
-            }
-        }
-        return lower && upper && digit && symbol;
     }
 
     private static ApiException badRequest(String message) {

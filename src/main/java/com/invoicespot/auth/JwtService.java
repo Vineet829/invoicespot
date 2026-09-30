@@ -7,6 +7,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -22,8 +23,10 @@ public class JwtService {
     private final SecretKey refreshKey;
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
+    private final Clock clock;
 
-    public JwtService(AppProperties properties) {
+    public JwtService(AppProperties properties, Clock clock) {
+        this.clock = clock;
         AppProperties.Jwt jwt = properties.jwt();
         this.accessKey = Keys.hmacShaKeyFor(jwt.accessSecret().getBytes(StandardCharsets.UTF_8));
         this.refreshKey = Keys.hmacShaKeyFor(jwt.refreshSecret().getBytes(StandardCharsets.UTF_8));
@@ -32,7 +35,7 @@ public class JwtService {
     }
 
     public String issueAccessToken(User user) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .subject(user.getId().toString())
@@ -44,7 +47,7 @@ public class JwtService {
     }
 
     public String issueRefreshToken(User user) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .subject(user.getId().toString())
@@ -54,19 +57,34 @@ public class JwtService {
                 .compact();
     }
 
+    public record TokenClaims(UUID subject, Instant issuedAt) {}
+
     public Optional<UUID> readAccessSubject(String token) {
-        return readSubject(token, accessKey);
+        return readAccessClaims(token).map(TokenClaims::subject);
     }
 
     public Optional<UUID> readRefreshSubject(String token) {
-        return readSubject(token, refreshKey);
+        return readRefreshClaims(token).map(TokenClaims::subject);
     }
 
-    private Optional<UUID> readSubject(String token, SecretKey key) {
+    public Optional<TokenClaims> readAccessClaims(String token) {
+        return readClaims(token, accessKey);
+    }
+
+    public Optional<TokenClaims> readRefreshClaims(String token) {
+        return readClaims(token, refreshKey);
+    }
+
+    private Optional<TokenClaims> readClaims(String token, SecretKey key) {
         try {
-            Claims claims =
-                    Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-            return Optional.of(UUID.fromString(claims.getSubject()));
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
+                    .clock(() -> Date.from(clock.instant()))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            Instant issuedAt = claims.getIssuedAt() == null ? Instant.EPOCH : claims.getIssuedAt().toInstant();
+            return Optional.of(new TokenClaims(UUID.fromString(claims.getSubject()), issuedAt));
         } catch (JwtException | IllegalArgumentException exception) {
             return Optional.empty();
         }

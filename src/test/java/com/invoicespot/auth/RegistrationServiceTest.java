@@ -80,6 +80,7 @@ class RegistrationServiceTest {
         verify(userRepository).save(captor.capture());
 
         assertThat(captor.getValue().getEmail()).isEqualTo("ada@example.com");
+        assertThat(captor.getValue().getPhoneNumber()).isNull();
     }
 
     @Test
