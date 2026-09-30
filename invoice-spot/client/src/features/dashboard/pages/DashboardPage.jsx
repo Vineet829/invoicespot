@@ -164,7 +164,10 @@ const DashboardPage = () => {
                   <div className={financeCards}>
                     <FinancialCard
                       label="Expected income"
-                      value={formatMoney(snapshot.expectedIncome)}
+                      value={formatMoney(
+                        snapshot.expectedIncome,
+                        snapshot.currency,
+                      )}
                       detail="Invoices and receipts"
                       icon={FiTrendingUp}
                       tone="blue"
@@ -172,7 +175,10 @@ const DashboardPage = () => {
                     />
                     <FinancialCard
                       label="Cash received"
-                      value={formatMoney(snapshot.cashReceived)}
+                      value={formatMoney(
+                        snapshot.cashReceived,
+                        snapshot.currency,
+                      )}
                       detail="Total amount received"
                       icon={FiArrowDownLeft}
                       tone="lilac"
@@ -180,7 +186,10 @@ const DashboardPage = () => {
                     />
                     <FinancialCard
                       label="Cash pending"
-                      value={formatMoney(snapshot.cashPending)}
+                      value={formatMoney(
+                        snapshot.cashPending,
+                        snapshot.currency,
+                      )}
                       detail="Expected income less cash received"
                       icon={FiClock}
                       tone="peach"
@@ -191,6 +200,7 @@ const DashboardPage = () => {
                 <PaymentHistory
                   sortPaymentHistory={payments.rows}
                   paymentDocuments={payments.documents}
+                  currency={snapshot.currency}
                 />
               </div>
               <DocumentStatus snapshot={snapshot} total={documentCount} />

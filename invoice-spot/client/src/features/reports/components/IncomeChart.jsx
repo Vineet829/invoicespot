@@ -128,7 +128,7 @@ const IncomeChart = ({ months, currency }) => {
                 dy="0.32em"
                 textAnchor="end"
               >
-                {compactAmount(tick)}
+                {compactAmount(tick, currency)}
               </text>
             </g>
           ))}

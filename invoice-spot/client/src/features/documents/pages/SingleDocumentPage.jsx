@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   FiBell,
+  FiCheck,
   FiCopy,
   FiDownload,
   FiEdit2,
@@ -9,6 +10,7 @@ import {
   FiMail,
   FiPrinter,
   FiRepeat,
+  FiSlash,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
@@ -19,10 +21,19 @@ import {
 } from "../documentsApiSlice";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 import { useGetBusinessQuery } from "../../business/businessApiSlice";
-import { RefusalNote, useBusiness } from "../../business/permissions";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
+import { RefusalNote, useBusiness } from "../../business/permissions";
 import { useDocumentPdf } from "../useDocumentPdf";
 import EmailDocumentDialog from "../components/EmailDocumentDialog";
+import IssueDialog from "../components/IssueDialog";
+import VoidDialog from "../components/VoidDialog";
+import EditDetailsDialog from "../components/EditDetailsDialog";
+import {
+  DocumentStatusBadge,
+  documentName,
+  isDraft,
+  isVoid,
+} from "../documentState";
 import ActivityTimeline from "../components/ActivityTimeline";
 import ShareDialog from "../components/ShareDialog";
 import ReminderDialog from "../components/ReminderDialog";
@@ -35,15 +46,16 @@ import {
   ActionLink,
   Panel,
   DataTable,
-  StatusBadge,
   Amount,
   LoadingState,
   ErrorState,
-  Badge,
   dateLabel,
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
+  errorBanner,
+  errorDetail,
+  errorTitle,
   primaryButton,
   secondaryButton,
   secondaryIconButton,
@@ -64,22 +76,38 @@ const SingleDocumentPage = () => {
   const { id } = useParams();
   const query = useGetSingleDocQuery(id);
   const profileQuery = useGetUserProfileQuery();
-  const settings = useGetSettingsQuery();
   const document = query.data?.document;
   const profile = profileQuery.data?.userProfile;
   const business = useGetBusinessQuery().data?.business;
+  // The business as the document went out with it, whatever has changed since.
+  // A draft keeps nothing yet, so it shows the business and its tax name as
+  // they are now.
+  const seller = document?.seller || business;
+  const liveSettings = useGetSettingsQuery(undefined, {
+    skip: !isDraft(document),
+  }).data?.settings;
+  const taxLabel = document?.taxLabel || liveSettings?.taxLabel || "Tax";
   const { reason } = useBusiness();
   const editRefusal = reason("EDIT_RECORDS");
+  const voidRefusal = reason("DELETE_RECORDS");
   // Sending is refused to viewers, and turned off for the demo account.
   const sendNote = editRefusal || (profile?.demo ? DEMO_EMAIL_NOTE : undefined);
   const sendNoteId = editRefusal ? "document-edit-refusal" : "demo-email-note";
   // Shown only when it differs from the name the business trades under.
   const legalName =
-    business?.legalName &&
-    business.legalName.trim().toLowerCase() !==
-      business.name?.trim().toLowerCase()
-      ? business.legalName
+    seller?.legalName &&
+    seller.legalName.trim().toLowerCase() !== seller.name?.trim().toLowerCase()
+      ? seller.legalName
       : null;
+  const draft = isDraft(document);
+  // A void document stays to be read, downloaded or copied, and nothing more.
+  const voided = isVoid(document);
+  const [issuing, setIssuing] = useState(false);
+  const [voiding, setVoiding] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  // A draft is edited in full; an issued document only has its due date,
+  // notes and terms changed, and an accepted quotation nothing.
+  const detailsLocked = voided || Boolean(document?.acceptedAt);
   const [emailing, setEmailing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [reminding, setReminding] = useState(false);
@@ -92,7 +120,7 @@ const SingleDocumentPage = () => {
   const navigate = useNavigate();
   const [duplicateDoc, { isLoading: duplicating }] = useDuplicateDocMutation();
   const [convertDoc, { isLoading: converting }] = useConvertDocMutation();
-  useTitle(`${document?.documentNumber || "Document"} — Invoice Spot`);
+  useTitle(`${documentName(document)} — Invoice Spot`);
   // A quotation turned into an invoice lists it as "Invoiced as"; any other
   // copy as "Copied to".
   const copies = document?.copies || [];
@@ -104,9 +132,7 @@ const SingleDocumentPage = () => {
   const duplicate = async () => {
     try {
       const { newDocument } = await duplicateDoc(id).unwrap();
-      toast.success(
-        `Copied as ${newDocument.documentNumber}. Review it before sending.`,
-      );
+      toast.success("Copied as a draft. Review it, then issue it.");
       navigate(`/edit-doc/${newDocument._id}`);
     } catch (error) {
       toast.error(errorMessage(error, "The document could not be copied."));
@@ -116,7 +142,7 @@ const SingleDocumentPage = () => {
     try {
       const { newDocument } = await convertDoc(id).unwrap();
       toast.success(
-        `Invoice ${newDocument.documentNumber} created from ${document.documentNumber}.`,
+        `A draft invoice was made from ${document.documentNumber}. Review it, then issue it.`,
       );
       navigate(`/document/${newDocument._id}`);
     } catch (error) {
@@ -141,7 +167,9 @@ const SingleDocumentPage = () => {
     {
       label: "Unit price",
       type: "amount",
-      render: (item) => <Amount value={item.unitPrice} />,
+      render: (item) => (
+        <Amount value={item.unitPrice} currency={document?.currency} hideCode />
+      ),
     },
     { label: "Discount (%)", render: (item) => item.discount || "0" },
     {
@@ -156,7 +184,7 @@ const SingleDocumentPage = () => {
     <WorkspacePage section="Documents">
       <PageHeader
         back
-        title={document?.documentNumber || "Document"}
+        title={document ? documentName(document) : "Document"}
         description={
           document
             ? `${document.documentType} for ${document.customer?.name || "your customer"}`
@@ -165,9 +193,30 @@ const SingleDocumentPage = () => {
         actions={
           document && (
             <>
-              <ActionLink to={`/edit-doc/${id}`} secondary reason={editRefusal}>
-                <FiEdit2 aria-hidden="true" /> Edit document
-              </ActionLink>
+              {draft ? (
+                <ActionLink
+                  to={`/edit-doc/${id}`}
+                  secondary
+                  reason={editRefusal}
+                >
+                  <FiEdit2 aria-hidden="true" /> Edit document
+                </ActionLink>
+              ) : (
+                !detailsLocked && (
+                  <button
+                    type="button"
+                    className={secondaryButton}
+                    onClick={() => setEditingDetails(true)}
+                    disabled={Boolean(editRefusal)}
+                    title={editRefusal}
+                    aria-describedby={
+                      editRefusal ? "document-edit-refusal" : undefined
+                    }
+                  >
+                    <FiEdit2 aria-hidden="true" /> Edit details
+                  </button>
+                )
+              )}
               <button
                 type="button"
                 className={secondaryIconButton}
@@ -204,36 +253,58 @@ const SingleDocumentPage = () => {
               >
                 <FiCopy aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                className={secondaryIconButton}
-                onClick={() => setSharing(true)}
-                disabled={Boolean(editRefusal)}
-                aria-label="Share link"
-                title={editRefusal || "Share link"}
-                aria-describedby={
-                  editRefusal ? "document-edit-refusal" : undefined
-                }
-              >
-                <FiLink aria-hidden="true" />
-              </button>
-              {document.documentType === "Quotation" && !invoicedAs.length && (
+              {!draft && !voided && (
                 <button
                   type="button"
-                  className={secondaryButton}
-                  onClick={convert}
-                  disabled={converting || Boolean(editRefusal)}
-                  aria-busy={converting}
-                  title={editRefusal}
+                  className={secondaryIconButton}
+                  onClick={() => setSharing(true)}
+                  disabled={Boolean(editRefusal)}
+                  aria-label="Share link"
+                  title={editRefusal || "Share link"}
                   aria-describedby={
                     editRefusal ? "document-edit-refusal" : undefined
                   }
                 >
-                  <FiRepeat aria-hidden="true" />
-                  {converting ? "Converting…" : "Convert to invoice"}
+                  <FiLink aria-hidden="true" />
                 </button>
               )}
+              {!draft && !voided && (
+                <button
+                  type="button"
+                  className={secondaryIconButton}
+                  onClick={() => setVoiding(true)}
+                  disabled={Boolean(voidRefusal)}
+                  aria-label="Void"
+                  title={voidRefusal || "Void"}
+                  aria-describedby={
+                    voidRefusal ? "document-void-refusal" : undefined
+                  }
+                >
+                  <FiSlash aria-hidden="true" />
+                </button>
+              )}
+              {document.documentType === "Quotation" &&
+                !draft &&
+                !voided &&
+                !invoicedAs.length && (
+                  <button
+                    type="button"
+                    className={secondaryButton}
+                    onClick={convert}
+                    disabled={converting || Boolean(editRefusal)}
+                    aria-busy={converting}
+                    title={editRefusal}
+                    aria-describedby={
+                      editRefusal ? "document-edit-refusal" : undefined
+                    }
+                  >
+                    <FiRepeat aria-hidden="true" />
+                    {converting ? "Converting…" : "Convert to invoice"}
+                  </button>
+                )}
               {document.documentType === "Invoice" &&
+                !draft &&
+                !voided &&
                 document.status !== "Paid" && (
                   <button
                     type="button"
@@ -246,22 +317,41 @@ const SingleDocumentPage = () => {
                     <FiBell aria-hidden="true" /> Send reminder
                   </button>
                 )}
-              <button
-                type="button"
-                className={primaryButton}
-                onClick={() => setEmailing(true)}
-                disabled={Boolean(sendNote)}
-                title={sendNote}
-                aria-describedby={sendNote ? sendNoteId : undefined}
-              >
-                <FiMail aria-hidden="true" /> Email document
-              </button>
+              {draft ? (
+                <button
+                  type="button"
+                  className={primaryButton}
+                  onClick={() => setIssuing(true)}
+                  disabled={Boolean(editRefusal)}
+                  title={editRefusal}
+                  aria-describedby={
+                    editRefusal ? "document-edit-refusal" : undefined
+                  }
+                >
+                  <FiCheck aria-hidden="true" /> Issue{" "}
+                  {document.documentType.toLowerCase()}
+                </button>
+              ) : (
+                !voided && (
+                  <button
+                    type="button"
+                    className={primaryButton}
+                    onClick={() => setEmailing(true)}
+                    disabled={Boolean(sendNote)}
+                    title={sendNote}
+                    aria-describedby={sendNote ? sendNoteId : undefined}
+                  >
+                    <FiMail aria-hidden="true" /> Email document
+                  </button>
+                )
+              )}
               {profile?.demo && (
                 <span id="demo-email-note" className="sr-only">
                   {DEMO_EMAIL_NOTE}
                 </span>
               )}
               <RefusalNote id="document-edit-refusal" reason={editRefusal} />
+              <RefusalNote id="document-void-refusal" reason={voidRefusal} />
             </>
           )
         }
@@ -279,43 +369,48 @@ const SingleDocumentPage = () => {
       ) : (
         document && (
           <>
+            {voided && (
+              <p className={errorBanner} role="note">
+                <FiSlash aria-hidden="true" />
+                <span>
+                  <strong className={errorTitle}>
+                    Voided on {dateLabel(document.voidedAt)}. It no longer
+                    counts toward anything owed.
+                  </strong>
+                  <span className={errorDetail}>{document.voidReason}</span>
+                </span>
+              </p>
+            )}
             <Panel
               title={document.documentType}
               aside={
                 <span className="flex flex-wrap justify-end gap-1.5">
-                  {document.acceptedAt && (
-                    <span
-                      title={`Accepted on ${dateLabel(document.acceptedAt)}`}
-                    >
-                      <Badge tone="paid">Accepted</Badge>
-                    </span>
-                  )}
-                  <StatusBadge status={document.status} />
+                  <DocumentStatusBadge document={document} />
                 </span>
               }
             >
               <div className="grid grid-cols-3 gap-8 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1 max-[700px]:gap-6">
                 <div className="min-w-0">
                   <h3 className={partyHeading}>From</h3>
-                  {business?.logo && (
+                  {seller?.logo && (
                     <img
                       className="mb-3 max-h-14 max-w-[120px] object-contain"
-                      src={business.logo}
-                      alt={`${business.name} logo`}
+                      src={seller.logo}
+                      alt={`${seller.name} logo`}
                     />
                   )}
-                  <strong className={partyName}>{business?.name}</strong>
+                  <strong className={partyName}>{seller?.name}</strong>
                   {[
                     legalName,
-                    business?.email,
-                    business?.phoneNumber,
-                    business?.address,
-                    business?.city,
-                    [business?.state, business?.postalCode]
+                    seller?.email,
+                    seller?.phoneNumber,
+                    seller?.address,
+                    seller?.city,
+                    [seller?.state, seller?.postalCode]
                       .filter(Boolean)
                       .join(" "),
-                    business?.country,
-                    business?.taxId && `Tax ID ${business.taxId}`,
+                    seller?.country,
+                    seller?.taxId && `Tax ID ${seller.taxId}`,
                   ]
                     .filter(Boolean)
                     .map((value, index) => (
@@ -362,14 +457,33 @@ const SingleDocumentPage = () => {
                   <h3 className={partyHeading}>Document details</h3>
                   <dl className="grid gap-4 max-[960px]:grid-cols-2 max-[700px]:grid-cols-1">
                     {[
-                      ["Issue date", document.createdAt],
-                      ["Due date", document.dueDate],
+                      [
+                        "Issue date",
+                        draft && !document.issueDate
+                          ? "On issue"
+                          : dateLabel(document.issueDate),
+                      ],
+                      [
+                        document.documentType === "Quotation"
+                          ? "Valid until"
+                          : "Due date",
+                        dateLabel(document.dueDate),
+                      ],
+                      ...(document.acceptedAt
+                        ? [["Accepted on", dateLabel(document.acceptedAt)]]
+                        : []),
+                      ...(document.declinedAt
+                        ? [
+                            ["Declined on", dateLabel(document.declinedAt)],
+                            ...(document.declineReason
+                              ? [["Their reason", document.declineReason]]
+                              : []),
+                          ]
+                        : []),
                     ].map(([label, value]) => (
                       <div key={label}>
                         <dt className={partyLine}>{label}</dt>
-                        <dd className="text-[15px] text-spot-ink">
-                          {dateLabel(value)}
-                        </dd>
+                        <dd className="text-[15px] text-spot-ink">{value}</dd>
                       </div>
                     ))}
                     {[
@@ -394,13 +508,14 @@ const SingleDocumentPage = () => {
                                 className={textLink}
                                 to={`/document/${link._id}`}
                               >
-                                {link.documentNumber}
+                                {documentName(link)}
                               </Link>
                             ))}
                           </dd>
                         </div>
                       ))}
                     {document.documentType === "Invoice" &&
+                      !voided &&
                       scheduleQuery.isSuccess && (
                         <div>
                           <dt className={partyLine}>Repeats</dt>
@@ -472,14 +587,16 @@ const SingleDocumentPage = () => {
                   {[
                     ["Subtotal", document.subTotal],
                     [
-                      `${settings.data?.settings?.taxLabel || "Tax"} (${document.rates || 0}%)`,
+                      `${taxLabel} (${document.rates || 0}%)`,
                       document.salesTax,
                     ],
                     ["Cumulative total", document.total],
                     ["Amount paid", totalAmountReceived],
                     [
                       "Balance",
-                      Number(document.total || 0) - totalAmountReceived,
+                      voided
+                        ? 0
+                        : Number(document.total || 0) - totalAmountReceived,
                     ],
                   ].map(([label, value], index, rows) => {
                     const balance = index === rows.length - 1;
@@ -521,6 +638,8 @@ const SingleDocumentPage = () => {
               </Panel>
             )}
             {document.documentType === "Invoice" &&
+              !draft &&
+              !voided &&
               document.status !== "Paid" &&
               !editRefusal && (
                 <Panel
@@ -544,6 +663,33 @@ const SingleDocumentPage = () => {
         open={emailing}
         onClose={() => setEmailing(false)}
       />
+      {document && !draft && !detailsLocked && (
+        <EditDetailsDialog
+          document={document}
+          open={editingDetails}
+          onClose={() => setEditingDetails(false)}
+        />
+      )}
+      {document && !draft && !voided && (
+        <VoidDialog
+          document={document}
+          open={voiding}
+          onClose={() => setVoiding(false)}
+        />
+      )}
+      {document && (
+        <IssueDialog
+          document={document}
+          open={issuing}
+          onClose={() => setIssuing(false)}
+          onIssued={({ email }) => {
+            setIssuing(false);
+            if (email) setEmailing(true);
+          }}
+          canEmail={!sendNote}
+          emailNote={sendNote}
+        />
+      )}
       <ReminderDialog
         documentId={id}
         open={reminding}

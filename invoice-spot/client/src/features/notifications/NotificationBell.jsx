@@ -5,7 +5,9 @@ import {
   FiBell,
   FiCheckCircle,
   FiEye,
+  FiFileText,
   FiRepeat,
+  FiXCircle,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import usePageVisible from "../../hooks/usePageVisible";
@@ -24,8 +26,10 @@ import { timeAgo } from "./timeAgo";
 const ICONS = {
   DOCUMENT_VIEWED: FiEye,
   QUOTATION_ACCEPTED: FiCheckCircle,
+  QUOTATION_DECLINED: FiXCircle,
   INVOICE_OVERDUE: FiAlertCircle,
   RECURRING_CREATED: FiRepeat,
+  RECURRING_DRAFT: FiFileText,
   REMINDER_SENT: FiBell,
 };
 

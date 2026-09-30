@@ -88,6 +88,19 @@ describe("the server query", () => {
     expect(query).toMatchObject({ overdue: "true", type: "Invoice", q: "inv" });
     expect(query).not.toHaveProperty("status");
   });
+
+  it("asks for drafts by their state, since a draft has no payment status", () => {
+    const query = documentQuery(read("status=drafts&type=quotation"));
+    expect(query).toMatchObject({ state: "draft", type: "Quotation" });
+    expect(query).not.toHaveProperty("status");
+    expect(query).not.toHaveProperty("overdue");
+  });
+
+  it("asks for void documents by their state", () => {
+    const query = documentQuery(read("status=void"));
+    expect(query).toMatchObject({ state: "void" });
+    expect(query).not.toHaveProperty("status");
+  });
 });
 
 describe("issue date periods", () => {

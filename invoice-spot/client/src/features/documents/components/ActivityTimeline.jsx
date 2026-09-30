@@ -1,6 +1,7 @@
 import {
   FiBell,
   FiCheckCircle,
+  FiCheckSquare,
   FiCircle,
   FiCopy,
   FiEye,
@@ -11,15 +12,22 @@ import {
   FiFilePlus,
   FiRepeat,
   FiSend,
+  FiSlash,
   FiTrash2,
+  FiXCircle,
 } from "react-icons/fi";
 import { useGetDocumentActivityQuery } from "../documentsApiSlice";
 import { panelNote, retryButton } from "../../../components/workspace/pastel";
 
 // How each event reads. The server words the detail when the event happens,
-// so an old entry never changes when the document does.
+// so an old entry never changes when the document does; a copy made as a
+// draft had no number to name.
 const EVENTS = {
   CREATED: { icon: FiFilePlus, text: () => "Created" },
+  ISSUED: {
+    icon: FiCheckSquare,
+    text: (detail) => (detail ? `Issued as ${detail}` : "Issued"),
+  },
   EDITED: { icon: FiEdit2, text: () => "Edited" },
   EMAILED: { icon: FiSend, text: (detail) => `Emailed ${detail}` },
   PAYMENT_RECORDED: {
@@ -34,15 +42,26 @@ const EVENTS = {
     icon: FiTrash2,
     text: (detail) => `Payment removed: ${detail}`,
   },
-  COPIED_FROM: { icon: FiCopy, text: (detail) => `Copied from ${detail}` },
-  COPIED_TO: { icon: FiCopy, text: (detail) => `Copied to ${detail}` },
+  COPIED_FROM: {
+    icon: FiCopy,
+    text: (detail) => `Copied from ${detail || "a draft"}`,
+  },
+  COPIED_TO: {
+    icon: FiCopy,
+    text: (detail) =>
+      detail ? `Copied to ${detail}` : "Copied to a new draft",
+  },
+  VOIDED: { icon: FiSlash, text: (detail) => `Voided: ${detail}` },
   CONVERTED_FROM: {
     icon: FiRepeat,
     text: (detail) => `Created from quotation ${detail}`,
   },
   CONVERTED_TO: {
     icon: FiRepeat,
-    text: (detail) => `Converted to invoice ${detail}`,
+    text: (detail) =>
+      detail
+        ? `Converted to invoice ${detail}`
+        : "Converted to a draft invoice",
   },
   RECEIPT_EMAILED: {
     icon: FiSend,
@@ -52,6 +71,11 @@ const EVENTS = {
   SHARE_REVOKED: { icon: FiLink2, text: () => "Share link turned off" },
   VIEWED: { icon: FiEye, text: () => "Viewed by the client" },
   ACCEPTED: { icon: FiCheckCircle, text: () => "Accepted by the client" },
+  DECLINED: {
+    icon: FiXCircle,
+    text: (detail) =>
+      detail ? `Declined by the client: ${detail}` : "Declined by the client",
+  },
   REMINDED: { icon: FiBell, text: (detail) => `Reminder sent ${detail}` },
   // The detail names the template and how often it repeats: "INV-1 · monthly".
   RECURRING: {

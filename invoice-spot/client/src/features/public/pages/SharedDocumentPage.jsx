@@ -1,10 +1,18 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { FiCheckCircle, FiDownload, FiLink } from "react-icons/fi";
+import {
+  FiCheckCircle,
+  FiClock,
+  FiDownload,
+  FiLink,
+  FiSlash,
+  FiXCircle,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import {
   useAcceptSharedDocumentMutation,
+  useDeclineSharedDocumentMutation,
   useGetSharedDocumentQuery,
   useGetSharedPdfMutation,
 } from "../publicApiSlice";
@@ -14,12 +22,17 @@ import {
   Amount,
   Badge,
   DataTable,
+  Field,
   StatusBadge,
   dateLabel,
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
   appSurface,
+  dangerButton,
+  errorBanner,
+  errorDetail,
+  errorTitle,
   panelNote,
   primaryButton,
   retryButton,
@@ -83,6 +96,10 @@ const SharedDocumentPage = () => {
   const [accept, { isLoading: accepting }] = useAcceptSharedDocumentMutation();
   const [getPdf, { isLoading: downloading }] = useGetSharedPdfMutation();
   const [confirming, setConfirming] = useState(false);
+  const [decline, { isLoading: declining }] =
+    useDeclineSharedDocumentMutation();
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const doc = query.data;
   useTitle(
     doc
@@ -90,6 +107,8 @@ const SharedDocumentPage = () => {
       : "Shared document — Invoice Spot",
   );
   const quotation = doc?.documentType === "Quotation";
+  // A void document keeps its number but is owed no more.
+  const voided = doc?.state === "void";
   const download = async () => {
     try {
       const url = await getPdf(token).unwrap();
@@ -99,6 +118,16 @@ const SharedDocumentPage = () => {
       );
     } catch (error) {
       toast.error(errorMessage(error, "The PDF could not be prepared."));
+    }
+  };
+  const confirmDecline = async (event) => {
+    event.preventDefault();
+    try {
+      await decline({ token, reason }).unwrap();
+      setDeclineOpen(false);
+      toast.success(`Thank you. ${doc.business.name} can now see your answer.`);
+    } catch (error) {
+      toast.error(errorMessage(error, "The quotation could not be declined."));
     }
   };
   const confirmAccept = async () => {
@@ -119,7 +148,9 @@ const SharedDocumentPage = () => {
     {
       label: "Unit price",
       type: "amount",
-      render: (item) => <Amount value={item.unitPrice} />,
+      render: (item) => (
+        <Amount value={item.unitPrice} currency={doc.currency} hideCode />
+      ),
     },
     { label: "Discount (%)", render: (item) => item.discount || "0" },
     {
@@ -177,6 +208,15 @@ const SharedDocumentPage = () => {
                 <FiDownload aria-hidden="true" />
                 {downloading ? "Preparing…" : "Download PDF"}
               </button>
+              {doc.canDecline && (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={() => setDeclineOpen(true)}
+                >
+                  <FiXCircle aria-hidden="true" /> Decline
+                </button>
+              )}
               {doc.canAccept && (
                 <button
                   type="button"
@@ -203,17 +243,52 @@ const SharedDocumentPage = () => {
                   Accepted on {dateLabel(doc.acceptedAt)}
                 </Badge>
               )}
-              {!quotation && <StatusBadge status={doc.status} />}
+              {doc.declinedAt && (
+                <Badge tone="unpaid">
+                  Declined on {dateLabel(doc.declinedAt)}
+                </Badge>
+              )}
+              {doc.expired && <Badge tone="partial">Expired</Badge>}
+              {voided ? (
+                <Badge tone="unpaid">Void</Badge>
+              ) : (
+                !quotation && <StatusBadge status={doc.status} />
+              )}
               {doc.overdue && <Badge tone="unpaid">Overdue</Badge>}
             </div>
           </div>
+
+          {doc.expired && (
+            <p
+              className="mt-6 flex items-start gap-3.5 rounded-xl border border-white/90 bg-white/60 px-5 py-4 text-[14px] leading-[1.6] text-spot-body [&>svg]:mt-0.5 [&>svg]:size-5 [&>svg]:shrink-0"
+              role="note"
+            >
+              <FiClock aria-hidden="true" />
+              <span>
+                This quotation expired on {dateLabel(doc.dueDate)}. Ask{" "}
+                {doc.business.name} for a new one.
+              </span>
+            </p>
+          )}
+          {voided && (
+            <p className={`${errorBanner} mt-6`} role="note">
+              <FiSlash aria-hidden="true" />
+              <span>
+                <strong className={errorTitle}>
+                  {doc.business.name} voided this{" "}
+                  {doc.documentType.toLowerCase()} on {dateLabel(doc.voidedAt)}.
+                </strong>
+                <span className={errorDetail}>{doc.voidReason}</span>
+              </span>
+            </p>
+          )}
 
           <div className="mt-7 grid grid-cols-3 gap-8 max-[860px]:grid-cols-2 max-[560px]:grid-cols-1">
             <Party title="For" party={doc.client} />
             <div>
               <h2 className={heading}>Issued</h2>
               <p className="text-[15px] text-spot-ink">
-                {dateLabel(doc.issuedAt)}
+                {dateLabel(doc.issueDate)}
               </p>
             </div>
             <div>
@@ -276,37 +351,83 @@ const SharedDocumentPage = () => {
         Shared with <span className="text-spot-text">Invoice Spot</span>
       </p>
       {doc && (
-        <Dialog
-          open={confirming}
-          title={`Accept ${doc.documentNumber}?`}
-          onClose={() => setConfirming(false)}
-          busy={accepting}
-        >
-          <p className="mt-3 text-[14px] leading-[1.6] text-spot-body">
-            You agree to the items, prices and terms in this quotation, and{" "}
-            {doc.business.name} can see that you accepted it.
-          </p>
-          <div className="mt-7 flex flex-wrap justify-end gap-2.5">
-            <button
-              type="button"
-              className={secondaryButton}
-              onClick={() => setConfirming(false)}
-              disabled={accepting}
-              data-autofocus
+        <>
+          <Dialog
+            open={declineOpen}
+            title={`Decline ${doc.documentNumber}?`}
+            onClose={() => setDeclineOpen(false)}
+            busy={declining}
+          >
+            <form
+              className="mt-3 flex flex-col gap-5"
+              onSubmit={confirmDecline}
             >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={primaryButton}
-              onClick={confirmAccept}
-              disabled={accepting}
-            >
-              <FiCheckCircle aria-hidden="true" />
-              {accepting ? "Accepting…" : "Accept quotation"}
-            </button>
-          </div>
-        </Dialog>
+              <p className="text-[14px] leading-[1.6] text-spot-body">
+                {doc.business.name} can see that you declined it, and why if you
+                say.
+              </p>
+              <Field
+                label="Reason (optional)"
+                as="textarea"
+                rows={3}
+                maxLength={500}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                disabled={declining}
+                data-autofocus
+              />
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={() => setDeclineOpen(false)}
+                  disabled={declining}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={dangerButton}
+                  disabled={declining}
+                >
+                  <FiXCircle aria-hidden="true" />
+                  {declining ? "Declining…" : "Decline quotation"}
+                </button>
+              </div>
+            </form>
+          </Dialog>
+          <Dialog
+            open={confirming}
+            title={`Accept ${doc.documentNumber}?`}
+            onClose={() => setConfirming(false)}
+            busy={accepting}
+          >
+            <p className="mt-3 text-[14px] leading-[1.6] text-spot-body">
+              You agree to the items, prices and terms in this quotation, and{" "}
+              {doc.business.name} can see that you accepted it.
+            </p>
+            <div className="mt-7 flex flex-wrap justify-end gap-2.5">
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={() => setConfirming(false)}
+                disabled={accepting}
+                data-autofocus
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={confirmAccept}
+                disabled={accepting}
+              >
+                <FiCheckCircle aria-hidden="true" />
+                {accepting ? "Accepting…" : "Accept quotation"}
+              </button>
+            </div>
+          </Dialog>
+        </>
       )}
     </div>
   );

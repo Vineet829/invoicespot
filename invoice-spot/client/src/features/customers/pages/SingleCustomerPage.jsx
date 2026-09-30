@@ -25,6 +25,10 @@ import {
 import { useGetAllMyDocsQuery } from "../../documents/documentsApiSlice";
 import { SORT_FIELDS } from "../../documents/documentFilters";
 import { saveFile } from "../../documents/useDocumentPdf";
+import {
+  DocumentStatusBadge,
+  documentName,
+} from "../../documents/documentState";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import EmailStatementDialog from "../components/EmailStatementDialog";
@@ -41,7 +45,6 @@ import {
   LoadingState,
   ErrorState,
   Badge,
-  StatusBadge,
   Amount,
   DueDate,
   dateInput,
@@ -211,7 +214,8 @@ const ClientDocuments = ({ customerId }) => {
       label: "Document no.",
       type: "main",
       sortBy: "number",
-      render: (row) => row.documentNumber,
+      render: (row) =>
+        row.documentNumber || <span className="text-spot-muted">Draft</span>,
     },
     { label: "Type", render: (row) => <Badge>{row.documentType}</Badge> },
     {
@@ -226,8 +230,8 @@ const ClientDocuments = ({ customerId }) => {
       render: (row) => <DueDate value={row.dueDate} overdue={row.overdue} />,
     },
     {
-      label: "Payment status",
-      render: (row) => <StatusBadge status={row.status} />,
+      label: "Status",
+      render: (row) => <DocumentStatusBadge document={row} />,
     },
     {
       label: "View",
@@ -236,7 +240,7 @@ const ClientDocuments = ({ customerId }) => {
         <Link
           className={rowAction}
           to={`/document/${row._id}`}
-          aria-label={`View ${row.documentNumber}`}
+          aria-label={`View ${documentName(row)}`}
         >
           <FiEye aria-hidden="true" />
           <span>View</span>
@@ -379,7 +383,7 @@ const SingleCustomerPage = () => {
                 <AccountTotals totals={totals} />
               ) : (
                 <p className={panelNote}>
-                  No documents yet. Totals appear once you bill this client.
+                  Nothing issued yet. Totals appear once you bill this client.
                 </p>
               )}
             </Panel>

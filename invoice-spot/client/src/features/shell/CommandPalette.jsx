@@ -20,7 +20,9 @@ import {
 } from "react-icons/fi";
 import { useGetAllUserCustomersQuery } from "../customers/customersApiSlice";
 import { useGetAllMyDocsQuery } from "../documents/documentsApiSlice";
+import { documentName } from "../documents/documentState";
 import { useBusiness } from "../business/permissions";
+import { formatAmount } from "../../utils/money";
 
 const PAGES = [
   { to: "/dashboard", label: "Overview", icon: FiGrid },
@@ -53,10 +55,7 @@ const NO_ROWS = [];
 // The shell renders the palette, so it formats amounts itself rather than
 // importing the workspace components, which import the shell.
 const amount = (value, currency) =>
-  `${currency ? `${currency} ` : ""}${new Intl.NumberFormat("en", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(value) || 0)}`;
+  `${currency ? `${currency} ` : ""}${formatAmount(value, currency)}`;
 
 // The typed text, once typing pauses.
 const useSettled = (value, delay) => {
@@ -120,7 +119,7 @@ const Palette = ({ isAdmin, onClose }) => {
         (document) => ({
           key: `document-${document._id}`,
           to: `/document/${document._id}`,
-          label: document.documentNumber,
+          label: documentName(document),
           hint: [
             document.customer?.name,
             amount(document.total, document.currency),

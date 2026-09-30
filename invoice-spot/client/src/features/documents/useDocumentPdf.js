@@ -3,8 +3,11 @@ import { toast } from "react-toastify";
 import { errorMessage } from "../../components/workspace/Workspace";
 import { useGetDocumentPdfMutation } from "./documentsApiSlice";
 
+// Named as the server names it: a draft has no number yet.
 export const pdfFileName = (document) =>
-  `${(document?.documentNumber || "document").replace(/[^A-Za-z0-9._-]/g, "-")}.pdf`;
+  document?.state === "draft"
+    ? `Draft-${document.documentType.toLowerCase()}.pdf`
+    : `${(document?.documentNumber || "document").replace(/[^A-Za-z0-9._-]/g, "-")}.pdf`;
 
 export const saveFile = (url, name) => {
   const link = window.document.createElement("a");

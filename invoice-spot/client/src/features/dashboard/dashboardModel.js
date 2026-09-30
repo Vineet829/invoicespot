@@ -1,4 +1,5 @@
 import { parseDate } from "../../utils/dates";
+import { formatAmount } from "../../utils/money";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -11,11 +12,8 @@ export const paymentRows = (payments = []) => ({
   ),
 });
 
-export const formatMoney = (value) =>
-  new Intl.NumberFormat("en", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(asAmount(value));
+export const formatMoney = (value, currency) =>
+  formatAmount(asAmount(value), currency);
 
 export const formatDate = (value) => {
   const date = value ? parseDate(value) : null;

@@ -212,22 +212,22 @@ const ReportsPage = () => {
           >
             <FinancialCard
               label="Billed"
-              value={formatMoney(shown.billed)}
+              value={formatMoney(shown.billed, currency)}
               detail={`${currency} · invoices and receipts issued`}
               icon={FiTrendingUp}
               tone="blue"
             />
             <FinancialCard
               label="Received"
-              value={formatMoney(shown.received)}
+              value={formatMoney(shown.received, currency)}
               detail={`${currency} · payments and receipts`}
               icon={FiArrowDownLeft}
               tone="lilac"
             />
             <FinancialCard
               label="Owed now"
-              value={formatMoney(shown.outstanding)}
-              detail={`${currency} · ${Number(shown.overdue) > 0 ? `${formatMoney(shown.overdue)} of it` : "none of it"} overdue`}
+              value={formatMoney(shown.outstanding, currency)}
+              detail={`${currency} · ${Number(shown.overdue) > 0 ? `${formatMoney(shown.overdue, currency)} of it` : "none of it"} overdue`}
               icon={FiClock}
               tone="peach"
             />

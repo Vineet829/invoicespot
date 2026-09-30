@@ -31,9 +31,12 @@ export const customerSnapshot = (customer) =>
       "phoneNumber",
     ].map((key) => [key, String(customer[key] ?? "")]),
   );
+// The issue date is sent only when one is chosen; left empty, the server
+// dates the document the day it is issued, in the business's time zone.
 export const documentPayload = ({
   customer,
   documentType,
+  issueDate,
   dueDate,
   rates,
   currency,
@@ -44,6 +47,7 @@ export const documentPayload = ({
   customerId: customer?._id || undefined,
   customer: customerSnapshot(customer),
   documentType,
+  issueDate: issueDate || undefined,
   dueDate,
   additionalInfo,
   termsConditions,

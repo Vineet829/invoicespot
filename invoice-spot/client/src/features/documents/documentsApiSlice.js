@@ -48,6 +48,24 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Document"],
     }),
+    // Issues a draft: it takes its number, and the day and due date given.
+    issueDoc: builder.mutation({
+      query: ({ id, ...dates }) => ({
+        url: `/document/${id}/issue`,
+        method: "POST",
+        body: dates,
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    // Voids an issued document, keeping its number, for the reason given.
+    voidDoc: builder.mutation({
+      query: ({ id, reason }) => ({
+        url: `/document/${id}/void`,
+        method: "POST",
+        body: { reason },
+      }),
+      invalidatesTags: ["Document"],
+    }),
     updateDoc: builder.mutation({
       query: ({ id, ...rest }) => ({
         url: `/document/${id}`,
@@ -166,5 +184,7 @@ export const {
   useDuplicateDocMutation,
   useConvertDocMutation,
   useGetAllMyDocsQuery,
+  useIssueDocMutation,
   useUpdateDocMutation,
+  useVoidDocMutation,
 } = documentsApiSlice;
