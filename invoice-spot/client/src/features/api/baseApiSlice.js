@@ -73,6 +73,9 @@ export const baseApiSlice = createApi({
     "Item",
     "Notification",
     "Recurring",
+    "Session",
+    "TwoFactor",
+    "Activity",
   ],
   endpoints: (builder) => ({}),
 });

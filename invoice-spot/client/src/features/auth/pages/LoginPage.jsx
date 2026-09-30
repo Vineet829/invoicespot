@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -8,6 +8,7 @@ import useTitle from "../../../hooks/useTitle";
 import { useLoginUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
 import AuthVisual from "../components/AuthVisual";
+import TwoFactorStep from "../components/TwoFactorStep";
 import {
   ArrowIcon,
   EyeIcon,
@@ -42,20 +43,20 @@ const LoginPage = () => {
   const from = location.state?.from?.pathname || "/dashboard";
 
   const [showPassword, setShowPassword] = useState(false);
-  const [loginUser, { isLoading, isSuccess }] = useLoginUserMutation();
+  // With two-factor sign-in on, a correct password earns a challenge that a
+  // code completes.
+  const [challenge, setChallenge] = useState(null);
+  const [loginUser, { isLoading }] = useLoginUserMutation();
   const [loginGuest, { isLoading: guestLoading }] = useLoginUserMutation();
 
-  useEffect(() => {
-    if (isSuccess) {
-      navigate(from, { replace: true });
-    }
-  }, [isSuccess, navigate, from]);
+  const signedIn = (credentials) => {
+    dispatch(logIn({ ...credentials }));
+    navigate(from, { replace: true });
+  };
 
   const handleGuestLogin = async () => {
     try {
-      const credentials = await loginGuest(GUEST_CREDENTIALS).unwrap();
-      dispatch(logIn({ ...credentials }));
-      navigate(from, { replace: true });
+      signedIn(await loginGuest(GUEST_CREDENTIALS).unwrap());
     } catch (err) {
       toast.error(
         err?.data?.message || "Unable to open the demo. Please try again.",
@@ -63,13 +64,39 @@ const LoginPage = () => {
     }
   };
 
+  // Both steps share the page, so the visual stays as it is between them.
+  const visual = (
+    <AuthVisual
+      headline={["Your invoices,", "simplified."]}
+      subtext="Create invoices, email PDFs, and track payments&nbsp;— all in one place."
+      loaderLabel="Setting up your workspace"
+    />
+  );
+
+  if (challenge) {
+    return (
+      <div className={auth.page}>
+        {visual}
+
+        <section className={auth.formPanel}>
+          <div className={auth.formWrap}>
+            <Link to="/" className={auth.mobileBrand}>
+              <span className={auth.brandMark}>IS</span>Invoice Spot
+            </Link>
+            <TwoFactorStep
+              challenge={challenge}
+              onBack={() => setChallenge(null)}
+              onSignedIn={signedIn}
+            />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className={auth.page}>
-      <AuthVisual
-        headline={["Your invoices,", "simplified."]}
-        subtext="Create invoices, email PDFs, and track payments&nbsp;— all in one place."
-        loaderLabel="Setting up your workspace"
-      />
+      {visual}
 
       <section className={auth.formPanel}>
         <div className={auth.formWrap}>
@@ -90,9 +117,10 @@ const LoginPage = () => {
             validationSchema={loginSchema}
             onSubmit={async (values, { setStatus, setSubmitting }) => {
               try {
-                const credentials = await loginUser(values).unwrap();
-                dispatch(logIn({ ...credentials }));
+                const result = await loginUser(values).unwrap();
                 setStatus({ success: true });
+                if (result.twoFactorRequired) setChallenge(result.challenge);
+                else signedIn(result);
               } catch (err) {
                 toast.error(err?.data?.message || "Login failed");
                 setStatus({ success: false });

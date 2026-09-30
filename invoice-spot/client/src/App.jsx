@@ -11,6 +11,7 @@ import PasswordResetRequestPage from "./features/auth/pages/PasswordResetRequest
 import PasswordResetPage from "./features/auth/pages/PasswordResetPage";
 import { ROLES } from "./config/roles";
 import UsersList from "./features/users/pages/UsersListPage";
+import AuditLogPage from "./features/users/pages/AuditLogPage";
 import DashboardPage from "./features/dashboard/pages/DashboardPage";
 import AuthRequired from "./components/AuthRequired";
 import EditProfileForm from "./features/users/pages/EditProfileForm";
@@ -24,6 +25,7 @@ import DocumentsPage from "./features/documents/pages/DocumentsPage";
 
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 import SettingsPage from "./features/settings/pages/SettingsPage";
+import SecurityPage from "./features/settings/pages/SecurityPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
 import RecurringPage from "./features/recurring/pages/RecurringPage";
@@ -49,6 +51,7 @@ const App = () => {
           <Route element={<AuthRequired allowedRoles={[ROLES.User]} />}>
             <Route path="profile" element={<ProfilePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="settings/security" element={<SecurityPage />} />
             <Route path="items" element={<ItemsPage />} />
             <Route path="edit-profile" element={<EditProfileForm />} />
             <Route path="customers" element={<CustomersPage />} />
@@ -73,6 +76,7 @@ const App = () => {
 
           <Route element={<AuthRequired allowedRoles={[ROLES.Admin]} />}>
             <Route path="users" element={<UsersList />} />
+            <Route path="users/audit" element={<AuditLogPage />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

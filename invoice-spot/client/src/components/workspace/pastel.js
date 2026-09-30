@@ -59,7 +59,7 @@ export const secondaryIconButton =
 const rowActionBase =
   "inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 text-[12.5px] transition-colors disabled:cursor-default disabled:opacity-100 coarse:min-h-11 [&>svg]:size-[15px] [&>svg]:shrink-0 [&>svg]:stroke-[1.7]";
 export const rowAction = `${rowActionBase} bg-spot-violet/[.07] text-spot-violet hover:bg-spot-violet/[.13] disabled:bg-spot-violet/[.04] disabled:text-spot-disabled`;
-export const rowActionDanger = `${rowActionBase} bg-overdue/70 text-overdue-strong hover:bg-overdue disabled:text-overdue-muted`;
+export const rowActionDanger = `${rowActionBase} bg-overdue/70 text-overdue-strong hover:enabled:bg-overdue disabled:bg-overdue/30 disabled:text-overdue-muted`;
 
 // Form controls. Each control type sets its own size, so no element gets
 // two utilities for the same property.
