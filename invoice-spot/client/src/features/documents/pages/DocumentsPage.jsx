@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import useListState from "../../../hooks/useListState";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
+import DocumentsTabs from "../components/DocumentsTabs";
 import {
   useDeleteDocMutation,
   useGetAllMyDocsQuery,
@@ -199,9 +200,12 @@ const DocumentsPage = () => {
         title="Documents"
         description="Invoices, quotations, and receipts. All your paperwork in one place."
         actions={
-          <ActionLink to="/create-doc">
-            <FiPlus aria-hidden="true" /> Create document
-          </ActionLink>
+          <>
+            <DocumentsTabs />
+            <ActionLink to="/create-doc">
+              <FiPlus aria-hidden="true" /> Create document
+            </ActionLink>
+          </>
         }
       />
       {query.isLoading ? (

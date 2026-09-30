@@ -5,6 +5,7 @@ import {
   FiGrid,
   FiPackage,
   FiPlus,
+  FiRepeat,
   FiSearch,
   FiSettings,
   FiShield,
@@ -18,6 +19,7 @@ import { useGetAllMyDocsQuery } from "../documents/documentsApiSlice";
 const PAGES = [
   { to: "/dashboard", label: "Overview", icon: FiGrid },
   { to: "/documents", label: "Documents", icon: FiFileText },
+  { to: "/recurring", label: "Recurring invoices", icon: FiRepeat },
   { to: "/customers", label: "Clients", icon: FiUsers },
   { to: "/items", label: "Items", icon: FiPackage },
   { to: "/profile", label: "Profile", icon: FiUser },

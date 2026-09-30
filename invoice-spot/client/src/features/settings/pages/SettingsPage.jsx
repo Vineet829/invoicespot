@@ -18,6 +18,7 @@ import {
   useUpdateSettingsMutation,
 } from "../settingsApiSlice";
 import { numberPreview } from "../numbering";
+import { reminderSummary } from "../reminders";
 
 const browserZone = () => {
   try {
@@ -66,10 +67,17 @@ const SettingsForm = ({ settings }) => {
     nextInvoiceNumber: String(settings.nextInvoiceNumber),
     nextQuotationNumber: String(settings.nextQuotationNumber),
     nextReceiptNumber: String(settings.nextReceiptNumber),
+    remindersEnabled: settings.remindersEnabled,
+    reminderDaysBefore: String(settings.reminderDaysBefore),
+    reminderOnDue: settings.reminderOnDue,
+    reminderEveryDays: String(settings.reminderEveryDays),
+    reminderMax: String(settings.reminderMax),
   });
   const [save, { isLoading: saving }] = useUpdateSettingsMutation();
   const change = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
+  const toggle = (key) => (event) =>
+    setValues((current) => ({ ...current, [key]: event.target.checked }));
   const submit = async (event) => {
     event.preventDefault();
     try {
@@ -80,6 +88,9 @@ const SettingsForm = ({ settings }) => {
         nextInvoiceNumber: Number(values.nextInvoiceNumber),
         nextQuotationNumber: Number(values.nextQuotationNumber),
         nextReceiptNumber: Number(values.nextReceiptNumber),
+        reminderDaysBefore: Number(values.reminderDaysBefore),
+        reminderEveryDays: Number(values.reminderEveryDays),
+        reminderMax: Number(values.reminderMax),
       }).unwrap();
       toast.success(result.message || "Your settings were saved.");
     } catch (error) {
@@ -89,76 +100,146 @@ const SettingsForm = ({ settings }) => {
   return (
     <form className="flex flex-col gap-6 compact:gap-5" onSubmit={submit}>
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-start gap-6 compact:gap-5 max-[1100px]:grid-cols-1">
-        <Panel
-          title="New documents"
-          description="Every new invoice, quotation and receipt starts with these."
-        >
-          <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
-            <Field
-              label="Currency"
-              as="select"
-              value={values.defaultCurrency}
-              onChange={change("defaultCurrency")}
-              disabled={saving}
+        <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
+          <Panel
+            title="New documents"
+            description="Every new invoice, quotation and receipt starts with these."
+          >
+            <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
+              <Field
+                label="Currency"
+                as="select"
+                value={values.defaultCurrency}
+                onChange={change("defaultCurrency")}
+                disabled={saving}
+              >
+                {currencies.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.code} — {item.currency}
+                  </option>
+                ))}
+              </Field>
+              <Field
+                label="Payment terms (days)"
+                type="number"
+                min="0"
+                max="365"
+                step="1"
+                required
+                value={values.paymentTermsDays}
+                onChange={change("paymentTermsDays")}
+                disabled={saving}
+                hint="The due date is this many days after the issue date."
+              />
+              <Field
+                label="Tax name"
+                required
+                maxLength={20}
+                value={values.taxLabel}
+                onChange={change("taxLabel")}
+                disabled={saving}
+                hint="Shown on documents and PDFs, such as VAT or GST."
+              />
+              <Field
+                label="Tax rate (%)"
+                type="number"
+                min="0"
+                max="100"
+                step="0.0001"
+                required
+                value={values.defaultTaxRate}
+                onChange={change("defaultTaxRate")}
+                disabled={saving}
+              />
+              <Field
+                label="Notes"
+                as="textarea"
+                maxLength={5000}
+                value={values.defaultNotes}
+                onChange={change("defaultNotes")}
+                disabled={saving}
+                className="col-span-full"
+              />
+              <Field
+                label="Terms & conditions"
+                as="textarea"
+                maxLength={5000}
+                value={values.defaultTerms}
+                onChange={change("defaultTerms")}
+                disabled={saving}
+                className="col-span-full"
+              />
+            </div>
+          </Panel>
+          <Panel
+            title="Payment reminders"
+            description="Emails to clients about unpaid invoices, with the invoice attached. They are checked once a day in your time zone."
+          >
+            <label className="flex items-center gap-3 text-[14px] text-spot-ink">
+              <input
+                type="checkbox"
+                className="size-[18px] shrink-0 accent-spot-violet"
+                checked={values.remindersEnabled}
+                onChange={toggle("remindersEnabled")}
+                disabled={saving}
+              />
+              Send reminders automatically
+            </label>
+            <fieldset
+              className="m-0 mt-5 grid min-w-0 grid-cols-2 gap-5 border-0 p-0 disabled:opacity-60 max-[700px]:grid-cols-1"
+              disabled={saving || !values.remindersEnabled}
             >
-              {currencies.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.code} — {item.currency}
-                </option>
-              ))}
-            </Field>
-            <Field
-              label="Payment terms (days)"
-              type="number"
-              min="0"
-              max="365"
-              step="1"
-              required
-              value={values.paymentTermsDays}
-              onChange={change("paymentTermsDays")}
-              disabled={saving}
-              hint="The due date is this many days after the issue date."
-            />
-            <Field
-              label="Tax name"
-              required
-              maxLength={20}
-              value={values.taxLabel}
-              onChange={change("taxLabel")}
-              disabled={saving}
-              hint="Shown on documents and PDFs, such as VAT or GST."
-            />
-            <Field
-              label="Tax rate (%)"
-              type="number"
-              min="0"
-              max="100"
-              step="0.0001"
-              required
-              value={values.defaultTaxRate}
-              onChange={change("defaultTaxRate")}
-              disabled={saving}
-            />
-            <Field
-              label="Notes"
-              as="textarea"
-              maxLength={5000}
-              value={values.defaultNotes}
-              onChange={change("defaultNotes")}
-              disabled={saving}
-              className="col-span-full"
-            />
-            <Field
-              label="Terms & conditions"
-              as="textarea"
-              maxLength={5000}
-              value={values.defaultTerms}
-              onChange={change("defaultTerms")}
-              disabled={saving}
-              className="col-span-full"
-            />
-          </div>
-        </Panel>
+              <legend className="sr-only">When reminders go out</legend>
+              <Field
+                label="Days before the due date"
+                type="number"
+                min="0"
+                max="60"
+                step="1"
+                required
+                value={values.reminderDaysBefore}
+                onChange={change("reminderDaysBefore")}
+                hint="0 sends none before."
+              />
+              <Field
+                label="Then every (days)"
+                type="number"
+                min="0"
+                max="60"
+                step="1"
+                required
+                value={values.reminderEveryDays}
+                onChange={change("reminderEveryDays")}
+                hint="Counted from the due date. 0 sends none after it."
+              />
+              <Field
+                label="At most, per invoice"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                required
+                value={values.reminderMax}
+                onChange={change("reminderMax")}
+              />
+              <label className="flex items-center gap-3 self-center text-[13px] text-spot-body">
+                <input
+                  type="checkbox"
+                  className="size-[18px] shrink-0 accent-spot-violet"
+                  checked={values.reminderOnDue}
+                  onChange={toggle("reminderOnDue")}
+                />
+                On the due date too
+              </label>
+            </fieldset>
+            <p
+              className="mt-5 text-[13px] leading-[1.6] text-spot-muted"
+              role="status"
+            >
+              {reminderSummary(values)}
+            </p>
+          </Panel>
+        </div>
         <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
           <Panel
             title="Emails"
