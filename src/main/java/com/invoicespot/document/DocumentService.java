@@ -36,15 +36,18 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final PdfService pdfService;
     private final SecureRandom random = new SecureRandom();
 
     public DocumentService(
             DocumentRepository documentRepository,
             CustomerRepository customerRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            PdfService pdfService) {
         this.documentRepository = documentRepository;
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
+        this.pdfService = pdfService;
     }
 
     @Transactional
@@ -96,6 +99,34 @@ public class DocumentService {
         return DocumentResponse.from(requireOwned(
                 ownerPkid, id, "document not found",
                 "You are not authorized to view this document. It's not yours"));
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentPdf renderPdf(User owner, String id) {
+        Document document = requireReadable(owner, id);
+        return new DocumentPdf(pdfFileName(document), pdfService.render(document, owner), envelope(document));
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentEnvelope envelope(User owner, String id) {
+        return envelope(requireReadable(owner, id));
+    }
+
+    private Document requireReadable(User owner, String id) {
+        return requireOwned(
+                owner.getPkid(), id, "document not found",
+                "You are not authorized to view this document. It's not yours");
+    }
+
+    private static DocumentEnvelope envelope(Document document) {
+        CustomerSnapshot customer = document.getCustomer();
+        String title = document.getDocumentNumber() == null
+                ? document.getDocumentType().getValue()
+                : document.getDocumentType().getValue() + " " + document.getDocumentNumber();
+        return new DocumentEnvelope(
+                title,
+                customer == null ? null : customer.getName(),
+                customer == null ? null : customer.getEmail());
     }
 
     @Transactional
@@ -213,6 +244,13 @@ public class DocumentService {
             result.add(item);
         }
         return result;
+    }
+
+    private static String pdfFileName(Document document) {
+        String number = document.getDocumentNumber() == null
+                ? ""
+                : document.getDocumentNumber().replaceAll("[^A-Za-z0-9._-]", "-");
+        return (number.isBlank() ? "document" : number) + ".pdf";
     }
 
     private String generateDocumentNumber() {

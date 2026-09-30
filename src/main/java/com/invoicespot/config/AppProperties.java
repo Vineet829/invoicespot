@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(
-        Jwt jwt, Cookie cookie, Site site, Verification verification, Pdf pdf, Upload upload) {
+        Jwt jwt, Cookie cookie, Site site, Verification verification, Upload upload) {
 
     public record Jwt(
             String accessSecret,
@@ -18,8 +18,6 @@ public record AppProperties(
     public record Site(String name, String clientUrl, String serverUrl, String defaultFromEmail) {}
 
     public record Verification(Duration tokenTtl) {}
-
-    public record Pdf(String storageDir) {}
 
     public record Upload(String dir) {}
 }

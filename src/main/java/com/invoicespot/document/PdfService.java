@@ -1,55 +1,172 @@
 package com.invoicespot.document;
 
-import com.invoicespot.config.AppProperties;
-import com.invoicespot.document.dto.BillingItemDto;
-import com.invoicespot.document.dto.DocumentCustomerDto;
-import com.invoicespot.document.dto.GeneratePdfRequest;
-import com.invoicespot.document.dto.PdfDocumentDto;
-import com.invoicespot.document.dto.PdfProfileDto;
+import com.invoicespot.upload.UploadService;
+import com.invoicespot.user.User;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.ITemplateEngine;
+import org.thymeleaf.context.Context;
 
 @Service
 public class PdfService {
 
-    private static final String FILE_NAME = "myDocument.pdf";
+    private static final DateTimeFormatter DATE =
+            DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
-    private final Path storageDir;
+    private final ITemplateEngine templateEngine;
+    private final UploadService uploadService;
 
-    public PdfService(AppProperties properties) {
-        this.storageDir = Path.of(properties.pdf().storageDir());
+    public PdfService(ITemplateEngine templateEngine, UploadService uploadService) {
+        this.templateEngine = templateEngine;
+        this.uploadService = uploadService;
     }
 
-    public byte[] generateAndSave(GeneratePdfRequest request) {
-        byte[] pdf = render(buildHtml(request));
-        try {
-            Files.createDirectories(storageDir);
-            Files.write(storageDir.resolve(FILE_NAME), pdf);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Failed to write PDF", exception);
+    public byte[] render(Document document, User owner) {
+        return toPdf(html(document, owner));
+    }
+
+    String html(Document document, User owner) {
+        Context context = new Context(Locale.ENGLISH);
+        context.setVariable("pdf", view(document, owner));
+        return templateEngine.process("pdf/document", context);
+    }
+
+    static String senderName(User owner) {
+        if (owner.getBusinessName() != null && !owner.getBusinessName().isBlank()) {
+            return owner.getBusinessName();
         }
-        return pdf;
+        return (value(owner.getFirstName()) + " " + value(owner.getLastName())).trim();
     }
 
-    public Optional<byte[]> readLatest() {
-        Path file = storageDir.resolve(FILE_NAME);
-        if (!Files.exists(file)) {
+    public record View(
+            String logo,
+            String sender,
+            List<String> senderLines,
+            String title,
+            String number,
+            String issued,
+            String dueLabel,
+            String due,
+            String status,
+            String statusTone,
+            String clientName,
+            List<String> clientLines,
+            String currency,
+            List<Line> items,
+            List<Total> totals,
+            String balanceLabel,
+            String balance,
+            String notes,
+            String terms) {}
+
+    public record Line(int index, String name, String quantity, String unitPrice, String discount, String amount) {}
+
+    public record Total(String label, String value) {}
+
+    private View view(Document document, User owner) {
+        DocumentType type = document.getDocumentType();
+        String currency = value(document.getCurrency());
+        CustomerSnapshot client = Optional.ofNullable(document.getCustomer()).orElseGet(CustomerSnapshot::new);
+
+        List<Line> items = new ArrayList<>();
+        List<BillingItem> billingItems = document.getBillingItems();
+        for (int index = 0; index < billingItems.size(); index++) {
+            BillingItem item = billingItems.get(index);
+            items.add(new Line(
+                    index + 1,
+                    value(item.getItemName()),
+                    item.getQuantity() == null ? "0" : item.getQuantity().toString(),
+                    money(item.getUnitPrice()),
+                    percent(item.getDiscount()),
+                    money(lineAmount(item))));
+        }
+
+        double received = document.getPaymentRecords().stream()
+                .map(PaymentRecord::getAmountPaid)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .sum();
+        double total = orZero(document.getTotal());
+        List<Total> totals = new ArrayList<>();
+        totals.add(new Total("Subtotal", money(document.getSubTotal())));
+        totals.add(new Total("Tax (" + percent(document.getRates()) + ")", money(document.getSalesTax())));
+        boolean quotation = type == DocumentType.QUOTATION;
+        if (!quotation) {
+            totals.add(new Total("Total", money(total)));
+            totals.add(new Total("Amount paid", money(received)));
+        }
+
+        return new View(
+                logo(owner.getAvatar()),
+                senderName(owner),
+                lines(
+                        owner.getEmail(),
+                        owner.getPhoneNumber(),
+                        joined(owner.getAddress(), owner.getCity(), owner.getCountry())),
+                type.getValue(),
+                value(document.getDocumentNumber()),
+                date(document.getCreatedAt()),
+                quotation ? "Valid until" : "Due",
+                date(document.getDueDate()),
+                quotation ? null : statusLabel(document.getStatus()),
+                statusTone(document.getStatus()),
+                value(client.getName()),
+                lines(
+                        client.getEmail(),
+                        client.getPhoneNumber(),
+                        joined(client.getAddress(), client.getCity(), client.getCountry()),
+                        client.getAccountNo() == null ? null : "Account no. " + client.getAccountNo(),
+                        vatTin(client.getVatTinNo())),
+                currency,
+                items,
+                totals,
+                quotation ? "Total" : "Balance due",
+                money(quotation ? total : total - received),
+                blankToNull(document.getAdditionalInfo()),
+                blankToNull(document.getTermsConditions()));
+    }
+
+    private String logo(String avatar) {
+        return uploadService.localFile(avatar).flatMap(PdfService::dataUri).orElse(null);
+    }
+
+    private static Optional<String> dataUri(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        String type = name.endsWith(".png")
+                ? "image/png"
+                : name.endsWith(".jpg") || name.endsWith(".jpeg")
+                        ? "image/jpeg"
+                        : name.endsWith(".gif") ? "image/gif" : null;
+        if (type == null) {
             return Optional.empty();
         }
         try {
-            return Optional.of(Files.readAllBytes(file));
+            return Optional.of(
+                    "data:" + type + ";base64," + Base64.getEncoder().encodeToString(Files.readAllBytes(file)));
         } catch (IOException exception) {
-            throw new IllegalStateException("Failed to read PDF", exception);
+            return Optional.empty();
         }
     }
 
-    private static byte[] render(String html) {
+    private static byte[] toPdf(String html) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             PdfRendererBuilder builder = new PdfRendererBuilder();
@@ -63,123 +180,70 @@ public class PdfService {
         }
     }
 
-    private static String buildHtml(GeneratePdfRequest request) {
-        PdfDocumentDto document = request.document();
-        PdfProfileDto profile = request.profile();
-        String currency = document != null && document.currency() != null ? document.currency() : "";
-        String heading = request.balanceDue() != null && request.balanceDue() <= 0
-                ? "Receipt"
-                : value(document == null ? null : document.documentType(), "Invoice");
-
-        StringBuilder html = new StringBuilder();
-        html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head>")
-                .append("<meta charset=\"utf-8\" />")
-                .append("<style>")
-                .append("body{font-family:sans-serif;font-size:12px;color:#222;padding:24px;}")
-                .append("h1{font-size:32px;font-weight:normal;margin:0;}")
-                .append(".muted{color:#666;font-size:11px;text-transform:uppercase;letter-spacing:1px;}")
-                .append(".row{width:100%;overflow:hidden;margin-bottom:16px;}")
-                .append(".col{width:48%;float:left;}")
-                .append(".right{text-align:right;}")
-                .append(".divider{height:3px;background:#11418d;margin:12px 0;}")
-                .append("table{border-collapse:collapse;width:100%;margin-top:12px;}")
-                .append("th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:11px;}")
-                .append("th{background:#11418d;color:#fff;}")
-                .append(".summary{margin-top:16px;width:40%;float:right;}")
-                .append(".summary td{border:none;padding:4px;}")
-                .append("</style></head><body>");
-
-        html.append("<div class=\"row\"><div class=\"col\"><h1>").append(esc(heading)).append("</h1>")
-                .append("<div class=\"muted\">No: ").append(esc(document == null ? null : document.documentNumber()))
-                .append("</div></div>")
-                .append("<div class=\"col right\"><strong>")
-                .append(esc(senderName(profile))).append("</strong><br />")
-                .append(esc(profile == null ? null : profile.email())).append("<br />")
-                .append(esc(profile == null ? null : profile.phoneNumber())).append("</div></div>");
-
-        html.append("<div class=\"divider\"></div>");
-
-        html.append("<div class=\"row\"><div class=\"col\"><div class=\"muted\">From</div>")
-                .append(esc(senderName(profile))).append("<br />")
-                .append(esc(addressLine(profile))).append("</div>");
-        DocumentCustomerDto customer = document == null ? null : document.customer();
-        html.append("<div class=\"col\"><div class=\"muted\">Bill To</div>")
-                .append(esc(customer == null ? null : customer.name())).append("<br />")
-                .append(esc(customer == null ? null : customer.email())).append("<br />")
-                .append(esc(customer == null ? null : customer.phoneNumber())).append("</div></div>");
-
-        html.append("<table><thead><tr><th>Item</th><th>Unit Price</th><th>Qty</th>")
-                .append("<th>Discount</th></tr></thead><tbody>");
-        List<BillingItemDto> items = document == null || document.billingItems() == null
-                ? List.of()
-                : document.billingItems();
-        if (items.isEmpty()) {
-            html.append("<tr><td colspan=\"4\">No items</td></tr>");
-        } else {
-            for (BillingItemDto item : items) {
-                html.append("<tr><td>").append(esc(item.itemName()))
-                        .append("</td><td>").append(esc(number(item.unitPrice())))
-                        .append("</td><td>").append(esc(item.quantity() == null ? "" : item.quantity().toString()))
-                        .append("</td><td>").append(esc(item.discount()))
-                        .append("</td></tr>");
-            }
-        }
-        html.append("</tbody></table>");
-
-        html.append("<table class=\"summary\">")
-                .append(summaryRow("Sub Total", currency, document == null ? null : document.subTotal()))
-                .append(summaryRow("Sales Tax", currency, document == null ? null : document.salesTax()))
-                .append(summaryRow("Total", currency, document == null ? null : document.total()))
-                .append(summaryRow("Amount Received", currency, request.totalAmountReceived()))
-                .append(summaryRow("Balance Due", currency, request.balanceDue()))
-                .append("</table>");
-
-        html.append("</body></html>");
-        return html.toString();
+    private static double lineAmount(BillingItem item) {
+        double quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+        return quantity * orZero(item.getUnitPrice()) * (1 - number(item.getDiscount()) / 100);
     }
 
-    private static String summaryRow(String label, String currency, Double amount) {
-        if (amount == null) {
-            return "";
-        }
-        return "<tr><td>" + esc(label) + "</td><td class=\"right\">"
-                + esc(currency + " " + number(amount)) + "</td></tr>";
+    private static String vatTin(String value) {
+        return value == null || value.isBlank() || value.trim().equals("0") ? null : "VAT / TIN " + value;
     }
 
-    private static String senderName(PdfProfileDto profile) {
-        if (profile == null) {
-            return "";
-        }
-        if (profile.businessName() != null && !profile.businessName().isBlank()) {
-            return profile.businessName();
-        }
-        return value(profile.firstName(), "") + " " + value(profile.lastName(), "");
+    private static String statusLabel(DocumentStatus status) {
+        return switch (status) {
+            case PAID -> "Paid";
+            case NOT_FULLY_PAID -> "Partially paid";
+            case NOT_PAID -> "Unpaid";
+        };
     }
 
-    private static String addressLine(PdfProfileDto profile) {
-        if (profile == null) {
-            return "";
+    private static String statusTone(DocumentStatus status) {
+        return switch (status) {
+            case PAID -> "paid";
+            case NOT_FULLY_PAID -> "partial";
+            case NOT_PAID -> "unpaid";
+        };
+    }
+
+    private static List<String> lines(String... values) {
+        return Stream.of(values).filter(line -> line != null && !line.isBlank()).toList();
+    }
+
+    private static String joined(String... values) {
+        return String.join(", ", lines(values));
+    }
+
+    private static String money(Double amount) {
+        DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format.format(BigDecimal.valueOf(orZero(amount)));
+    }
+
+    private static String percent(String value) {
+        return BigDecimal.valueOf(number(value)).stripTrailingZeros().toPlainString() + "%";
+    }
+
+    private static double number(String value) {
+        try {
+            return value == null || value.isBlank() ? 0 : Double.parseDouble(value.trim());
+        } catch (NumberFormatException exception) {
+            return 0;
         }
-        return String.join(
-                ", ",
-                List.of(value(profile.address(), ""), value(profile.city(), ""), value(profile.country(), "")));
     }
 
-    private static String number(Double value) {
-        return value == null ? "" : Optional.of(value).map(String::valueOf).orElse("");
+    private static String date(Instant instant) {
+        return instant == null ? null : DATE.format(instant);
     }
 
-    private static String value(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
+    private static double orZero(Double value) {
+        return value == null ? 0 : value;
     }
 
-    private static String esc(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
+    private static String value(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

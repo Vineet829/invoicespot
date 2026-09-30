@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class UploadService {
+
+    private static final String PUBLIC_PREFIX = "/uploads/";
 
     private final Path uploadDir;
 
@@ -40,7 +43,19 @@ public class UploadService {
             throw new ApiException(
                     HttpStatus.INTERNAL_SERVER_ERROR, "The logo could not be uploaded");
         }
-        return "/uploads/" + fileName;
+        return PUBLIC_PREFIX + fileName;
+    }
+
+    public Optional<Path> localFile(String publicUrl) {
+        if (publicUrl == null || !publicUrl.startsWith(PUBLIC_PREFIX)) {
+            return Optional.empty();
+        }
+        Path root = uploadDir.toAbsolutePath().normalize();
+        Path file = root.resolve(publicUrl.substring(PUBLIC_PREFIX.length())).normalize();
+        if (!file.getParent().equals(root) || !Files.isRegularFile(file)) {
+            return Optional.empty();
+        }
+        return Optional.of(file);
     }
 
     private static String extension(String contentType, String originalName) {
