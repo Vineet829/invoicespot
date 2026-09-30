@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FiBookmark,
   FiCheck,
@@ -67,11 +67,18 @@ const blankItem = () => ({
   quantity: "",
   discount: "",
 });
-// A new document starts from the business settings; an existing one keeps
-// its own values.
-const DocumentFields = ({ doc, settings, customers, onSubmit, busy }) => {
+// A new document starts from the business settings, and from a client when
+// it was started from their page; an existing one keeps its own values.
+const DocumentFields = ({
+  doc,
+  settings,
+  customers,
+  initialCustomer,
+  onSubmit,
+  busy,
+}) => {
   const [customer, setCustomer] = useState(
-    doc ? { ...doc.customer, _id: doc.customerId } : null,
+    doc ? { ...doc.customer, _id: doc.customerId } : initialCustomer || null,
   );
   const [documentType, setDocumentType] = useState(
     doc?.documentType || "Invoice",
@@ -534,6 +541,8 @@ const DocumentFields = ({ doc, settings, customers, onSubmit, busy }) => {
 };
 const DocCreateEditForm = () => {
   const { id } = useParams();
+  const [params] = useSearchParams();
+  const clientId = id ? null : params.get("client");
   const navigate = useNavigate();
   useTitle(`${id ? "Edit document" : "Create document"} — Invoice Spot`);
   const query = useGetSingleDocQuery(id, { skip: !id });
@@ -549,7 +558,7 @@ const DocCreateEditForm = () => {
       toast.success(
         result.message || "Your document was created successfully.",
       );
-      navigate("/documents");
+      navigate(clientId ? `/single-customer/${clientId}` : "/documents");
     } catch (error) {
       toast.error(errorMessage(error, "The document could not be saved."));
     }
@@ -574,10 +583,13 @@ const DocCreateEditForm = () => {
       ) : (
         (!id || query.data?.document) && (
           <DocumentFields
-            key={id || "new"}
+            key={id || `new-${clientId || ""}`}
             doc={query.data?.document}
             settings={settings.data?.settings}
             customers={clients.data?.myCustomers || []}
+            initialCustomer={clients.data?.myCustomers?.find(
+              (client) => client._id === clientId,
+            )}
             onSubmit={save}
             busy={creating || updating}
           />

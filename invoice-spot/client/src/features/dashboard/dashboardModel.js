@@ -2,14 +2,18 @@ import { parseDate } from "../../utils/dates";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
-// Preserve the original dashboard's totals and stored status categories.
+// Income comes from invoices and receipts; a quotation is an offer, not money
+// owed. Overdue is the server's flag, which leaves settled documents out.
 // Payments are displayed as recorded; this view never creates or updates data.
-export const getDashboardSnapshot = (documents, now = new Date()) => {
-  const expectedIncome = documents.reduce(
+export const getDashboardSnapshot = (documents) => {
+  const billed = documents.filter(
+    (document) => document.documentType !== "Quotation",
+  );
+  const expectedIncome = billed.reduce(
     (sum, document) => sum + asAmount(document.total),
     0,
   );
-  const cashReceived = documents.reduce(
+  const cashReceived = billed.reduce(
     (sum, document) => sum + asAmount(document.totalAmountReceived),
     0,
   );
@@ -36,9 +40,7 @@ export const getDashboardSnapshot = (documents, now = new Date()) => {
     ).length,
     unpaid: documents.filter((document) => document.status === "Not Paid")
       .length,
-    overdue: documents.filter(
-      (document) => document.dueDate <= now.toISOString(),
-    ).length,
+    overdue: documents.filter((document) => document.overdue).length,
     payments,
   };
 };

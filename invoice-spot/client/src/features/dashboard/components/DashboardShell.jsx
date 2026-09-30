@@ -10,6 +10,7 @@ import {
   FiLogOut,
   FiMenu,
   FiPackage,
+  FiSearch,
   FiSettings,
   FiShield,
   FiUser,
@@ -21,6 +22,7 @@ import { logOut } from "../../auth/authSlice";
 import { useLogoutUserMutation } from "../../auth/authApiSlice";
 import useAuthUser from "../../../hooks/useAuthUser";
 import { brandMark, iconButton } from "../../../components/workspace/pastel";
+import CommandPalette from "../../shell/CommandPalette";
 
 const navLink =
   "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
@@ -41,7 +43,11 @@ const ui = {
     "sticky top-0 flex h-dvh min-h-[540px] flex-col border-r border-white/70 bg-white/[.34] px-4 pb-[18px] pt-[30px] backdrop-blur-[18px] max-[960px]:hidden",
   brandRow: "flex items-center justify-between px-3",
   brand: brandMark,
-  navigation: "mt-10 flex flex-col gap-1.5",
+  search:
+    "mt-8 flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/85 bg-white/50 px-3.5 text-left text-[14.5px] text-spot-muted transition-colors hover:bg-white/80 hover:text-spot-night [&>svg]:size-[18px] [&>svg]:shrink-0 [&>svg]:stroke-[1.6]",
+  shortcut:
+    "ml-auto rounded-md border border-[#23273524] px-1.5 py-0.5 font-ui text-[11px] text-spot-muted",
+  navigation: "mt-4 flex flex-col gap-1.5",
   navLink: `${navLink} text-spot-nav`,
   navLinkActive: `${navLink} bg-white font-medium text-spot-ink shadow-nav [&>svg]:text-spot-violet`,
   sidebarBottom: "mt-auto flex flex-col gap-2 pt-6",
@@ -93,6 +99,7 @@ const DashboardShell = ({
   const navigate = useNavigate();
   const [logoutUser, { isLoading: signingOut }] = useLogoutUserMutation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
   const dialogRef = useRef(null);
   const menuButtonRef = useRef(null);
   const desktopWidth = 961;
@@ -133,6 +140,29 @@ const DashboardShell = ({
     };
   }, [menuOpen, desktopWidth]);
 
+  // ⌘K on a Mac, Ctrl+K elsewhere, opens search unless a dialog is open.
+  useEffect(() => {
+    const onShortcut = (event) => {
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "k"
+      )
+        return;
+      event.preventDefault();
+      if (document.querySelector("dialog[open]:not(#command-palette)")) return;
+      setSearching((open) => !open);
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K";
+  const openSearch = () => {
+    setMenuOpen(false);
+    setSearching(true);
+  };
+
   const signOut = async () => {
     setMenuOpen(false);
     await logoutUser();
@@ -167,6 +197,18 @@ const DashboardShell = ({
           </button>
         )}
       </div>
+      <button
+        type="button"
+        className={ui.search}
+        onClick={openSearch}
+        aria-keyshortcuts="Meta+K Control+K"
+      >
+        <FiSearch aria-hidden="true" />
+        <span>Search</span>
+        <kbd className={ui.shortcut} aria-hidden="true">
+          {shortcut}
+        </kbd>
+      </button>
       <nav
         className={ui.navigation}
         aria-label={
@@ -265,6 +307,15 @@ const DashboardShell = ({
               Invoice Spot
             </Link>
           </div>
+          <button
+            type="button"
+            className={ui.menuButton}
+            onClick={openSearch}
+            aria-label="Search"
+            aria-keyshortcuts="Meta+K Control+K"
+          >
+            <FiSearch aria-hidden="true" />
+          </button>
         </header>
         <main
           className={fit ? ui.contentFit : fill ? ui.contentFill : ui.content}
@@ -274,6 +325,11 @@ const DashboardShell = ({
           {children}
         </main>
       </div>
+      <CommandPalette
+        open={searching}
+        onClose={() => setSearching(false)}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 };

@@ -1,9 +1,11 @@
 import { baseApiSlice } from "../api/baseApiSlice";
+import { fetchPdf } from "../api/fetchPdf";
 
 export const documentsApiSlice = baseApiSlice.injectEndpoints({
   endpoints: (builder) => ({
+    // One page of documents; see documentQuery for the search and filters.
     getAllMyDocs: builder.query({
-      query: (page = 1) => `/document/all?page=${page}`,
+      query: (params = {}) => `/document/all?${new URLSearchParams(params)}`,
       providesTags: ["Document"],
     }),
     getSingleDoc: builder.query({
@@ -44,18 +46,9 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
         body: email,
       }),
     }),
-    // The PDF needs the sign-in token, so it comes back as a blob and is
-    // handed over as an object URL, which the caller revokes.
     getDocumentPdf: builder.mutation({
-      queryFn: async (id, _api, _extraOptions, baseQuery) => {
-        const result = await baseQuery({
-          url: `/document/${id}/pdf`,
-          responseHandler: (response) =>
-            response.ok ? response.blob() : response.json(),
-        });
-        if (result.error) return { error: result.error };
-        return { data: URL.createObjectURL(result.data) };
-      },
+      queryFn: (id, _api, _extraOptions, baseQuery) =>
+        fetchPdf(baseQuery, `/document/${id}/pdf`),
     }),
     updatePayment: builder.mutation({
       query: ({ id, paymentId, ...payment }) => ({

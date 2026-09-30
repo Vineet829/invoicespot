@@ -144,7 +144,7 @@ const DashboardPage = () => {
                     <FinancialCard
                       label="Expected income"
                       value={formatMoney(snapshot.expectedIncome)}
-                      detail="Total document value"
+                      detail="Invoices and receipts"
                       icon={FiTrendingUp}
                       tone="blue"
                       fill={bars?.expected}

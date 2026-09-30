@@ -78,8 +78,50 @@ const EmailForm = ({ draft, sending, onSend, onClose }) => {
   );
 };
 
-// Emails a document's PDF. The server suggests the recipient, subject and
-// message; each can be changed before sending.
+// Emails a PDF. The server suggests the recipient, subject and message in
+// `draft`; each can be changed before sending.
+export const EmailDialog = ({
+  title,
+  open,
+  onClose,
+  draft,
+  sending,
+  onSend,
+}) => (
+  <Dialog
+    open={open}
+    title={title}
+    onClose={onClose}
+    busy={sending}
+    dismissible={false}
+    size="medium"
+  >
+    {draft.isFetching || draft.isUninitialized ? (
+      <p className="mt-4 text-[13.5px] text-spot-muted" role="status">
+        Preparing the email…
+      </p>
+    ) : draft.isError ? (
+      <div className={`${errorBanner} mt-5`} role="alert">
+        <div className="flex-1">
+          <strong className={errorTitle}>We couldn’t prepare the email.</strong>
+          <span className={errorDetail}>{errorMessage(draft.error)}</span>
+        </div>
+        <button type="button" className={retryButton} onClick={draft.refetch}>
+          Try again
+        </button>
+      </div>
+    ) : (
+      <EmailForm
+        key={draft.fulfilledTimeStamp}
+        draft={draft.data}
+        sending={sending}
+        onSend={onSend}
+        onClose={onClose}
+      />
+    )}
+  </Dialog>
+);
+
 const EmailDocumentDialog = ({ documentId, open, onClose }) => {
   const draft = useGetEmailDraftQuery(documentId, { skip: !open });
   const [send, { isLoading: sending }] = useEmailDocumentMutation();
@@ -93,40 +135,14 @@ const EmailDocumentDialog = ({ documentId, open, onClose }) => {
     }
   };
   return (
-    <Dialog
-      open={open}
+    <EmailDialog
       title="Email document"
+      open={open}
       onClose={onClose}
-      busy={sending}
-      dismissible={false}
-      size="medium"
-    >
-      {draft.isFetching || draft.isUninitialized ? (
-        <p className="mt-4 text-[13.5px] text-spot-muted" role="status">
-          Preparing the email…
-        </p>
-      ) : draft.isError ? (
-        <div className={`${errorBanner} mt-5`} role="alert">
-          <div className="flex-1">
-            <strong className={errorTitle}>
-              We couldn’t prepare the email.
-            </strong>
-            <span className={errorDetail}>{errorMessage(draft.error)}</span>
-          </div>
-          <button type="button" className={retryButton} onClick={draft.refetch}>
-            Try again
-          </button>
-        </div>
-      ) : (
-        <EmailForm
-          key={draft.fulfilledTimeStamp}
-          draft={draft.data}
-          sending={sending}
-          onSend={sendEmail}
-          onClose={onClose}
-        />
-      )}
-    </Dialog>
+      draft={draft}
+      sending={sending}
+      onSend={sendEmail}
+    />
   );
 };
 

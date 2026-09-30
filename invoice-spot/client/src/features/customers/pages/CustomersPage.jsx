@@ -1,10 +1,21 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiEye, FiPlus, FiTrash2, FiUsers } from "react-icons/fi";
+import { FiEye, FiPlus, FiSearch, FiTrash2, FiUsers } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
-import { useDeleteCustomerMutation } from "../customersApiSlice";
-import { useGetWorkspaceCustomersQuery } from "../../workspace/workspaceApiSlice";
+import useListState from "../../../hooks/useListState";
+import { PAGE_SIZES, nextSort } from "../../../utils/listState";
+import {
+  useDeleteCustomerMutation,
+  useGetAllUserCustomersQuery,
+} from "../customersApiSlice";
+import {
+  SORT_FIELDS,
+  SORT_OPTIONS,
+  clientListSearch,
+  clientQuery,
+  readClientList,
+} from "../clientFilters";
 import {
   WorkspacePage,
   PageHeader,
@@ -12,25 +23,47 @@ import {
   Panel,
   DataTable,
   Pagination,
-  usePagination,
+  serverPagination,
+  SearchField,
   ConfirmDialog,
   EmptyState,
   LoadingState,
   ErrorState,
+  Amount,
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
   rowAction,
   rowActionDanger,
+  secondaryButton,
+  toolbarSelect,
 } from "../../../components/workspace/pastel";
+
+const NO_CLIENTS = [];
 
 const CustomersPage = () => {
   useTitle("Clients — Invoice Spot");
-  const query = useGetWorkspaceCustomersQuery(undefined, {
+  const [list, update] = useListState(readClientList, clientListSearch);
+  const search = useCallback((q) => update({ q, page: 1 }), [update]);
+  const query = useGetAllUserCustomersQuery(clientQuery(list), {
     refetchOnMountOrArgChange: 60,
   });
-  const rows = query.data?.myCustomers || [];
-  const pagination = usePagination(rows, 10);
+  const rows = query.data?.myCustomers || NO_CLIENTS;
+  const count = query.data?.totalCustomers ?? 0;
+  const pagination = serverPagination({
+    rows,
+    count,
+    page: list.page - 1,
+    size: list.size,
+    setPage: (page) => update({ page: page + 1 }),
+    setSize: (size) => update({ size, page: 1 }),
+  });
+  // A page past the end, after a delete or from an old link, shows the last.
+  const pages = query.currentData?.numberOfPages;
+  useEffect(() => {
+    if (pages && list.page > pages) update({ page: pages });
+  }, [pages, list.page, update]);
+
   const [selected, setSelected] = useState(null);
   const [deleteCustomer, { isLoading: deleting }] = useDeleteCustomerMutation();
   const remove = async () => {
@@ -42,6 +75,9 @@ const CustomersPage = () => {
       toast.error(errorMessage(error, "The customer could not be deleted."));
     }
   };
+  // A new account has nothing to search yet.
+  const showTools = Boolean(query.data) && (count > 0 || Boolean(list.q));
+
   const columns = [
     {
       label: "No.",
@@ -51,6 +87,7 @@ const CustomersPage = () => {
     {
       label: "Name",
       type: "main",
+      sortBy: "name",
       render: (row) => row.name,
     },
     {
@@ -60,6 +97,31 @@ const CustomersPage = () => {
     },
     { label: "Phone", render: (row) => row.phoneNumber || "—" },
     { label: "Account no.", render: (row) => row.accountNo },
+    {
+      label: "Documents",
+      sortBy: "documents",
+      render: (row) => (row.documentCount ?? 0).toLocaleString("en"),
+    },
+    {
+      label: "Balance",
+      type: "amount",
+      sortBy: "balance",
+      // What the client's unpaid invoices still owe, in each currency.
+      render: (row) =>
+        row.balances?.length ? (
+          <span className="inline-flex flex-col items-end gap-0.5 stacked:items-start">
+            {row.balances.map((balance) => (
+              <Amount
+                key={balance.currency}
+                value={balance.outstanding}
+                currency={balance.currency}
+              />
+            ))}
+          </span>
+        ) : (
+          <span className="text-spot-faint">—</span>
+        ),
+    },
     {
       label: "View details",
       type: "action",
@@ -90,6 +152,47 @@ const CustomersPage = () => {
       ),
     },
   ];
+
+  const results = query.isError ? (
+    <ErrorState error={query.error} retry={query.refetch} />
+  ) : rows.length ? (
+    <>
+      <DataTable
+        columns={columns}
+        rows={pagination.rows}
+        fillRows={pagination.fullPage}
+        label="Clients"
+        sort={{ field: list.sort, dir: list.dir }}
+        onSort={(field) =>
+          update({ ...nextSort(SORT_FIELDS, list, field), page: 1 })
+        }
+        busy={query.isFetching}
+      />
+      <Pagination pagination={pagination} sizes={PAGE_SIZES} />
+    </>
+  ) : list.q ? (
+    <EmptyState
+      title="No clients match."
+      text="Try another name, email or account number."
+      icon={FiSearch}
+      action={
+        <button
+          type="button"
+          className={secondaryButton}
+          onClick={() => search("")}
+        >
+          Clear search
+        </button>
+      }
+    />
+  ) : (
+    <EmptyState
+      title="A place for every client."
+      text="Add a client’s contact details to start creating documents for them."
+      icon={FiUsers}
+    />
+  );
+
   return (
     <WorkspacePage section="Clients" fill>
       <PageHeader
@@ -103,27 +206,42 @@ const CustomersPage = () => {
       />
       {query.isLoading ? (
         <LoadingState />
-      ) : query.isError && !query.data ? (
-        <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel title="Your clients" fill={rows.length > 0}>
-          {rows.length ? (
-            <>
-              <DataTable
-                columns={columns}
-                rows={pagination.rows}
-                fillRows={pagination.fullPage}
-                label="Clients"
-              />
-              <Pagination pagination={pagination} />
-            </>
-          ) : (
-            <EmptyState
-              title="A place for every client."
-              text="Add a client’s contact details to start creating documents for them."
-              icon={FiUsers}
-            />
-          )}
+        <Panel
+          title="Your clients"
+          fill={rows.length > 0 && !query.isError}
+          aside={
+            showTools && (
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5 max-[700px]:w-full">
+                <SearchField
+                  value={list.q}
+                  onSearch={search}
+                  label="Search clients"
+                  placeholder="Name, email or account"
+                  className="w-[240px] max-[700px]:w-full"
+                />
+                <label className="min-w-0 max-[700px]:flex-1">
+                  <span className="sr-only">Sort clients</span>
+                  <select
+                    className={`${toolbarSelect} max-[700px]:w-full`}
+                    value={`${list.sort}:${list.dir}`}
+                    onChange={(event) => {
+                      const [sort, dir] = event.target.value.split(":");
+                      update({ sort, dir, page: 1 });
+                    }}
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )
+          }
+        >
+          {results}
         </Panel>
       )}
       <ConfirmDialog

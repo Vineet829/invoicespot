@@ -429,7 +429,7 @@ export const DocumentStatus = ({ snapshot, total }) => {
           <dt className="text-[14.5px]">
             Overdue
             <span className="mt-0.5 block text-[12.5px] text-overdue-muted max-[700px]:text-[12px]">
-              Documents past their due date
+              Unpaid invoices past their due date
             </span>
           </dt>
           <dd className="text-[44px] compact:text-[38px] max-[700px]:text-[38px]">

@@ -8,9 +8,7 @@ import {
   getStatusRingRatio,
 } from "./dashboardModel";
 
-const now = new Date("2026-09-28T12:00:00.000Z");
-
-it("preserves the original totals, backend status categories, and due-date count", () => {
+it("counts income from invoices and receipts, and overdue from the server's flag", () => {
   const documents = [
     {
       _id: "invoice",
@@ -19,6 +17,7 @@ it("preserves the original totals, backend status categories, and due-date count
       totalAmountReceived: 20,
       status: "Not Fully Paid",
       dueDate: "2026-09-27T00:00:00.000Z",
+      overdue: true,
       paymentRecords: [{ amountPaid: 35 }],
     },
     {
@@ -28,31 +27,36 @@ it("preserves the original totals, backend status categories, and due-date count
       totalAmountReceived: 200,
       status: "Paid",
       dueDate: "2026-09-25T00:00:00.000Z",
+      overdue: false,
     },
     {
       _id: "quote",
       documentType: "Quotation",
       total: 900,
+      totalAmountReceived: 0,
       status: "Not Paid",
-      dueDate: "2026-10-10T00:00:00.000Z",
+      dueDate: "2026-09-20T00:00:00.000Z",
+      overdue: false,
     },
     {
       _id: "receipt",
       documentType: "Receipt",
       total: 60,
+      totalAmountReceived: 60,
       status: "Paid",
       dueDate: "2026-09-29T00:00:00.000Z",
+      overdue: false,
     },
   ];
-  const summary = getDashboardSnapshot(documents, now);
+  const summary = getDashboardSnapshot(documents);
   expect(summary).toMatchObject({
-    expectedIncome: 1260,
-    cashReceived: 220,
-    cashPending: 1040,
+    expectedIncome: 360,
+    cashReceived: 280,
+    cashPending: 80,
     paid: 2,
     partial: 1,
     unpaid: 1,
-    overdue: 2,
+    overdue: 1,
   });
   // The UI uses stored totals and statuses, not new payment or invoice rules.
   expect(summary.payments).toHaveLength(1);
@@ -131,7 +135,7 @@ it("keeps every original payment-history field and sorts recorded payments newes
     { _id: "two", paymentRecords: [newer], status: "Paid", total: 10 },
     { _id: "three", status: "Paid", total: 999 },
   ];
-  const snapshot = getDashboardSnapshot(documents, now);
+  const snapshot = getDashboardSnapshot(documents);
   expect(snapshot.payments).toEqual([
     { ...newer, id: "two-0" },
     { ...older, id: "one-0" },
@@ -140,7 +144,7 @@ it("keeps every original payment-history field and sorts recorded payments newes
 });
 
 it("shows empty data safely without creating payment records or inferred statuses", () => {
-  expect(getDashboardSnapshot([], now)).toEqual({
+  expect(getDashboardSnapshot([])).toEqual({
     expectedIncome: 0,
     cashReceived: 0,
     cashPending: 0,
@@ -150,7 +154,7 @@ it("shows empty data safely without creating payment records or inferred statuse
     overdue: 0,
     payments: [],
   });
-  expect(getDashboardSnapshot([{ _id: "empty" }], now).payments).toEqual([]);
+  expect(getDashboardSnapshot([{ _id: "empty" }]).payments).toEqual([]);
   expect(formatMoney(undefined)).toBe("0.00");
   expect(formatMoney(1234.5)).toBe("1,234.50");
   expect(formatDate("invalid")).toBe("—");
@@ -173,7 +177,7 @@ it("finds the document behind every payment the history shows", () => {
   const documents = [invoice, receipt, { _id: "quote" }];
   const byPayment = getPaymentDocuments(documents);
   // Every payment id in the history resolves to its own document.
-  const ids = getDashboardSnapshot(documents, now).payments.map(
+  const ids = getDashboardSnapshot(documents).payments.map(
     (payment) => payment.id,
   );
   expect(ids.map((id) => byPayment.get(id)?.documentNumber)).toEqual([

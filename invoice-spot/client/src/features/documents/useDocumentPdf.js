@@ -6,7 +6,7 @@ import { useGetDocumentPdfMutation } from "./documentsApiSlice";
 export const pdfFileName = (document) =>
   `${(document?.documentNumber || "document").replace(/[^A-Za-z0-9._-]/g, "-")}.pdf`;
 
-const saveFile = (url, name) => {
+export const saveFile = (url, name) => {
   const link = window.document.createElement("a");
   link.href = url;
   link.download = name;

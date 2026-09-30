@@ -64,9 +64,20 @@ export const rowActionDanger = `${rowActionBase} bg-overdue/70 text-overdue-stro
 // Form controls. Each control type sets its own size, so no element gets
 // two utilities for the same property.
 export const fieldLabel = "text-[13px] text-spot-body";
-const control =
-  "block w-full min-w-0 rounded-xl border border-[#23273524] bg-white/80 text-spot-ink [font-family:inherit] transition-[border-color] placeholder:text-spot-faint hover:enabled:border-[#23273540] focus:border-spot-violet/60 disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled aria-[invalid=true]:border-overdue-icon/70";
+const controlSurface =
+  "rounded-xl border border-[#23273524] bg-white/80 text-spot-ink [font-family:inherit] transition-[border-color] placeholder:text-spot-faint hover:enabled:border-[#23273540] focus:border-spot-violet/60 disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled aria-[invalid=true]:border-overdue-icon/70";
+const control = `block w-full min-w-0 ${controlSurface}`;
 export const inputControl = `${control} h-11 px-3 text-[14px]`;
+// A list's search box, sized like the toolbar around it, with room on the
+// left for the magnifier drawn inside it.
+export const searchControl = `${control} h-11 pl-10 pr-3 text-[13px]`;
+// A select in a list's toolbar, as wide as its longest option.
+export const toolbarSelect = `${controlSurface} h-11 max-w-full px-3 text-[13px]`;
+
+// One option of a filter group: a pill around a visually hidden radio, so
+// the pill shows the radio's checked and keyboard focus states.
+export const filterChip =
+  "relative inline-flex h-9 cursor-pointer select-none items-center whitespace-nowrap rounded-full border border-spot-violet/15 bg-white/60 px-3.5 text-[13px] text-spot-body transition-colors has-[:checked]:border-spot-night has-[:checked]:bg-spot-night has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[3px] has-[:focus-visible]:outline-[#5b47a0] coarse:h-11 [&:not(:has(:checked)):hover]:bg-white";
 export const textareaControl = `${control} min-h-[120px] resize-y px-3 py-2.5 text-[14px] leading-[1.6]`;
 export const fileControl = `${control} px-2 py-1.5 text-[13px] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-spot-violet/10 file:px-3 file:py-2 file:text-[13px] file:[font-family:inherit] file:text-spot-violet`;
 
