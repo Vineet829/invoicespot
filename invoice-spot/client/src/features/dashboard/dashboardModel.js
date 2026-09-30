@@ -1,3 +1,4 @@
+import { parseDate } from "../../utils/dates";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -21,8 +22,8 @@ export const getDashboardSnapshot = (documents, now = new Date()) => {
     )
     .sort(
       (a, b) =>
-        (new Date(b.datePaid).getTime() || 0) -
-        (new Date(a.datePaid).getTime() || 0),
+        (parseDate(b.datePaid).getTime() || 0) -
+        (parseDate(a.datePaid).getTime() || 0),
     );
 
   return {
@@ -49,7 +50,7 @@ export const formatMoney = (value) =>
   }).format(asAmount(value));
 
 export const formatDate = (value) => {
-  const date = value ? new Date(value) : null;
+  const date = value ? parseDate(value) : null;
   return date && Number.isFinite(date.getTime())
     ? date.toLocaleDateString("en", {
         day: "numeric",

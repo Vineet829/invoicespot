@@ -1,15 +1,21 @@
+// Rounds half up to the cent, as the server does. Going through 15
+// significant digits first drops binary noise, so 1.005 becomes 1.01.
+export const roundMoney = (value) =>
+  Number(`${Math.round(Number(`${Number(value).toPrecision(15)}e2`))}e-2`);
+// The editor's running totals. The server computes the saved ones with the
+// same rules: each line and the tax are rounded to the cent.
 export const lineAmount = (item) =>
-  Number(
-    (
-      (Number(item.quantity) || 0) *
+  roundMoney(
+    (Number(item.quantity) || 0) *
       (Number(item.unitPrice) || 0) *
-      (1 - (Number(item.discount) || 0) / 100)
-    ).toFixed(2),
+      (1 - (Number(item.discount) || 0) / 100),
   );
 export const documentTotals = (items, rates) => {
-  const subTotal = items.reduce((sum, item) => sum + lineAmount(item), 0);
-  const salesTax = ((Number(rates) || 0) / 100) * subTotal;
-  return { subTotal, salesTax, total: subTotal + salesTax };
+  const subTotal = roundMoney(
+    items.reduce((sum, item) => sum + lineAmount(item), 0),
+  );
+  const salesTax = roundMoney((subTotal * (Number(rates) || 0)) / 100);
+  return { subTotal, salesTax, total: roundMoney(subTotal + salesTax) };
 };
 export const customerSnapshot = (customer) =>
   customer &&
@@ -26,7 +32,6 @@ export const customerSnapshot = (customer) =>
     ].map((key) => [key, String(customer[key] ?? "")]),
   );
 export const documentPayload = ({
-  doc,
   customer,
   documentType,
   dueDate,
@@ -36,16 +41,14 @@ export const documentPayload = ({
   additionalInfo,
   termsConditions,
 }) => ({
+  customerId: customer?._id || undefined,
   customer: customerSnapshot(customer),
   documentType,
   dueDate,
   additionalInfo,
   termsConditions,
-  status: documentType === "Receipt" ? "Paid" : doc?.status || "Not Paid",
-  ...documentTotals(items, rates),
   rates: String(rates || "0"),
   currency,
-  totalAmountReceived: doc?.totalAmountReceived ?? 0,
   billingItems: items.map((item) => ({
     itemName: item.itemName || "",
     quantity: Number(item.quantity) || 0,

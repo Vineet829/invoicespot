@@ -34,6 +34,18 @@ it("calculates discounted lines and tax from the same rounded line amounts shown
   expect(
     lineAmount({ quantity: "3", unitPrice: "19.99", discount: "12.5" }),
   ).toBe(52.47);
+  expect(lineAmount({ quantity: 1, unitPrice: "1.005", discount: "0" })).toBe(
+    1.01,
+  );
+  expect(
+    documentTotals(
+      [
+        { quantity: 2, unitPrice: 150, discount: 10 },
+        { quantity: 1, unitPrice: 0.05, discount: 0 },
+      ],
+      "10",
+    ),
+  ).toEqual({ subTotal: 270.05, salesTax: 27.01, total: 297.06 });
   expect(documentTotals(input.items, input.rates)).toEqual({
     subTotal: 270,
     salesTax: 27,
@@ -48,6 +60,7 @@ it("calculates discounted lines and tax from the same rounded line amounts shown
 
 it("serializes only the existing backend document fields with their DTO types", () => {
   expect(documentPayload(input)).toEqual({
+    customerId: "client-1",
     customer: {
       name: "Morrow & Co.",
       email: "morrow@example.com",
@@ -62,33 +75,19 @@ it("serializes only the existing backend document fields with their DTO types", 
     dueDate: input.dueDate,
     additionalInfo: "Project work",
     termsConditions: "Due in 14 days",
-    status: "Not Paid",
-    subTotal: 270,
-    salesTax: 27,
-    total: 297,
     rates: "10",
     currency: "USD",
-    totalAmountReceived: 0,
     billingItems: [
       { itemName: "Design", quantity: 2, unitPrice: 150, discount: "10" },
     ],
   });
 });
 
-it("keeps the existing document type, payment status and amount received when editing", () => {
-  const result = documentPayload({
-    ...input,
-    documentType: "Quotation",
-    doc: { status: "Not Fully Paid", totalAmountReceived: 120 },
-  });
-  expect(result).toMatchObject({
-    documentType: "Quotation",
-    status: "Not Fully Paid",
-    totalAmountReceived: 120,
-    dueDate: input.dueDate,
-  });
-  expect(documentPayload({ ...input, documentType: "Receipt" }).status).toBe(
-    "Paid",
+it("leaves totals, payment status and amount received to the server", () => {
+  const result = documentPayload({ ...input, documentType: "Receipt" });
+  expect(result.documentType).toBe("Receipt");
+  ["status", "subTotal", "salesTax", "total", "totalAmountReceived"].forEach(
+    (key) => expect(result).not.toHaveProperty(key),
   );
 });
 
@@ -103,4 +102,10 @@ it("supports optional customer details without sending nulls or database identif
     country: "",
     phoneNumber: "",
   });
+});
+
+it("links an unlinked older document by its copied details only", () => {
+  const result = documentPayload({ ...input, customer: { name: "Avery" } });
+  expect(result).not.toHaveProperty("customerId", expect.anything());
+  expect(result.customer.name).toBe("Avery");
 });

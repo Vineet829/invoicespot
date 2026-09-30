@@ -49,7 +49,9 @@ const blankItem = () => ({
 });
 const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
   const navigate = useNavigate();
-  const [customer, setCustomer] = useState(doc?.customer || null);
+  const [customer, setCustomer] = useState(
+    doc ? { ...doc.customer, _id: doc.customerId } : null,
+  );
   const [documentType, setDocumentType] = useState(
     doc?.documentType || "Invoice",
   );
@@ -86,7 +88,6 @@ const DocumentFields = ({ doc, customers, onSubmit, busy }) => {
         }
         onSubmit(
           documentPayload({
-            doc,
             customer,
             documentType,
             dueDate: dateInstant(dueDate),

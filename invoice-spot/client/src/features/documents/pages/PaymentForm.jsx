@@ -1,62 +1,42 @@
 import { useState } from "react";
 import { FiCheck } from "react-icons/fi";
 import { toast } from "react-toastify";
-import {
-  useCreatePaymentMutation,
-  useUpdateDocMutation,
-} from "../documentsApiSlice";
+import { useCreatePaymentMutation } from "../documentsApiSlice";
+import { PAYMENT_METHODS } from "../paymentMethods";
 import {
   Field,
   dateInput,
-  dateInstant,
   errorMessage,
+  money,
 } from "../../../components/workspace/Workspace";
 import { primaryButton } from "../../../components/workspace/pastel";
 
 const PaymentForm = ({ document }) => {
+  const balance = Math.max(
+    0,
+    Number(document.total || 0) - Number(document.totalAmountReceived || 0),
+  );
   const [datePaid, setDatePaid] = useState(dateInput());
   const [amountPaid, setAmountPaid] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
-  const [create, { isLoading: creating }] = useCreatePaymentMutation();
-  const [update, { isLoading: updating }] = useUpdateDocMutation();
-  const busy = creating || updating;
+  const [create, { isLoading: busy }] = useCreatePaymentMutation();
   const submit = async (event) => {
     event.preventDefault();
-    const totalReceived =
-      (document.paymentRecords || []).reduce(
-        (sum, payment) => sum + Number(payment.amountPaid || 0),
-        0,
-      ) + Number(amountPaid);
-    let recorded = false;
     try {
       await create({
         id: document._id,
-        paidBy: document.customer?.name,
-        datePaid: dateInstant(datePaid),
+        datePaid,
         amountPaid: Number(amountPaid),
         paymentMethod,
         additionalInfo,
       }).unwrap();
-      recorded = true;
-      await update({
-        id: document._id,
-        totalAmountReceived: totalReceived,
-        status: totalReceived >= document.total ? "Paid" : "Not Fully Paid",
-      }).unwrap();
       toast.success("Payment has been recorded successfully.");
+      setAmountPaid("");
+      setPaymentMethod("");
+      setAdditionalInfo("");
     } catch (error) {
-      toast.error(
-        recorded
-          ? "Payment was recorded, but the document status could not be updated. Refresh before recording another payment."
-          : errorMessage(error, "The payment could not be recorded."),
-      );
-    } finally {
-      if (recorded) {
-        setAmountPaid("");
-        setPaymentMethod("");
-        setAdditionalInfo("");
-      }
+      toast.error(errorMessage(error, "The payment could not be recorded."));
     }
   };
   return (
@@ -74,8 +54,10 @@ const PaymentForm = ({ document }) => {
           label="Amount paid"
           type="number"
           min="0.01"
-          step="any"
+          max={balance}
+          step="0.01"
           required
+          hint={`Up to ${money(balance, document.currency)} is still owed.`}
           value={amountPaid}
           onChange={(event) => setAmountPaid(event.target.value)}
           disabled={busy}
@@ -89,14 +71,7 @@ const PaymentForm = ({ document }) => {
           disabled={busy}
         >
           <option value="">Choose a method</option>
-          {[
-            "Mobile Money",
-            "Cash",
-            "Bank Transfer",
-            "PayPal",
-            "Credit Card",
-            "Others",
-          ].map((method) => (
+          {PAYMENT_METHODS.map((method) => (
             <option key={method}>{method}</option>
           ))}
         </Field>

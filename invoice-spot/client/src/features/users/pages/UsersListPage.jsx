@@ -81,9 +81,13 @@ const UsersListPage = () => {
           <input
             type="checkbox"
             checked={Boolean(row.active)}
-            disabled={!row.active || busyUser === row._id}
+            disabled={!row.active || row.demo || busyUser === row._id}
             onChange={() => deactivateUser(row)}
-            aria-label={`Deactivate ${row.username}`}
+            aria-label={
+              row.demo
+                ? "The shared demo account can’t be deactivated"
+                : `Deactivate ${row.username}`
+            }
           />
           {row.active ? "Active" : "Inactive"}
         </label>
@@ -97,7 +101,12 @@ const UsersListPage = () => {
           type="button"
           className={rowActionDanger}
           onClick={() => setSelected(row)}
-          aria-label={`Delete ${row.username}`}
+          disabled={row.demo}
+          aria-label={
+            row.demo
+              ? "The shared demo account can’t be deleted"
+              : `Delete ${row.username}`
+          }
         >
           <FiTrash2 aria-hidden="true" />
           <span>Delete</span>
