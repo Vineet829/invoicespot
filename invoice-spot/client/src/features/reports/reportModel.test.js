@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   axisTicks,
   compactAmount,
+  currentMonth,
+  gstFileName,
   monthName,
   monthYear,
   periodOptions,
+  previousMonth,
   share,
 } from "./reportModel";
 
@@ -49,4 +52,19 @@ describe("reportModel", () => {
     expect(share(10, 0)).toBe(0);
     expect(share(300, 200)).toBe(1);
   });
+});
+
+it("names last month and this one by the reader's calendar, across a new year", () => {
+  expect(previousMonth(new Date(2026, 0, 15))).toBe("2025-12");
+  expect(previousMonth(new Date(2026, 9, 31))).toBe("2026-09");
+  expect(currentMonth(new Date(2026, 9, 1))).toBe("2026-10");
+});
+
+it("names the GST helper files as the server does", () => {
+  expect(gstFileName("b2b", "2026-09", "2026-09")).toBe(
+    "invoice-spot-gstr1-b2b-2026-09.csv",
+  );
+  expect(gstFileName("gstr3b", "2026-04", "2026-06")).toBe(
+    "invoice-spot-gstr3b-2026-04-to-2026-06.csv",
+  );
 });

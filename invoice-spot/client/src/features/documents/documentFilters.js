@@ -23,6 +23,7 @@ export const TYPE_FILTERS = [
   { value: "invoice", label: "Invoices", type: "Invoice" },
   { value: "quotation", label: "Quotations", type: "Quotation" },
   { value: "receipt", label: "Receipts", type: "Receipt" },
+  { value: "credit-note", label: "Credit notes", type: "Credit Note" },
 ];
 
 // Periods of issue dates. The browser's calendar picks the days, and the

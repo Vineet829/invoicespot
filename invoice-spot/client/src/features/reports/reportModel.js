@@ -40,6 +40,19 @@ export const monthYear = (month) =>
     timeZone: "UTC",
   });
 
+// A month as "2026-09", by the reader's calendar: the one before `today`,
+// or the one it is in.
+const monthOf = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+export const previousMonth = (today = new Date()) =>
+  monthOf(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+export const currentMonth = (today = new Date()) => monthOf(today);
+
+// The GST helper files are named as the server names them: GSTR-1 tables
+// as "gstr1-…", with the month, or the first and last months.
+export const gstFileName = (key, from, to) =>
+  `invoice-spot-${key === "gstr3b" ? "gstr3b" : `gstr1-${key}`}-${from === to ? from : `${from}-to-${to}`}.csv`;
+
 // A bar's length as a share of the longest one, from 0 to 1.
 export const share = (value, largest) => {
   const amount = Number(value);

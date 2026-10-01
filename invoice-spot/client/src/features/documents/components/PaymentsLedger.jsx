@@ -16,6 +16,7 @@ import {
   rowAction,
   rowActionDanger,
   secondaryButton,
+  textLink,
 } from "../../../components/workspace/pastel";
 import {
   useDeletePaymentMutation,
@@ -23,6 +24,7 @@ import {
   useUpdatePaymentMutation,
 } from "../documentsApiSlice";
 import { PAYMENT_METHODS } from "../paymentMethods";
+import { TAX_WITHHELD_HINT, TAX_WITHHELD_LABEL, cents } from "../taxWithheld";
 import { saveFile } from "../useDocumentPdf";
 import EmailReceiptDialog from "./EmailReceiptDialog";
 
@@ -30,16 +32,21 @@ const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
 
 const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
   // What is still owed if this payment were removed.
-  const limit =
-    Number(document.total || 0) -
-    Number(document.totalAmountReceived || 0) +
-    Number(payment.amountPaid || 0);
+  const limit = cents(
+    Number(document.ledger?.balanceDue || 0) +
+      Number(payment.amountPaid || 0) +
+      Number(payment.tdsAmount || 0),
+  );
   const [values, setValues] = useState({
     datePaid: payment.datePaid || "",
     amountPaid: String(payment.amountPaid ?? ""),
+    // The tax the client withheld, or null while its field is hidden.
+    tdsAmount: Number(payment.tdsAmount) > 0 ? String(payment.tdsAmount) : null,
     paymentMethod: payment.paymentMethod || "",
     additionalInfo: payment.additionalInfo || "",
   });
+  const withholding = values.tdsAmount !== null;
+  const settles = cents(values.amountPaid) + cents(values.tdsAmount);
   const update = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
   return (
@@ -47,7 +54,11 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
       className="mt-5 flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ ...values, amountPaid: Number(values.amountPaid) });
+        onSave({
+          ...values,
+          amountPaid: Number(values.amountPaid),
+          tdsAmount: Number(values.tdsAmount),
+        });
       }}
     >
       <div className="grid grid-cols-2 gap-4 max-[700px]:grid-cols-1">
@@ -63,14 +74,14 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
         <Field
           label="Amount paid"
           type="number"
-          min="0.01"
-          max={limit}
+          min={withholding ? "0" : "0.01"}
+          max={cents(limit - cents(values.tdsAmount))}
           step="0.01"
-          required
+          required={!withholding}
           value={values.amountPaid}
           onChange={update("amountPaid")}
           disabled={busy}
-          hint={`At most ${money(limit, document.currency)}.`}
+          hint={`At most ${money(limit, document.currency)}${withholding ? " with the tax withheld" : ""}.`}
         />
         <Field
           label="Payment method"
@@ -91,7 +102,38 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
           onChange={update("additionalInfo")}
           disabled={busy}
         />
+        {withholding && (
+          <Field
+            id="edit-payment-tds"
+            label={TAX_WITHHELD_LABEL}
+            type="number"
+            min="0"
+            max={cents(limit - cents(values.amountPaid))}
+            step="0.01"
+            hint={TAX_WITHHELD_HINT}
+            value={values.tdsAmount}
+            onChange={update("tdsAmount")}
+            disabled={busy}
+          />
+        )}
       </div>
+      <button
+        type="button"
+        className={`${textLink} self-start bg-transparent p-0 text-[13px] coarse:min-h-11`}
+        aria-expanded={withholding}
+        aria-controls={withholding ? "edit-payment-tds" : undefined}
+        onClick={() =>
+          setValues((current) => ({
+            ...current,
+            tdsAmount: withholding ? null : "",
+          }))
+        }
+        disabled={busy}
+      >
+        {withholding
+          ? "Remove the tax withheld"
+          : "Add tax withheld by the client (TDS)"}
+      </button>
       <div className="mt-3 flex flex-wrap justify-end gap-2.5">
         <button
           type="button"
@@ -101,12 +143,36 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
         >
           Cancel
         </button>
-        <button type="submit" className={primaryButton} disabled={busy}>
+        <button
+          type="submit"
+          className={primaryButton}
+          disabled={busy || settles <= 0}
+        >
           <FiCheck aria-hidden="true" />
           {busy ? "Saving…" : "Save payment"}
         </button>
       </div>
     </form>
+  );
+};
+
+const DeletedPayment = ({ payment, document }) => {
+  const withheld = Number(payment.tdsAmount) > 0;
+  return (
+    <>
+      The payment of {money(payment.amountPaid, document.currency)}
+      {withheld &&
+        `, with ${money(payment.tdsAmount, document.currency)} of tax withheld,`}{" "}
+      on {dateLabel(payment.datePaid)} will be deleted, and the amount still
+      owed goes up by{" "}
+      {withheld
+        ? money(
+            cents(payment.amountPaid) + cents(payment.tdsAmount),
+            document.currency,
+          )
+        : "the same amount"}
+      .
+    </>
   );
 };
 
@@ -139,6 +205,7 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
       setDownloading(null);
     }
   };
+  const payments = document.paymentRecords || [];
   const [update, { isLoading: saving }] = useUpdatePaymentMutation();
   const [remove, { isLoading: deleting }] = useDeletePaymentMutation();
   const save = async (values) => {
@@ -181,6 +248,18 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
         <Amount value={payment.amountPaid} currency={document.currency} />
       ),
     },
+    // Only once some payment had tax withheld from it.
+    ...(payments.some((payment) => Number(payment.tdsAmount) > 0)
+      ? [
+          {
+            label: "Tax withheld",
+            type: "amount",
+            render: (payment) => (
+              <Amount value={payment.tdsAmount} currency={document.currency} />
+            ),
+          },
+        ]
+      : []),
     {
       label: "Receipt",
       type: "action",
@@ -248,11 +327,7 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
     : columns;
   return (
     <>
-      <DataTable
-        columns={shown}
-        rows={document.paymentRecords || []}
-        label="Payments"
-      />
+      <DataTable columns={shown} rows={payments} label="Payments" />
       <Dialog
         open={Boolean(editing)}
         title="Edit payment"
@@ -285,10 +360,7 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
         onClose={() => setRemoving(null)}
         busy={deleting}
       >
-        The payment of{" "}
-        {removing && money(removing.amountPaid, document.currency)} on{" "}
-        {removing && dateLabel(removing.datePaid)} will be deleted, and the
-        amount still owed goes up by the same amount.
+        {removing && <DeletedPayment payment={removing} document={document} />}
       </ConfirmDialog>
     </>
   );

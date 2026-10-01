@@ -244,8 +244,9 @@ module.exports = {
         "@container wide-table (max-width: 960px)",
         "@container narrow-table (max-width: 400px)",
       ]);
-      // Document line items: three columns in a narrow form, then two.
-      addVariant("items-md", "@container items (max-width: 720px)");
+      // Document line items: one row each in a wide form, four columns once
+      // the form is too narrow for all eight fields, then two.
+      addVariant("items-md", "@container items (max-width: 900px)");
       addVariant("items-sm", "@container items (max-width: 480px)");
     }),
   ],

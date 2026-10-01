@@ -28,6 +28,7 @@ const daysAfter = (day, days) =>
 const IssueForm = ({
   document,
   terms,
+  base,
   canEmail,
   emailNote,
   onClose,
@@ -46,6 +47,14 @@ const IssueForm = ({
         ? daysAfter(document.issueDate || today, terms)
         : "",
   );
+  // A document in another currency than the reporting one can be issued
+  // with a rate to it, which is then fixed.
+  const foreign = Boolean(document.currency) && document.currency !== base;
+  const [exchangeRate, setExchangeRate] = useState(
+    document.exchangeRate && document.exchangeBase === base
+      ? document.exchangeRate
+      : "",
+  );
   const [email, setEmail] = useState(false);
   const [issue, { isLoading: issuing }] = useIssueDocMutation();
   const submit = async (event) => {
@@ -55,6 +64,7 @@ const IssueForm = ({
         id: document._id,
         issueDate,
         ...(dueDate && { dueDate: dateInstant(dueDate) }),
+        ...(foreign && { exchangeRate: exchangeRate.trim() }),
       }).unwrap();
       toast.success(result.message || "The document was issued.");
       onIssued({ email: canEmail && email });
@@ -89,6 +99,18 @@ const IssueForm = ({
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
             disabled={issuing}
+          />
+        )}
+        {foreign && (
+          <Field
+            label={`Exchange rate (1 ${document.currency} in ${base})`}
+            type="number"
+            min="0.0000000001"
+            step="any"
+            value={exchangeRate}
+            onChange={(event) => setExchangeRate(event.target.value)}
+            disabled={issuing}
+            hint={`Optional. Reports can then show it in ${base}.`}
           />
         )}
       </div>
@@ -168,6 +190,7 @@ const IssueDialog = ({
         <IssueForm
           document={document}
           terms={settings.data.settings.paymentTermsDays}
+          base={settings.data.settings.baseCurrency}
           canEmail={canEmail}
           emailNote={emailNote}
           onClose={onClose}

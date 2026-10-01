@@ -8,6 +8,12 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       query: (params = {}) => `/document/all?${new URLSearchParams(params)}`,
       providesTags: ["Document"],
     }),
+    // The rates and units the business uses, most used first, to suggest
+    // on each line.
+    getTaxRates: builder.query({
+      query: () => "/document/tax-rates",
+      providesTags: ["Document", "Item"],
+    }),
     getSingleDoc: builder.query({
       query: (id) => `/document/${id}`,
       providesTags: ["Document"],
@@ -19,6 +25,11 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
     // A quotation becomes an invoice once; each then names the other.
     convertDoc: builder.mutation({
       query: (id) => ({ url: `/document/${id}/convert`, method: "POST" }),
+      invalidatesTags: ["Document"],
+    }),
+    // A draft credit note for an issued invoice or receipt.
+    creditDoc: builder.mutation({
+      query: (id) => ({ url: `/document/${id}/credit-note`, method: "POST" }),
       invalidatesTags: ["Document"],
     }),
     // A document's share link. The server keeps only a hash of it, so the
@@ -157,6 +168,30 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Document"],
     }),
+    // Money paid back when a credit note leaves a document overpaid.
+    createRefund: builder.mutation({
+      query: ({ id, ...refund }) => ({
+        url: `/document/${id}/refund`,
+        method: "POST",
+        body: refund,
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    updateRefund: builder.mutation({
+      query: ({ id, refundId, ...refund }) => ({
+        url: `/document/${id}/refund/${refundId}`,
+        method: "PATCH",
+        body: refund,
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    deleteRefund: builder.mutation({
+      query: ({ id, refundId }) => ({
+        url: `/document/${id}/refund/${refundId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Document"],
+    }),
   }),
 });
 
@@ -177,12 +212,17 @@ export const {
   useDeleteDocMutation,
   useCreateDocMutation,
   useGetSingleDocQuery,
+  useGetTaxRatesQuery,
   useGetDocumentActivityQuery,
   useGetShareStatusQuery,
   useCreateShareLinkMutation,
   useRevokeShareLinkMutation,
   useDuplicateDocMutation,
   useConvertDocMutation,
+  useCreditDocMutation,
+  useCreateRefundMutation,
+  useUpdateRefundMutation,
+  useDeleteRefundMutation,
   useGetAllMyDocsQuery,
   useIssueDocMutation,
   useUpdateDocMutation,

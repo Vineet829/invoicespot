@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   FiArchive,
   FiArrowDownLeft,
@@ -25,6 +26,7 @@ import {
   panelNote,
   primaryButton,
   secondaryButton,
+  textLink,
 } from "../../../components/workspace/pastel";
 import {
   useGetDocumentsCsvMutation,
@@ -32,6 +34,9 @@ import {
 } from "../../documents/documentsApiSlice";
 import { useGetCustomersCsvMutation } from "../../customers/customersApiSlice";
 import SettingsTabs from "../components/SettingsTabs";
+import { useGetBusinessQuery } from "../../business/businessApiSlice";
+import { useGetGstStatesQuery } from "../../gst/gstApiSlice";
+import { isValidGstin, normalizeGstin } from "../../gst/gstin";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
   useGetDataExportMutation,
@@ -66,12 +71,18 @@ const NUMBERING = [
     next: "nextQuotationNumber",
   },
   { type: "Receipts", prefix: "receiptPrefix", next: "nextReceiptNumber" },
+  {
+    type: "Credit notes",
+    prefix: "creditNotePrefix",
+    next: "nextCreditNoteNumber",
+  },
 ];
 
 const SettingsForm = ({ settings }) => {
   const refusal = useBusiness().reason("MANAGE_BUSINESS");
   const [values, setValues] = useState({
     defaultCurrency: settings.defaultCurrency,
+    baseCurrency: settings.baseCurrency,
     paymentTermsDays: String(settings.paymentTermsDays),
     defaultTaxRate: String(settings.defaultTaxRate),
     taxLabel: settings.taxLabel,
@@ -86,15 +97,28 @@ const SettingsForm = ({ settings }) => {
     invoicePrefix: settings.invoicePrefix,
     quotationPrefix: settings.quotationPrefix,
     receiptPrefix: settings.receiptPrefix,
+    creditNotePrefix: settings.creditNotePrefix,
     nextInvoiceNumber: String(settings.nextInvoiceNumber),
     nextQuotationNumber: String(settings.nextQuotationNumber),
     nextReceiptNumber: String(settings.nextReceiptNumber),
+    nextCreditNoteNumber: String(settings.nextCreditNoteNumber),
     remindersEnabled: settings.remindersEnabled,
     reminderDaysBefore: String(settings.reminderDaysBefore),
     reminderOnDue: settings.reminderOnDue,
     reminderEveryDays: String(settings.reminderEveryDays),
     reminderMax: String(settings.reminderMax),
+    taxRegime: settings.taxRegime || "STANDARD",
+    lutReference: settings.lutReference || "",
   });
+  // GST mode needs the business's GSTIN, from its tax ID.
+  const business = useGetBusinessQuery().data?.business;
+  const gstStates = useGetGstStatesQuery().data?.states;
+  const gstin = isValidGstin(business?.taxId)
+    ? normalizeGstin(business.taxId)
+    : null;
+  const gstState =
+    gstin && gstStates?.find((state) => state.code === gstin.slice(0, 2));
+  const gstMode = values.taxRegime === "GST_INDIA";
   const [save, { isLoading: saving }] = useUpdateSettingsMutation();
   const change = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
@@ -110,6 +134,7 @@ const SettingsForm = ({ settings }) => {
         nextInvoiceNumber: Number(values.nextInvoiceNumber),
         nextQuotationNumber: Number(values.nextQuotationNumber),
         nextReceiptNumber: Number(values.nextReceiptNumber),
+        nextCreditNoteNumber: Number(values.nextCreditNoteNumber),
         reminderDaysBefore: Number(values.reminderDaysBefore),
         reminderEveryDays: Number(values.reminderEveryDays),
         reminderMax: Number(values.reminderMax),
@@ -317,20 +342,95 @@ const SettingsForm = ({ settings }) => {
               ))}
             </div>
           </Panel>
-          <Panel title="Region" description="Dates on your PDFs follow it.">
-            <Field
-              label="Time zone"
-              as="select"
-              value={values.timeZone}
-              onChange={change("timeZone")}
-              disabled={locked}
-            >
-              {timeZones(values.timeZone).map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone.replace(/_/g, " ")}
-                </option>
-              ))}
-            </Field>
+          <Panel
+            title="Region"
+            description="Dates on your PDFs follow the time zone. Reports can show every amount in the reporting currency."
+          >
+            <div className="flex flex-col gap-5">
+              <Field
+                label="Time zone"
+                as="select"
+                value={values.timeZone}
+                onChange={change("timeZone")}
+                disabled={locked}
+              >
+                {timeZones(values.timeZone).map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </Field>
+              <Field
+                label="Reporting currency"
+                as="select"
+                value={values.baseCurrency}
+                onChange={change("baseCurrency")}
+                disabled={locked || gstMode}
+                hint={
+                  gstMode
+                    ? "GST mode reports in INR."
+                    : "A document in another currency converts at the exchange rate typed in for it."
+                }
+              >
+                {currencies.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.code} — {item.currency}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </Panel>
+          <Panel
+            title="GST"
+            description="India’s GST: CGST and SGST or IGST by place of supply, on tax invoices. Documents already issued stay as they are."
+          >
+            <div className="flex flex-col gap-5">
+              {gstin ? (
+                <p className="m-0 text-[14px] text-spot-body">
+                  GSTIN <span className="text-spot-ink">{gstin}</span>
+                  {gstState && ` · ${gstState.name} (${gstState.code})`}
+                </p>
+              ) : (
+                <p className={`m-0 ${panelNote}`}>
+                  Add your GSTIN as your tax ID under{" "}
+                  <Link className={textLink} to="/settings/business">
+                    Settings → Business
+                  </Link>{" "}
+                  to turn on GST mode.
+                </p>
+              )}
+              <label className="flex items-start gap-3 text-[14px] text-spot-ink">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-[18px] shrink-0 accent-spot-violet"
+                  checked={gstMode}
+                  onChange={(event) =>
+                    setValues((current) => ({
+                      ...current,
+                      taxRegime: event.target.checked
+                        ? "GST_INDIA"
+                        : "STANDARD",
+                      ...(event.target.checked && { baseCurrency: "INR" }),
+                    }))
+                  }
+                  disabled={locked || (!gstin && !gstMode)}
+                />
+                <span>
+                  India GST mode
+                  <span className="block text-[12.5px] text-spot-muted">
+                    Prefixes can then use only letters, digits, / and -.
+                  </span>
+                </span>
+              </label>
+              <Field
+                label="LUT reference"
+                maxLength={40}
+                value={values.lutReference}
+                onChange={change("lutReference")}
+                disabled={locked}
+                hint="Your letter of undertaking, to export without paying IGST."
+              />
+            </div>
           </Panel>
         </div>
       </div>
