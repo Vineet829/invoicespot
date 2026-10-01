@@ -1,0 +1,71 @@
+# The whole app in containers: cp .env.example .env, fill in the secrets, then
+#   docker compose --profile mail up -d --build
+# and open http://localhost:8088. It has its own project name, network and
+# volumes, and publishes only the web port (and, with the mail profile,
+# Mailpit's inbox on this machine), so it runs next to the dev setup without
+# touching it.
+name: invoicespot-stack
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-invoicespot}
+      POSTGRES_USER: ${POSTGRES_USER:-invoicespot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    # Everything in .env reaches the app, so any Spring property can be set
+    # there as an environment variable, such as SPRING_MAIL_USERNAME.
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      # A mail server being down shouldn't mark the app unhealthy.
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+    volumes:
+      - app_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./invoice-spot/client
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Catches every email the app sends; the backend reaches it as mailpit:1025.
+  # Its inbox shows sign-in and password-reset links and has no login, so it
+  # is published on this machine only.
+  mailpit:
+    image: axllent/mailpit:v1.15
+    profiles:
+      - mail
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8027}:8025"
+
+volumes:
+  db_data:
+  app_data:
