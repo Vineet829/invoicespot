@@ -61,6 +61,15 @@ export const authApiSlice = baseApiSlice.injectEndpoints({
         body: formData,
       }),
     }),
+    // The sign-in providers the server is set up for, such as Google.
+    getSignInProviders: builder.query({
+      query: () => "/auth/providers",
+    }),
+    // Swaps the session's refresh cookie for an access token, as a reload
+    // does; Google sign-in ends with a session and nothing else.
+    refreshSession: builder.mutation({
+      query: () => "/auth/new_access_token",
+    }),
   }),
 });
 
@@ -72,4 +81,6 @@ export const {
   usePasswordResetRequestMutation,
   useResetPasswordMutation,
   useCompleteTwoFactorMutation,
+  useGetSignInProvidersQuery,
+  useRefreshSessionMutation,
 } = authApiSlice;

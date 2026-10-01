@@ -40,6 +40,7 @@ import {
   useGetReportQuery,
   useGetTaxReportQuery,
   useGetTdsReportQuery,
+  useGetProfitReportQuery,
 } from "../reportsApiSlice";
 import {
   DEFAULT_PERIOD,
@@ -49,6 +50,7 @@ import {
 } from "../reportModel";
 import IncomeChart, { SERIES } from "../components/IncomeChart";
 import GstHelpers from "../components/GstHelpers";
+import ProfitAndLoss from "../components/ProfitAndLoss";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 
 const AGEING_BARS = {
@@ -373,6 +375,7 @@ const ReportsPage = () => {
   const query = useGetReportQuery({ period, view });
   const tdsQuery = useGetTdsReportQuery(period);
   const taxQuery = useGetTaxReportQuery({ period, view });
+  const profitQuery = useGetProfitReportQuery(period);
   const gstMode =
     useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
   const report = query.data;
@@ -498,17 +501,24 @@ const ReportsPage = () => {
           . Add a rate to a draft before you issue it.
         </p>
       )}
-      {query.isLoading || tdsQuery.isLoading || taxQuery.isLoading ? (
+      {query.isLoading ||
+      tdsQuery.isLoading ||
+      taxQuery.isLoading ||
+      profitQuery.isLoading ? (
         <LoadingState />
       ) : (query.isError && !query.isFetching) ||
         (tdsQuery.isError && !tdsQuery.isFetching) ||
-        (taxQuery.isError && !taxQuery.isFetching) ? (
+        (taxQuery.isError && !taxQuery.isFetching) ||
+        (profitQuery.isError && !profitQuery.isFetching) ? (
         <ErrorState
-          error={query.error || tdsQuery.error || taxQuery.error}
+          error={
+            query.error || tdsQuery.error || taxQuery.error || profitQuery.error
+          }
           retry={() => {
             query.refetch();
             tdsQuery.refetch();
             taxQuery.refetch();
+            profitQuery.refetch();
           }}
         />
       ) : !shown ? (
@@ -605,6 +615,11 @@ const ReportsPage = () => {
               </div>
             </details>
           </Panel>
+          <ProfitAndLoss
+            report={profitQuery.data}
+            periodName={periodName}
+            busy={profitQuery.isFetching}
+          />
           <div className="grid min-w-0 gap-6 compact:gap-5 min-[1100px]:grid-cols-2 max-[700px]:gap-5">
             <Panel
               title="Unpaid invoices by age"

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   FiBarChart2,
   FiBriefcase,
+  FiCreditCard,
   FiFileText,
   FiGrid,
   FiList,
@@ -30,6 +31,7 @@ const PAGES = [
   { to: "/recurring", label: "Recurring invoices", icon: FiRepeat },
   { to: "/customers", label: "Clients", icon: FiUsers },
   { to: "/items", label: "Items", icon: FiPackage },
+  { to: "/expenses", label: "Expenses", icon: FiCreditCard },
   { to: "/reports", label: "Reports", icon: FiBarChart2 },
   { to: "/profile", label: "Profile", icon: FiUser },
   { to: "/settings", label: "Settings", icon: FiSettings },

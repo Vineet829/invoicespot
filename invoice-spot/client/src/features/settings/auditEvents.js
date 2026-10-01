@@ -28,6 +28,9 @@ export const EVENT_LABELS = {
   INVITATION_RESENT: "Invitation sent again",
   INVITATION_REVOKED: "Invitation withdrawn",
   MEMBER_JOINED: "Joined the business",
+  // A static label because this list also fills the audit log's filter. The
+  // detail line under it names the provider, such as "Google".
+  PROVIDER_LINKED: "Sign-in method added",
 };
 
 // Entries that may mean someone else is trying the account.

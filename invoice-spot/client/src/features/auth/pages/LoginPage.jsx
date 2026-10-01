@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { toast } from "react-toastify";
 import { Formik } from "formik";
 import * as Yup from "yup";
@@ -8,7 +13,9 @@ import useTitle from "../../../hooks/useTitle";
 import { pendingInvitePath } from "../../business/pendingInvite";
 import { useLoginUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
+import { oauthErrorMessage } from "../oauthErrors";
 import AuthVisual from "../components/AuthVisual";
+import ProviderButtons from "../components/ProviderButtons";
 import TwoFactorStep from "../components/TwoFactorStep";
 import {
   ArrowIcon,
@@ -42,6 +49,27 @@ const LoginPage = () => {
   // sent to, even across signing up and verifying the email.
   const from =
     location.state?.from?.pathname || pendingInvitePath() || "/dashboard";
+
+  // A sign-in with Google that didn't work comes back here with the reason.
+  // It shows once, even though StrictMode runs effects twice in development,
+  // and leaves the address so a reload doesn't show it again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const oauthError = searchParams.get("oauth_error");
+  const oauthErrorShown = useRef(false);
+  useEffect(() => {
+    if (!oauthError || oauthErrorShown.current) return;
+    oauthErrorShown.current = true;
+    toast.error(oauthErrorMessage(oauthError));
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("oauth_error");
+        next.delete("provider");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [oauthError, setSearchParams]);
 
   const [showPassword, setShowPassword] = useState(false);
   // With two-factor sign-in on, a correct password earns a challenge that a
@@ -230,16 +258,23 @@ const LoginPage = () => {
                       <div className={auth.dividerLine} />
                     </div>
 
-                    <button
-                      type="button"
-                      className={`${auth.ghost} ${rise}`}
+                    {/* Sign-in providers share Guest's row, in equal columns,
+                        tightened on narrow screens so labels stay on one line. */}
+                    <div
+                      className={`grid auto-cols-fr grid-flow-col gap-2.5 ${rise}`}
                       style={delay(0.66)}
-                      onClick={handleGuestLogin}
-                      disabled={busy}
                     >
-                      <GuestIcon />
-                      {guestLoading ? "Opening demo…" : "Guest"}
-                    </button>
+                      <ProviderButtons />
+                      <button
+                        type="button"
+                        className={`${auth.ghost} ${auth.tight}`}
+                        onClick={handleGuestLogin}
+                        disabled={busy}
+                      >
+                        <GuestIcon />
+                        {guestLoading ? "Opening demo…" : "Guest"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className={`${auth.foot} ${rise}`} style={delay(0.72)}>

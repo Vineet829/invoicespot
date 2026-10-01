@@ -1,15 +1,10 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { decodeToken } from "react-jwt";
 import { readSavedUser } from "./savedSession";
 
 const user = readSavedUser(localStorage);
-const googleToken = localStorage.getItem("googleToken");
-
-const decodedToken = decodeToken(googleToken);
 
 const initialState = {
-  user: user ? user : decodedToken,
-  googleToken: googleToken ? googleToken : null,
+  user: user ? user : null,
 };
 
 const authSlice = createSlice({
@@ -22,9 +17,7 @@ const authSlice = createSlice({
     },
     logOut: (state, action) => {
       state.user = null;
-      state.googleToken = null;
       localStorage.removeItem("user");
-      localStorage.removeItem("googleToken");
     },
   },
 });
@@ -34,5 +27,3 @@ export const { logIn, logOut } = authSlice.actions;
 export default authSlice.reducer;
 
 export const selectCurrentUserToken = (state) => state.auth.user?.accessToken;
-
-export const selectCurrentUserGoogleToken = (state) => state.auth?.googleToken;

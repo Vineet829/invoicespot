@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { isExpired } from "react-jwt";
 import {
   FiArrowUpRight,
   FiBarChart2,
   FiChevronRight,
+  FiCreditCard,
   FiFileText,
   FiGrid,
   FiLogOut,
@@ -18,8 +18,6 @@ import {
   FiUsers,
   FiX,
 } from "react-icons/fi";
-import { toast } from "react-toastify";
-import { logOut } from "../../auth/authSlice";
 import { useLogoutUserMutation } from "../../auth/authApiSlice";
 import useAuthUser from "../../../hooks/useAuthUser";
 import { brandMark, iconButton } from "../../../components/workspace/pastel";
@@ -98,12 +96,11 @@ const DashboardShell = ({
   fit = false,
   fill = false,
 }) => {
-  const { user, googleToken } = useSelector((state) => state.auth);
+  const { user } = useSelector((state) => state.auth);
   const { isAdmin } = useAuthUser();
   const business = useGetBusinessesQuery().data?.businesses?.find(
     (candidate) => candidate.active,
   );
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [logoutUser, { isLoading: signingOut }] = useLogoutUserMutation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -121,14 +118,6 @@ const DashboardShell = ({
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-
-  useEffect(() => {
-    if (googleToken && isExpired(googleToken)) {
-      dispatch(logOut());
-      navigate("/login");
-      toast.warning("Your session has expired. Please log in again.");
-    }
-  }, [dispatch, googleToken, navigate]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -182,6 +171,7 @@ const DashboardShell = ({
     { to: "/documents", label: "Documents", icon: FiFileText },
     { to: "/customers", label: "Clients", icon: FiUsers },
     { to: "/items", label: "Items", icon: FiPackage },
+    { to: "/expenses", label: "Expenses", icon: FiCreditCard },
     { to: "/reports", label: "Reports", icon: FiBarChart2 },
     { to: "/profile", label: "Profile", icon: FiUser },
     { to: "/settings", label: "Settings", icon: FiSettings },

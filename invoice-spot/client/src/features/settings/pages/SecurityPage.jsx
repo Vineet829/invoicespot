@@ -21,7 +21,10 @@ const SecurityPage = () => {
         description="How you sign in, and where your account is signed in."
         actions={<SettingsTabs />}
       />
-      <ChangePassword demo={demo} provider={profile?.provider} />
+      <ChangePassword
+        demo={demo}
+        hasPassword={profile?.hasPassword !== false}
+      />
       <TwoFactor demo={demo} />
       <SignedInDevices demo={demo} />
       <RecentActivity demo={demo} />

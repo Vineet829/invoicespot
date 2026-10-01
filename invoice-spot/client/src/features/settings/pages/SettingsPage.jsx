@@ -78,6 +78,25 @@ const NUMBERING = [
   },
 ];
 
+// How every PDF can look, with what sets each apart.
+const PDF_TEMPLATES = [
+  {
+    value: "CLASSIC",
+    label: "Classic",
+    hint: "The layout your PDFs have had so far.",
+  },
+  {
+    value: "MODERN",
+    label: "Modern",
+    hint: "A tinted heading band, with violet titles and table headings.",
+  },
+  {
+    value: "COMPACT",
+    label: "Compact",
+    hint: "Smaller type and tighter spacing, to fit more on a page.",
+  },
+];
+
 const SettingsForm = ({ settings }) => {
   const refusal = useBusiness().reason("MANAGE_BUSINESS");
   const [values, setValues] = useState({
@@ -108,6 +127,7 @@ const SettingsForm = ({ settings }) => {
     reminderMax: String(settings.reminderMax),
     taxRegime: settings.taxRegime || "STANDARD",
     lutReference: settings.lutReference || "",
+    pdfTemplate: settings.pdfTemplate || "CLASSIC",
   });
   // GST mode needs the business's GSTIN, from its tax ID.
   const business = useGetBusinessQuery().data?.business;
@@ -364,6 +384,29 @@ const SettingsForm = ({ settings }) => {
                 ))}
               </Field>
             </div>
+          </Panel>
+          <Panel
+            title="PDFs"
+            description="How every PDF looks: invoices, quotations, receipts, credit notes, payment receipts and statements."
+          >
+            <Field
+              label="Template"
+              as="select"
+              value={values.pdfTemplate}
+              onChange={change("pdfTemplate")}
+              disabled={locked}
+              hint={
+                PDF_TEMPLATES.find(
+                  (template) => template.value === values.pdfTemplate,
+                )?.hint
+              }
+            >
+              {PDF_TEMPLATES.map((template) => (
+                <option key={template.value} value={template.value}>
+                  {template.label}
+                </option>
+              ))}
+            </Field>
           </Panel>
           <Panel
             title="GST"

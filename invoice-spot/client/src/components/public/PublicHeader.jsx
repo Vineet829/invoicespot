@@ -1,10 +1,6 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { isExpired } from "react-jwt";
-import { toast } from "react-toastify";
 import { FiArrowUpRight, FiLogOut } from "react-icons/fi";
-import { logOut } from "../../features/auth/authSlice";
 import { useLogoutUserMutation } from "../../features/auth/authApiSlice";
 import { brandMark, iconButton, primaryButton } from "../workspace/pastel";
 
@@ -17,8 +13,7 @@ const headerButton = `${primaryButton} max-[480px]:px-3 max-[400px]:[&>svg]:hidd
 // their workspace, their profile and sign out, as in the workspace sidebar.
 // signUp={false} drops Get started where the page offers sign-up itself.
 const PublicHeader = ({ signUp = true }) => {
-  const { user, googleToken } = useSelector((state) => state.auth);
-  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [logoutUser, { isLoading: signingOut }] = useLogoutUserMutation();
   const name =
@@ -31,14 +26,6 @@ const PublicHeader = ({ signUp = true }) => {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-
-  useEffect(() => {
-    if (googleToken && isExpired(googleToken)) {
-      dispatch(logOut());
-      navigate("/login");
-      toast.warning("Your session has expired. Please log in again.");
-    }
-  }, [dispatch, googleToken, navigate]);
 
   const signOut = async () => {
     await logoutUser();

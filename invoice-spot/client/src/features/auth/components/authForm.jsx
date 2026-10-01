@@ -49,7 +49,8 @@ export const auth = {
   passwordInput: `${inputControl} pr-11 max-[900px]:text-[16px]`,
   primary: `${button} bg-spot-night tracking-[-0.01em] text-white after:bg-[linear-gradient(90deg,transparent,#ffffff2e,transparent)] hover:enabled:-translate-y-0.5 hover:enabled:bg-[#433369] hover:enabled:shadow-[0_10px_24px_-12px_#30234fb3] active:enabled:translate-y-0`,
   ghost: `${button} border border-spot-violet/15 bg-white/70 text-spot-night after:bg-[linear-gradient(90deg,transparent,#7c62d61f,transparent)] hover:enabled:-translate-y-px hover:enabled:border-spot-violet/30 hover:enabled:bg-white hover:enabled:shadow-[0_8px_18px_-12px_#3c346473] [&>svg]:hover:enabled:scale-110`,
-  // Sign up fits three buttons in a row; narrow screens tighten them.
+  // Log in and sign up put the provider buttons, such as Google, beside Guest
+  // in one row; narrow screens tighten them so labels stay on one line.
   tight: "max-[560px]:gap-1.5 max-[560px]:px-2",
   social: "grid grid-cols-2 gap-2.5",
   socialThree:
