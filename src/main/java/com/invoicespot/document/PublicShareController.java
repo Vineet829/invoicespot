@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.document.dto.DeclineRequest;
 import com.invoicespot.document.dto.PublicDocumentResponse;
+import com.invoicespot.document.dto.ReportPaymentRequest;
 import com.invoicespot.ratelimit.RateLimit;
 import com.invoicespot.ratelimit.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,5 +52,13 @@ public class PublicShareController {
             HttpServletRequest http) {
         rateLimiter.consume(RateLimit.SHARED_DOCUMENT, http.getRemoteAddr());
         return shareService.decline(token, request == null ? null : request.reason());
+    }
+
+    @PostMapping("/payment-claims")
+    public PublicDocumentResponse reportPayment(
+            @PathVariable String token, @Valid @RequestBody ReportPaymentRequest request, HttpServletRequest http) {
+        rateLimiter.consume(RateLimit.SHARED_DOCUMENT, http.getRemoteAddr());
+        rateLimiter.consume(RateLimit.PAYMENT_CLAIM, http.getRemoteAddr());
+        return shareService.reportPayment(token, request);
     }
 }

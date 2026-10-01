@@ -23,4 +23,5 @@ public record UpdateDocumentRequest(
         @Size(max = 500, message = "The reason can be at most 500 characters") String creditReason,
         String placeOfSupply,
         Boolean reverseCharge,
-        String exportType) {}
+        String exportType,
+        Boolean showPaymentDetails) {}

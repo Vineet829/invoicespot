@@ -18,7 +18,7 @@ class SettingsIntegrationTest extends IntegrationTest {
     private static final String VALID = """
             {"defaultCurrency": "INR", "paymentTermsDays": 15, "defaultTaxRate": 18, "taxLabel": "GST",
              "defaultNotes": "Thanks for your business.", "defaultTerms": "Due in 15 days.",
-             "emailMessage": "Hello {client}, here is {document}.", "timeZone": "Asia/Kolkata"}
+             "timeZone": "Asia/Kolkata"}
             """;
 
     private ResultActions save(User user, String json) throws Exception {
@@ -81,8 +81,7 @@ class SettingsIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.settings.defaultCurrency").value("INR"))
                 .andExpect(jsonPath("$.settings.paymentTermsDays").value(30))
                 .andExpect(jsonPath("$.settings.defaultTaxRate").value(18))
-                .andExpect(jsonPath("$.settings.timeZone").value("Asia/Kolkata"))
-                .andExpect(jsonPath("$.settings.emailMessage").value("Hello {client}, here is {document}."));
+                .andExpect(jsonPath("$.settings.timeZone").value("Asia/Kolkata"));
         mockMvc.perform(get("/api/v1/settings").header(HttpHeaders.AUTHORIZATION, bearer(createUser())))
                 .andExpect(jsonPath("$.settings.defaultCurrency").value("USD"));
     }

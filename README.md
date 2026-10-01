@@ -240,7 +240,8 @@ The backend's settings are in `src/main/resources/application.yml`. Besides the 
 `JWT_ACCESS_SECRET_KEY` settings there, it reads:
 
 - `APP_ENCRYPTION_KEY`: 32 random bytes, base64-encoded (for example `openssl rand -base64 32`), which
-  two-factor secrets are encrypted with. Without it the app runs, but two-factor sign-in can't be turned on.
+  two-factor secrets and share links are encrypted with. Without it the app runs, but two-factor sign-in
+  can't be turned on, and a share link is shown only once, when it is made.
 - `JOBS_ENABLED`, `JOBS_CRON` and `JOBS_ZONE`: the daily run that makes recurring invoices, sends automatic
   reminders, raises overdue alerts and removes expired sign-ins. It is on by default, at 07:00 UTC.
 

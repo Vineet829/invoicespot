@@ -29,7 +29,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest(
         properties = {
             "app.jwt.access-secret=integration-test-access-secret-0123456789abcdef",
-            "app.two-factor.encryption-key=aW50ZWdyYXRpb24tdGVzdC1rZXktMzItYnl0ZXMhISE=",
+            "app.encryption.key=aW50ZWdyYXRpb24tdGVzdC1rZXktMzItYnl0ZXMhISE=",
             "management.health.mail.enabled=false",
             "app.jobs.enabled=false",
             "app.demo.email=" + IntegrationTest.DEMO_EMAIL

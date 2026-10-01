@@ -6,6 +6,7 @@ import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.auth.twofactor.dto.TwoFactorSetupResponse;
 import com.invoicespot.auth.twofactor.dto.TwoFactorStatusResponse;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.SecretBox;
 import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;

@@ -91,6 +91,7 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.events[*].type", contains(
                         "EMAILED",
+                        "SHARED",
                         "PAYMENT_DELETED",
                         "PAYMENT_EDITED",
                         "PAYMENT_RECORDED",
@@ -99,6 +100,7 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
                         "CREATED")))
                 .andExpect(jsonPath("$.events[*].detail", contains(
                         "to accounts@beta.test",
+                        "for an email",
                         "USD 50.00 · Bank Transfer",
                         "USD 50.00 · Bank Transfer",
                         "USD 40.00 · Bank Transfer",
@@ -151,7 +153,7 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("an email that fails to send is not recorded as sent")
+    @DisplayName("an email that fails to send is not recorded as sent, though the link made for it stays")
     void failedEmail() throws Exception {
         User owner = createUser();
         String id = invoice(owner);
@@ -160,7 +162,7 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
 
         mockMvc.perform(post("/api/v1/document/{id}/email", id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isBadGateway());
-        activity(id, owner).andExpect(jsonPath("$.events[*].type", contains("ISSUED", "CREATED")));
+        activity(id, owner).andExpect(jsonPath("$.events[*].type", contains("SHARED", "ISSUED", "CREATED")));
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.invoicespot.business.Business;
 import com.invoicespot.common.BaseEntity;
 import com.invoicespot.tax.TaxRegime;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -56,9 +57,6 @@ public class BusinessSettings extends BaseEntity {
     @Column(name = "default_terms", columnDefinition = "text")
     private String defaultTerms;
 
-    @Column(name = "email_message", columnDefinition = "text")
-    private String emailMessage;
-
     @Column(name = "time_zone", nullable = false, length = 64)
     private String timeZone = "UTC";
 
@@ -100,4 +98,12 @@ public class BusinessSettings extends BaseEntity {
 
     @Column(name = "reminder_max", nullable = false)
     private int reminderMax = 3;
+
+    @Embedded
+    private PaymentDetails paymentDetails;
+
+    // Hibernate reads payment details that are all empty as none at all.
+    public PaymentDetails getPaymentDetails() {
+        return paymentDetails == null ? new PaymentDetails() : paymentDetails;
+    }
 }

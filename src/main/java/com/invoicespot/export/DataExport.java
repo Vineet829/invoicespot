@@ -14,7 +14,9 @@ import com.invoicespot.document.DocumentSearch;
 import com.invoicespot.document.DocumentTotals;
 import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.EmailTemplateService;
 import com.invoicespot.settings.SettingsService;
+import com.invoicespot.settings.dto.EmailTemplateResponse;
 import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.dto.UserProfileResponse;
@@ -57,6 +59,8 @@ public class DataExport {
             items.csv        Your saved products and services.
             recurring.csv    The invoices that repeat, and how.
             settings.json    Your defaults for new documents, numbering and reminders.
+            email-templates.json
+                             The subject and message you wrote for each kind of email.
             business.json    Your business details, as documents show them.
             profile.json     Your account details.
 
@@ -68,6 +72,7 @@ public class DataExport {
     private final DocumentExport documentExport;
     private final CustomerService customerService;
     private final SettingsService settingsService;
+    private final EmailTemplateService emailTemplates;
     private final BusinessService businessService;
     private final DemoAccountGuard demoAccountGuard;
     private final JdbcClient jdbc;
@@ -78,6 +83,7 @@ public class DataExport {
             DocumentExport documentExport,
             CustomerService customerService,
             SettingsService settingsService,
+            EmailTemplateService emailTemplates,
             BusinessService businessService,
             DemoAccountGuard demoAccountGuard,
             JdbcClient jdbc,
@@ -86,6 +92,7 @@ public class DataExport {
         this.documentExport = documentExport;
         this.customerService = customerService;
         this.settingsService = settingsService;
+        this.emailTemplates = emailTemplates;
         this.businessService = businessService;
         this.demoAccountGuard = demoAccountGuard;
         this.jdbc = jdbc;
@@ -113,6 +120,9 @@ public class DataExport {
         files.put("items.csv", items(businessPkid).content());
         files.put("recurring.csv", recurring(businessPkid).content());
         files.put("settings.json", json(SettingsResponse.from(settings)));
+        files.put(
+                "email-templates.json",
+                json(emailTemplates.list(access).stream().filter(EmailTemplateResponse::custom).toList()));
         files.put(
                 "business.json",
                 json(BusinessProfileResponse.from(businessService.require(businessPkid), access.role())));

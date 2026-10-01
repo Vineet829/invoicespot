@@ -91,7 +91,8 @@ class DataExportIntegrationTest extends IntegrationTest {
 
         assertThat(files.keySet()).containsExactly(
                 "README.txt", "documents.csv", "line-items.csv", "document-tax.csv", "payments.csv", "clients.csv",
-                "items.csv", "recurring.csv", "settings.json", "business.json", "profile.json");
+                "items.csv", "recurring.csv", "settings.json", "email-templates.json", "business.json",
+                "profile.json");
         assertThat(files.get("README.txt")).startsWith("Invoice Spot export, made on " + today + ".");
         assertThat(lines(files.get("documents.csv"))).hasSize(2).last().asString()
                 .startsWith("INV-0001,Invoice,Partially paid,Acme,");

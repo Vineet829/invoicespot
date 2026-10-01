@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 // A server started without its encryption key can't open the secrets codes
 // from authenticator apps are checked against. Such a code is refused with a
 // way in, rather than a server error, and a recovery code still signs in.
-@TestPropertySource(properties = "app.two-factor.encryption-key=")
+@TestPropertySource(properties = "app.encryption.key=")
 class TwoFactorWithoutKeyIntegrationTest extends IntegrationTest {
 
     private static final String PASSWORD = "Str0ng!pass";

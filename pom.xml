@@ -21,6 +21,7 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
+        <zxing.version>3.5.3</zxing.version>
         <bucket4j.version>8.14.0</bucket4j.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <testcontainers.version>1.21.3</testcontainers.version>
@@ -97,6 +98,11 @@
             <groupId>com.openhtmltopdf</groupId>
             <artifactId>openhtmltopdf-pdfbox</artifactId>
             <version>${openhtmltopdf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxing.version}</version>
         </dependency>
 
         <dependency>

@@ -16,7 +16,10 @@ import com.invoicespot.document.dto.PaymentRecordDto;
 import com.invoicespot.item.CatalogItemService;
 import com.invoicespot.item.dto.CreateItemRequest;
 import com.invoicespot.settings.BusinessSettingsRepository;
+import com.invoicespot.settings.EmailTemplateKind;
+import com.invoicespot.settings.EmailTemplateService;
 import com.invoicespot.settings.SettingsService;
+import com.invoicespot.settings.dto.EmailTemplateRequest;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
@@ -55,6 +58,7 @@ public class DemoDataSeeder {
     private final CustomerRepository customerRepository;
     private final BusinessSettingsRepository settingsRepository;
     private final SettingsService settingsService;
+    private final EmailTemplateService emailTemplateService;
     private final CatalogItemService itemService;
     private final CustomerService customerService;
     private final DocumentService documentService;
@@ -71,6 +75,7 @@ public class DemoDataSeeder {
             CustomerRepository customerRepository,
             BusinessSettingsRepository settingsRepository,
             SettingsService settingsService,
+            EmailTemplateService emailTemplateService,
             CatalogItemService itemService,
             CustomerService customerService,
             DocumentService documentService,
@@ -82,6 +87,7 @@ public class DemoDataSeeder {
         this.customerRepository = customerRepository;
         this.settingsRepository = settingsRepository;
         this.settingsService = settingsService;
+        this.emailTemplateService = emailTemplateService;
         this.itemService = itemService;
         this.customerService = customerService;
         this.documentService = documentService;
@@ -113,9 +119,15 @@ public class DemoDataSeeder {
         ZoneId zone = ZoneId.of(ZONE);
         if (settingsRepository.findByBusinessPkid(owner.businessPkid()).isEmpty()) {
             settingsService.update(owner, new UpdateSettingsRequest(
-                    "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS, DemoData.EMAIL_MESSAGE,
+                    "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS,
                     ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null, null, null, null, null,
                     null));
+            for (EmailTemplateKind kind : EmailTemplateKind.values()) {
+                if (kind != EmailTemplateKind.REMINDER) {
+                    emailTemplateService.save(owner, kind.name(), new EmailTemplateRequest(
+                            kind.standardSubject(), DemoData.EMAIL_MESSAGE));
+                }
+            }
         }
         DemoData.ITEMS.forEach(item -> itemService.create(
                 owner, new CreateItemRequest(item.name(), item.description(), item.price(), null, null, null)));
@@ -173,6 +185,7 @@ public class DemoDataSeeder {
                 "USD",
                 lines(random),
                 plan.issued(),
+                null,
                 null,
                 null,
                 null,

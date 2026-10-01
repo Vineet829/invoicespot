@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -12,10 +13,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.common.SecretBox;
+import com.invoicespot.config.EncryptionProperties;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +70,7 @@ class ShareLinkIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.url", matchesPattern("^https?://.+/p/[A-Za-z0-9_-]{43}$")))
+                .andExpect(jsonPath("$.kept").value(true))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -75,6 +80,11 @@ class ShareLinkIntegrationTest extends IntegrationTest {
 
     private ResultActions open(String token) throws Exception {
         return mockMvc.perform(get("/api/v1/public/share/{token}", token));
+    }
+
+    private ResultActions linkStatus(String id) throws Exception {
+        return mockMvc.perform(
+                get("/api/v1/document/{id}/share", id).header(HttpHeaders.AUTHORIZATION, bearer(owner)));
     }
 
     private ResultActions activity(String id) throws Exception {
@@ -144,6 +154,36 @@ class ShareLinkIntegrationTest extends IntegrationTest {
                 .andExpect(status().isNotFound());
         open("not-a-real-token").andExpect(status().isNotFound());
         activity(id).andExpect(jsonPath("$.events[0].type").value("SHARE_REVOKED"));
+    }
+
+    @Test
+    @DisplayName("a link is kept sealed so it can be shown again, and one that can't be opened can only be replaced")
+    void shownAgain() throws Exception {
+        String id = document("Invoice");
+        String token = share(id);
+        String sealed = jdbcTemplate.queryForObject(
+                "select l.token_sealed from share_links l join documents d on d.pkid = l.document_pkid"
+                        + " where d.id = ? and l.revoked_at is null",
+                String.class,
+                UUID.fromString(id));
+
+        assertThat(sealed).isNotBlank().doesNotContain(token);
+        linkStatus(id).andExpect(jsonPath("$.url", endsWith("/p/" + token)));
+
+        String otherKey = Base64.getEncoder()
+                .encodeToString("another-key-of-thirty-two-bytes!".getBytes(StandardCharsets.UTF_8));
+        String elsewhere = new SecretBox(new EncryptionProperties(otherKey))
+                .seal(token.getBytes(StandardCharsets.UTF_8));
+        jdbcTemplate.update("update share_links set token_sealed = ? where token_sealed = ?", elsewhere, sealed);
+        linkStatus(id).andExpect(jsonPath("$.active").value(true)).andExpect(jsonPath("$.url").doesNotExist());
+
+        jdbcTemplate.update("update share_links set token_sealed = null where token_sealed = ?", elsewhere);
+        linkStatus(id).andExpect(jsonPath("$.active").value(true)).andExpect(jsonPath("$.url").doesNotExist());
+        open(token).andExpect(status().isOk());
+
+        String replacement = share(id);
+        linkStatus(id).andExpect(jsonPath("$.url", endsWith("/p/" + replacement)));
+        open(token).andExpect(status().isNotFound());
     }
 
     @Test

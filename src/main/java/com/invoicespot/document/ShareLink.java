@@ -31,6 +31,11 @@ public class ShareLink {
     @Column(name = "token_hash", nullable = false, length = 64, updatable = false)
     private String tokenHash;
 
+    // The token sealed with the app's key, so the link can be shown again;
+    // none on links made before that, or without a key.
+    @Column(name = "token_sealed", updatable = false)
+    private String tokenSealed;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

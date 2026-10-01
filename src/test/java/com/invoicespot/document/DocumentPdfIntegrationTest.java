@@ -198,21 +198,22 @@ class DocumentPdfIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("the email draft follows the saved message, with the client, document and business filled in")
+    @DisplayName("the email draft follows the saved invoice email, with the client, document and business filled in")
     void savedMessage() throws Exception {
         User owner = createUser();
         Document document = documentFor(owner, "beta@x.com");
-        mockMvc.perform(put("/api/v1/settings")
+        mockMvc.perform(put("/api/v1/settings/email-templates/INVOICE")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0, "taxLabel": "Tax",
-                                 "emailMessage": "Hi {client}, {document} is attached. {business}", "timeZone": "UTC"}
+                                {"subject": "Your {document}",
+                                 "body": "Hi {client}, {document} is attached. {business}"}
                                 """))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/document/{id}/email", document.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.subject").value("Your Invoice 2026-September-ABC123"))
                 .andExpect(jsonPath("$.message").value(
                         "Hi Beta LLC, Invoice 2026-September-ABC123 is attached. Test User"));
     }

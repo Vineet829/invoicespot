@@ -4,6 +4,8 @@ import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.settings.dto.PaymentDetailsRequest;
+import com.invoicespot.settings.dto.PaymentDetailsResponse;
 import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
 import com.invoicespot.tax.Gstin;
@@ -42,11 +44,7 @@ public class SettingsService {
 
     @Transactional
     public SettingsResponse update(BusinessAccess access, UpdateSettingsRequest request) {
-        BusinessSettings settings = settingsRepository.findByBusinessPkid(access.businessPkid()).orElseGet(() -> {
-            BusinessSettings created = new BusinessSettings();
-            created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
-            return created;
-        });
+        BusinessSettings settings = saved(access);
         // The reporting currency follows the default currency until it is
         // set to another one.
         if (request.baseCurrency() != null) {
@@ -60,7 +58,6 @@ public class SettingsService {
         settings.setTaxLabel(request.taxLabel().trim());
         settings.setDefaultNotes(blankToNull(request.defaultNotes()));
         settings.setDefaultTerms(blankToNull(request.defaultTerms()));
-        settings.setEmailMessage(blankToNull(request.emailMessage()));
         settings.setTimeZone(zone(request.timeZone()));
         if (request.invoicePrefix() != null) {
             settings.setInvoicePrefix(request.invoicePrefix());
@@ -112,6 +109,29 @@ public class SettingsService {
         }
         settingsRepository.save(settings);
         return SettingsResponse.from(settings);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentDetailsResponse paymentDetails(BusinessAccess access) {
+        return PaymentDetailsResponse.from(forBusiness(access.businessPkid()).getPaymentDetails());
+    }
+
+    @Transactional
+    public PaymentDetailsResponse updatePaymentDetails(BusinessAccess access, PaymentDetailsRequest request) {
+        PaymentDetails details = PaymentDetailsValidator.validate(request);
+        BusinessSettings settings = saved(access);
+        settings.setPaymentDetails(details);
+        settingsRepository.save(settings);
+        return PaymentDetailsResponse.from(settings.getPaymentDetails());
+    }
+
+    // The business's settings row, made with the defaults if it has none yet.
+    private BusinessSettings saved(BusinessAccess access) {
+        return settingsRepository.findByBusinessPkid(access.businessPkid()).orElseGet(() -> {
+            BusinessSettings created = new BusinessSettings();
+            created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
+            return created;
+        });
     }
 
     // India GST mode needs the business's GSTIN, reports in rupees, and

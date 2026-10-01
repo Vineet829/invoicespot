@@ -3,29 +3,29 @@ package com.invoicespot.document;
 import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.SecretBox;
 import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
-import com.invoicespot.document.dto.BillingItemResponse;
-import com.invoicespot.document.dto.GstResponse;
 import com.invoicespot.document.dto.PublicDocumentResponse;
-import com.invoicespot.document.dto.PublicParty;
+import com.invoicespot.document.dto.ReportPaymentRequest;
 import com.invoicespot.document.dto.ShareLinkResponse;
 import com.invoicespot.document.dto.ShareStatusResponse;
-import com.invoicespot.document.dto.TaxResponse;
+import com.invoicespot.document.dto.WhatsAppShareResponse;
+import com.invoicespot.mail.Placeholders;
 import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
-import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
-import java.math.BigDecimal;
+import com.invoicespot.tax.TaxRegime;
+import com.invoicespot.user.User;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +34,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ShareService {
 
     private static final Duration VIEW_GAP = Duration.ofHours(1);
+    private static final String WHATSAPP_MESSAGE = "Hello {client}, here is {document} from {business}: {link}";
 
     private final DocumentRepository documentRepository;
     private final ShareLinkRepository shareLinkRepository;
     private final DocumentActivity activity;
-    private final PdfService pdfService;
     private final SettingsService settingsService;
     private final NotificationService notificationService;
+    private final PublicDocuments publicDocuments;
+    private final SecretBox secretBox;
     private final AppProperties properties;
     private final Clock clock;
 
@@ -48,28 +50,35 @@ public class ShareService {
             DocumentRepository documentRepository,
             ShareLinkRepository shareLinkRepository,
             DocumentActivity activity,
-            PdfService pdfService,
             SettingsService settingsService,
             NotificationService notificationService,
+            PublicDocuments publicDocuments,
+            SecretBox secretBox,
             AppProperties properties,
             Clock clock) {
         this.documentRepository = documentRepository;
         this.shareLinkRepository = shareLinkRepository;
         this.activity = activity;
-        this.pdfService = pdfService;
         this.settingsService = settingsService;
         this.notificationService = notificationService;
+        this.publicDocuments = publicDocuments;
+        this.secretBox = secretBox;
         this.properties = properties;
         this.clock = clock;
     }
 
-    // Only the token's hash is kept, so the link is shown this once. A new
-    // link replaces the document's current one. A draft isn't shared.
+    // The token's hash finds the link; the token is also kept sealed with the
+    // app's key, when there is one, so the link can be shown again. A new link
+    // replaces the document's current one. A draft isn't shared.
     @Transactional
     public ShareLinkResponse create(BusinessAccess access, String id) {
         Document document = requireInBusiness(access, id);
         DocumentService.requireIssued(document, "Issue this draft before sharing it");
         DocumentService.requireNotVoid(document, "A void document can't be shared");
+        return newLink(document, access.user(), null);
+    }
+
+    private ShareLinkResponse newLink(Document document, User actor, String detail) {
         Instant now = Instant.now(clock);
         shareLinkRepository.findByDocumentAndRevokedAtIsNull(document).ifPresent(active -> {
             active.setRevokedAt(now);
@@ -79,18 +88,109 @@ public class ShareService {
         ShareLink link = new ShareLink();
         link.setDocument(document);
         link.setTokenHash(SecretTokens.hash(token));
+        if (secretBox.available()) {
+            link.setTokenSealed(secretBox.seal(token.getBytes(StandardCharsets.UTF_8)));
+        }
         link.setCreatedAt(now);
         shareLinkRepository.save(link);
-        activity.record(document, DocumentEventType.SHARED, null, access.user());
-        return new ShareLinkResponse(true, properties.site().clientUrl() + "/p/" + token, now);
+        activity.record(document, DocumentEventType.SHARED, detail, actor);
+        return new ShareLinkResponse(true, address(token), now, link.getTokenSealed() != null);
+    }
+
+    // What an email draft can say about the document's link: the link itself
+    // when it can be shown again, or, when it can't, the day it was made, as
+    // sending will replace it. With no link yet, neither: one is made when
+    // the email is sent.
+    public record EmailLink(String url, String replaces) {}
+
+    @Transactional(readOnly = true)
+    public EmailLink peekForEmail(BusinessAccess access, UUID documentId) {
+        Document document = requireInBusiness(access, documentId.toString());
+        return shareLinkRepository.findByDocumentAndRevokedAtIsNull(document)
+                .map(link -> recovered(link)
+                        .map(url -> new EmailLink(url, null))
+                        .orElseGet(() -> new EmailLink(null, PdfService.DATE.format(link.getCreatedAt().atZone(
+                                ZoneId.of(settingsService.forBusiness(access.businessPkid()).getTimeZone()))))))
+                .orElseGet(() -> new EmailLink(null, null));
+    }
+
+    // The link an email being sent carries: the document's current one when
+    // it can be shown again, or a new one. An email sent automatically never
+    // replaces a link that can't be shown again, and goes without one.
+    @Transactional
+    public Optional<String> linkForEmail(BusinessAccess access, UUID documentId, boolean mayReplace, User actor) {
+        return linkToSend(access, documentId, mayReplace, actor, "for an email").map(SentLink::url);
+    }
+
+    // A link to send someone, and whether making it replaced one that
+    // couldn't be shown again.
+    public record SentLink(String url, boolean replaced) {}
+
+    // The document is locked, so two messages at once share one new link.
+    private Optional<SentLink> linkToSend(
+            BusinessAccess access, UUID documentId, boolean mayReplace, User actor, String detail) {
+        Document document = documentRepository.findForUpdateByExternalId(documentId)
+                .filter(found -> found.getBusiness().getPkid().equals(access.businessPkid()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
+        if (document.isDraft() || document.isVoid()) {
+            return Optional.empty();
+        }
+        Optional<ShareLink> active = shareLinkRepository.findByDocumentAndRevokedAtIsNull(document);
+        Optional<String> current = active.flatMap(this::recovered);
+        if (current.isPresent() || (active.isPresent() && !mayReplace)) {
+            return current.map(url -> new SentLink(url, false));
+        }
+        return Optional.of(new SentLink(newLink(document, actor, detail).url(), active.isPresent()));
+    }
+
+    // A WhatsApp message with the document's link, to its client's number
+    // when there is one WhatsApp can use.
+    @Transactional
+    public WhatsAppShareResponse whatsApp(BusinessAccess access, String id) {
+        Document document = requireInBusiness(access, id);
+        DocumentService.requireIssued(document, "Issue this draft before sharing it");
+        DocumentService.requireNotVoid(document, "A void document can't be shared");
+        SentLink link = linkToSend(access, document.getId(), true, access.user(), "for WhatsApp").orElseThrow();
+        Business business = document.getBusiness();
+        CustomerSnapshot client = Objects.requireNonNullElseGet(document.getCustomerSnapshot(), CustomerSnapshot::new);
+        boolean indian =
+                WhatsAppLink.inIndia(business, settingsService.forBusiness(business.getPkid()).getTaxRegime());
+        String text = Placeholders.fill(WHATSAPP_MESSAGE, Map.of(
+                "client", client.getName() == null || client.getName().isBlank() ? "there" : client.getName(),
+                "document", PublicDocuments.title(document),
+                "business", PublicDocuments.sellerParty(document, business).name(),
+                "link", link.url()));
+        return new WhatsAppShareResponse(true, WhatsAppLink.of(client.getPhoneNumber(), indian, text), link.replaced());
     }
 
     @Transactional(readOnly = true)
     public ShareStatusResponse status(BusinessAccess access, String id) {
         return shareLinkRepository.findByDocumentAndRevokedAtIsNull(requireInBusiness(access, id))
                 .map(link -> new ShareStatusResponse(
-                        true, true, link.getCreatedAt(), link.getLastViewedAt(), link.getViewCount()))
-                .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0));
+                        true,
+                        true,
+                        link.getCreatedAt(),
+                        link.getLastViewedAt(),
+                        link.getViewCount(),
+                        recovered(link).orElse(null)))
+                .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0, null));
+    }
+
+    // A link's address again, when its token was kept sealed and the key in
+    // use opens it.
+    Optional<String> recovered(ShareLink link) {
+        if (link.getTokenSealed() == null || !secretBox.available()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(address(new String(secretBox.open(link.getTokenSealed()), StandardCharsets.UTF_8)));
+        } catch (IllegalStateException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    private String address(String token) {
+        return properties.site().clientUrl() + "/p/" + token;
     }
 
     @Transactional
@@ -114,163 +214,31 @@ public class ShareService {
             notificationService.notify(
                     document,
                     NotificationType.DOCUMENT_VIEWED,
-                    clientName(document) + " viewed " + title(document));
+                    PublicDocuments.clientName(document) + " viewed " + PublicDocuments.title(document));
         }
         link.setLastViewedAt(now);
         link.setViewCount(link.getViewCount() + 1);
-        return publicView(link.getDocument());
+        return publicDocuments.view(link.getDocument());
     }
 
     @Transactional(readOnly = true)
     public DocumentPdf pdf(String token) {
-        Document document = requireLink(token).getDocument();
-        Business seller = document.getBusiness();
-        return new DocumentPdf(
-                DocumentService.pdfFileName(document),
-                pdfService.render(document, seller, settingsService.forBusiness(seller.getPkid())),
-                null);
+        return publicDocuments.pdf(requireLink(token).getDocument());
     }
 
-    // A client answers a quotation once, while it is still valid. Giving the
-    // same answer again changes nothing.
     @Transactional
     public PublicDocumentResponse accept(String token) {
-        Document document = requireLink(token).getDocument();
-        if (document.getDocumentType() != DocumentType.QUOTATION) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can be accepted");
-        }
-        DocumentService.requireNotVoid(document, "This quotation was withdrawn, so it can't be accepted");
-        if (document.getDeclinedAt() != null) {
-            throw new ApiException(HttpStatus.CONFLICT, "This quotation was declined");
-        }
-        if (document.getAcceptedAt() == null) {
-            requireOpen(document);
-            document.setAcceptedAt(Instant.now(clock));
-            activity.record(document, DocumentEventType.ACCEPTED, null, null);
-            notificationService.notify(
-                    document,
-                    NotificationType.QUOTATION_ACCEPTED,
-                    clientName(document) + " accepted " + title(document));
-        }
-        return publicView(document);
+        return publicDocuments.accept(requireLink(token).getDocument());
     }
 
     @Transactional
     public PublicDocumentResponse decline(String token, String reason) {
-        Document document = requireLink(token).getDocument();
-        if (document.getDocumentType() != DocumentType.QUOTATION) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only a quotation can be declined");
-        }
-        DocumentService.requireNotVoid(document, "This quotation was withdrawn");
-        if (document.getAcceptedAt() != null) {
-            throw new ApiException(HttpStatus.CONFLICT, "This quotation was already accepted");
-        }
-        if (document.getDeclinedAt() == null) {
-            requireOpen(document);
-            String why = reason == null || reason.isBlank() ? null : reason.trim();
-            document.setDeclinedAt(Instant.now(clock));
-            document.setDeclineReason(why);
-            activity.record(document, DocumentEventType.DECLINED, why, null);
-            notificationService.notify(
-                    document,
-                    NotificationType.QUOTATION_DECLINED,
-                    clientName(document) + " declined " + title(document) + (why == null ? "" : ": " + why));
-        }
-        return publicView(document);
+        return publicDocuments.decline(requireLink(token).getDocument(), reason);
     }
 
-    private void requireOpen(Document document) {
-        ZoneId zone = ZoneId.of(settingsService.forBusiness(document.getBusiness().getPkid()).getTimeZone());
-        if (document.isExpired(startOfToday(zone))) {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "This quotation expired on " + PdfService.DATE.format(document.getDueDate().atZone(zone))
-                            + ". Ask " + sellerParty(document, document.getBusiness()).name() + " for a new one");
-        }
-    }
-
-    private Instant startOfToday(ZoneId zone) {
-        return LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
-    }
-
-    // The business as the document went out with it, or as it is now until the
-    // document keeps its own copy.
-    private static PublicParty sellerParty(Document document, Business business) {
-        SellerSnapshot kept = Objects.requireNonNullElseGet(document.getSeller(), () -> SellerSnapshot.of(business));
-        return new PublicParty(
-                Objects.requireNonNullElse(kept.getName(), ""), kept.getLogo(), PdfService.senderLines(document, kept));
-    }
-
-    private PublicDocumentResponse publicView(Document document) {
-        Business seller = document.getBusiness();
-        BusinessSettings settings = settingsService.forBusiness(seller.getPkid());
-        ZoneId zone = ZoneId.of(settings.getTimeZone());
-        Instant startOfToday = startOfToday(zone);
-        CustomerSnapshot client = Objects.requireNonNullElseGet(document.getCustomerSnapshot(), CustomerSnapshot::new);
-        BigDecimal total = orZero(document.getTotal());
-        BigDecimal received = orZero(document.getTotalAmountReceived());
-        boolean quotation = document.getDocumentType() == DocumentType.QUOTATION;
-        boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
-        Document credited = document.getCredited();
-        boolean voided = document.isVoid();
-        boolean expired = document.isExpired(startOfToday);
-        boolean answerable = quotation && !voided && !expired
-                && document.getAcceptedAt() == null && document.getDeclinedAt() == null;
-        return new PublicDocumentResponse(
-                true,
-                document.getDocumentType(),
-                document.getDocumentNumber(),
-                document.state(),
-                document.getVoidedAt(),
-                document.getVoidReason(),
-                document.getStatus(),
-                DocumentTotals.isOverdue(document, startOfToday),
-                document.getIssueDate(),
-                document.getDueDate(),
-                document.getCurrency(),
-                sellerParty(document, seller),
-                new PublicParty(
-                        client.getName(),
-                        null,
-                        lines(client.getEmail(), client.getPhoneNumber(), client.getAddress(), client.getCity(),
-                                client.getCountry(),
-                                client.getGstin() == null ? null : "GSTIN " + client.getGstin())),
-                document.getBillingItems().stream().map(BillingItemResponse::from).toList(),
-                document.getSubTotal(),
-                document.getTaxLabel(),
-                document.getTaxSummaries().stream().map(TaxResponse::from).toList(),
-                document.getSalesTax(),
-                total,
-                received,
-                orZero(document.getTotalTds()),
-                quotation || creditNote ? total : voided ? BigDecimal.ZERO : DocumentTotals.balanceDue(document),
-                document.getAdditionalInfo(),
-                document.getTermsConditions(),
-                document.getAcceptedAt(),
-                document.getDeclinedAt(),
-                expired,
-                answerable,
-                answerable,
-                orZero(document.getTotalCredited()),
-                orZero(document.getTotalRefunded()),
-                voided ? BigDecimal.ZERO : DocumentTotals.refundDue(document),
-                credited == null
-                        ? null
-                        : new PublicDocumentResponse.PublicCreditedDocument(
-                                credited.getDocumentType(), credited.getDocumentNumber(), credited.getIssueDate()),
-                document.getCreditReason(),
-                GstResponse.from(document));
-    }
-
-    private static String clientName(Document document) {
-        CustomerSnapshot client = document.getCustomerSnapshot();
-        return client == null || client.getName() == null || client.getName().isBlank()
-                ? "Your client"
-                : client.getName();
-    }
-
-    private static String title(Document document) {
-        return document.getDocumentType().getValue() + " " + document.getDocumentNumber();
+    @Transactional
+    public PublicDocumentResponse reportPayment(String token, ReportPaymentRequest request) {
+        return publicDocuments.reportPayment(requireLink(token).getDocument(), request);
     }
 
     private Document requireInBusiness(BusinessAccess access, String id) {
@@ -300,11 +268,4 @@ public class ShareService {
         return new ApiException(HttpStatus.NOT_FOUND, "This link doesn't work anymore");
     }
 
-    private static List<String> lines(String... values) {
-        return Stream.of(values).filter(value -> value != null && !value.isBlank()).toList();
-    }
-
-    private static BigDecimal orZero(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
-    }
 }

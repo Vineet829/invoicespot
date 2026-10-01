@@ -119,7 +119,7 @@ class DocumentServiceTest {
         return new CreateDocumentRequest(
                 CUSTOMER_ID.toString(),
                 new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1", null, null),
-                type, null, null, null, null, "USD", null, null, draft, null, null, null, null);
+                type, null, null, null, null, "USD", null, null, draft, null, null, null, null, null);
     }
 
     @Test
@@ -238,7 +238,7 @@ class DocumentServiceTest {
                 new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1", null, null),
                 "Invoice", null, null, null, rates, "USD",
                 List.of(new BillingItemDto("Design", new BigDecimal("100"), BigDecimal.ONE, discount, null, null, null)),
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     @Test
@@ -306,7 +306,7 @@ class DocumentServiceTest {
 
     private static UpdateDocumentRequest update(String type, List<BillingItemDto> items) {
         return new UpdateDocumentRequest(
-                null, null, type, null, null, null, null, null, items, null, null, null, null, null, null);
+                null, null, type, null, null, null, null, null, items, null, null, null, null, null, null, null);
     }
 
     @Test

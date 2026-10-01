@@ -60,7 +60,8 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) String declineReason,
         boolean expired,
         int remindersSent,
-        @JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRemindedAt) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRemindedAt,
+        boolean showPaymentDetails) {
 
     public static DocumentResponse from(Document document, Instant startOfToday) {
         return from(document, startOfToday, null);
@@ -141,7 +142,8 @@ public record DocumentResponse(
                 document.getDeclineReason(),
                 document.isExpired(startOfToday),
                 document.getRemindersSent(),
-                document.getLastRemindedAt());
+                document.getLastRemindedAt(),
+                document.isShowPaymentDetails());
     }
 
     // Invoices and receipts are the documents credit notes credit.

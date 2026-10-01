@@ -44,7 +44,10 @@ public record PublicDocumentResponse(
         BigDecimal refundDue,
         @JsonInclude(JsonInclude.Include.NON_NULL) PublicCreditedDocument credits,
         @JsonInclude(JsonInclude.Include.NON_NULL) String creditReason,
-        @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst,
+        @JsonInclude(JsonInclude.Include.NON_NULL) PublicPayment payment,
+        boolean canReportPayment,
+        List<PublicPaymentReport> paymentReports) {
 
     // The invoice or receipt a credit note credits, as its client knows it.
     public record PublicCreditedDocument(DocumentType documentType, String documentNumber, LocalDate issueDate) {}

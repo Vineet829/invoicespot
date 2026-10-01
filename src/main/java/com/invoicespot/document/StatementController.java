@@ -37,7 +37,7 @@ public class StatementController {
     public EmailDraftResponse emailDraft(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.statementDraft(access, id);
-        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
 
     @PostMapping("/email")

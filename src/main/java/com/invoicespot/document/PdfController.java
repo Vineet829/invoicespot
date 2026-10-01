@@ -60,7 +60,7 @@ public class PdfController {
             @PathVariable String id,
             @PathVariable String paymentId) {
         EmailDraft draft = documentMailService.receiptDraft(access, id, paymentId);
-        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
 
     @PostMapping("/{id}/payment/{paymentId}/receipt/email")
@@ -78,7 +78,7 @@ public class PdfController {
     public EmailDraftResponse reminderDraft(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.reminderDraft(access, id);
-        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
 
     @PostMapping("/{id}/remind")
@@ -94,7 +94,7 @@ public class PdfController {
     public EmailDraftResponse emailDraft(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.draft(access, id);
-        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message());
+        return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
 
     @PostMapping("/{id}/email")

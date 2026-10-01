@@ -128,6 +128,10 @@ public class Document extends BaseEntity {
     @Column(name = "terms_conditions", columnDefinition = "text")
     private String termsConditions;
 
+    // Whether an unpaid invoice shows how to pay it.
+    @Column(name = "show_payment_details", nullable = false)
+    private boolean showPaymentDetails = true;
+
     @Column(name = "status", nullable = false, length = 20)
     private DocumentStatus status = DocumentStatus.NOT_PAID;
 

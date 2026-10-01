@@ -25,4 +25,5 @@ public record CreateDocumentRequest(
         String exchangeRate,
         String placeOfSupply,
         Boolean reverseCharge,
-        String exportType) {}
+        String exportType,
+        Boolean showPaymentDetails) {}

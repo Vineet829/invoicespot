@@ -6,6 +6,7 @@ import com.invoicespot.business.Requires;
 import com.invoicespot.business.Permission;
 import com.invoicespot.document.dto.ShareLinkResponse;
 import com.invoicespot.document.dto.ShareStatusResponse;
+import com.invoicespot.document.dto.WhatsAppShareResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,12 @@ public class ShareController {
     public ShareStatusResponse status(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
         return shareService.status(access, id);
+    }
+
+    @PostMapping("/whatsapp")
+    public WhatsAppShareResponse whatsApp(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return shareService.whatsApp(access, id);
     }
 
     @DeleteMapping

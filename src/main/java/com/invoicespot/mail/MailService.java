@@ -40,6 +40,21 @@ public class MailService {
         }
     }
 
+    // An email from a business with nothing attached, sent at once, so a
+    // failure reaches the person sending.
+    public void sendFromBusiness(String to, String replyTo, String subject, String body) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message);
+        helper.setFrom(from);
+        helper.setTo(to);
+        if (replyTo != null && !replyTo.isBlank()) {
+            helper.setReplyTo(replyTo);
+        }
+        helper.setSubject(subject);
+        helper.setText(body);
+        mailSender.send(message);
+    }
+
     public void sendDocument(
             String to,
             String replyTo,

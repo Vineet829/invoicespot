@@ -65,8 +65,10 @@ app:
     access-secret: ${JWT_ACCESS_SECRET_KEY}
     access-token-ttl: PT10M
     refresh-token-ttl: P1D
-  two-factor:
-    encryption-key: ${APP_ENCRYPTION_KEY:}
+  # The one key secrets are sealed with, such as two-factor secrets. 32 random
+  # bytes, base64.
+  encryption:
+    key: ${APP_ENCRYPTION_KEY:}
   cookie:
     refresh-name: jwt
     path: /

@@ -14,6 +14,8 @@ public enum RateLimit {
     VERIFICATION_EMAIL(5, Duration.ofHours(1), "Too many verification emails requested"),
     OUTGOING_EMAIL(30, Duration.ofHours(1), "Too many emails sent"),
     SHARED_DOCUMENT(60, Duration.ofMinutes(1), "Too many requests for shared documents"),
+    PAYMENT_CLAIM(5, Duration.ofHours(1), "Too many payments reported from this network"),
+    CLIENT_PORTAL(60, Duration.ofMinutes(1), "Too many requests for client portals"),
     INVITATION(20, Duration.ofHours(1), "Too many invitations sent"),
     INVITATION_LOOKUP(30, Duration.ofMinutes(1), "Too many requests for invitations"),
     // A business's whole archive is built in memory each time.

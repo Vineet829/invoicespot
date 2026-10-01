@@ -2,8 +2,10 @@ package com.invoicespot.document;
 
 import com.invoicespot.business.Business;
 import com.invoicespot.common.MoneyFormat;
+import com.invoicespot.common.QrCode;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.document.dto.BillingItemResponse;
+import com.invoicespot.payment.UpiPayment;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.tax.AmountInWords;
 import com.invoicespot.tax.GstStates;
@@ -159,7 +161,8 @@ public class PdfService {
     // A draft has no number yet, and is marked as one on every page; a void
     // document is marked void, and says when and why. Lines taxed at more
     // than one rate show each line's rate and a table of what each rate
-    // charged.
+    // charged. An unpaid invoice says how to pay it, and in rupees with a UPI
+    // ID carries a QR code to pay its balance.
     public record View(
             String watermark,
             String voidNote,
@@ -184,7 +187,12 @@ public class PdfService {
             String reference,
             String reason,
             String rateHeader,
-            Gst gst) {}
+            Gst gst,
+            PaymentSection payment,
+            Upi upi) {}
+
+    // A UPI QR code as a PNG data URI, and what it asks the payer to do.
+    public record Upi(String image, String caption) {}
 
     // What a GST invoice adds: each rate's CGST and SGST (UTGST in a union
     // territory without a legislature) or IGST, whether the recipient pays
@@ -352,6 +360,7 @@ public class PdfService {
         }
         BigDecimal refundDue = voided ? BigDecimal.ZERO : DocumentTotals.refundDue(document);
         Document credited = document.getCredited();
+        PaymentSection payment = PaymentSection.of(document, settings.getPaymentDetails()).orElse(null);
 
         return new View(
                 draft ? "DRAFT" : voided ? "VOID" : null,
@@ -393,7 +402,17 @@ public class PdfService {
                 credited == null ? null : reference(credited),
                 blankToNull(document.getCreditReason()),
                 gst ? "GST" : "Tax",
-                gst ? gst(document, seller, currency) : null);
+                gst ? gst(document, seller, currency) : null,
+                payment,
+                payment == null || payment.upi() == null ? null : upi(payment.upi()));
+    }
+
+    private static Upi upi(UpiPayment upi) {
+        return new Upi(
+                QrCode.dataUri(upi.uri()),
+                upi.amountIncluded()
+                        ? "Scan to pay INR " + money(upi.amount(), "INR") + " with any UPI app"
+                        : "Scan with any UPI app and enter the amount. UPI limits apply");
     }
 
     // A GST invoice is a tax invoice, or a bill of supply when nothing on it

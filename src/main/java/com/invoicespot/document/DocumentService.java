@@ -23,6 +23,7 @@ import com.invoicespot.document.dto.VoidDocumentRequest;
 import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.EmailTemplateKind;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.tax.Gstin;
 import com.invoicespot.tax.HsnSac;
@@ -37,8 +38,10 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -117,6 +120,7 @@ public class DocumentService {
         document.setDueDate(takesDueDate(document) ? request.dueDate() : null);
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
+        document.setShowPaymentDetails(!Boolean.FALSE.equals(request.showPaymentDetails()));
         document.setCurrency(request.currency());
         exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
         document.setBillingItems(toBillingItems(request.billingItems(), percentage(request.rates(), "Tax rate")));
@@ -281,21 +285,106 @@ public class DocumentService {
                 "You are not authorized to view this document. It's not yours");
     }
 
-    private static DocumentEnvelope envelope(Document document) {
-        CustomerSnapshot customer = document.getCustomerSnapshot();
+    // A document's email: its title, number and total, and for an invoice
+    // what is left to pay and when it is due, or for a quotation the day it is
+    // valid until.
+    private DocumentEnvelope envelope(Document document) {
+        DocumentType type = document.getDocumentType();
         String title = document.getDocumentNumber() == null
-                ? document.getDocumentType().getValue()
-                : document.getDocumentType().getValue() + " " + document.getDocumentNumber();
+                ? type.getValue()
+                : type.getValue() + " " + document.getDocumentNumber();
+        Map<String, String> values = new HashMap<>();
+        values.put("document", title);
+        values.put("number", Objects.requireNonNullElse(document.getDocumentNumber(), ""));
+        values.put("amount", total(document));
+        if (type == DocumentType.INVOICE) {
+            values.put("balance", DocumentActivity.amount(document, DocumentTotals.balanceDue(document)));
+            values.put("payment", howToPay(document));
+        }
+        if (type == DocumentType.INVOICE || type == DocumentType.QUOTATION) {
+            values.put("due", Objects.requireNonNullElse(dueDate(document), ""));
+        }
+        return envelope(emailKind(type), title, document, values);
+    }
+
+    private static DocumentEnvelope envelope(
+            EmailTemplateKind kind, String title, Document document, Map<String, String> values) {
+        CustomerSnapshot customer = document.getCustomerSnapshot();
         return new DocumentEnvelope(
+                kind,
                 title,
                 customer == null ? null : customer.getName(),
-                customer == null ? null : customer.getEmail());
+                customer == null ? null : customer.getEmail(),
+                values,
+                document.getId());
+    }
+
+    // How to pay an unpaid invoice that shows it, as email lines; nothing
+    // otherwise.
+    private String howToPay(Document document) {
+        return PaymentSection.of(
+                        document, settingsService.forBusiness(document.getBusiness().getPkid()).getPaymentDetails())
+                .map(PaymentSection::text)
+                .orElse("");
+    }
+
+    private static EmailTemplateKind emailKind(DocumentType type) {
+        return switch (type) {
+            case INVOICE -> EmailTemplateKind.INVOICE;
+            case QUOTATION -> EmailTemplateKind.QUOTATION;
+            case RECEIPT -> EmailTemplateKind.RECEIPT;
+            case CREDIT_NOTE -> EmailTemplateKind.CREDIT_NOTE;
+        };
+    }
+
+    private static String total(Document document) {
+        return DocumentActivity.amount(document, Objects.requireNonNullElse(document.getTotal(), BigDecimal.ZERO));
+    }
+
+    // The day a document is due, in the business's time zone.
+    private String dueDate(Document document) {
+        return document.getDueDate() == null
+                ? null
+                : PdfService.DATE.format(document.getDueDate().atZone(zoneOf(document.getBusiness().getPkid())));
+    }
+
+    // The latest email of a kind the business could send, for previewing what
+    // its subject and message would say.
+    @Transactional(readOnly = true)
+    public DocumentEnvelope latestEnvelope(BusinessAccess access, EmailTemplateKind kind) {
+        Long businessPkid = access.businessPkid();
+        PageRequest latest = PageRequest.of(0, 1);
+        return switch (kind) {
+            case REMINDER -> documentRepository
+                    .findLatestUnpaid(businessPkid, DocumentType.INVOICE, DocumentStatus.PAID, latest)
+                    .stream()
+                    .findFirst()
+                    .map(this::reminderEnvelope)
+                    .orElseThrow(() -> nothingToPreview("unpaid invoice"));
+            case PAYMENT_RECEIPT -> documentRepository.findLatestPayments(businessPkid, latest).stream()
+                    .findFirst()
+                    .map(payment -> receiptEnvelope(payment.getDocument(), payment))
+                    .orElseThrow(() -> nothingToPreview("payment"));
+            case STATEMENT -> throw new IllegalArgumentException("A statement isn't a document's email");
+            default -> {
+                DocumentType type = DocumentType.valueOf(kind.name());
+                yield documentRepository.findLatestIssued(businessPkid, type, latest).stream()
+                        .findFirst()
+                        .map(this::envelope)
+                        .orElseThrow(() -> nothingToPreview("issued " + kind.noun()));
+            }
+        };
+    }
+
+    static ApiException nothingToPreview(String what) {
+        return new ApiException(HttpStatus.NOT_FOUND, "There's no " + what + " to preview this email with yet");
     }
 
     // A draft changes freely. An issued document keeps its client, lines,
-    // currency, tax and issue date: only its due date, notes and terms change,
-    // and its amounts stay as they went out. It is locked while it changes,
-    // so an edit can't land on a draft that was issued meanwhile.
+    // currency, tax and issue date: only its due date, notes and terms, and
+    // whether it shows how to pay, change. Its amounts stay as they went out.
+    // It is locked while it changes, so an edit can't land on a draft that was
+    // issued meanwhile.
     @Transactional
     public DocumentResponse update(BusinessAccess access, String id, UpdateDocumentRequest request) {
         Document document = lockInBusiness(
@@ -341,6 +430,9 @@ public class DocumentService {
         }
         if (request.termsConditions() != null) {
             document.setTermsConditions(request.termsConditions());
+        }
+        if (request.showPaymentDetails() != null) {
+            document.setShowPaymentDetails(request.showPaymentDetails());
         }
         boolean currencyChanged = request.currency() != null && !request.currency().equals(document.getCurrency());
         if (request.currency() != null) {
@@ -471,6 +563,7 @@ public class DocumentService {
                 .toInstant());
         copy.setAdditionalInfo(original.getAdditionalInfo());
         copy.setTermsConditions(original.getTermsConditions());
+        copy.setShowPaymentDetails(original.isShowPaymentDetails());
         copy.setCurrency(original.getCurrency());
         // A GST copy goes where the original went, until it is saved again.
         copy.setPlaceOfSupply(original.getPlaceOfSupply());
@@ -532,6 +625,13 @@ public class DocumentService {
     @Transactional
     public DocumentResponse addPayment(BusinessAccess access, String id, CreatePaymentRequest request) {
         Document document = lockInBusiness(access, id);
+        recordPayment(document, request, actor(access));
+        return respond(document);
+    }
+
+    // Records a payment on a document the caller has locked, as everything
+    // that takes a payment does, and returns it.
+    public Payment recordPayment(Document document, CreatePaymentRequest request, User actor) {
         requireIssued(document, "Issue this draft before recording a payment");
         requireNotVoid(document, "A void document can't take payments");
         if (document.getDocumentType() == DocumentType.QUOTATION) {
@@ -564,8 +664,8 @@ public class DocumentService {
                 DocumentEventType.PAYMENT_RECORDED,
                 DocumentActivity.paymentDetail(document, payment),
                 payment.getPkid(),
-                actor(access));
-        return respond(document);
+                actor);
+        return payment;
     }
 
     @Transactional
@@ -683,13 +783,13 @@ public class DocumentService {
                                 .map(paid -> paid.getAmountPaid().add(paid.getTdsAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add),
                         document.getBusiness()),
-                receiptEnvelope(document, number));
+                receiptEnvelope(document, payment));
     }
 
     @Transactional(readOnly = true)
     public DocumentEnvelope receiptEnvelope(BusinessAccess access, String id, String paymentId) {
         Document document = requireReadable(access, id);
-        return receiptEnvelope(document, receiptNumber(document, requirePayment(document, paymentId)));
+        return receiptEnvelope(document, requirePayment(document, paymentId));
     }
 
     @Transactional
@@ -705,26 +805,33 @@ public class DocumentService {
     }
 
     @Transactional(readOnly = true)
-    public ReminderFacts reminderFacts(BusinessAccess access, String id) {
+    public DocumentEnvelope reminderEnvelope(BusinessAccess access, String id) {
         Document document = requireReadable(access, id);
         requireIssued(document, "Issue this draft before sending a reminder");
         requireNotVoid(document, "A void document needs no reminder");
         if (document.getDocumentType() != DocumentType.INVOICE || document.getStatus() == DocumentStatus.PAID) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an unpaid invoice needs a reminder");
         }
-        return reminderFacts(document);
+        return reminderEnvelope(document);
     }
 
-    ReminderFacts reminderFacts(Document document) {
-        ZoneId zone = zoneOf(document.getBusiness().getPkid());
-        CustomerSnapshot customer = document.getCustomerSnapshot();
-        return new ReminderFacts(
-                document.getDocumentType().getValue() + " " + document.getDocumentNumber(),
-                customer == null ? null : customer.getName(),
-                customer == null ? null : customer.getEmail(),
-                DocumentActivity.amount(document, DocumentTotals.balanceDue(document)),
-                document.getDueDate() == null ? null : PdfService.DATE.format(document.getDueDate().atZone(zone)),
-                DocumentTotals.isOverdue(document, startOfToday(zone)));
+    // A reminder names what is still owed and when it was, or is, due.
+    private DocumentEnvelope reminderEnvelope(Document document) {
+        String title = document.getDocumentType().getValue() + " " + document.getDocumentNumber();
+        String due = dueDate(document);
+        boolean overdue = DocumentTotals.isOverdue(
+                document, startOfToday(zoneOf(document.getBusiness().getPkid())));
+        Map<String, String> values = new HashMap<>();
+        values.put("document", title);
+        values.put("number", document.getDocumentNumber());
+        values.put("amount", total(document));
+        values.put("balance", DocumentActivity.amount(document, DocumentTotals.balanceDue(document)));
+        values.put("due", Objects.requireNonNullElse(due, ""));
+        values.put("due_status", due == null
+                ? "is still open"
+                : overdue ? "was due on " + due + " and is still open" : "is due on " + due);
+        values.put("payment", howToPay(document));
+        return envelope(EmailTemplateKind.REMINDER, title, document, values);
     }
 
     @Transactional
@@ -752,12 +859,17 @@ public class DocumentService {
         return document.getDocumentNumber() + "-P" + payment.getReceiptNumber();
     }
 
-    private static DocumentEnvelope receiptEnvelope(Document document, String number) {
-        CustomerSnapshot customer = document.getCustomerSnapshot();
-        return new DocumentEnvelope(
-                "Payment receipt " + number,
-                customer == null ? null : customer.getName(),
-                customer == null ? null : customer.getEmail());
+    // A payment receipt's email: the receipt, what was paid, and what is
+    // still to pay on the document.
+    private static DocumentEnvelope receiptEnvelope(Document document, Payment payment) {
+        String number = receiptNumber(document, payment);
+        String title = "Payment receipt " + number;
+        Map<String, String> values = new HashMap<>();
+        values.put("document", title);
+        values.put("number", number);
+        values.put("amount", DocumentActivity.amount(document, payment.getAmountPaid()));
+        values.put("balance", DocumentActivity.amount(document, DocumentTotals.balanceDue(document)));
+        return envelope(EmailTemplateKind.PAYMENT_RECEIPT, title, document, values);
     }
 
     // The document, locked until the transaction ends, so two changes to it

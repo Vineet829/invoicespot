@@ -29,7 +29,6 @@ public record UpdateSettingsRequest(
                 String taxLabel,
         @Size(max = 5000, message = "Default notes can be at most 5,000 characters") String defaultNotes,
         @Size(max = 5000, message = "Default terms can be at most 5,000 characters") String defaultTerms,
-        @Size(max = 5000, message = "The email message can be at most 5,000 characters") String emailMessage,
         @NotBlank(message = "Choose a time zone") @Size(max = 64, message = "Choose a time zone") String timeZone,
         @Size(max = 20, message = "Prefixes can be at most 20 characters")
                 @Pattern(
