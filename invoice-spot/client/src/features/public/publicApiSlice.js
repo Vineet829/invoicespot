@@ -1,7 +1,8 @@
 import { baseApiSlice } from "../api/baseApiSlice";
 import { fetchFile } from "../api/fetchFile";
 
-// The page shows a quotation as the answer left it.
+// The page shows a quotation as the answer left it, and an invoice with the
+// payment its client just reported.
 const showAnswer = async (token, { dispatch, queryFulfilled }) => {
   try {
     const { data } = await queryFulfilled;
@@ -38,6 +39,14 @@ export const publicApiSlice = baseApiSlice.injectEndpoints({
       }),
       onQueryStarted: ({ token }, api) => showAnswer(token, api),
     }),
+    reportSharedPayment: builder.mutation({
+      query: ({ token, ...report }) => ({
+        url: `/public/share/${token}/payment-claims`,
+        method: "POST",
+        body: report,
+      }),
+      onQueryStarted: ({ token }, api) => showAnswer(token, api),
+    }),
     getSharedPdf: builder.mutation({
       queryFn: (token, _api, _extraOptions, baseQuery) =>
         fetchFile(baseQuery, `/public/share/${token}/pdf`),
@@ -50,4 +59,5 @@ export const {
   useAcceptSharedDocumentMutation,
   useDeclineSharedDocumentMutation,
   useGetSharedPdfMutation,
+  useReportSharedPaymentMutation,
 } = publicApiSlice;

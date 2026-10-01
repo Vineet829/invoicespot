@@ -86,7 +86,12 @@ const EVENTS = {
     icon: FiSend,
     text: (detail) => `Emailed receipt ${detail}`,
   },
-  SHARED: { icon: FiLink, text: () => "Share link created" },
+  // A link made to send in a message says so: "for an email".
+  SHARED: {
+    icon: FiLink,
+    text: (detail) =>
+      detail ? `Share link created ${detail}` : "Share link created",
+  },
   SHARE_REVOKED: { icon: FiLink2, text: () => "Share link turned off" },
   VIEWED: { icon: FiEye, text: () => "Viewed by the client" },
   ACCEPTED: { icon: FiCheckCircle, text: () => "Accepted by the client" },
@@ -96,6 +101,18 @@ const EVENTS = {
       detail ? `Declined by the client: ${detail}` : "Declined by the client",
   },
   REMINDED: { icon: FiBell, text: (detail) => `Reminder sent ${detail}` },
+  PAYMENT_REPORTED: {
+    icon: FiDollarSign,
+    text: (detail) => `Payment reported by the client: ${detail}`,
+  },
+  PAYMENT_REPORT_CONFIRMED: {
+    icon: FiCheckCircle,
+    text: (detail) => `Reported payment confirmed: ${detail}`,
+  },
+  PAYMENT_REPORT_DISMISSED: {
+    icon: FiXCircle,
+    text: (detail) => `Reported payment dismissed: ${detail}`,
+  },
   // The detail names the template and how often it repeats: "INV-1 · monthly".
   RECURRING: {
     icon: FiRepeat,

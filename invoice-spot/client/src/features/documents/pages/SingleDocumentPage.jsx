@@ -67,6 +67,7 @@ import {
   textLink,
 } from "../../../components/workspace/pastel";
 import PaymentForm from "./PaymentForm";
+import PaymentClaims from "../components/PaymentClaims";
 import PaymentsLedger from "../components/PaymentsLedger";
 import LineName from "../../gst/LineName";
 
@@ -766,6 +767,9 @@ const SingleDocumentPage = () => {
                 document.refunds?.length > 0) && (
                 <RefundsPanel document={document} refusal={editRefusal} />
               )}
+            {document.documentType === "Invoice" && !draft && !voided && (
+              <PaymentClaims document={document} refusal={editRefusal} />
+            )}
             {document.documentType === "Invoice" &&
               !draft &&
               !voided &&

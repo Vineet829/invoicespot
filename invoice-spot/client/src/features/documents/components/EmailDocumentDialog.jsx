@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiSend } from "react-icons/fi";
+import { FiAlertTriangle, FiSend } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Dialog } from "../../../components/workspace/Dialog";
 import { Field, errorMessage } from "../../../components/workspace/Workspace";
@@ -24,6 +24,7 @@ const EmailForm = ({ draft, sending, onSend, onClose }) => {
   });
   const update = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
+  const linked = (form.subject + form.message).includes("{link}");
   return (
     <form
       className="mt-5 flex flex-col gap-4"
@@ -32,6 +33,15 @@ const EmailForm = ({ draft, sending, onSend, onClose }) => {
         onSend(form);
       }}
     >
+      {draft.note && (
+        <p
+          className="flex items-start gap-3 rounded-2xl bg-overdue/70 px-4 py-3 text-[13.5px] leading-[1.6] text-overdue-ink [&>svg]:mt-0.5 [&>svg]:size-4 [&>svg]:shrink-0"
+          role="note"
+        >
+          <FiAlertTriangle aria-hidden="true" />
+          {draft.note}
+        </p>
+      )}
       <Field
         label="To"
         type="email"
@@ -58,7 +68,7 @@ const EmailForm = ({ draft, sending, onSend, onClose }) => {
         maxLength={5000}
         value={form.message}
         onChange={update("message")}
-        hint="The PDF is attached, and replies come to your email address."
+        hint={`The PDF is attached, and replies come to your email address.${linked ? " {link} becomes the document’s link when you send." : ""}`}
       />
       <div className="mt-3 flex flex-wrap justify-end gap-2.5">
         <button
@@ -79,7 +89,8 @@ const EmailForm = ({ draft, sending, onSend, onClose }) => {
 };
 
 // Emails a PDF. The server suggests the recipient, subject and message in
-// `draft`; each can be changed before sending.
+// `draft`, and notes anything sending will do; each can be changed before
+// sending.
 export const EmailDialog = ({
   title,
   open,

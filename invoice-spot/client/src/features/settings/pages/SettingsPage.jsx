@@ -88,7 +88,6 @@ const SettingsForm = ({ settings }) => {
     taxLabel: settings.taxLabel,
     defaultNotes: settings.defaultNotes || "",
     defaultTerms: settings.defaultTerms || "",
-    emailMessage: settings.emailMessage || "",
     // A user who never saved settings starts with this browser's zone.
     timeZone:
       settings.timeZone === "UTC" && !settings.saved
@@ -290,20 +289,6 @@ const SettingsForm = ({ settings }) => {
           </Panel>
         </div>
         <div className="flex min-w-0 flex-col gap-6 compact:gap-5">
-          <Panel
-            title="Emails"
-            description="The message when you email a document."
-          >
-            <Field
-              label="Message"
-              as="textarea"
-              maxLength={5000}
-              value={values.emailMessage}
-              onChange={change("emailMessage")}
-              disabled={locked}
-              hint="{client}, {document} and {business} are filled in for each email. Leave it empty for the standard message."
-            />
-          </Panel>
           <Panel
             title="Numbering"
             description="New documents count up from these. Numbers already used are skipped."

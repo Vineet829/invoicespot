@@ -96,6 +96,22 @@ it("taxes each rate's lines together, rounding once per rate, as the server does
   });
 });
 
+it("sends whether an invoice shows how to pay, and leaves it out for other types", () => {
+  expect(
+    documentPayload({ ...input, showPaymentDetails: false }).showPaymentDetails,
+  ).toBe(false);
+  expect(
+    documentPayload({ ...input, showPaymentDetails: true }).showPaymentDetails,
+  ).toBe(true);
+  expect(
+    documentPayload({
+      ...input,
+      documentType: "Quotation",
+      showPaymentDetails: false,
+    }).showPaymentDetails,
+  ).toBeUndefined();
+});
+
 it("serializes only the existing backend document fields with their DTO types", () => {
   expect(documentPayload(input)).toEqual({
     customerId: "client-1",

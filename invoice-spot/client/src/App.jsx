@@ -31,8 +31,12 @@ import BusinessGate from "./features/business/BusinessGate";
 import WelcomePage from "./features/business/pages/WelcomePage";
 import AcceptInvitePage from "./features/business/pages/AcceptInvitePage";
 import TeamPage from "./features/settings/pages/TeamPage";
+import PaymentDetailsPage from "./features/settings/pages/PaymentDetailsPage";
+import EmailTemplatesPage from "./features/settings/pages/EmailTemplatesPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
+import ClientPortalPage from "./features/portal/pages/ClientPortalPage";
+import PortalDocumentPage from "./features/portal/pages/PortalDocumentPage";
 import RecurringPage from "./features/recurring/pages/RecurringPage";
 import ReportsPage from "./features/reports/pages/ReportsPage";
 
@@ -52,6 +56,8 @@ const App = () => {
           />
           <Route path="auth/reset_password" element={<PasswordResetPage />} />
           <Route path="p/:token" element={<SharedDocumentPage />} />
+          <Route path="c/:token" element={<ClientPortalPage />} />
+          <Route path="c/:token/doc" element={<PortalDocumentPage />} />
           <Route path="invite/:token" element={<AcceptInvitePage />} />
           {/* Private Routes - Users */}
           <Route element={<AuthRequired allowedRoles={[ROLES.User]} />}>
@@ -66,6 +72,11 @@ const App = () => {
                 path="settings/business"
                 element={<BusinessProfilePage />}
               />
+              <Route
+                path="settings/payments"
+                element={<PaymentDetailsPage />}
+              />
+              <Route path="settings/emails" element={<EmailTemplatesPage />} />
               <Route path="settings/team" element={<TeamPage />} />
               <Route path="items" element={<ItemsPage />} />
               <Route path="customers" element={<CustomersPage />} />

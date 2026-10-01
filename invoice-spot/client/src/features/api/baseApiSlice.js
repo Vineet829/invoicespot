@@ -95,6 +95,7 @@ export const baseApiSlice = createApi({
     "Business",
     "Team",
     "Invitation",
+    "Portal",
   ],
   endpoints: (builder) => ({}),
 });

@@ -32,8 +32,8 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       query: (id) => ({ url: `/document/${id}/credit-note`, method: "POST" }),
       invalidatesTags: ["Document"],
     }),
-    // A document's share link. The server keeps only a hash of it, so the
-    // link itself comes back once, from createShareLink.
+    // A document's share link. Its status includes the link itself when the
+    // server kept it sealed; otherwise only createShareLink returns it, once.
     getShareStatus: builder.query({
       query: (id) => `/document/${id}/share`,
       providesTags: ["Document"],
@@ -44,6 +44,42 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
     }),
     revokeShareLink: builder.mutation({
       query: (id) => ({ url: `/document/${id}/share`, method: "DELETE" }),
+      invalidatesTags: ["Document"],
+    }),
+    // A wa.me link to send the document's link in a WhatsApp message, making
+    // the link if it has none.
+    shareOnWhatsApp: builder.mutation({
+      query: (id) => ({
+        url: `/document/${id}/share/whatsapp`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    // Payments the client reported from the share page, newest first, and
+    // what the business decided.
+    // Every report waiting in the business, newest first.
+    getWaitingPaymentClaims: builder.query({
+      query: () => "/payment-claims",
+      providesTags: ["Document"],
+    }),
+    getPaymentClaims: builder.query({
+      query: (id) => `/document/${id}/payment-claims`,
+      providesTags: ["Document"],
+    }),
+    confirmPaymentClaim: builder.mutation({
+      query: ({ id, claimId, ...payment }) => ({
+        url: `/document/${id}/payment-claims/${claimId}/confirm`,
+        method: "POST",
+        body: payment,
+      }),
+      invalidatesTags: ["Document"],
+    }),
+    dismissPaymentClaim: builder.mutation({
+      query: ({ id, claimId, reason }) => ({
+        url: `/document/${id}/payment-claims/${claimId}/dismiss`,
+        method: "POST",
+        body: { reason },
+      }),
       invalidatesTags: ["Document"],
     }),
     // What happened to a document, newest first.
@@ -227,4 +263,9 @@ export const {
   useIssueDocMutation,
   useUpdateDocMutation,
   useVoidDocMutation,
+  useShareOnWhatsAppMutation,
+  useGetPaymentClaimsQuery,
+  useGetWaitingPaymentClaimsQuery,
+  useConfirmPaymentClaimMutation,
+  useDismissPaymentClaimMutation,
 } = documentsApiSlice;

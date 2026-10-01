@@ -62,6 +62,45 @@ export const customersApiSlice = baseApiSlice.injectEndpoints({
       query: (custId) => `/customer/${custId}/statement/email`,
       keepUnusedDataFor: 0,
     }),
+    // The client's portal link: its status, including the link itself when
+    // the server kept it sealed.
+    getPortalStatus: builder.query({
+      query: (custId) => `/customer/${custId}/portal`,
+      providesTags: ["Customer"],
+    }),
+    createPortalLink: builder.mutation({
+      query: (custId) => ({
+        url: `/customer/${custId}/portal`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Customer"],
+    }),
+    getPortalEmailDraft: builder.query({
+      query: (custId) => `/customer/${custId}/portal/email`,
+      keepUnusedDataFor: 0,
+    }),
+    emailPortal: builder.mutation({
+      query: ({ id, ...email }) => ({
+        url: `/customer/${id}/portal/email`,
+        method: "POST",
+        body: email,
+      }),
+      invalidatesTags: ["Customer"],
+    }),
+    sharePortalOnWhatsApp: builder.mutation({
+      query: (custId) => ({
+        url: `/customer/${custId}/portal/whatsapp`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Customer"],
+    }),
+    revokePortalLink: builder.mutation({
+      query: (custId) => ({
+        url: `/customer/${custId}/portal`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Customer"],
+    }),
     emailStatement: builder.mutation({
       query: ({ id, ...email }) => ({
         url: `/customer/${id}/statement/email`,
@@ -101,4 +140,10 @@ export const {
   useCreateCustomerMutation,
   useUpdateCustomerInfoMutation,
   useDeleteCustomerMutation,
+  useGetPortalStatusQuery,
+  useCreatePortalLinkMutation,
+  useRevokePortalLinkMutation,
+  useGetPortalEmailDraftQuery,
+  useEmailPortalMutation,
+  useSharePortalOnWhatsAppMutation,
 } = customersApiSlice;
