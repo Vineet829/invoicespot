@@ -56,7 +56,6 @@ import {
   StatusBadge,
   Amount,
   dateInput,
-  dateInstant,
   errorMessage,
   money,
 } from "../../../components/workspace/Workspace";
@@ -306,7 +305,7 @@ const DocumentFields = ({
             customer,
             documentType,
             issueDate,
-            dueDate: dateInstant(dueDate),
+            dueDate: dueDate || null,
             currency,
             exchangeRate: foreign ? exchangeRate : "",
             items,
@@ -837,7 +836,7 @@ const DocumentFields = ({
                               "LUT",
                               "Under your LUT, without IGST",
                               settings?.lutReference
-                                ? `Lines are saved at 0%. LUT ${settings.lutReference}.`
+                                ? `Lines are issued at 0%. LUT ${settings.lutReference}.`
                                 : "Add your LUT reference in Settings first.",
                             ],
                             [

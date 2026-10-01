@@ -5,7 +5,6 @@ import { Dialog } from "../../../components/workspace/Dialog";
 import {
   Field,
   dateInput,
-  dateInstant,
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
@@ -33,7 +32,7 @@ const DetailsForm = ({ document, onClose }) => {
     try {
       const result = await update({
         id: document._id,
-        ...(!receipt && dueDate && { dueDate: dateInstant(dueDate) }),
+        ...(!receipt && dueDate && { dueDate }),
         additionalInfo: notes,
         termsConditions: terms,
         ...(invoice && { showPaymentDetails }),
