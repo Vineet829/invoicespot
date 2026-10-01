@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import * as Yup from "yup";
 import useTitle from "../../../hooks/useTitle";
 import PublicPage, { CardHeading } from "../../../components/public/PublicPage";
+import { errorMessage } from "../../../components/workspace/Workspace";
 import {
   fieldLabel,
   inputControl,
@@ -107,8 +108,13 @@ const PasswordResetPage = () => {
             setStatus({ success: true });
             setSubmitting(false);
           } catch (err) {
-            const message = err.data.message;
-            toast.error(message);
+            // A server that can't be reached sends no message of its own.
+            toast.error(
+              errorMessage(
+                err,
+                "Your password could not be reset. Please try again.",
+              ),
+            );
             setStatus({ success: false });
             setSubmitting(false);
           }

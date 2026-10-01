@@ -58,7 +58,6 @@ export const auth = {
   dividerLine:
     "h-px flex-1 animate-auth-divider bg-[linear-gradient(90deg,transparent,#5b47a040,transparent,#5b47a040,transparent)] bg-[length:200%_100%]",
   dividerText: "whitespace-nowrap text-[12px] leading-none text-spot-muted",
-  terms: `text-center text-[12px] leading-[1.6] text-spot-muted ${underlinedLinks}`,
   foot: "flex flex-col gap-3.5",
   cta: "group flex items-center justify-between gap-3 rounded-xl border border-spot-violet/[.12] bg-[linear-gradient(135deg,#7c62d614,#7c62d605)] px-3.5 py-[11px] transition-colors duration-200 hover:border-spot-violet/30 hover:bg-[linear-gradient(135deg,#7c62d626,#7c62d60a)] max-[379px]:flex-col max-[379px]:items-start max-[379px]:gap-2",
   ctaText: "text-[13px] leading-[1.3] text-spot-sub",

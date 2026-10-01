@@ -37,12 +37,15 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
         fetchWorkspaceRows(baseQuery, "/customer/all", "myCustomers"),
       providesTags: ["Customer"],
     }),
+    // The logo's address comes back as text; a refusal comes back as the
+    // usual error, so its message can be shown.
     uploadProfileLogo: builder.mutation({
       query: (body) => ({
         url: "/upload",
         method: "PATCH",
         body,
-        responseHandler: "text",
+        responseHandler: (response) =>
+          response.ok ? response.text() : response.json(),
       }),
     }),
   }),

@@ -1,31 +1,32 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { decodeToken } from "react-jwt";
+import { readSavedUser } from "./savedSession";
 
-const user = JSON.parse(localStorage.getItem("user"));
+const user = readSavedUser(localStorage);
 const googleToken = localStorage.getItem("googleToken");
 
 const decodedToken = decodeToken(googleToken);
 
 const initialState = {
-	user: user ? user : decodedToken,
-	googleToken: googleToken ? googleToken : null,
+  user: user ? user : decodedToken,
+  googleToken: googleToken ? googleToken : null,
 };
 
 const authSlice = createSlice({
-	name: "auth",
-	initialState,
-	reducers: {
-		logIn: (state, action) => {
-			state.user = action.payload;
-			localStorage.setItem("user", JSON.stringify(action.payload));
-		},
-		logOut: (state, action) => {
-			state.user = null;
-			state.googleToken = null;
-			localStorage.removeItem("user");
-			localStorage.removeItem("googleToken");
-		},
-	},
+  name: "auth",
+  initialState,
+  reducers: {
+    logIn: (state, action) => {
+      state.user = action.payload;
+      localStorage.setItem("user", JSON.stringify(action.payload));
+    },
+    logOut: (state, action) => {
+      state.user = null;
+      state.googleToken = null;
+      localStorage.removeItem("user");
+      localStorage.removeItem("googleToken");
+    },
+  },
 });
 
 export const { logIn, logOut } = authSlice.actions;

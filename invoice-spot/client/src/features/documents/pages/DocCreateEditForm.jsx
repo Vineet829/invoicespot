@@ -490,14 +490,22 @@ const DocumentFields = ({
                       }
                       disabled={busy}
                     />
-                    <Field
-                      label="Due date"
-                      type="date"
-                      required
-                      value={dueDate}
-                      onChange={(event) => setDueDate(event.target.value)}
-                      disabled={busy}
-                    />
+                    {/* A receipt is paid as it is made, so it has no due
+                        date; a quotation is valid until a day instead. */}
+                    {documentType !== "Receipt" && (
+                      <Field
+                        label={
+                          documentType === "Quotation"
+                            ? "Valid until"
+                            : "Due date"
+                        }
+                        type="date"
+                        required={documentType === "Invoice"}
+                        value={dueDate}
+                        onChange={(event) => setDueDate(event.target.value)}
+                        disabled={busy}
+                      />
+                    )}
                     <dl className="grid gap-4">
                       <div>
                         <dt className={panelNote}>Payment status</dt>

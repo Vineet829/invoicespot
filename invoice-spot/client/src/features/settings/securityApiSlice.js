@@ -40,7 +40,8 @@ export const securityApiSlice = baseApiSlice.injectEndpoints({
         method: "POST",
         body: { code },
       }),
-      invalidatesTags: ["TwoFactor", "Activity"],
+      // Turning it on or off signs out the other devices.
+      invalidatesTags: ["TwoFactor", "Activity", "Session"],
     }),
     disableTwoFactor: builder.mutation({
       query: ({ password, code }) => ({
@@ -48,7 +49,7 @@ export const securityApiSlice = baseApiSlice.injectEndpoints({
         method: "POST",
         body: { password, code },
       }),
-      invalidatesTags: ["TwoFactor", "Activity"],
+      invalidatesTags: ["TwoFactor", "Activity", "Session"],
     }),
     renewRecoveryCodes: builder.mutation({
       query: (code) => ({

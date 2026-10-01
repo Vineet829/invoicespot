@@ -17,6 +17,7 @@ import {
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
+  panelNote,
   primaryButton,
   sectionTitle,
   textLink,
@@ -29,6 +30,8 @@ const ProfileFields = ({ profile }) => {
     Object.fromEntries(keys.map((key) => [key, profile[key] || ""])),
   );
   const [save, { isLoading: saving }] = useUpdateUserProfileMutation();
+  // Everyone who tries the demo shares its account, so nobody renames it.
+  const locked = saving || profile.demo;
   const change = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
   const submit = async (event) => {
@@ -58,7 +61,7 @@ const ProfileFields = ({ profile }) => {
                 autoComplete="given-name"
                 value={values.firstName}
                 onChange={change("firstName")}
-                disabled={saving}
+                disabled={locked}
               />
               <Field
                 label="Last name"
@@ -68,7 +71,7 @@ const ProfileFields = ({ profile }) => {
                 autoComplete="family-name"
                 value={values.lastName}
                 onChange={change("lastName")}
-                disabled={saving}
+                disabled={locked}
               />
               <Field
                 label="Username"
@@ -78,12 +81,17 @@ const ProfileFields = ({ profile }) => {
                 autoComplete="username"
                 value={values.username}
                 onChange={change("username")}
-                disabled={saving}
+                disabled={locked}
               />
             </div>
           </Panel>
-          <div className="flex justify-end max-[700px]:[&>*]:flex-1">
-            <button type="submit" className={primaryButton} disabled={saving}>
+          <div className="flex flex-wrap items-center justify-end gap-4 max-[700px]:[&>button]:flex-1">
+            {profile.demo && (
+              <p className={`mr-auto ${panelNote}`}>
+                This is a shared demo account, so its profile can’t be changed.
+              </p>
+            )}
+            <button type="submit" className={primaryButton} disabled={locked}>
               <FiCheck aria-hidden="true" />
               {saving ? "Saving…" : "Save changes"}
             </button>

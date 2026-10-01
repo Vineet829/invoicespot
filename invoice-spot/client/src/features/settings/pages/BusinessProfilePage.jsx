@@ -186,8 +186,8 @@ const BusinessFields = ({ business }) => {
               <Field
                 label="Choose your logo"
                 type="file"
-                accept="image/*"
-                hint="An image of up to 2 MB."
+                accept="image/png,image/jpeg,image/gif"
+                hint="A PNG, JPEG or GIF image of up to 2 MB, so it prints on your PDFs too."
                 onChange={uploadLogo}
                 disabled={busy}
                 className="col-span-full"

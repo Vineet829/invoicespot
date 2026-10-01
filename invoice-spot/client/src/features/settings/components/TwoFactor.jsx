@@ -163,7 +163,9 @@ const TurnOn = ({ onClose, onBusy }) => {
       onSubmit={async (event) => {
         event.preventDefault();
         try {
-          setCodes((await enable(code).unwrap()).recoveryCodes);
+          const result = await enable(code).unwrap();
+          setCodes(result.recoveryCodes);
+          toast.success(result.message);
         } catch (error) {
           toast.error(errorMessage(error, "That code didn't work."));
         }
