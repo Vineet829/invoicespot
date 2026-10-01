@@ -6,7 +6,9 @@ import com.invoicespot.auth.dto.LogoutResponse;
 import com.invoicespot.auth.dto.TwoFactorChallengeResponse;
 import com.invoicespot.auth.dto.TwoFactorSignInRequest;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.metrics.AppMetrics;
 import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimitedException;
 import com.invoicespot.ratelimit.RateLimiter;
 import com.invoicespot.user.User;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,11 +32,14 @@ public class AuthController {
     private final AuthService authService;
     private final RateLimiter rateLimiter;
     private final RefreshCookies refreshCookies;
+    private final AppMetrics metrics;
 
-    public AuthController(AuthService authService, RateLimiter rateLimiter, RefreshCookies refreshCookies) {
+    public AuthController(
+            AuthService authService, RateLimiter rateLimiter, RefreshCookies refreshCookies, AppMetrics metrics) {
         this.authService = authService;
         this.rateLimiter = rateLimiter;
         this.refreshCookies = refreshCookies;
+        this.metrics = metrics;
     }
 
     @PostMapping("/login")
@@ -56,13 +61,17 @@ public class AuthController {
         } catch (ApiException exception) {
             rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, attempt);
             rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
+            metrics.signInFailed(AppMetrics.PASSWORD);
             throw exception;
         }
         rateLimiter.reset(RateLimit.FAILED_SIGN_IN, attempt);
         return switch (outcome) {
             case LoginOutcome.TwoFactorChallenge challenge ->
                     ResponseEntity.ok(new TwoFactorChallengeResponse(true, true, challenge.challenge()));
-            case TokenBundle bundle -> signedIn(bundle, response);
+            case TokenBundle bundle -> {
+                metrics.signedIn(AppMetrics.PASSWORD);
+                yield signedIn(bundle, response);
+            }
         };
     }
 
@@ -71,7 +80,19 @@ public class AuthController {
             @Valid @RequestBody TwoFactorSignInRequest request,
             @CookieValue(name = "jwt", required = false) String refreshCookie,
             HttpServletResponse response) {
-        return signedIn(authService.completeTwoFactor(request.challenge(), request.code(), refreshCookie), response);
+        TokenBundle bundle;
+        try {
+            bundle = authService.completeTwoFactor(request.challenge(), request.code(), refreshCookie);
+        } catch (ApiException exception) {
+            // A code refused for too many tries counts as a rate-limit
+            // rejection instead, as a password does.
+            if (!(exception instanceof RateLimitedException)) {
+                metrics.signInFailed(AppMetrics.TWO_FACTOR);
+            }
+            throw exception;
+        }
+        metrics.signedIn(AppMetrics.TWO_FACTOR);
+        return signedIn(bundle, response);
     }
 
     private ResponseEntity<Object> signedIn(TokenBundle bundle, HttpServletResponse response) {

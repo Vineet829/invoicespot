@@ -8,6 +8,9 @@ import com.invoicespot.auth.TokenCleanup;
 import com.invoicespot.document.AutomaticReminders;
 import com.invoicespot.document.OverdueAlerts;
 import com.invoicespot.document.RecurringService;
+import com.invoicespot.metrics.AppMetrics;
+import com.invoicespot.ratelimit.RateLimiter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -32,11 +35,18 @@ class DailyJobsTest {
     @Mock private AutomaticReminders automaticReminders;
     @Mock private OverdueAlerts overdueAlerts;
     @Mock private TokenCleanup tokenCleanup;
+    @Mock private RateLimiter rateLimiter;
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(JobsConfig.class)
             .withBean(DailyJobs.class, () -> new DailyJobs(
-                    recurringService, automaticReminders, overdueAlerts, tokenCleanup, Clock.systemUTC()));
+                    recurringService,
+                    automaticReminders,
+                    overdueAlerts,
+                    tokenCleanup,
+                    rateLimiter,
+                    new AppMetrics(new SimpleMeterRegistry()),
+                    Clock.systemUTC()));
 
     private static List<String> cronTasks(ApplicationContext context) {
         return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
@@ -47,18 +57,30 @@ class DailyJobsTest {
     }
 
     @Test
-    @DisplayName("every step runs at the same moment, even after one of them fails")
+    @DisplayName("every step runs at the same moment, even after one of them fails, and each is timed")
     void everyStepRuns() {
         when(recurringService.makeDue(NOW)).thenThrow(new IllegalStateException("database is down"));
         when(automaticReminders.send(NOW)).thenReturn(2);
 
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        new DailyJobs(recurringService, automaticReminders, overdueAlerts, tokenCleanup, clock).run();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        AppMetrics metrics = new AppMetrics(registry);
+        new DailyJobs(recurringService, automaticReminders, overdueAlerts, tokenCleanup, rateLimiter, metrics, clock)
+                .run();
 
         verify(recurringService).makeDue(NOW);
         verify(automaticReminders).send(NOW);
         verify(overdueAlerts).raise(NOW);
         verify(tokenCleanup).removeExpired();
+        verify(rateLimiter).removeExpired();
+        assertThat(registry.get("invoicespot.jobs").timers())
+                .extracting(timer -> timer.getId().getTag("step") + " " + timer.getId().getTag("outcome"))
+                .containsExactlyInAnyOrder(
+                        "recurring_invoices failure",
+                        "automatic_reminders success",
+                        "overdue_alerts success",
+                        "expired_tokens success",
+                        "expired_rate_limits success");
     }
 
     @Test

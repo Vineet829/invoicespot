@@ -1,6 +1,7 @@
 package com.invoicespot.mail;
 
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.metrics.AppMetrics;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -18,11 +19,19 @@ public class MailService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MailService.class);
 
+    // What each email is, for counting: to someone about their account, or
+    // from a business, alone or with a document attached.
+    private static final String ACCOUNT = "account";
+    private static final String BUSINESS = "business";
+    private static final String DOCUMENT = "document";
+
     private final JavaMailSender mailSender;
+    private final AppMetrics metrics;
     private final String from;
 
-    public MailService(JavaMailSender mailSender, AppProperties properties) {
+    public MailService(JavaMailSender mailSender, AppMetrics metrics, AppProperties properties) {
         this.mailSender = mailSender;
+        this.metrics = metrics;
         this.from = properties.site().defaultFromEmail();
     }
 
@@ -35,7 +44,9 @@ public class MailService {
         message.setText(body);
         try {
             mailSender.send(message);
+            metrics.emailSent(ACCOUNT);
         } catch (MailException exception) {
+            metrics.emailFailed(ACCOUNT);
             LOGGER.error("Failed to send \"{}\" to {}", subject, to, exception);
         }
     }
@@ -52,7 +63,7 @@ public class MailService {
         }
         helper.setSubject(subject);
         helper.setText(body);
-        mailSender.send(message);
+        deliver(BUSINESS, message);
     }
 
     public void sendDocument(
@@ -73,6 +84,17 @@ public class MailService {
         helper.setSubject(subject);
         helper.setText(body);
         helper.addAttachment(attachmentName, new ByteArrayResource(attachment));
-        mailSender.send(message);
+        deliver(DOCUMENT, message);
+    }
+
+    // Sends the email, counted as sent, or as failed when the server refuses it.
+    private void deliver(String kind, MimeMessage message) {
+        try {
+            mailSender.send(message);
+        } catch (MailException exception) {
+            metrics.emailFailed(kind);
+            throw exception;
+        }
+        metrics.emailSent(kind);
     }
 }

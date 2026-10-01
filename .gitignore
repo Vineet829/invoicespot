@@ -11,3 +11,6 @@ target/
 
 docs/
 uploads/
+
+# docker compose settings, with real secrets
+.env

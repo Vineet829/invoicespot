@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.invoicespot.metrics.AppMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,7 +41,8 @@ class RateLimiterTest {
     }
 
     private final MovableClock clock = new MovableClock();
-    private final RateLimiter limiter = new RateLimiter(clock);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final RateLimiter limiter = new RateLimiter(new LocalBucketStore(clock), new AppMetrics(registry));
 
     @Test
     @DisplayName("requests beyond the limit are refused with how long to wait, then allowed as tokens refill")
@@ -53,6 +56,8 @@ class RateLimiterTest {
                 .hasMessage("Too many sign-ups from this network. Please try again in 12 minutes.")
                 .extracting(e -> ((RateLimitedException) e).getRetryAfterSeconds())
                 .isEqualTo(720L);
+        assertThat(registry.get("invoicespot.ratelimit.rejections").tag("limit", "sign_up").counter().count())
+                .isEqualTo(1);
         assertThatCode(() -> limiter.consume(RateLimit.SIGN_UP, "10.0.0.2")).doesNotThrowAnyException();
 
         clock.advance(Duration.ofMinutes(12));

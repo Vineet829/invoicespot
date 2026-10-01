@@ -23,6 +23,7 @@
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <zxing.version>3.5.3</zxing.version>
         <bucket4j.version>8.14.0</bucket4j.version>
+        <shedlock.version>5.16.0</shedlock.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <testcontainers.version>1.21.3</testcontainers.version>
         <docker.api.version>1.44</docker.api.version>
@@ -56,6 +57,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -111,8 +116,24 @@
             <version>${bucket4j.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-postgresql</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
 
         <dependency>

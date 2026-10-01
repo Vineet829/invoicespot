@@ -1,6 +1,7 @@
 package com.invoicespot.auth.oauth;
 
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.metrics.AppMetrics;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -20,9 +21,11 @@ public class OAuthFailureHandler implements AuthenticationFailureHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OAuthFailureHandler.class);
 
+    private final AppMetrics metrics;
     private final String clientUrl;
 
-    public OAuthFailureHandler(AppProperties properties) {
+    public OAuthFailureHandler(AppMetrics metrics, AppProperties properties) {
+        this.metrics = metrics;
         this.clientUrl = properties.site().clientUrl();
     }
 
@@ -44,7 +47,12 @@ public class OAuthFailureHandler implements AuthenticationFailureHandler {
                 LOGGER.warn("A sign-in with a provider failed", exception);
             }
         }
-        response.sendRedirect(refused(clientUrl, code, provider(request)));
+        String provider = provider(request);
+        // A callback naming no provider here is nobody's sign-in.
+        if (!provider.isEmpty()) {
+            metrics.signInFailed(provider);
+        }
+        response.sendRedirect(refused(clientUrl, code, provider));
     }
 
     static String code(String error) {

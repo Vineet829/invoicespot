@@ -24,11 +24,20 @@ public enum RateLimit {
     private final int capacity;
     private final Duration period;
     private final String reason;
+    // Buckets kept in the database hold on to the numbers they were made
+    // with. Raise a limit's version when changing its numbers, and its stored
+    // buckets start over with the new ones.
+    private final int version;
 
     RateLimit(int capacity, Duration period, String reason) {
+        this(capacity, period, reason, 1);
+    }
+
+    RateLimit(int capacity, Duration period, String reason, int version) {
         this.capacity = capacity;
         this.period = period;
         this.reason = reason;
+        this.version = version;
     }
 
     Bandwidth bandwidth() {
@@ -37,5 +46,9 @@ public enum RateLimit {
 
     String reason() {
         return reason;
+    }
+
+    int version() {
+        return version;
     }
 }

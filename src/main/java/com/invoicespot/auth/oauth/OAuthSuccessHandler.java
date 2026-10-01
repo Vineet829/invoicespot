@@ -4,6 +4,7 @@ import com.invoicespot.auth.LoginOutcome;
 import com.invoicespot.auth.RefreshCookies;
 import com.invoicespot.auth.TokenBundle;
 import com.invoicespot.config.AppProperties;
+import com.invoicespot.metrics.AppMetrics;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -28,11 +29,14 @@ public class OAuthSuccessHandler implements AuthenticationSuccessHandler {
 
     private final OAuthSignIn signIn;
     private final RefreshCookies refreshCookies;
+    private final AppMetrics metrics;
     private final String clientUrl;
 
-    public OAuthSuccessHandler(OAuthSignIn signIn, RefreshCookies refreshCookies, AppProperties properties) {
+    public OAuthSuccessHandler(
+            OAuthSignIn signIn, RefreshCookies refreshCookies, AppMetrics metrics, AppProperties properties) {
         this.signIn = signIn;
         this.refreshCookies = refreshCookies;
+        this.metrics = metrics;
         this.clientUrl = properties.site().clientUrl();
     }
 
@@ -51,6 +55,7 @@ public class OAuthSuccessHandler implements AuthenticationSuccessHandler {
             switch (outcome) {
                 case TokenBundle bundle -> {
                     refreshCookies.set(response, bundle.refreshToken());
+                    metrics.signedIn(provider);
                     response.sendRedirect(clientUrl + "/auth/callback");
                 }
                 case LoginOutcome.TwoFactorChallenge challenge -> response.sendRedirect(clientUrl
@@ -58,15 +63,22 @@ public class OAuthSuccessHandler implements AuthenticationSuccessHandler {
                         + URLEncoder.encode(challenge.challenge(), StandardCharsets.UTF_8));
             }
         } catch (OAuthSignInException exception) {
+            failed(provider);
             response.sendRedirect(refused(exception.code(), provider));
         } catch (RuntimeException exception) {
             // Such as two first sign-ins at once both making the account: the
             // sign-in page rather than a bare error page.
             LOGGER.warn("A sign-in with a provider failed", exception);
+            failed(provider);
             response.sendRedirect(refused("failed", provider));
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    // Counted under the provider; a sign-in without one is nobody's.
+    private void failed(String provider) {
+        SignInProvider.of(provider).ifPresent(known -> metrics.signInFailed(known.id()));
     }
 
     private String refused(String code, String provider) {

@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
+import com.invoicespot.metrics.AppMetrics;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 // Issuing a draft: it is dated, takes the next number, and keeps the client,
 // the business and the name of its tax as they are at that moment. A credit
@@ -25,6 +28,7 @@ public class DocumentIssuer {
     private final DocumentNumbering documentNumbering;
     private final GstSupply gstSupply;
     private final DocumentActivity activity;
+    private final AppMetrics metrics;
     private final Clock clock;
 
     public DocumentIssuer(
@@ -32,11 +36,13 @@ public class DocumentIssuer {
             DocumentNumbering documentNumbering,
             GstSupply gstSupply,
             DocumentActivity activity,
+            AppMetrics metrics,
             Clock clock) {
         this.settingsService = settingsService;
         this.documentNumbering = documentNumbering;
         this.gstSupply = gstSupply;
         this.activity = activity;
+        this.metrics = metrics;
         this.clock = clock;
     }
 
@@ -96,5 +102,13 @@ public class DocumentIssuer {
         }
         document.setIssuedAt(Instant.now(clock));
         activity.record(document, DocumentEventType.ISSUED, document.getDocumentNumber(), actor);
+        // Counted once the issue commits, so one rolled back isn't.
+        DocumentType type = document.getDocumentType();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                metrics.documentIssued(type);
+            }
+        });
     }
 }
