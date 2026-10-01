@@ -15,7 +15,8 @@ import {
 import { useUpdateDocMutation } from "../documentsApiSlice";
 
 const DetailsForm = ({ document, onClose }) => {
-  const receipt = document.documentType === "Receipt";
+  // A receipt and a credit note have no due date.
+  const receipt = ["Receipt", "Credit Note"].includes(document.documentType);
   const quotation = document.documentType === "Quotation";
   const [dueDate, setDueDate] = useState(
     document.dueDate ? dateInput(document.dueDate) : "",

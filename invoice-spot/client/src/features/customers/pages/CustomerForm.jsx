@@ -19,6 +19,10 @@ import {
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import { useBusiness } from "../../business/permissions";
+import GstinField from "../../gst/GstinField";
+import { isValidGstin, looksLikeGstin, normalizeGstin } from "../../gst/gstin";
+import { useGetGstStatesQuery } from "../../gst/gstApiSlice";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import {
   primaryButton,
   sectionTitle,
@@ -55,6 +59,8 @@ const fields = [
     autoComplete: "off",
     maxLength: 50,
   },
+  { key: "gstin" },
+  { key: "stateCode" },
   {
     key: "address",
     label: "Address",
@@ -79,11 +85,29 @@ const CustomerFields = ({ customer, onSubmit, busy }) => {
   const [values, setValues] = useState(() =>
     Object.fromEntries(fields.map(({ key }) => [key, customer?.[key] ?? ""])),
   );
+  // In GST mode a client without a GSTIN can still have a state, which
+  // decides where a supply to them goes.
+  const gstMode =
+    useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
+  const states =
+    useGetGstStatesQuery(undefined, { skip: !gstMode }).data?.states || [];
+  const registered = isValidGstin(values.gstin);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ ...values, vatTinNo: String(values.vatTinNo).trim() });
+        const gstin = normalizeGstin(values.gstin);
+        if (gstin && !isValidGstin(gstin)) {
+          toast.error("Check the GSTIN: it isn’t a valid one yet.");
+          return;
+        }
+        const { stateCode, ...rest } = values;
+        onSubmit({
+          ...rest,
+          vatTinNo: String(values.vatTinNo).trim(),
+          gstin,
+          ...(gstMode && !gstin && { stateCode }),
+        });
       }}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6 compact:gap-5 max-[1359px]:grid-cols-1">
@@ -93,21 +117,64 @@ const CustomerFields = ({ customer, onSubmit, busy }) => {
             description="Contact and billing information"
           >
             <div className="grid grid-cols-2 gap-5 max-[700px]:grid-cols-1">
-              {fields.map(({ key, ...props }) => (
-                <Field
-                  key={key}
-                  {...props}
-                  name={key}
-                  value={values[key]}
-                  onChange={(event) =>
-                    setValues((current) => ({
-                      ...current,
-                      [key]: event.target.value,
-                    }))
-                  }
-                  disabled={busy}
-                />
-              ))}
+              {fields.map(({ key, ...props }) => {
+                if (key === "stateCode") {
+                  return (
+                    gstMode && (
+                      <Field
+                        key={key}
+                        label="Location for GST"
+                        as="select"
+                        value={
+                          registered
+                            ? normalizeGstin(values.gstin).slice(0, 2)
+                            : values.stateCode
+                        }
+                        onChange={(event) =>
+                          setValues((current) => ({
+                            ...current,
+                            stateCode: event.target.value,
+                          }))
+                        }
+                        hint={
+                          registered
+                            ? "From the GSTIN."
+                            : "Where supplies to this client go when it has no GSTIN."
+                        }
+                        disabled={busy || registered}
+                      >
+                        <option value="">Not set</option>
+                        {states.map((state) => (
+                          <option key={state.code} value={state.code}>
+                            {state.code} – {state.name}
+                          </option>
+                        ))}
+                      </Field>
+                    )
+                  );
+                }
+                const Control = key === "gstin" ? GstinField : Field;
+                return (
+                  <Control
+                    key={key}
+                    {...props}
+                    {...(key === "vatTinNo" &&
+                      !values.gstin &&
+                      looksLikeGstin(values.vatTinNo) && {
+                        hint: "This looks like a GSTIN. Enter it under GSTIN too, so it’s checked and printed as one.",
+                      })}
+                    name={key}
+                    value={values[key]}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        [key]: event.target.value,
+                      }))
+                    }
+                    disabled={busy}
+                  />
+                );
+              })}
             </div>
           </Panel>
           <div className="flex justify-end max-[700px]:[&>*]:flex-1">

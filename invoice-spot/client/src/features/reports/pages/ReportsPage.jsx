@@ -4,6 +4,7 @@ import {
   FiBarChart2,
   FiClock,
   FiDownload,
+  FiPercent,
   FiPlus,
   FiTrendingUp,
 } from "react-icons/fi";
@@ -20,6 +21,7 @@ import {
   Panel,
   WorkspacePage,
   dateLabel,
+  money,
 } from "../../../components/workspace/Workspace";
 import {
   filterChip,
@@ -33,7 +35,12 @@ import {
   financeCards,
 } from "../../dashboard/components/DashboardPanels";
 import { formatMoney } from "../../dashboard/dashboardModel";
-import { useGetReportCsvMutation, useGetReportQuery } from "../reportsApiSlice";
+import {
+  useGetReportCsvMutation,
+  useGetReportQuery,
+  useGetTaxReportQuery,
+  useGetTdsReportQuery,
+} from "../reportsApiSlice";
 import {
   DEFAULT_PERIOD,
   monthYear,
@@ -41,6 +48,8 @@ import {
   share,
 } from "../reportModel";
 import IncomeChart, { SERIES } from "../components/IncomeChart";
+import GstHelpers from "../components/GstHelpers";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 
 const AGEING_BARS = {
   notDue: "bg-spot-lilac",
@@ -64,17 +73,24 @@ const ShareBar = ({ ratio, tone }) => (
   </span>
 );
 
-// Downloads one section for every currency, named like the server names it.
+// Downloads one section for every currency, or in the reporting currency
+// as the report shows it, named like the server names it. The tax withheld
+// is only ever by currency.
 const CsvButton = ({ section, report, name, fileName }) => {
   const [download, busy] = useFileDownload(useGetReportCsvMutation);
+  const converted = report.view === "base" && section !== "tds";
   return (
     <button
       type="button"
       className={rowAction}
       onClick={() =>
         download(
-          { section, period: report.period },
-          `invoice-spot-${fileName}.csv`,
+          {
+            section,
+            period: report.period,
+            ...(converted && { view: "base" }),
+          },
+          `invoice-spot-${fileName}${converted ? `-in-${report.baseCurrency}` : ""}.csv`,
         )
       }
       disabled={busy}
@@ -91,11 +107,274 @@ const amountColumn = (label, key, currency) => ({
   render: (row) => <Amount value={row[key]} currency={currency} />,
 });
 
+// What was taxed and charged at a rate; under GST, split as it was charged.
+const taxColumns = (currency, gst) => [
+  amountColumn("Taxable", "taxable", currency),
+  ...(gst
+    ? [
+        amountColumn("CGST", "cgst", currency),
+        amountColumn("SGST/UTGST", "sgst", currency),
+        amountColumn("IGST", "igst", currency),
+      ]
+    : []),
+  amountColumn("Tax", "tax", currency),
+];
+
+// The tax charged in the period at each rate, less credit notes, with each
+// month's figures behind a disclosure. Supplies under reverse charge carry no
+// tax the business charged, so they are only mentioned.
+const TaxCharged = ({ report, entry, currency, periodFile, busy }) => (
+  <Panel
+    title="Tax charged"
+    description="Tax on the invoices and receipts issued in this period, at each rate, less credit notes. The CSV file has each month."
+    aside={
+      <CsvButton
+        section="tax"
+        report={report}
+        name="tax charged"
+        fileName={`tax-by-rate-${periodFile}`}
+      />
+    }
+  >
+    {entry ? (
+      <div
+        className={`transition-opacity ${busy ? "opacity-60" : ""}`}
+        aria-busy={busy || undefined}
+      >
+        <p className="mb-5 text-[14px] text-spot-body">
+          <span className="text-spot-ink">{money(entry.tax, currency)}</span>{" "}
+          charged on {money(entry.taxable, currency)}, from{" "}
+          {entry.documents.toLocaleString("en")}{" "}
+          {entry.documents === 1 ? "document" : "documents"}.
+        </p>
+        <DataTable
+          label={`Tax charged by rate, ${currency}`}
+          rows={entry.rates}
+          rowKey={(row) => row.rate}
+          columns={[
+            {
+              label: "Rate",
+              type: "main",
+              render: (row) => `${row.rate}%`,
+            },
+            {
+              label: "Documents",
+              render: (row) => row.documents.toLocaleString("en"),
+            },
+            ...taxColumns(currency, entry.gst),
+          ]}
+        />
+        {Number(entry.reverseChargeTaxable) !== 0 && (
+          <p className={`mt-4 ${panelNote}`}>
+            Supplies worth {money(entry.reverseChargeTaxable, currency)} were
+            under reverse charge: your clients pay their tax, so none of it is
+            counted here.
+          </p>
+        )}
+        <details className="group mt-4">
+          <summary className={`w-max cursor-pointer ${textLink}`}>
+            Show each month
+          </summary>
+          <div className="mt-3">
+            <DataTable
+              label={`Tax charged by month and rate, ${currency}`}
+              rows={entry.months}
+              rowKey={(row) => `${row.month}-${row.rate}`}
+              columns={[
+                {
+                  label: "Month",
+                  type: "main",
+                  render: (row) => monthYear(row.month),
+                },
+                { label: "Rate", render: (row) => `${row.rate}%` },
+                ...taxColumns(currency, entry.gst),
+              ]}
+            />
+          </div>
+        </details>
+      </div>
+    ) : (
+      <EmptyState
+        title="No tax charged in this period."
+        text="The tax on the invoices and receipts you issue shows up here, at each rate."
+        icon={FiPercent}
+      />
+    )}
+  </Panel>
+);
+
+// The tax clients withheld from their payments in the period, per client and
+// per month, with each payment behind a disclosure.
+const TaxWithheld = ({
+  report,
+  entry,
+  currency,
+  elsewhere,
+  periodFile,
+  busy,
+}) => {
+  const largest = Number(entry?.clients[0]?.withheld) || 0;
+  const count = entry?.payments.length || 0;
+  return (
+    <Panel
+      title="Tax withheld"
+      description="Tax your clients withheld from their payments in this period, by the date paid, and paid to the tax office for you. The CSV file lists every payment."
+      aside={
+        <CsvButton
+          section="tds"
+          report={report}
+          name="tax withheld"
+          fileName={`tax-withheld-${periodFile}`}
+        />
+      }
+    >
+      {elsewhere.length > 0 && (
+        <p className={`mb-4 ${panelNote}`}>
+          Tax withheld in {elsewhere.join(", ")} shows when the report is by
+          currency.
+        </p>
+      )}
+      {entry ? (
+        <div
+          className={`transition-opacity ${busy ? "opacity-60" : ""}`}
+          aria-busy={busy || undefined}
+        >
+          <p className="mb-5 text-[14px] text-spot-body">
+            <span className="text-spot-ink">
+              {money(entry.withheld, currency)}
+            </span>{" "}
+            withheld from {count.toLocaleString("en")}{" "}
+            {count === 1 ? "payment" : "payments"}.
+          </p>
+          <div className="grid min-w-0 gap-6 min-[1100px]:grid-cols-2">
+            <DataTable
+              label={`Tax withheld by client, ${currency}`}
+              narrow
+              rows={entry.clients}
+              rowKey={(row) => row.customerId || `name-${row.name}`}
+              columns={[
+                {
+                  label: "Client",
+                  type: "main",
+                  render: (row) => (
+                    <>
+                      {row.customerId ? (
+                        <Link
+                          className={textLink}
+                          to={`/single-customer/${row.customerId}`}
+                        >
+                          {row.name}
+                        </Link>
+                      ) : (
+                        row.name || "Unnamed client"
+                      )}
+                      {row.pan && (
+                        <span className={`block ${panelNote}`}>
+                          PAN {row.pan}
+                        </span>
+                      )}
+                      <ShareBar
+                        ratio={share(row.withheld, largest)}
+                        tone="bg-card-lilac-bar"
+                      />
+                    </>
+                  ),
+                },
+                {
+                  label: "Payments",
+                  render: (row) => row.payments.toLocaleString("en"),
+                },
+                amountColumn("Received", "received", currency),
+                amountColumn("Tax withheld", "withheld", currency),
+              ]}
+            />
+            <DataTable
+              label={`Tax withheld by month, ${currency}`}
+              narrow
+              rows={entry.months}
+              rowKey={(row) => row.month}
+              columns={[
+                {
+                  label: "Month",
+                  type: "main",
+                  render: (row) => monthYear(row.month),
+                },
+                {
+                  label: "Payments",
+                  render: (row) => row.payments.toLocaleString("en"),
+                },
+                amountColumn("Tax withheld", "withheld", currency),
+              ]}
+            />
+          </div>
+          <details className="group mt-4">
+            <summary className={`w-max cursor-pointer ${textLink}`}>
+              Show each payment
+            </summary>
+            <div className="mt-3">
+              <DataTable
+                label={`Payments tax was withheld from, ${currency}`}
+                rows={entry.payments}
+                rowKey={(row, index) => `${row.documentId}-${index}`}
+                columns={[
+                  {
+                    label: "Date paid",
+                    type: "main",
+                    render: (row) => dateLabel(row.datePaid),
+                  },
+                  {
+                    label: "Client",
+                    render: (row) => (
+                      <>
+                        {row.client || "Unnamed client"}
+                        {row.pan && (
+                          <span className={`block ${panelNote}`}>
+                            PAN {row.pan}
+                          </span>
+                        )}
+                      </>
+                    ),
+                  },
+                  {
+                    label: "Document",
+                    render: (row) => (
+                      <Link
+                        className={textLink}
+                        to={`/document/${row.documentId}`}
+                      >
+                        {row.documentNumber || "Unnumbered"}
+                      </Link>
+                    ),
+                  },
+                  amountColumn("Received", "received", currency),
+                  amountColumn("Tax withheld", "withheld", currency),
+                ]}
+              />
+            </div>
+          </details>
+        </div>
+      ) : (
+        <EmptyState
+          title="No tax withheld in this period."
+          text="When a client withholds tax from a payment, add it to that payment and it shows up here."
+          icon={FiPercent}
+        />
+      )}
+    </Panel>
+  );
+};
+
 const ReportsPage = () => {
   useTitle("Reports — Invoice Spot");
   const [params, setParams] = useSearchParams();
   const period = params.get("period") || DEFAULT_PERIOD;
-  const query = useGetReportQuery(period);
+  // Everything in the reporting currency, at each document's own rate.
+  const view = params.get("view") === "base" ? "base" : undefined;
+  const query = useGetReportQuery({ period, view });
+  const tdsQuery = useGetTdsReportQuery(period);
+  const taxQuery = useGetTaxReportQuery({ period, view });
+  const gstMode =
+    useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
   const report = query.data;
   const currencies = report?.currencies || [];
   const shown =
@@ -110,6 +389,7 @@ const ReportsPage = () => {
         Object.entries({
           period,
           currency: params.get("currency"),
+          view,
           ...changes,
         }).filter(
           ([key, value]) =>
@@ -152,7 +432,7 @@ const ReportsPage = () => {
         description="Billed, received and owed, from your invoices, receipts and payments."
         actions={
           <>
-            {currencies.length > 1 && (
+            {!view && currencies.length > 1 && (
               <fieldset className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
                 <legend className="sr-only">Currency</legend>
                 {currencies.map((entry) => (
@@ -169,6 +449,23 @@ const ReportsPage = () => {
                 ))}
               </fieldset>
             )}
+            {report &&
+              (view ||
+                currencies.some(
+                  (entry) => entry.currency !== report.baseCurrency,
+                )) && (
+                <label className={filterChip}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={Boolean(view)}
+                    onChange={(event) =>
+                      choose({ view: event.target.checked ? "base" : null })
+                    }
+                  />
+                  Show in {report.baseCurrency}
+                </label>
+              )}
             <label className="flex items-center gap-2.5">
               <span className="sr-only">Period</span>
               <select
@@ -186,10 +483,34 @@ const ReportsPage = () => {
           </>
         }
       />
-      {query.isLoading ? (
+      {report?.view === "base" && report.notConverted.length > 0 && (
+        <p
+          className="rounded-2xl border border-spot-violet/15 bg-white/60 px-4 py-3 text-[13.5px] leading-[1.6] text-spot-body"
+          role="note"
+        >
+          Left out, with no exchange rate to {report.baseCurrency}:{" "}
+          {report.notConverted
+            .map(
+              (entry) =>
+                `${entry.documents.toLocaleString("en")} ${entry.documents === 1 ? "document" : "documents"} ${entry.currency ? `in ${entry.currency}` : "with no currency"}, ${money(entry.amount, entry.currency)}`,
+            )
+            .join("; ")}
+          . Add a rate to a draft before you issue it.
+        </p>
+      )}
+      {query.isLoading || tdsQuery.isLoading || taxQuery.isLoading ? (
         <LoadingState />
-      ) : query.isError && !query.isFetching ? (
-        <ErrorState error={query.error} retry={query.refetch} />
+      ) : (query.isError && !query.isFetching) ||
+        (tdsQuery.isError && !tdsQuery.isFetching) ||
+        (taxQuery.isError && !taxQuery.isFetching) ? (
+        <ErrorState
+          error={query.error || tdsQuery.error || taxQuery.error}
+          retry={() => {
+            query.refetch();
+            tdsQuery.refetch();
+            taxQuery.refetch();
+          }}
+        />
       ) : !shown ? (
         <Panel>
           <EmptyState
@@ -437,6 +758,32 @@ const ReportsPage = () => {
               />
             )}
           </Panel>
+          <TaxCharged
+            report={report}
+            entry={taxQuery.data?.currencies.find(
+              (entry) => entry.currency === currency,
+            )}
+            currency={currency}
+            periodFile={periodFile}
+            busy={taxQuery.isFetching}
+          />
+          {gstMode && <GstHelpers />}
+          <TaxWithheld
+            report={report}
+            entry={tdsQuery.data?.currencies.find(
+              (entry) => entry.currency === currency,
+            )}
+            currency={currency}
+            elsewhere={
+              view
+                ? (tdsQuery.data?.currencies || [])
+                    .filter((entry) => entry.currency !== currency)
+                    .map((entry) => entry.currency || "no currency")
+                : []
+            }
+            periodFile={periodFile}
+            busy={tdsQuery.isFetching}
+          />
         </>
       )}
     </WorkspacePage>

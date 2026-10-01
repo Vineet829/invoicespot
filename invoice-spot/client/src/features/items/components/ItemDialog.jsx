@@ -8,15 +8,29 @@ import {
   secondaryButton,
 } from "../../../components/workspace/pastel";
 import { useCreateItemMutation, useUpdateItemMutation } from "../itemsApiSlice";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
+import {
+  HSN_SAC_PATTERN,
+  isValidHsnSac,
+  normalizeHsnSac,
+} from "../../gst/hsnSac";
 
 const ItemForm = ({ item, busy, onSave, onClose }) => {
   const [values, setValues] = useState({
     name: item?.name || "",
     description: item?.description || "",
     unitPrice: item ? String(item.unitPrice) : "",
+    taxRate: item?.taxRate == null ? "" : String(item.taxRate),
+    unit: item?.unit || "",
+    hsnSac: item?.hsnSac || "",
   });
   const change = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
+  // In GST mode an item keeps the HSN or SAC code its lines are taxed
+  // under; outside it the code is left as it is.
+  const gstMode =
+    useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
+  const code = values.hsnSac.trim();
   return (
     <form
       className="mt-5 flex flex-col gap-4"
@@ -26,6 +40,9 @@ const ItemForm = ({ item, busy, onSave, onClose }) => {
           name: values.name.trim(),
           description: values.description,
           unitPrice: Number(values.unitPrice) || 0,
+          taxRate: values.taxRate,
+          unit: values.unit,
+          ...(gstMode ? { hsnSac: normalizeHsnSac(values.hsnSac) } : {}),
         });
       }}
     >
@@ -48,6 +65,41 @@ const ItemForm = ({ item, busy, onSave, onClose }) => {
         onChange={change("unitPrice")}
         disabled={busy}
       />
+      <div className="grid grid-cols-2 gap-4 max-[480px]:grid-cols-1">
+        <Field
+          label="Tax rate (%)"
+          type="number"
+          min="0"
+          max="100"
+          step="any"
+          value={values.taxRate}
+          onChange={change("taxRate")}
+          disabled={busy}
+          hint="Left empty, lines take your default rate."
+        />
+        <Field
+          label="Unit"
+          maxLength={20}
+          value={values.unit}
+          onChange={change("unit")}
+          disabled={busy}
+          hint="What a quantity counts, such as hours."
+        />
+      </div>
+      {gstMode && (
+        <Field
+          label="HSN/SAC code"
+          inputMode="numeric"
+          maxLength={12}
+          pattern={HSN_SAC_PATTERN}
+          title="4 to 8 digits"
+          value={values.hsnSac}
+          onChange={change("hsnSac")}
+          disabled={busy}
+          error={code && !isValidHsnSac(code) ? "Enter 4 to 8 digits." : null}
+          hint="Filled in on its lines; GST invoices total their tax by it."
+        />
+      )}
       <Field
         label="Description"
         as="textarea"

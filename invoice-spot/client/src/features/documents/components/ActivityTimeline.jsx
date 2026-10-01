@@ -9,8 +9,10 @@ import {
   FiLink2,
   FiDollarSign,
   FiEdit2,
+  FiFileMinus,
   FiFilePlus,
   FiRepeat,
+  FiRotateCcw,
   FiSend,
   FiSlash,
   FiTrash2,
@@ -52,6 +54,23 @@ const EVENTS = {
       detail ? `Copied to ${detail}` : "Copied to a new draft",
   },
   VOIDED: { icon: FiSlash, text: (detail) => `Voided: ${detail}` },
+  CREDITED: { icon: FiFileMinus, text: (detail) => `Credited: ${detail}` },
+  CREDIT_VOIDED: {
+    icon: FiSlash,
+    text: (detail) => `Credit note ${detail} voided`,
+  },
+  REFUND_RECORDED: {
+    icon: FiRotateCcw,
+    text: (detail) => `Refund recorded: ${detail}`,
+  },
+  REFUND_EDITED: {
+    icon: FiEdit2,
+    text: (detail) => `Refund changed to ${detail}`,
+  },
+  REFUND_DELETED: {
+    icon: FiTrash2,
+    text: (detail) => `Refund removed: ${detail}`,
+  },
   CONVERTED_FROM: {
     icon: FiRepeat,
     text: (detail) => `Created from quotation ${detail}`,

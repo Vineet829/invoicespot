@@ -190,7 +190,11 @@ const DashboardPage = () => {
                         snapshot.cashPending,
                         snapshot.currency,
                       )}
-                      detail="Expected income less cash received"
+                      detail={
+                        Number(snapshot.taxWithheld) > 0
+                          ? "Expected income less cash received and tax withheld"
+                          : "Expected income less cash received"
+                      }
                       icon={FiClock}
                       tone="peach"
                       fill={bars?.pending}

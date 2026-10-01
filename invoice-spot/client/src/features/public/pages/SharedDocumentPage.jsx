@@ -39,6 +39,8 @@ import {
   secondaryButton,
   surface,
 } from "../../../components/workspace/pastel";
+import { taxRows } from "../../documents/gstRows";
+import LineName from "../../gst/LineName";
 
 const frame = `${appSurface} flex min-h-dvh flex-col items-center gap-6 px-8 py-10 max-[700px]:px-4 max-[700px]:py-6`;
 const cardBase = `${surface} w-full animate-ov-rise p-9 max-[700px]:rounded-3xl max-[700px]:p-6`;
@@ -107,6 +109,10 @@ const SharedDocumentPage = () => {
       : "Shared document — Invoice Spot",
   );
   const quotation = doc?.documentType === "Quotation";
+  // A credit note takes an amount off another document; nothing is paid on it.
+  const creditNote = doc?.documentType === "Credit Note";
+  // Paid beyond what is owed once credits are taken off.
+  const refundDue = Number(doc?.refundDue) > 0;
   // A void document keeps its number but is owed no more.
   const voided = doc?.state === "void";
   const download = async () => {
@@ -143,8 +149,16 @@ const SharedDocumentPage = () => {
   };
   const columns = [
     { label: "#", type: "index", render: (_item, index) => index + 1 },
-    { label: "Item", type: "main", render: (item) => item.itemName },
-    { label: "Quantity", render: (item) => item.quantity },
+    {
+      label: "Item",
+      type: "main",
+      render: (item) => <LineName name={item.itemName} hsnSac={item.hsnSac} />,
+    },
+    {
+      label: "Quantity",
+      render: (item) =>
+        item.unit ? `${item.quantity} ${item.unit}` : item.quantity,
+    },
     {
       label: "Unit price",
       type: "amount",
@@ -153,6 +167,10 @@ const SharedDocumentPage = () => {
       ),
     },
     { label: "Discount (%)", render: (item) => item.discount || "0" },
+    // Each line's rate shows when the lines are taxed at more than one.
+    ...(doc?.taxes?.length > 1
+      ? [{ label: `${doc.taxLabel} %`, render: (item) => item.taxRate }]
+      : []),
     {
       label: "Amount",
       type: "amount",
@@ -164,12 +182,19 @@ const SharedDocumentPage = () => {
   const totals = doc
     ? [
         ["Subtotal", doc.subTotal],
-        [`${doc.taxLabel} (${doc.rates}%)`, doc.salesTax],
-        ...(quotation
+        ...taxRows(doc.taxes, doc.gst, doc.taxLabel),
+        ...(quotation || creditNote
           ? []
           : [
               ["Total", doc.total],
               ["Paid", doc.received],
+              ...(Number(doc.taxWithheld) > 0
+                ? [["Tax withheld", doc.taxWithheld]]
+                : []),
+              ...(Number(doc.credited) > 0 ? [["Credited", doc.credited]] : []),
+              ...(Number(doc.refunded) > 0
+                ? [["Refunded to you", doc.refunded]]
+                : []),
             ]),
       ]
     : [];
@@ -252,7 +277,7 @@ const SharedDocumentPage = () => {
               {voided ? (
                 <Badge tone="unpaid">Void</Badge>
               ) : (
-                !quotation && <StatusBadge status={doc.status} />
+                !quotation && !creditNote && <StatusBadge status={doc.status} />
               )}
               {doc.overdue && <Badge tone="unpaid">Overdue</Badge>}
             </div>
@@ -291,13 +316,42 @@ const SharedDocumentPage = () => {
                 {dateLabel(doc.issueDate)}
               </p>
             </div>
-            <div>
-              <h2 className={heading}>{quotation ? "Valid until" : "Due"}</h2>
-              <p className="text-[15px] text-spot-ink">
-                {dateLabel(doc.dueDate)}
+            {creditNote ? (
+              <div>
+                <h2 className={heading}>Credits</h2>
+                <p className="text-[15px] text-spot-ink">
+                  {doc.credits.documentType} {doc.credits.documentNumber}
+                </p>
+                {doc.credits.issueDate && (
+                  <p className="text-[13.5px] text-spot-body">
+                    Issued {dateLabel(doc.credits.issueDate)}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <h2 className={heading}>{quotation ? "Valid until" : "Due"}</h2>
+                <p className="text-[15px] text-spot-ink">
+                  {dateLabel(doc.dueDate)}
+                </p>
+              </div>
+            )}
+          </div>
+          {doc.gst?.placeOfSupply && (
+            <p className="mt-6 text-[13.5px] text-spot-body">
+              Place of supply: {doc.gst.placeOfSupply} –{" "}
+              {doc.gst.placeOfSupplyName}
+              {doc.gst.reverseCharge && " · Reverse charge: you pay the GST"}
+            </p>
+          )}
+          {doc.creditReason && (
+            <div className="mt-7">
+              <h2 className={heading}>Reason for this credit</h2>
+              <p className="whitespace-pre-wrap text-[14px] leading-[1.7] text-spot-body [overflow-wrap:anywhere]">
+                {doc.creditReason}
               </p>
             </div>
-          </div>
+          )}
 
           <section className="mt-9" aria-label="Items">
             <DataTable
@@ -322,10 +376,19 @@ const SharedDocumentPage = () => {
             ))}
             <div className="mt-2 flex items-baseline justify-between gap-6 border-t border-[#23273517] pt-3.5">
               <dt className="text-[15px] font-medium text-spot-ink">
-                {quotation ? "Total" : "Balance due"}
+                {quotation
+                  ? "Total"
+                  : creditNote
+                    ? "Total credit"
+                    : refundDue
+                      ? "Due back to you"
+                      : "Balance due"}
               </dt>
               <dd className="text-[24px] text-spot-ink">
-                <Amount value={doc.balance} currency={doc.currency} />
+                <Amount
+                  value={refundDue ? doc.refundDue : doc.balance}
+                  currency={doc.currency}
+                />
               </dd>
             </div>
           </dl>

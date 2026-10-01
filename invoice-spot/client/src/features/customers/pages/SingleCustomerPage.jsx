@@ -356,6 +356,7 @@ const SingleCustomerPage = () => {
                   ["Email address", customer.email],
                   ["Phone number", customer.phoneNumber],
                   ["VAT / TIN number", customer.vatTinNo],
+                  ...(customer.gstin ? [["GSTIN", customer.gstin]] : []),
                   ["Address", customer.address],
                   ["City", customer.city],
                   ["Country", customer.country],

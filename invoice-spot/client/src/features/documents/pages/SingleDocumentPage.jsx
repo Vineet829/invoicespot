@@ -6,6 +6,7 @@ import {
   FiCopy,
   FiDownload,
   FiEdit2,
+  FiFileMinus,
   FiLink,
   FiMail,
   FiPrinter,
@@ -16,6 +17,7 @@ import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import {
   useConvertDocMutation,
+  useCreditDocMutation,
   useDuplicateDocMutation,
   useGetSingleDocQuery,
 } from "../documentsApiSlice";
@@ -35,6 +37,9 @@ import {
   isVoid,
 } from "../documentState";
 import ActivityTimeline from "../components/ActivityTimeline";
+import CreditNotesPanel from "../components/CreditNotesPanel";
+import { taxRows } from "../gstRows";
+import RefundsPanel from "../components/RefundsPanel";
 import ShareDialog from "../components/ShareDialog";
 import ReminderDialog from "../components/ReminderDialog";
 import ScheduleDialog from "../../recurring/components/ScheduleDialog";
@@ -63,6 +68,7 @@ import {
 } from "../../../components/workspace/pastel";
 import PaymentForm from "./PaymentForm";
 import PaymentsLedger from "../components/PaymentsLedger";
+import LineName from "../../gst/LineName";
 
 const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
 const partyHeading = "mb-3 text-[12.5px] font-normal text-spot-muted";
@@ -120,6 +126,15 @@ const SingleDocumentPage = () => {
   const navigate = useNavigate();
   const [duplicateDoc, { isLoading: duplicating }] = useDuplicateDocMutation();
   const [convertDoc, { isLoading: converting }] = useConvertDocMutation();
+  const [creditDoc, { isLoading: crediting }] = useCreditDocMutation();
+  // A credit note takes an amount off an issued invoice or receipt; it has
+  // no payments, due date or copies of its own.
+  const creditNote = document?.documentType === "Credit Note";
+  const creditable =
+    ["Invoice", "Receipt"].includes(document?.documentType) &&
+    !draft &&
+    !voided &&
+    Number(document?.ledger?.creditable) > 0;
   useTitle(`${documentName(document)} — Invoice Spot`);
   // A quotation turned into an invoice lists it as "Invoiced as"; any other
   // copy as "Copied to".
@@ -136,6 +151,17 @@ const SingleDocumentPage = () => {
       navigate(`/edit-doc/${newDocument._id}`);
     } catch (error) {
       toast.error(errorMessage(error, "The document could not be copied."));
+    }
+  };
+  const credit = async () => {
+    try {
+      const { newDocument } = await creditDoc(id).unwrap();
+      toast.success(
+        `A draft credit note was made for ${document.documentNumber}. Set what it credits, then issue it.`,
+      );
+      navigate(`/edit-doc/${newDocument._id}`);
+    } catch (error) {
+      toast.error(errorMessage(error, "The credit note could not be made."));
     }
   };
   const convert = async () => {
@@ -161,9 +187,13 @@ const SingleDocumentPage = () => {
     {
       label: "Product / service",
       type: "main",
-      render: (item) => item.itemName,
+      render: (item) => <LineName name={item.itemName} hsnSac={item.hsnSac} />,
     },
-    { label: "Quantity", render: (item) => item.quantity },
+    {
+      label: "Quantity",
+      render: (item) =>
+        item.unit ? `${item.quantity} ${item.unit}` : item.quantity,
+    },
     {
       label: "Unit price",
       type: "amount",
@@ -172,6 +202,10 @@ const SingleDocumentPage = () => {
       ),
     },
     { label: "Discount (%)", render: (item) => item.discount || "0" },
+    // Each line's rate shows when the lines are taxed at more than one.
+    ...(document?.taxes?.length > 1
+      ? [{ label: `${taxLabel} %`, render: (item) => item.taxRate }]
+      : []),
     {
       label: "Line total",
       type: "amount",
@@ -239,20 +273,22 @@ const SingleDocumentPage = () => {
               >
                 <FiPrinter aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                className={secondaryIconButton}
-                onClick={duplicate}
-                disabled={duplicating || Boolean(editRefusal)}
-                aria-busy={duplicating}
-                aria-label="Duplicate"
-                title={editRefusal || "Duplicate"}
-                aria-describedby={
-                  editRefusal ? "document-edit-refusal" : undefined
-                }
-              >
-                <FiCopy aria-hidden="true" />
-              </button>
+              {!creditNote && (
+                <button
+                  type="button"
+                  className={secondaryIconButton}
+                  onClick={duplicate}
+                  disabled={duplicating || Boolean(editRefusal)}
+                  aria-busy={duplicating}
+                  aria-label="Duplicate"
+                  title={editRefusal || "Duplicate"}
+                  aria-describedby={
+                    editRefusal ? "document-edit-refusal" : undefined
+                  }
+                >
+                  <FiCopy aria-hidden="true" />
+                </button>
+              )}
               {!draft && !voided && (
                 <button
                   type="button"
@@ -302,6 +338,22 @@ const SingleDocumentPage = () => {
                     {converting ? "Converting…" : "Convert to invoice"}
                   </button>
                 )}
+              {creditable && (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={credit}
+                  disabled={crediting || Boolean(editRefusal)}
+                  aria-busy={crediting}
+                  title={editRefusal}
+                  aria-describedby={
+                    editRefusal ? "document-edit-refusal" : undefined
+                  }
+                >
+                  <FiFileMinus aria-hidden="true" />
+                  {crediting ? "Making…" : "Credit note"}
+                </button>
+              )}
               {document.documentType === "Invoice" &&
                 !draft &&
                 !voided &&
@@ -410,7 +462,13 @@ const SingleDocumentPage = () => {
                       .filter(Boolean)
                       .join(" "),
                     seller?.country,
-                    seller?.taxId && `Tax ID ${seller.taxId}`,
+                    // Under GST the tax ID is the GSTIN, and the state it is
+                    // registered in follows, as on the PDF.
+                    seller?.taxId &&
+                      `${document.gst?.supplyType ? "GSTIN" : "Tax ID"} ${seller.taxId}`,
+                    document.gst?.supplyType &&
+                      document.gst.sellerStateCode &&
+                      `State: ${document.gst.sellerStateName} (${document.gst.sellerStateCode})`,
                   ]
                     .filter(Boolean)
                     .map((value, index) => (
@@ -439,6 +497,11 @@ const SingleDocumentPage = () => {
                   <p className={partyLine}>
                     VAT / TIN: {document.customer?.vatTinNo || "—"}
                   </p>
+                  {document.customer?.gstin && (
+                    <p className={partyLine}>
+                      GSTIN: {document.customer.gstin}
+                    </p>
+                  )}
                   {[
                     document.customer?.email,
                     document.customer?.phoneNumber,
@@ -463,12 +526,58 @@ const SingleDocumentPage = () => {
                           ? "On issue"
                           : dateLabel(document.issueDate),
                       ],
-                      [
-                        document.documentType === "Quotation"
-                          ? "Valid until"
-                          : "Due date",
-                        dateLabel(document.dueDate),
-                      ],
+                      ...(creditNote
+                        ? [
+                            [
+                              "Credits",
+                              <Link
+                                className={textLink}
+                                to={`/document/${document.creditedDocument._id}`}
+                              >
+                                {documentName(document.creditedDocument)}
+                              </Link>,
+                            ],
+                            ...(document.creditReason
+                              ? [["Reason", document.creditReason]]
+                              : []),
+                          ]
+                        : [
+                            [
+                              document.documentType === "Quotation"
+                                ? "Valid until"
+                                : "Due date",
+                              dateLabel(document.dueDate),
+                            ],
+                          ]),
+                      ...(document.gst?.placeOfSupply
+                        ? [
+                            [
+                              "Place of supply",
+                              `${document.gst.placeOfSupply} – ${document.gst.placeOfSupplyName}`,
+                            ],
+                            ...(document.gst.reverseCharge
+                              ? [["Reverse charge", "Yes, the recipient pays"]]
+                              : []),
+                            ...(document.gst.supplyType === "EXPORT_LUT"
+                              ? [
+                                  [
+                                    "Export",
+                                    `Under LUT ${document.gst.lutReference}`,
+                                  ],
+                                ]
+                              : document.gst.supplyType === "EXPORT_IGST"
+                                ? [["Export", "With IGST"]]
+                                : []),
+                          ]
+                        : []),
+                      ...(document.exchangeRate
+                        ? [
+                            [
+                              "Exchange rate",
+                              `1 ${document.currency} = ${document.exchangeRate} ${document.exchangeBase}`,
+                            ],
+                          ]
+                        : []),
                       ...(document.acceptedAt
                         ? [["Accepted on", dateLabel(document.acceptedAt)]]
                         : []),
@@ -586,18 +695,30 @@ const SingleDocumentPage = () => {
                 <dl className="m-0">
                   {[
                     ["Subtotal", document.subTotal],
-                    [
-                      `${taxLabel} (${document.rates || 0}%)`,
-                      document.salesTax,
-                    ],
-                    ["Cumulative total", document.total],
-                    ["Amount paid", totalAmountReceived],
-                    [
-                      "Balance",
-                      voided
-                        ? 0
-                        : Number(document.total || 0) - totalAmountReceived,
-                    ],
+                    ...taxRows(document.taxes || [], document.gst, taxLabel),
+                    ...(creditNote
+                      ? [["Total credit", document.total]]
+                      : [
+                          ["Cumulative total", document.total],
+                          ["Amount paid", totalAmountReceived],
+                          ...(Number(document.ledger?.totalTds) > 0
+                            ? [["Tax withheld", document.ledger.totalTds]]
+                            : []),
+                          ...(Number(document.ledger?.totalCredited) > 0
+                            ? [["Credited", document.ledger.totalCredited]]
+                            : []),
+                          ...(Number(document.ledger?.totalRefunded) > 0
+                            ? [["Refunded", document.ledger.totalRefunded]]
+                            : []),
+                          !voided && Number(document.ledger?.refundDue) > 0
+                            ? ["Refund due", document.ledger.refundDue]
+                            : [
+                                "Balance",
+                                voided
+                                  ? 0
+                                  : Number(document.ledger?.balanceDue || 0),
+                              ],
+                        ]),
                   ].map(([label, value], index, rows) => {
                     const balance = index === rows.length - 1;
                     return (
@@ -637,6 +758,14 @@ const SingleDocumentPage = () => {
                 />
               </Panel>
             )}
+            {document.creditNotes?.length > 0 && (
+              <CreditNotesPanel document={document} />
+            )}
+            {!voided &&
+              (Number(document.ledger?.refundDue) > 0 ||
+                document.refunds?.length > 0) && (
+                <RefundsPanel document={document} refusal={editRefusal} />
+              )}
             {document.documentType === "Invoice" &&
               !draft &&
               !voided &&

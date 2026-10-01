@@ -24,6 +24,8 @@ import {
   rowActionDanger,
 } from "../../../components/workspace/pastel";
 import { RefusalNote, useBusiness } from "../../business/permissions";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
+import LineName from "../../gst/LineName";
 
 const ItemsPage = () => {
   useTitle("Items — Invoice Spot");
@@ -35,6 +37,8 @@ const ItemsPage = () => {
   const [removing, setRemoving] = useState(null);
   const editRefusal = useBusiness().reason("EDIT_RECORDS");
   const [deleteItem, { isLoading: deleting }] = useDeleteItemMutation();
+  const gstMode =
+    useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
   const remove = async () => {
     try {
       await deleteItem(removing._id).unwrap();
@@ -50,7 +54,14 @@ const ItemsPage = () => {
       type: "index",
       render: (_row, index) => pagination.start + index + 1,
     },
-    { label: "Name", type: "main", render: (row) => row.name },
+    {
+      label: "Name",
+      type: "main",
+      // In GST mode, with the HSN or SAC code its lines take.
+      render: (row) => (
+        <LineName name={row.name} hsnSac={gstMode ? row.hsnSac : null} />
+      ),
+    },
     {
       label: "Description",
       render: (row) => row.description || "—",
@@ -58,7 +69,18 @@ const ItemsPage = () => {
     {
       label: "Unit price",
       type: "amount",
-      render: (row) => <Amount value={row.unitPrice} />,
+      render: (row) => (
+        <>
+          <Amount value={row.unitPrice} />
+          {row.unit && (
+            <span className="text-[13px] text-spot-muted"> / {row.unit}</span>
+          )}
+        </>
+      ),
+    },
+    {
+      label: "Tax rate",
+      render: (row) => (row.taxRate == null ? "Default" : `${row.taxRate}%`),
     },
     {
       label: "Edit",
