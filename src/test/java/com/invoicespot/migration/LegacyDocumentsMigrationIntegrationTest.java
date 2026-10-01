@@ -153,6 +153,30 @@ class LegacyDocumentsMigrationIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("each old payment keeps the receipt number it showed, by date, and the next comes after")
+    void receiptNumbersKept() {
+        database.migrateToLatest();
+
+        assertThat(jdbc.queryForList("""
+                        select receipt_number = row_number() over (partition by document_pkid order by date_paid, pkid)
+                        from payments
+                        """, Boolean.class))
+                .hasSize(3)
+                .containsOnly(true);
+        assertThat(jdbc.queryForList("""
+                        select d.receipts_numbered from documents d
+                        where exists (select 1 from payments p where p.document_pkid = d.pkid) order by d.pkid
+                        """, Integer.class))
+                .containsExactly(1, 2);
+        // The payments of nothing stay, and the amount check still holds for
+        // what comes after them.
+        assertThat(jdbc.queryForObject("""
+                        select convalidated from pg_constraint where conname = 'chk_payments_amount'
+                        """, Boolean.class))
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("each old document is dated on the day it was made, in its business's time zone")
     void datedAsMade() {
         database.migrateToLatest();

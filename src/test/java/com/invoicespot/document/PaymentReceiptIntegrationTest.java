@@ -5,7 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -67,7 +69,7 @@ class PaymentReceiptIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("each payment's receipt is a PDF numbered by its place among the invoice's payments")
+    @DisplayName("each receipt is a PDF numbered in the order its payment was recorded, whatever the dates")
     void pdf() throws Exception {
         User owner = createUser();
         Paid paid = paidInvoice(owner);
@@ -78,12 +80,54 @@ class PaymentReceiptIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
                 .andExpect(header().string(
-                        HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"Receipt-INV-0001-P2.pdf\""))
+                        HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"Receipt-INV-0001-P1.pdf\""))
                 .andReturn()
                 .getResponse()
                 .getContentAsByteArray();
 
         assertThat(new String(body, 0, 5)).isEqualTo("%PDF-");
+    }
+
+    // The file name a payment's receipt is given, which carries its number.
+    private String receiptName(User owner, Paid paid, String payment) throws Exception {
+        return mockMvc.perform(get("/api/v1/document/{id}/payment/{payment}/receipt", paid.document(), payment)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getHeader(HttpHeaders.CONTENT_DISPOSITION);
+    }
+
+    @Test
+    @DisplayName("a receipt keeps its number when its payment's date changes, and a deleted one's isn't given again")
+    void numbersKept() throws Exception {
+        User owner = createUser();
+        Paid paid = paidInvoice(owner);
+        String first = paid.payments().get(1);
+
+        mockMvc.perform(patch("/api/v1/document/{id}/payment/{payment}", paid.document(), first)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"datePaid\": \"2026-09-01\", \"amountPaid\": 30}"))
+                .andExpect(status().isOk());
+        assertThat(receiptName(owner, paid, first)).contains("Receipt-INV-0001-P1.pdf");
+
+        mockMvc.perform(delete("/api/v1/document/{id}/payment/{payment}", paid.document(), paid.payments().get(0))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/document/{id}/payment", paid.document())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amountPaid\": 10, \"datePaid\": \"2026-09-05\"}"))
+                .andExpect(status().isCreated());
+        String body = mockMvc.perform(get("/api/v1/document/{id}", paid.document())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        List<String> payments = JsonPath.read(body, "$.document.paymentRecords[*]._id");
+        String latest = payments.stream().filter(payment -> !payment.equals(first)).findFirst().orElseThrow();
+        assertThat(receiptName(owner, paid, latest)).contains("Receipt-INV-0001-P3.pdf");
     }
 
     @Test
@@ -97,7 +141,7 @@ class PaymentReceiptIntegrationTest extends IntegrationTest {
                                 paid.document(), paid.payments().get(0))
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.to").value(paid.email()))
-                .andExpect(jsonPath("$.subject").value("Payment receipt INV-0001-P1 from Test User"));
+                .andExpect(jsonPath("$.subject").value("Payment receipt INV-0001-P2 from Test User"));
         mockMvc.perform(post("/api/v1/document/{id}/payment/{payment}/receipt/email",
                                 paid.document(), paid.payments().get(0))
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -110,7 +154,7 @@ class PaymentReceiptIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/v1/document/{id}/activity", paid.document())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.events[0].type").value("RECEIPT_EMAILED"))
-                .andExpect(jsonPath("$.events[0].detail").value("INV-0001-P1 to " + paid.email()));
+                .andExpect(jsonPath("$.events[0].detail").value("INV-0001-P2 to " + paid.email()));
     }
 
     @Test

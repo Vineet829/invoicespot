@@ -1,5 +1,7 @@
 package com.invoicespot.document;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -128,6 +130,31 @@ class DocumentLockIntegrationTest extends IntegrationTest {
         change(quotation, "{\"additionalInfo\": \"Thanks\"}")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("An accepted quotation can't be changed"));
+    }
+
+    @Test
+    @DisplayName("a receipt never takes a due date: not made, saved as a draft, turned into one, or issued")
+    void receiptsHaveNoDueDate() throws Exception {
+        String due = "\"dueDate\": \"2026-12-01T12:00:00Z\"";
+        String made = JsonPath.read(
+                body(send(post("/api/v1/document/create"), """
+                                {"customerId": "%s", "documentType": "Receipt", "currency": "USD", %s,
+                                 "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
+                                """.formatted(client, due))
+                        .andExpect(jsonPath("$.newDocument.dueDate").value(nullValue()))),
+                "$.newDocument._id");
+        assertThat(made).isNotBlank();
+
+        String draft = document("Receipt", true);
+        change(draft, "{" + due + "}").andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
+        String invoice = document("Invoice", true);
+        change(invoice, "{" + due + "}")
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01T12:00:00Z"));
+        change(invoice, "{\"documentType\": \"Receipt\"}")
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
+        send(post("/api/v1/document/{id}/issue", draft), "{" + due + "}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
     }
 
     @Test

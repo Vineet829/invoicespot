@@ -314,7 +314,7 @@ class DocumentServiceTest {
     void refusesLockedChanges() {
         UUID id = UUID.randomUUID();
         Document issued = paidInvoice(new BigDecimal("40"));
-        when(documentRepository.findByExternalId(id)).thenReturn(Optional.of(issued));
+        when(documentRepository.findForUpdateByExternalId(id)).thenReturn(Optional.of(issued));
 
         assertThatThrownBy(() -> service.update(access(1L), id.toString(), update("Quotation", null)))
                 .isInstanceOf(ApiException.class)

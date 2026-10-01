@@ -2,6 +2,7 @@ package com.invoicespot.auth.twofactor;
 
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.auth.twofactor.dto.TwoFactorSetupResponse;
 import com.invoicespot.auth.twofactor.dto.TwoFactorStatusResponse;
 import com.invoicespot.common.ApiException;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class TwoFactorService {
 
     private final UserRepository userRepository;
     private final RecoveryCodeRepository recoveryCodeRepository;
+    private final SessionService sessionService;
     private final SecretBox secretBox;
     private final PasswordEncoder passwordEncoder;
     private final RateLimiter rateLimiter;
@@ -67,6 +70,7 @@ public class TwoFactorService {
     public TwoFactorService(
             UserRepository userRepository,
             RecoveryCodeRepository recoveryCodeRepository,
+            SessionService sessionService,
             SecretBox secretBox,
             PasswordEncoder passwordEncoder,
             RateLimiter rateLimiter,
@@ -77,6 +81,7 @@ public class TwoFactorService {
             Clock clock) {
         this.userRepository = userRepository;
         this.recoveryCodeRepository = recoveryCodeRepository;
+        this.sessionService = sessionService;
         this.secretBox = secretBox;
         this.passwordEncoder = passwordEncoder;
         this.rateLimiter = rateLimiter;
@@ -102,7 +107,7 @@ public class TwoFactorService {
     // confirmed; starting again replaces it.
     @Transactional
     public TwoFactorSetupResponse setup(User principal, String password) {
-        User user = require(principal);
+        User user = requireLocked(principal);
         demoAccountGuard.requireNotDemo(user, "two-factor sign-in");
         if (!secretBox.available()) {
             throw new ApiException(HttpStatus.CONFLICT, "Two-factor sign-in isn't available on this server yet");
@@ -124,9 +129,12 @@ public class TwoFactorService {
                         + "&algorithm=SHA1&digits=6&period=30");
     }
 
+    // Turning it on or off signs out every other device, as a new password
+    // does: whoever else was signed in has to sign in again under the new
+    // rules.
     @Transactional
-    public List<String> enable(User principal, String code) {
-        User user = require(principal);
+    public List<String> enable(User principal, UUID currentSession, String code) {
+        User user = requireLocked(principal);
         demoAccountGuard.requireNotDemo(user, "two-factor sign-in");
         if (user.isTwoFactorEnabled()) {
             throw new ApiException(HttpStatus.CONFLICT, "Two-factor sign-in is already on");
@@ -139,13 +147,14 @@ public class TwoFactorService {
         }
         user.setTwoFactorEnabledAt(clock.instant());
         List<String> codes = newRecoveryCodes(user);
+        sessionService.endOthers(user, currentSession);
         auditLog.record(AuditEventType.TWO_FACTOR_ENABLED, user);
         notifyOwner(user, "Two-factor sign-in was turned on", "turned on");
         return codes;
     }
 
     @Transactional
-    public void disable(User principal, String password, String code) {
+    public void disable(User principal, UUID currentSession, String password, String code) {
         User user = requireEnabled(principal);
         requirePassword(user, password);
         if (verify(user, code).isEmpty()) {
@@ -155,6 +164,7 @@ public class TwoFactorService {
         user.setTwoFactorEnabledAt(null);
         user.setTwoFactorLastStep(null);
         recoveryCodeRepository.deleteAllOf(user.getPkid());
+        sessionService.endOthers(user, currentSession);
         auditLog.record(AuditEventType.TWO_FACTOR_DISABLED, user);
         notifyOwner(user, "Two-factor sign-in was turned off", "turned off");
     }
@@ -176,7 +186,7 @@ public class TwoFactorService {
     // recovery code is used up; an app code can't be used again.
     @Transactional
     public Optional<Method> verify(User principal, String code) {
-        User user = require(principal);
+        User user = requireLocked(principal);
         String attempts = "code:" + user.getPkid();
         rateLimiter.requireAvailable(RateLimit.WRONG_TWO_FACTOR_CODE, attempts);
         Optional<Method> method = check(user, code == null ? "" : code);
@@ -191,6 +201,14 @@ public class TwoFactorService {
     private Optional<Method> check(User user, String code) {
         String digits = code.replaceAll("\\s", "");
         if (digits.matches("\\d{6}")) {
+            // The app's secret is kept sealed with the server's key; without
+            // it a code can't be checked, but recovery codes, kept hashed,
+            // still sign in.
+            if (!secretBox.available()) {
+                throw new ApiException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Codes from your authenticator app can't be checked right now. Use a recovery code");
+            }
             OptionalLong step = Totp.match(secretBox.open(user.getTwoFactorSecret()), digits, clock.instant());
             Long last = user.getTwoFactorLastStep();
             if (step.isPresent() && (last == null || step.getAsLong() > last)) {
@@ -244,7 +262,7 @@ public class TwoFactorService {
     }
 
     private User requireEnabled(User principal) {
-        User user = require(principal);
+        User user = requireLocked(principal);
         demoAccountGuard.requireNotDemo(user, "two-factor sign-in");
         if (!user.isTwoFactorEnabled()) {
             throw new ApiException(HttpStatus.CONFLICT, "Two-factor sign-in is off");
@@ -257,6 +275,13 @@ public class TwoFactorService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
     }
 
+    // The account, locked until the transaction ends, so a code checked here
+    // can't be spent by another request at the same time.
+    private User requireLocked(User principal) {
+        return userRepository.findForUpdateByPkid(principal.getPkid())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
+    }
+
     private static ApiException wrongCode() {
         return new ApiException(HttpStatus.BAD_REQUEST, "That code didn't work");
     }
@@ -266,7 +291,8 @@ public class TwoFactorService {
                 user.getEmail(),
                 subject,
                 "Hello " + user.getFirstName() + ",\n\n"
-                        + "Two-factor sign-in was just " + change + " for your " + site.name() + " account.\n\n"
+                        + "Two-factor sign-in was just " + change + " for your " + site.name()
+                        + " account, and your other devices were signed out.\n\n"
                         + "If this wasn't you, reset your password at " + site.clientUrl()
                         + "/reset_password_request and check the devices signed in to your account.");
     }

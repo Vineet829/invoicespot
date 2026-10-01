@@ -190,6 +190,11 @@ public class Document extends BaseEntity {
     @Column(name = "total_refunded", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalRefunded = BigDecimal.ZERO;
 
+    // The last receipt number one of its payments was given, so a deleted
+    // payment's number isn't given again.
+    @Column(name = "receipts_numbered", nullable = false)
+    private int receiptsNumbered;
+
     @ElementCollection
     @CollectionTable(name = "document_billing_items", joinColumns = @JoinColumn(name = "document_pkid"))
     @OrderColumn(name = "position")

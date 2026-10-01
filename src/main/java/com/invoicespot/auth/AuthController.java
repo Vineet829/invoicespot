@@ -49,14 +49,19 @@ public class AuthController {
             @CookieValue(name = "jwt", required = false) String refreshCookie,
             HttpServletRequest http,
             HttpServletResponse response) {
-        String attempt = http.getRemoteAddr() + "|"
+        // Failures count per email from an address, and for the address as a
+        // whole; a success clears only its email's count.
+        String address = http.getRemoteAddr();
+        String attempt = address + "|"
                 + (request.email() == null ? "" : request.email().trim().toLowerCase(Locale.ROOT));
+        rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
         rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN, attempt);
         LoginOutcome outcome;
         try {
             outcome = authService.login(request.email(), request.password(), refreshCookie);
         } catch (ApiException exception) {
             rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, attempt);
+            rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
             throw exception;
         }
         rateLimiter.reset(RateLimit.FAILED_SIGN_IN, attempt);
@@ -100,7 +105,8 @@ public class AuthController {
         return ResponseEntity.ok(bodyOf(bundle));
     }
 
-    @GetMapping("/logout")
+    // Only a POST signs out: a link or an image on another site can't.
+    @PostMapping("/logout")
     public ResponseEntity<LogoutResponse> logout(
             @CookieValue(name = "jwt", required = false) String refreshCookie,
             HttpServletResponse response) {

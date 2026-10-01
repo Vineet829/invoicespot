@@ -23,6 +23,7 @@ public class AuthService {
     private final SessionService sessionService;
     private final TwoFactorService twoFactorService;
     private final AuditLog auditLog;
+    private final String unusedHash;
 
     public AuthService(
             UserRepository userRepository,
@@ -37,6 +38,7 @@ public class AuthService {
         this.sessionService = sessionService;
         this.twoFactorService = twoFactorService;
         this.auditLog = auditLog;
+        this.unusedHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     // A sign-in starts a session; one the browser still had is ended. With
@@ -48,9 +50,11 @@ public class AuthService {
         }
 
         Optional<User> account = userRepository.findByEmailIgnoreCase(email.trim());
-        if (account.isEmpty()
-                || account.get().getPassword() == null
-                || !passwordEncoder.matches(password, account.get().getPassword())) {
+        String hash = account.map(User::getPassword).orElse(null);
+        // Without an account the password is still checked, against a hash
+        // nobody's password matches, so the answer takes as long either way.
+        boolean matches = passwordEncoder.matches(password, hash == null ? unusedHash : hash);
+        if (hash == null || !matches) {
             auditLog.signInFailed(
                     email, account.orElse(null), account.isEmpty() ? "No account with this email" : "Wrong password");
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Incorrect email or password");
@@ -83,7 +87,7 @@ public class AuthService {
     @Transactional
     public TokenBundle completeTwoFactor(String challenge, String code, String presentedRefreshToken) {
         User user = jwtService.readTwoFactorChallenge(challenge)
-                .flatMap(userRepository::findByExternalId)
+                .flatMap(userRepository::findForUpdateByExternalId)
                 .filter(candidate -> candidate.isActive() && candidate.isTwoFactorEnabled())
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Your sign-in timed out. Log in again"));
         Optional<TwoFactorService.Method> method = twoFactorService.verify(user, code);

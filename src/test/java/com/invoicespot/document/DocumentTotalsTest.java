@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Random;
 import org.junit.jupiter.api.DisplayName;
@@ -146,13 +148,22 @@ class DocumentTotalsTest {
     }
 
     @Test
-    @DisplayName("a document totalling zero stays unpaid")
+    @DisplayName("an invoice totalling zero has nothing to pay, so it is paid and never overdue")
     void zeroTotal() {
-        Document document = document(DocumentType.INVOICE, "0");
+        Document invoice = document(DocumentType.INVOICE, "0", item("0", 2, "0"));
+        DocumentTotals.apply(invoice);
+        assertThat(invoice.getStatus()).isEqualTo(DocumentStatus.PAID);
 
-        DocumentTotals.apply(document);
+        // One saved unpaid before this rule still never falls due.
+        invoice.setStatus(DocumentStatus.NOT_PAID);
+        invoice.setIssuedAt(Instant.parse("2026-09-01T10:00:00Z"));
+        invoice.setIssueDate(LocalDate.parse("2026-09-01"));
+        invoice.setDueDate(Instant.parse("2026-09-10T10:00:00Z"));
+        assertThat(DocumentTotals.isOverdue(invoice, Instant.parse("2026-10-01T00:00:00Z"))).isFalse();
 
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.NOT_PAID);
+        Document quotation = document(DocumentType.QUOTATION, "0", item("0", 2, "0"));
+        DocumentTotals.apply(quotation);
+        assertThat(quotation.getStatus()).isEqualTo(DocumentStatus.NOT_PAID);
     }
 
     @Test

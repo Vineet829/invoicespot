@@ -12,7 +12,12 @@ import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.codec.binary.Base32;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +26,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class TwoFactorIntegrationTest extends IntegrationTest {
 
@@ -30,6 +37,9 @@ class TwoFactorIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private User withPassword() {
         User user = createUser();
@@ -146,6 +156,52 @@ class TwoFactorIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("two sign-ins racing with one code, from the app or a recovery code, take turns: one gets in")
+    void oneCodeOnce() throws Exception {
+        Enabled enabled = enabled();
+
+        assertThat(race(enabled.user(), Totp.code(enabled.secret(), enabled.step() + 1)))
+                .containsExactlyInAnyOrder(200, 400);
+        assertThat(race(enabled.user(), enabled.recoveryCodes().get(0))).containsExactlyInAnyOrder(200, 400);
+    }
+
+    // Two sign-ins send the same code while the account is held locked, and
+    // go on together once it is let go.
+    private List<Integer> race(User user, String code) throws Exception {
+        List<String> challenges = List.of(challenge(user), challenge(user));
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        try {
+            Future<?> holder = pool.submit(() -> transaction.executeWithoutResult(tx -> {
+                userRepository.findForUpdateByPkid(user.getPkid());
+                held.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            held.await();
+            List<Future<Integer>> results = new ArrayList<>();
+            for (String challenge : challenges) {
+                results.add(pool.submit(() -> secondStep(challenge, code).andReturn().getResponse().getStatus()));
+            }
+            Thread.sleep(500);
+            release.countDown();
+            holder.get();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> result : results) {
+                statuses.add(result.get());
+            }
+            return statuses;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("turning it off takes the password and a code; then a password signs in again")
     void turnOff() throws Exception {
         Enabled enabled = enabled();
@@ -157,6 +213,40 @@ class TwoFactorIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         login(enabled.user()).andExpect(jsonPath("$.accessToken").exists()).andExpect(cookie().exists("jwt"));
+    }
+
+    @Test
+    @DisplayName("turning it on, or off, signs out every other device and keeps this one signed in")
+    void signsOutOtherDevices() throws Exception {
+        User user = withPassword();
+        String here = bearer(user);
+        String elsewhere = bearer(user);
+        String setup = account("/setup", here, "{\"password\": \"%s\"}".formatted(PASSWORD))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        byte[] secret = new Base32().decode((String) JsonPath.read(setup, "$.secret"));
+        long step = Totp.step(Instant.now());
+        account("/enable", here, "{\"code\": \"%s\"}".formatted(Totp.code(secret, step)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(
+                        "Two-factor sign-in is on, and your other devices were signed out. Keep your recovery codes"
+                                + " somewhere safe"));
+        profile(elsewhere).andExpect(status().isForbidden());
+        profile(here).andExpect(status().isOk());
+
+        String another = bearer(user);
+        account("/disable", here, "{\"password\": \"%s\", \"code\": \"%s\"}".formatted(
+                        PASSWORD, Totp.code(secret, step + 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(
+                        "Two-factor sign-in is off, and your other devices were signed out"));
+        profile(another).andExpect(status().isForbidden());
+        profile(here).andExpect(status().isOk());
+    }
+
+    private ResultActions profile(String authorization) throws Exception {
+        return mockMvc.perform(get("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, authorization));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.invoicespot.config.AppProperties;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,8 +18,11 @@ public class UploadService {
 
     public static final long MAX_BYTES = 2L * 1024 * 1024;
     public static final String TOO_LARGE = "Logos can be at most 2 MB";
+    public static final String NOT_AN_IMAGE = "Logos can be PNG, JPEG or GIF images";
 
     private static final String PUBLIC_PREFIX = "/uploads/";
+    // What was ever stored here: today's logos, and WebP ones from before.
+    private static final List<String> SERVED = List.of(".png", ".jpg", ".jpeg", ".gif", ".webp");
 
     private final Path uploadDir;
 
@@ -26,30 +30,33 @@ public class UploadService {
         this.uploadDir = Path.of(properties.upload().dir());
     }
 
+    // A logo is kept only when its first bytes show a PNG, JPEG or GIF image,
+    // and named for what it is, whatever the browser called it: a page or
+    // script sent as an image is refused. WebP is left out because PDFs can't
+    // show it.
     public String store(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "A logo file is required");
         }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Only image files are allowed");
-        }
-        if (contentType.toLowerCase(Locale.ROOT).contains("svg")) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "SVG files are not allowed");
-        }
         if (file.getSize() > MAX_BYTES) {
             throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, TOO_LARGE);
         }
-
-        String fileName = UUID.randomUUID() + extension(contentType, file.getOriginalFilename());
         try {
+            byte[] content = file.getBytes();
+            String fileName = UUID.randomUUID() + extension(content)
+                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, NOT_AN_IMAGE));
             Files.createDirectories(uploadDir);
-            file.transferTo(uploadDir.resolve(fileName).toAbsolutePath());
+            Files.write(uploadDir.resolve(fileName).toAbsolutePath(), content);
+            return PUBLIC_PREFIX + fileName;
         } catch (IOException exception) {
-            throw new ApiException(
-                    HttpStatus.INTERNAL_SERVER_ERROR, "The logo could not be uploaded");
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "The logo could not be uploaded");
         }
-        return PUBLIC_PREFIX + fileName;
+    }
+
+    // Only image files are served from /uploads.
+    public static boolean servable(String path) {
+        String name = path.toLowerCase(Locale.ROOT);
+        return SERVED.stream().anyMatch(name::endsWith);
     }
 
     public Optional<Path> localFile(String publicUrl) {
@@ -64,16 +71,28 @@ public class UploadService {
         return Optional.of(file);
     }
 
-    private static String extension(String contentType, String originalName) {
-        if (originalName != null && originalName.contains(".")) {
-            return originalName.substring(originalName.lastIndexOf('.')).toLowerCase(Locale.ROOT);
+    private static Optional<String> extension(byte[] content) {
+        if (startsWith(content, 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A)) {
+            return Optional.of(".png");
         }
-        return switch (contentType.toLowerCase(Locale.ROOT)) {
-            case "image/png" -> ".png";
-            case "image/jpeg", "image/jpg" -> ".jpg";
-            case "image/gif" -> ".gif";
-            case "image/webp" -> ".webp";
-            default -> "";
-        };
+        if (startsWith(content, 0xFF, 0xD8, 0xFF)) {
+            return Optional.of(".jpg");
+        }
+        if (startsWith(content, 'G', 'I', 'F', '8', '7', 'a') || startsWith(content, 'G', 'I', 'F', '8', '9', 'a')) {
+            return Optional.of(".gif");
+        }
+        return Optional.empty();
+    }
+
+    private static boolean startsWith(byte[] content, int... signature) {
+        if (content.length < signature.length) {
+            return false;
+        }
+        for (int index = 0; index < signature.length; index++) {
+            if ((content[index] & 0xFF) != signature[index]) {
+                return false;
+            }
+        }
+        return true;
     }
 }

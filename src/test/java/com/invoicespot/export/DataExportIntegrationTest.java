@@ -1,9 +1,11 @@
 package com.invoicespot.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
@@ -119,5 +121,18 @@ class DataExportIntegrationTest extends IntegrationTest {
         assertThat(lines(other.get("documents.csv"))).hasSize(1);
         assertThat(lines(other.get("line-items.csv"))).hasSize(1);
         assertThat(lines(other.get("recurring.csv"))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a business can download everything at most ten times an hour")
+    void limited() throws Exception {
+        User owner = createUser();
+        for (int attempt = 0; attempt < 10; attempt++) {
+            export(owner);
+        }
+
+        mockMvc.perform(get("/api/v1/export/all").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(startsWith("Too many exports of everything")));
     }
 }

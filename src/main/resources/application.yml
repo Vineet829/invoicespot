@@ -89,6 +89,7 @@ app:
     cron: ${JOBS_CRON:0 0 7 * * *}
     zone: ${JOBS_ZONE:UTC}
 
+# The app's own logging, INFO unless LOG_LEVEL asks for more (or less).
 logging:
   level:
-    com.invoicespot: DEBUG
+    com.invoicespot: ${LOG_LEVEL:INFO}

@@ -40,4 +40,9 @@ public class Payment extends BaseEntity {
 
     @Column(name = "additional_info")
     private String additionalInfo;
+
+    // The number of its receipt on the document, given when it was recorded
+    // and kept, whatever its date or the payments recorded after it.
+    @Column(name = "receipt_number", nullable = false)
+    private int receiptNumber;
 }

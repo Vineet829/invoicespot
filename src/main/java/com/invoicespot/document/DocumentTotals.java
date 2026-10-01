@@ -111,10 +111,16 @@ public final class DocumentTotals {
         BigDecimal withheld = withheld(document);
         document.setTotalAmountReceived(received);
         document.setTotalTds(withheld);
-        document.setStatus(status(
-                total,
-                received.add(withheld).subtract(document.getTotalRefunded()),
-                document.getTotalCredited()));
+        // An invoice whose lines come to nothing has nothing left to pay.
+        boolean free = document.getDocumentType() == DocumentType.INVOICE
+                && !document.getBillingItems().isEmpty()
+                && total.signum() == 0;
+        document.setStatus(free
+                ? DocumentStatus.PAID
+                : status(
+                        total,
+                        received.add(withheld).subtract(document.getTotalRefunded()),
+                        document.getTotalCredited()));
     }
 
     // What is still owed: the total less what was credited, the money
@@ -188,12 +194,13 @@ public final class DocumentTotals {
                 .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
     }
 
-    // Only an issued invoice falls due; a draft isn't owed yet, and a void one
-    // no longer is.
+    // Only an issued invoice falls due; a draft isn't owed yet, a void one no
+    // longer is, and one for nothing never was.
     public static boolean isOverdue(Document document, Instant startOfToday) {
         return document.getDocumentType() == DocumentType.INVOICE
                 && document.state() == DocumentState.ISSUED
                 && document.getStatus() != DocumentStatus.PAID
+                && orZero(document.getTotal()).signum() > 0
                 && document.getDueDate() != null
                 && document.getDueDate().isBefore(startOfToday);
     }

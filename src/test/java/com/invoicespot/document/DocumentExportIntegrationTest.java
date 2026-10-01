@@ -90,8 +90,9 @@ class DocumentExportIntegrationTest extends IntegrationTest {
         assertThat(csv(owner, "/api/v1/document/csv")).containsExactly(
                 "﻿Number,Type,Status,Client,Client email,Currency,Subtotal,Tax,Total,Paid,Owed,Issued,Due,Overdue,"
                         + "Tax withheld,Exchange rate,Exchange rate to,Credits,Credited,Refunded",
-                "REC-0001,Receipt,Paid,Acme,%s,USD,20.00,0.00,20.00,20.00,0.00,%s,%s,No,0.00,,,,0.00,0.00"
-                        .formatted(email, today, today),
+                // A receipt has no due date.
+                "REC-0001,Receipt,Paid,Acme,%s,USD,20.00,0.00,20.00,20.00,0.00,%s,,No,0.00,,,,0.00,0.00"
+                        .formatted(email, today),
                 "QUO-0001,Quotation,Unpaid,Acme,%s,USD,70.00,0.00,70.00,,,%s,No,,,,,,".formatted(email, dates),
                 "INV-0002,Invoice,Paid,Acme,%s,USD,50.00,0.00,50.00,50.00,0.00,%s,No,0.00,,,,0.00,0.00"
                         .formatted(email, dates),

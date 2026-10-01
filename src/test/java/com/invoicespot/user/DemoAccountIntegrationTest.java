@@ -33,6 +33,27 @@ class DemoAccountIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("the demo account's profile can't be renamed by whoever is trying it; anyone else's can")
+    void profileStays() throws Exception {
+        User demo = demoUser();
+        String name = demo.getFirstName();
+
+        mockMvc.perform(patch("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(demo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\": \"Hijacked\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This is a shared demo account, so changing its profile is turned off"));
+        assertThat(userRepository.findByExternalId(demo.getId()).orElseThrow().getFirstName()).isEqualTo(name);
+        mockMvc.perform(patch("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(createUser()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\": \"Renamed\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("the demo account can't delete itself")
     void cannotDeleteItself() throws Exception {
         User demo = demoUser();

@@ -79,6 +79,8 @@ public class UserService {
         }
 
         User user = require(pkid);
+        // Everyone who tries the demo shares this account, so nobody renames it.
+        demoAccountGuard.requireNotDemo(user, "changing its profile");
         if (request.username() != null) {
             user.setUsername(request.username());
         }

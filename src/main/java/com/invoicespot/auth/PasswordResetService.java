@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PasswordResetService {
 
+    public static final String RESET_REQUESTED =
+            "If an account uses that email, we've sent it a link to reset the password";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService tokenService;
@@ -47,36 +50,29 @@ public class PasswordResetService {
         this.clock = clock;
     }
 
+    // The answer is the same whether or not the email has an account, so the
+    // form can't be used to find out who has one. Only a verified account is
+    // sent a link.
     @Transactional
     public String requestReset(String email) {
         if (email == null || email.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "You must enter your email address");
         }
-        User user = userRepository
+        userRepository
                 .findByEmailIgnoreCase(email.trim())
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.BAD_REQUEST, "That email is not associated with any account"));
+                .filter(User::isEmailVerified)
+                .ifPresent(this::sendResetLink);
+        return RESET_REQUESTED;
+    }
 
-        if (user.isEmailVerified()) {
-            String token = tokenService.issue(user);
-            String link = site.clientUrl()
-                    + "/auth/reset_password?emailToken="
-                    + token
-                    + "&userId="
-                    + user.getId();
-            mailService.send(
-                    user.getEmail(),
-                    "Password Reset Request",
-                    "Hello "
-                            + user.getFirstName()
-                            + ", use this link to reset your "
-                            + site.name()
-                            + " password: "
-                            + link);
-        }
-        return "Hey "
-                + user.getFirstName()
-                + ", an email has been sent to your account with the password reset link";
+    private void sendResetLink(User user) {
+        String token = tokenService.issue(user);
+        String link = site.clientUrl() + "/auth/reset_password?emailToken=" + token + "&userId=" + user.getId();
+        mailService.send(
+                user.getEmail(),
+                "Password Reset Request",
+                "Hello " + user.getFirstName() + ", use this link to reset your " + site.name() + " password: "
+                        + link);
     }
 
     @Transactional

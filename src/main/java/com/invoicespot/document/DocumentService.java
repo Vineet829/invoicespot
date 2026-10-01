@@ -114,7 +114,7 @@ public class DocumentService {
         document.setCustomerSnapshot(CustomerSnapshot.of(customer));
         document.setDocumentType(documentType(request.documentType()));
         document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
-        document.setDueDate(request.dueDate());
+        document.setDueDate(takesDueDate(document) ? request.dueDate() : null);
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
         document.setCurrency(request.currency());
@@ -164,8 +164,11 @@ public class DocumentService {
     public DocumentResponse issue(BusinessAccess access, String id, IssueDocumentRequest request) {
         Document document = lockInBusiness(access, id);
         boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
-        if (document.isDraft() && request.dueDate() != null && !creditNote) {
+        if (document.isDraft() && request.dueDate() != null && takesDueDate(document)) {
             document.setDueDate(request.dueDate());
+        }
+        if (document.isDraft() && !takesDueDate(document)) {
+            document.setDueDate(null);
         }
         if (document.isDraft() && request.exchangeRate() != null && !creditNote) {
             exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
@@ -291,10 +294,11 @@ public class DocumentService {
 
     // A draft changes freely. An issued document keeps its client, lines,
     // currency, tax and issue date: only its due date, notes and terms change,
-    // and its amounts stay as they went out.
+    // and its amounts stay as they went out. It is locked while it changes,
+    // so an edit can't land on a draft that was issued meanwhile.
     @Transactional
     public DocumentResponse update(BusinessAccess access, String id, UpdateDocumentRequest request) {
-        Document document = requireInBusiness(
+        Document document = lockInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to update this document. It's not yours");
         requireNotVoid(document, "A void document can't be changed");
@@ -328,6 +332,9 @@ public class DocumentService {
         }
         if (request.dueDate() != null) {
             document.setDueDate(request.dueDate());
+        }
+        if (!takesDueDate(document)) {
+            document.setDueDate(null);
         }
         if (request.additionalInfo() != null) {
             document.setAdditionalInfo(request.additionalInfo());
@@ -369,9 +376,11 @@ public class DocumentService {
         return respond(document);
     }
 
+    // The original is locked while it is copied, so the copy is of one
+    // version of it.
     @Transactional
     public DocumentResponse duplicate(BusinessAccess access, String id) {
-        Document original = requireInBusiness(
+        Document original = lockInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to copy this document. It's not yours");
         if (original.getDocumentType() == DocumentType.CREDIT_NOTE) {
@@ -385,18 +394,21 @@ public class DocumentService {
         return respond(copy);
     }
 
-    // A draft credit note for an issued invoice or receipt.
+    // A draft credit note for an issued invoice or receipt, made while the
+    // document is locked, so it isn't voided at the same moment.
     @Transactional
     public DocumentResponse creditNote(BusinessAccess access, String id) {
-        Document credited = requireInBusiness(
+        Document credited = lockInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to credit this document. It's not yours");
         return respond(creditNotes.create(credited, actor(access)));
     }
 
+    // The quotation is locked, so two conversions at once take turns and the
+    // second finds the invoice the first made.
     @Transactional
     public DocumentResponse convert(BusinessAccess access, String id) {
-        Document quotation = requireInBusiness(
+        Document quotation = lockInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to convert this document. It's not yours");
         if (quotation.getDocumentType() != DocumentType.QUOTATION) {
@@ -500,10 +512,11 @@ public class DocumentService {
     }
 
     // Only a draft is deleted: an issued document keeps its number, and is
-    // voided instead.
+    // voided instead. It is locked first, so a draft being issued meanwhile
+    // isn't deleted.
     @Transactional
     public void delete(BusinessAccess access, String id) {
-        Document document = requireInBusiness(
+        Document document = lockInBusiness(
                 access, id, "That document does not exist!",
                 "You are not authorized to delete this document. It's not yours");
         if (!document.isDraft()) {
@@ -532,6 +545,8 @@ public class DocumentService {
         }
         Payment payment = new Payment();
         payment.setDocument(document);
+        document.setReceiptsNumbered(document.getReceiptsNumbered() + 1);
+        payment.setReceiptNumber(document.getReceiptsNumbered());
         CustomerSnapshot customer = document.getCustomerSnapshot();
         payment.setPaidBy(customer == null ? null : customer.getName());
         payment.setDatePaid(paymentDate(request.datePaid()));
@@ -731,9 +746,10 @@ public class DocumentService {
         }
     }
 
-    // Payments are kept in date order, so a receipt's number follows it.
+    // A receipt is numbered in the order its payment was recorded, and keeps
+    // that number.
     private static String receiptNumber(Document document, Payment payment) {
-        return document.getDocumentNumber() + "-P" + (document.getPayments().indexOf(payment) + 1);
+        return document.getDocumentNumber() + "-P" + payment.getReceiptNumber();
     }
 
     private static DocumentEnvelope receiptEnvelope(Document document, String number) {
@@ -749,16 +765,29 @@ public class DocumentService {
     // A credit note's document is locked before the note, as everything that
     // changes both does.
     private Document lockInBusiness(BusinessAccess access, String id) {
+        return lockInBusiness(
+                access, id, "That document does not exist!",
+                "You are not authorized to update this document. It's not yours");
+    }
+
+    private Document lockInBusiness(
+            BusinessAccess access, String id, String notFoundMessage, String forbiddenMessage) {
         Optional<UUID> external = externalId(id);
         external.flatMap(documentRepository::findCreditedPkid).ifPresent(documentRepository::findForUpdateByPkid);
         Document document = external
                 .flatMap(documentRepository::findForUpdateByExternalId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist!"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, notFoundMessage));
         if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
-            throw new ApiException(
-                    HttpStatus.FORBIDDEN, "You are not authorized to update this document. It's not yours");
+            throw new ApiException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
         return document;
+    }
+
+    // An invoice falls due and a quotation is valid until a day; a receipt is
+    // paid as it is made, and a credit note takes its invoice's terms.
+    private static boolean takesDueDate(Document document) {
+        return document.getDocumentType() == DocumentType.INVOICE
+                || document.getDocumentType() == DocumentType.QUOTATION;
     }
 
     private static Payment requirePayment(Document document, String paymentId) {

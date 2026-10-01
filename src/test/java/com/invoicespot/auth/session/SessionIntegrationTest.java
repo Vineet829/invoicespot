@@ -135,11 +135,23 @@ class SessionIntegrationTest extends IntegrationTest {
         User user = withPassword();
         SignedIn session = signIn(user);
 
-        mockMvc.perform(get("/api/v1/auth/logout").cookie(new Cookie("jwt", session.refresh())))
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(new Cookie("jwt", session.refresh())))
                 .andExpect(status().isOk());
 
         profile(session.access()).andExpect(status().isForbidden());
         refresh(session.refresh()).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a GET can't sign anyone out, so a link or an image on another site can't either")
+    void signOutTakesPost() throws Exception {
+        User user = withPassword();
+        SignedIn session = signIn(user);
+
+        mockMvc.perform(get("/api/v1/auth/logout").cookie(new Cookie("jwt", session.refresh())))
+                .andExpect(status().isMethodNotAllowed());
+
+        profile(session.access()).andExpect(status().isOk());
     }
 
     @Test

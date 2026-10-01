@@ -3,6 +3,8 @@ package com.invoicespot.export;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.Requires;
 import com.invoicespot.business.Permission;
+import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimiter;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,13 +20,16 @@ public class ExportController {
     private static final MediaType ZIP = MediaType.parseMediaType("application/zip");
 
     private final DataExport dataExport;
+    private final RateLimiter rateLimiter;
 
-    public ExportController(DataExport dataExport) {
+    public ExportController(DataExport dataExport, RateLimiter rateLimiter) {
         this.dataExport = dataExport;
+        this.rateLimiter = rateLimiter;
     }
 
     @GetMapping("/all")
     public ResponseEntity<byte[]> all(@Requires(Permission.EXPORT_ARCHIVE) BusinessAccess access) {
+        rateLimiter.consume(RateLimit.WHOLE_EXPORT, String.valueOf(access.businessPkid()));
         DataExport.Archive archive = dataExport.all(access);
         return ResponseEntity.ok()
                 .contentType(ZIP)

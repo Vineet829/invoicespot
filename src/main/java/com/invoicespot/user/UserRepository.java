@@ -25,6 +25,16 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByUsername(String username);
 
+    // Locked, so two sign-ins can't spend one two-factor code at once: the
+    // second waits, then sees it spent.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.pkid = :pkid")
+    Optional<User> findForUpdateByPkid(@Param("pkid") Long pkid);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :externalId")
+    Optional<User> findForUpdateByExternalId(@Param("externalId") UUID externalId);
+
     // Locked, so two admins removing each other at once can't leave none.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u join u.roles role where role = 'Admin' and u.active = true")

@@ -79,7 +79,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     @Query("""
             select d from Document d
             where d.documentType = :invoice and d.issuedAt is not null and d.voidedAt is null
-              and d.status <> :paid
+              and d.status <> :paid and d.total > 0
               and d.dueDate < :before and d.overdueAlertedAt is null
             """)
     List<Document> findUnalertedOverdue(
@@ -92,7 +92,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             select d from Document d
             where d.business.pkid = :businessPkid and d.documentType = :invoice
               and d.issuedAt is not null and d.voidedAt is null
-              and d.status <> :paid and d.dueDate is not null and d.remindersSent < :most
+              and d.status <> :paid and d.total > 0 and d.dueDate is not null and d.remindersSent < :most
             """)
     List<Document> findRemindable(
             @Param("businessPkid") Long businessPkid,

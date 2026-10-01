@@ -61,6 +61,22 @@ class RateLimitIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("thirty failed sign-ins from one address, whatever the emails, stop that address for a while")
+    void sprayedPasswords() throws Exception {
+        User user = userWithPassword();
+        String address = address();
+        for (int attempt = 0; attempt < 30; attempt++) {
+            login(address, "nobody" + attempt + "@example.test", "Spr4y!password")
+                    .andExpect(status().isUnauthorized());
+        }
+
+        login(address, user.getEmail(), PASSWORD)
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(startsWith("Too many sign-in attempts from this network")));
+        login(address(), user.getEmail(), PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("a successful sign-in clears the failures before it")
     void successResets() throws Exception {
         User user = userWithPassword();

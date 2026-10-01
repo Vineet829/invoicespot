@@ -83,7 +83,7 @@ class AuditLogIntegrationTest extends IntegrationTest {
     void signOutAndReset() throws Exception {
         User user = withPassword();
         Cookie refresh = login(user.getEmail(), PASSWORD).andReturn().getResponse().getCookie("jwt");
-        mockMvc.perform(get("/api/v1/auth/logout").cookie(refresh)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(refresh)).andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/auth/reset_password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

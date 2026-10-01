@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RegistrationService {
 
+    public static final String VERIFICATION_RESENT =
+            "If that email has an account waiting to be verified, we've sent it a new link. It works for 15 minutes";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService tokenService;
@@ -112,20 +115,18 @@ public class RegistrationService {
                         + "/login");
     }
 
+    // The same answer whether or not the email has an account, or one that is
+    // already verified, so the form can't be used to find out who signed up.
     @Transactional
     public String resend(String email) {
         if (isBlank(email)) {
             throw badRequest("An email must be provided");
         }
-        User user = userRepository
+        userRepository
                 .findByEmailIgnoreCase(email.trim())
-                .orElseThrow(() -> badRequest("We were unable to find a user with that email address"));
-        if (user.isEmailVerified()) {
-            throw badRequest("This account has already been verified. Please login");
-        }
-        sendVerification(user);
-        return user.getFirstName()
-                + ", an email has been sent to your account, please verify within 15 minutes";
+                .filter(user -> !user.isEmailVerified())
+                .ifPresent(this::sendVerification);
+        return VERIFICATION_RESENT;
     }
 
     private void sendVerification(User user) {

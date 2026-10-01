@@ -3,6 +3,8 @@ package com.invoicespot.common;
 import com.invoicespot.business.BusinessChangedException;
 import com.invoicespot.ratelimit.RateLimitedException;
 import com.invoicespot.upload.UploadService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(RateLimitedException.class)
     public ResponseEntity<ErrorResponse> handleRateLimited(RateLimitedException ex) {
@@ -94,10 +98,27 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "That route does not exist - " + path);
     }
 
+    // Spring's own request errors, such as a method or media type the route
+    // doesn't take or a missing parameter, keep their status. Anything else
+    // is unexpected: it is logged with where it happened, and answered
+    // without its details.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
+    public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, WebRequest request) {
+        if (ex instanceof org.springframework.web.ErrorResponse spring
+                && spring.getStatusCode().is4xxClientError()) {
+            HttpStatus status = HttpStatus.valueOf(spring.getStatusCode().value());
+            String detail = spring.getBody().getDetail();
+            return build(status, detail == null ? status.getReasonPhrase() : detail);
+        }
+        LOGGER.error("Unexpected error on {}", describe(request), ex);
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong. Please try again later.");
+    }
+
+    private static String describe(WebRequest request) {
+        return request instanceof ServletWebRequest servlet
+                ? servlet.getRequest().getMethod() + " " + servlet.getRequest().getRequestURI()
+                : request.getDescription(false);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {

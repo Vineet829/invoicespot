@@ -1,5 +1,6 @@
 package com.invoicespot.common;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,6 +13,9 @@ import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+@ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
 
     private MockMvc mockMvc;
@@ -73,13 +78,25 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("an unexpected error is masked as a 500 without leaking internals")
-    void unexpectedError() throws Exception {
+    @DisplayName("an unexpected error is masked as a 500 without leaking internals, and logged with its request")
+    void unexpectedError(CapturedOutput output) throws Exception {
         mockMvc.perform(get("/probe/boom"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Something went wrong. Please try again later."))
                 .andExpect(jsonPath("$.statusCode").value(500));
+        assertThat(output.getOut() + output.getErr())
+                .contains("Unexpected error on GET /probe/boom")
+                .contains("IllegalStateException: sensitive internal detail");
+    }
+
+    @Test
+    @DisplayName("a method the route doesn't take is a 405 that says so, not a 500")
+    void methodNotAllowed(CapturedOutput output) throws Exception {
+        mockMvc.perform(post("/probe/boom"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.message").value("Method 'POST' is not supported."));
+        assertThat(output.getOut() + output.getErr()).doesNotContain("Unexpected error");
     }
 
     @Test

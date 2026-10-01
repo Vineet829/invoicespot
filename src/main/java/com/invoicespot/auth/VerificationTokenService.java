@@ -1,5 +1,6 @@
 package com.invoicespot.auth;
 
+import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.user.User;
 import java.security.SecureRandom;
@@ -11,6 +12,9 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// The tokens in verification and password reset links. Each is kept only as
+// its SHA-256 hash, like refresh tokens and recovery codes, so a copy of the
+// database can't verify or reset an account.
 @Service
 public class VerificationTokenService {
 
@@ -34,7 +38,7 @@ public class VerificationTokenService {
 
         VerifyResetToken entity = new VerifyResetToken();
         entity.setUser(user);
-        entity.setToken(token);
+        entity.setToken(SecretTokens.hash(token));
         Instant now = clock.instant();
         entity.setCreatedAt(now);
         entity.setExpiresAt(now.plus(tokenTtl));
@@ -48,7 +52,7 @@ public class VerificationTokenService {
             return Optional.empty();
         }
         return tokenRepository
-                .findByToken(token)
+                .findByToken(SecretTokens.hash(token))
                 .filter(entity -> entity.getExpiresAt().isAfter(clock.instant()));
     }
 
