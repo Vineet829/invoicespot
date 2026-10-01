@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.MailSendException;
 import org.springframework.test.web.servlet.ResultActions;
 
 // Emails about a document carry its link to view and pay it, and how to pay,
@@ -215,6 +218,41 @@ class DocumentEmailLinkIntegrationTest extends IntegrationTest {
         assertThat(url).isNotEqualTo(old);
         mockMvc.perform(get("/api/v1/public/share/{token}", token(old))).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/public/share/{token}", token(url))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a link that can't be shown again keeps working when the email that would replace it fails to send")
+    void failedEmailKeepsLink() throws Exception {
+        Invoice invoice = invoice(LocalDate.now(ZoneOffset.UTC).plusDays(30));
+        String old = JsonPath.read(
+                mockMvc.perform(post("/api/v1/document/{id}/share", invoice.id())
+                                .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.url");
+        forgetSealed(invoice);
+        doThrow(new MailSendException("down")).doNothing().when(mailSender).send(any(MimeMessage.class));
+
+        mockMvc.perform(post("/api/v1/document/{id}/email", invoice.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadGateway());
+        mockMvc.perform(get("/api/v1/public/share/{token}", token(old))).andExpect(status().isOk());
+        assertThat(links(invoice)).isEqualTo(1);
+        draft(invoice)
+                .andExpect(jsonPath("$.note", containsString("Sending replaces this document's share link made on")));
+
+        email(invoice);
+        String url = link(lastTo(invoice).text());
+        assertThat(url).isNotEqualTo(old);
+        mockMvc.perform(get("/api/v1/public/share/{token}", token(old))).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/public/share/{token}", token(url))).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/document/{id}/activity", invoice.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.events[*].type", contains(
+                        "VIEWED", "EMAILED", "SHARED", "VIEWED", "SHARED", "ISSUED", "CREATED")));
     }
 
     @Test

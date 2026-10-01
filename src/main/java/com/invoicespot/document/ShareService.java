@@ -79,12 +79,15 @@ public class ShareService {
     }
 
     private ShareLinkResponse newLink(Document document, User actor, String detail) {
+        return newLink(document, actor, detail, SecretTokens.generate());
+    }
+
+    private ShareLinkResponse newLink(Document document, User actor, String detail, String token) {
         Instant now = Instant.now(clock);
         shareLinkRepository.findByDocumentAndRevokedAtIsNull(document).ifPresent(active -> {
             active.setRevokedAt(now);
             shareLinkRepository.saveAndFlush(active);
         });
-        String token = SecretTokens.generate();
         ShareLink link = new ShareLink();
         link.setDocument(document);
         link.setTokenHash(SecretTokens.hash(token));
@@ -115,32 +118,54 @@ public class ShareService {
     }
 
     // The link an email being sent carries: the document's current one when
-    // it can be shown again, or a new one. An email sent automatically never
-    // replaces a link that can't be shown again, and goes without one.
+    // it can be shown again, or a new one. A new one that replaces a link
+    // that can't be shown again is made only once the email has gone (keep),
+    // so an email that fails leaves the old link working. An email sent
+    // automatically never replaces a link that can't be shown again, and goes
+    // without one.
     @Transactional
-    public Optional<String> linkForEmail(BusinessAccess access, UUID documentId, boolean mayReplace, User actor) {
-        return linkToSend(access, documentId, mayReplace, actor, "for an email").map(SentLink::url);
+    public Optional<SentLink> linkForEmail(BusinessAccess access, UUID documentId, boolean mayReplace, User actor) {
+        return linkToSend(access, documentId, mayReplace, actor, "for an email", true);
     }
 
     // A link to send someone, and whether making it replaced one that
-    // couldn't be shown again.
-    public record SentLink(String url, boolean replaced) {}
+    // couldn't be shown again. One that waits to replace it until its email
+    // has gone carries the token it is made from.
+    public record SentLink(String url, boolean replaced, String token) {}
 
-    // The document is locked, so two messages at once share one new link.
+    // Makes the link an email that has gone carries, when it waited to
+    // replace the document's current one.
+    @Transactional
+    public void keep(BusinessAccess access, UUID documentId, SentLink link, User actor) {
+        if (link.token() != null) {
+            newLink(lockInBusiness(access, documentId), actor, "for an email", link.token());
+        }
+    }
+
+    // The document is locked, so two messages at once share one new link,
+    // unless each waits for its email to replace one.
     private Optional<SentLink> linkToSend(
-            BusinessAccess access, UUID documentId, boolean mayReplace, User actor, String detail) {
-        Document document = documentRepository.findForUpdateByExternalId(documentId)
-                .filter(found -> found.getBusiness().getPkid().equals(access.businessPkid()))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
+            BusinessAccess access, UUID documentId, boolean mayReplace, User actor, String detail, boolean later) {
+        Document document = lockInBusiness(access, documentId);
         if (document.isDraft() || document.isVoid()) {
             return Optional.empty();
         }
         Optional<ShareLink> active = shareLinkRepository.findByDocumentAndRevokedAtIsNull(document);
         Optional<String> current = active.flatMap(this::recovered);
         if (current.isPresent() || (active.isPresent() && !mayReplace)) {
-            return current.map(url -> new SentLink(url, false));
+            return current.map(url -> new SentLink(url, false, null));
         }
-        return Optional.of(new SentLink(newLink(document, actor, detail).url(), active.isPresent()));
+        if (active.isPresent() && later) {
+            String token = SecretTokens.generate();
+            return Optional.of(new SentLink(address(token), true, token));
+        }
+        return Optional.of(new SentLink(newLink(document, actor, detail).url(), active.isPresent(), null));
+    }
+
+    private Document lockInBusiness(BusinessAccess access, UUID documentId) {
+        return documentRepository.findForUpdateByExternalId(documentId)
+                .filter(found -> found.getBusiness().getPkid().equals(access.businessPkid()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
     }
 
     // A WhatsApp message with the document's link, to its client's number
@@ -150,7 +175,7 @@ public class ShareService {
         Document document = requireInBusiness(access, id);
         DocumentService.requireIssued(document, "Issue this draft before sharing it");
         DocumentService.requireNotVoid(document, "A void document can't be shared");
-        SentLink link = linkToSend(access, document.getId(), true, access.user(), "for WhatsApp").orElseThrow();
+        SentLink link = linkToSend(access, document.getId(), true, access.user(), "for WhatsApp", false).orElseThrow();
         Business business = document.getBusiness();
         CustomerSnapshot client = Objects.requireNonNullElseGet(document.getCustomerSnapshot(), CustomerSnapshot::new);
         boolean indian =

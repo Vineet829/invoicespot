@@ -3,7 +3,6 @@ package com.invoicespot.document.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -11,7 +10,7 @@ public record UpdateDocumentRequest(
         String customerId,
         @Valid DocumentCustomerDto customer,
         String documentType,
-        Instant dueDate,
+        String dueDate,
         @Size(max = 5000, message = "Additional info can be at most 5,000 characters") String additionalInfo,
         @Size(max = 5000, message = "Terms can be at most 5,000 characters") String termsConditions,
         String rates,

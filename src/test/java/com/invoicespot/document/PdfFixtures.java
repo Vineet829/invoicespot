@@ -323,4 +323,25 @@ final class PdfFixtures {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO));
     }
+
+    // Rupees, in amounts as wide as a test needs: an invoice for what was
+    // charged, then a payment and a credit note against it.
+    static List<Statements.Account> account(BigDecimal charged, BigDecimal paid) {
+        BigDecimal credited = new BigDecimal("20000.00");
+        BigDecimal due = charged.subtract(paid).subtract(credited);
+        return List.of(new Statements.Account(
+                "INR",
+                List.of(
+                        new Statements.Line(LocalDate.of(2026, 8, 1), "Invoice INV-0040", charged, null, charged),
+                        new Statements.Line(LocalDate.of(2026, 9, 2), "Payment for INV-0040 (Bank Transfer)",
+                                null, paid, charged.subtract(paid)),
+                        new Statements.Line(LocalDate.of(2026, 9, 10), "Credit note CN-0001 for INV-0040",
+                                null, credited, due)),
+                charged,
+                paid,
+                credited,
+                BigDecimal.ZERO,
+                due,
+                due));
+    }
 }

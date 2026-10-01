@@ -22,6 +22,8 @@ public interface PaymentClaimRepository extends JpaRepository<PaymentClaim, Long
 
     Optional<PaymentClaim> findByIdAndDocument(UUID id, Document document);
 
+    Optional<PaymentClaim> findByPayment(Payment payment);
+
     // Reports waiting in a business, newest first, with their documents.
     @Query("""
             select c from PaymentClaim c join fetch c.document

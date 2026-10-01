@@ -207,6 +207,23 @@ public class PaymentClaimService {
         return PaymentClaimResponse.from(claim);
     }
 
+    // A report dismissed by what a member did to its document, such as deleting
+    // the payment it was confirmed as: that member decides it, the reason stays
+    // with the business, and the client sees it wasn't confirmed. Static, since
+    // DocumentService calls it and this service already depends on DocumentService.
+    static void dismissed(PaymentClaim claim, String reason, User actor, Instant at, DocumentActivity activity) {
+        claim.setStatus(PaymentClaim.Status.DISMISSED);
+        claim.setPayment(null);
+        claim.setDismissReason(reason);
+        claim.setDecidedBy(actor);
+        claim.setDecidedAt(at);
+        activity.record(
+                claim.getDocument(),
+                DocumentEventType.PAYMENT_REPORT_DISMISSED,
+                detail(claim) + " · " + reason,
+                actor);
+    }
+
     private void decided(PaymentClaim claim, User actor) {
         claim.setDecidedBy(actor);
         claim.setDecidedAt(Instant.now(clock));

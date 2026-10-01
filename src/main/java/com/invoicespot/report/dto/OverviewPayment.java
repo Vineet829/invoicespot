@@ -2,7 +2,6 @@ package com.invoicespot.report.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -21,5 +20,5 @@ public record OverviewPayment(
             String documentNumber,
             BigDecimal total,
             String status,
-            Instant dueDate) {}
+            LocalDate dueDate) {}
 }

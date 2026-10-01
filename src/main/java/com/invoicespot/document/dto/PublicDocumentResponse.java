@@ -19,7 +19,7 @@ public record PublicDocumentResponse(
         DocumentStatus status,
         boolean overdue,
         LocalDate issueDate,
-        Instant dueDate,
+        LocalDate dueDate,
         String currency,
         PublicParty business,
         PublicParty client,

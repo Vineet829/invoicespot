@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -149,7 +150,8 @@ class PdfRenderingTest {
                 "INV-0042-P1",
                 new BigDecimal("44550.00"),
                 seller,
-                PdfTemplate.CLASSIC));
+                PdfTemplate.CLASSIC))
+                .replaceAll("\\s+", " ");
 
         assertThat(text).contains(
                 "Payment receipt",
@@ -157,8 +159,26 @@ class PdfRenderingTest {
                 "INR 44,550.00",
                 "Paid by Bank Transfer",
                 "Invoice INV-0042 total",
-                "Balance after this payment",
-                "INR 1,00,000.00");
+                "Balance after this payment INR 1,00,000.00");
+    }
+
+    @Test
+    @DisplayName("a payment receipt sets the balance apart from its label in every template, however long it is")
+    void receiptBalanceApart() {
+        BigDecimal paid = new BigDecimal("44550.00");
+        for (PdfTemplate template : PdfTemplate.values()) {
+            for (String balance : List.of("10,000.00", "1,00,000.00", "10,00,000.00", "1,00,00,000.00")) {
+                Document invoice = PdfFixtures.invoice();
+                invoice.setTotal(paid.add(new BigDecimal(balance.replace(",", ""))));
+
+                byte[] pdf = service.renderReceipt(
+                        invoice, invoice.getPayments().get(0), "INV-0042-P1", paid, seller, template);
+
+                assertThat(PdfText.gapBefore(pdf, "INR " + balance))
+                        .as("%s, a balance of INR %s", template, balance)
+                        .isGreaterThan(5f);
+            }
+        }
     }
 
     @Test
@@ -180,6 +200,35 @@ class PdfRenderingTest {
                 "INR 80,000.00",
                 "Amount due",
                 "USD 0.00");
+    }
+
+    @Test
+    @DisplayName("a statement's headings and amounts never print over one another, however wide, in every template")
+    void statementColumns() {
+        // From an everyday amount up to the widest the database holds.
+        List<String> amounts = List.of("144550.00", "888888888.88", "888888888888.88", "88888888888888888.88");
+        List<String> overprinted = new ArrayList<>();
+        for (PdfTemplate template : PdfTemplate.values()) {
+            for (String amount : amounts) {
+                BigDecimal charged = new BigDecimal(amount);
+                // A small payment leaves the heading the widest thing in its
+                // column; one as wide as the charge widens every column.
+                for (BigDecimal paid : List.of(
+                        new BigDecimal("44550.00"), charged.subtract(new BigDecimal("20000.00")))) {
+                    byte[] pdf = service.renderStatement(
+                            seller,
+                            PdfFixtures.customer(),
+                            LocalDate.of(2026, 10, 3),
+                            PdfFixtures.account(charged, paid),
+                            template);
+
+                    PdfText.overlaps(pdf).forEach(pair ->
+                            overprinted.add(template + ", charged " + charged + ", paid " + paid + ": " + pair));
+                }
+            }
+        }
+
+        assertThat(overprinted).isEmpty();
     }
 
     @Test

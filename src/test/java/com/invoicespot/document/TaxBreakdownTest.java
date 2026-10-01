@@ -77,7 +77,7 @@ class TaxBreakdownTest {
     }
 
     @Test
-    @DisplayName("an export under a LUT is stored at 0% and charges nothing")
+    @DisplayName("an export under a LUT is issued at 0% and charges nothing")
     void underLut() {
         Document document = gst(SupplyType.EXPORT_LUT, false);
         GstSupply.zeroRatedExport(document);
@@ -85,6 +85,20 @@ class TaxBreakdownTest {
 
         assertThat(document.getBillingItems()).allSatisfy(item -> assertThat(item.getTaxRate()).isZero());
         assertThat(document.getSalesTax()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("an export under a LUT charges nothing, and its draft lines keep their rates")
+    void lutDraft() {
+        Document document = gst(SupplyType.EXPORT_LUT, false);
+        DocumentTotals.apply(document);
+
+        assertThat(document.getSalesTax()).isEqualByComparingTo("0");
+        assertThat(document.getTaxSummaries()).hasSize(1);
+        assertThat(at(document, 0).getRate()).isEqualByComparingTo("0");
+        assertThat(at(document, 0).getTaxable()).isEqualByComparingTo("1101.00");
+        assertThat(document.getBillingItems().get(0).getTaxRate()).isEqualByComparingTo("5");
+        assertThat(document.getBillingItems().get(1).getTaxRate()).isEqualByComparingTo("18");
     }
 
     @Test

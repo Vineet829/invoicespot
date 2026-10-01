@@ -10,10 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.invoicespot.IntegrationTest;
 import com.jayway.jsonpath.JsonPath;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -23,6 +27,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 // typed in for it, which is fixed once the document is issued; reports can
 // then show everything in the reporting currency, and say what they leave out.
 class ExchangeRateIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private RecurringService recurring;
 
     private String session;
     private String client;
@@ -176,6 +183,30 @@ class ExchangeRateIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.notConverted[1].currency").value("USD"))
                 .andExpect(jsonPath("$.notConverted[1].documents").value(2))
                 .andExpect(jsonPath("$.notConverted[1].amount").value(110.0));
+    }
+
+    @Test
+    @DisplayName("a copy keeps a rate typed against the reporting currency, and so does each invoice a schedule makes")
+    void copies() throws Exception {
+        String invoice = id(create("Invoice", "USD", "120", "83", false));
+        send(post("/api/v1/document/{id}/duplicate", invoice), "")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.newDocument.exchangeRate").value("83"))
+                .andExpect(jsonPath("$.newDocument.exchangeBase").value("INR"));
+
+        send(post("/api/v1/recurring"), """
+                {"documentId": "%s", "frequency": "monthly", "startDate": "%s"}
+                """.formatted(invoice, LocalDate.now(ZoneOffset.UTC)))
+                .andExpect(status().isCreated());
+        recurring.makeDue(Instant.now());
+        // 120 x 83 for the invoice, and again for the one its schedule made.
+        report("base")
+                .andExpect(jsonPath("$.notConverted.length()").value(0))
+                .andExpect(jsonPath("$.currencies[0].billed").value(19920.0));
+
+        settings("EUR");
+        send(post("/api/v1/document/{id}/duplicate", invoice), "")
+                .andExpect(jsonPath("$.newDocument.exchangeRate").doesNotExist());
     }
 
     private ResultActions defaultCurrency(String currency) throws Exception {

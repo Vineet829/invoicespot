@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.common.SecretTokens;
+import com.invoicespot.config.AppProperties;
 import com.invoicespot.metrics.AppMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
@@ -42,10 +43,21 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private AppProperties properties;
+
+    // The app's own store, which names the rows its limiter writes.
+    @Autowired
+    private PostgresBucketStore appStore;
+
     private final List<PostgresBucketStore> stores = new ArrayList<>();
 
     private RateLimiter server(Clock clock) {
-        PostgresBucketStore store = new PostgresBucketStore(connection, clock);
+        return server(clock, properties.jwt().accessSecret());
+    }
+
+    private RateLimiter server(Clock clock, String secret) {
+        PostgresBucketStore store = new PostgresBucketStore(connection, clock, secret);
         stores.add(store);
         return new RateLimiter(store, new AppMetrics(new SimpleMeterRegistry()));
     }
@@ -60,8 +72,8 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
                 + "." + (int) (Math.random() * 250);
     }
 
-    private static String id(RateLimit limit, String key) {
-        return limit.name() + ":" + SecretTokens.hash(key);
+    private String id(RateLimit limit, String key) {
+        return appStore.id(limit, key);
     }
 
     private List<String> storedIds() {
@@ -127,7 +139,8 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("the table keeps each limit with a hash of its key, never the email or address itself")
+    @DisplayName("the table keeps each limit with a keyed hash of its key, never the email or address,"
+            + " nor a plain hash anyone could match by trying every address")
     void storesHashes() {
         String address = address();
         String email = "hashed-" + UUID.randomUUID() + "@example.test";
@@ -135,12 +148,34 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
         rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, address + "|" + email);
 
         assertThat(storedIds())
-                .contains(id(RateLimit.SIGN_UP, address), id(RateLimit.FAILED_SIGN_IN, address + "|" + email));
+                .contains(id(RateLimit.SIGN_UP, address), id(RateLimit.FAILED_SIGN_IN, address + "|" + email))
+                .doesNotContain(
+                        RateLimit.SIGN_UP.name() + ":" + SecretTokens.hash(address),
+                        RateLimit.FAILED_SIGN_IN.name() + ":" + SecretTokens.hash(address + "|" + email));
         List<String> rows = jdbcTemplate.queryForList(
                 "select id || ' ' || encode(coalesce(state, ''), 'escape') || ' ' || coalesce(expires_at, 0)"
                         + " from rate_limit_buckets",
                 String.class);
         assertThat(rows).isNotEmpty().noneMatch(row -> row.contains(address) || row.contains(email));
+    }
+
+    @Test
+    @DisplayName("a server with another secret counts in buckets of its own")
+    void keyedBySecret() {
+        Clock clock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
+        RateLimiter first = server(clock);
+        RateLimiter other = server(clock, "another-access-secret-0123456789abcdef");
+        String address = address();
+        for (int attempt = 0; attempt < 5; attempt++) {
+            first.consume(RateLimit.SIGN_UP, address);
+        }
+
+        assertThatThrownBy(() -> first.consume(RateLimit.SIGN_UP, address)).isInstanceOf(RateLimitedException.class);
+        // The app's own limiter is keyed with the access-token secret too, so
+        // it counts in the same bucket.
+        assertThatThrownBy(() -> rateLimiter.consume(RateLimit.SIGN_UP, address))
+                .isInstanceOf(RateLimitedException.class);
+        assertThatCode(() -> other.consume(RateLimit.SIGN_UP, address)).doesNotThrowAnyException();
     }
 
     @Test
@@ -169,6 +204,7 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
                 .withUserConfiguration(RateLimitConfig.class, RateLimiter.class)
                 .withBean(Clock.class, Clock::systemUTC)
                 .withBean(AppMetrics.class, () -> new AppMetrics(new SimpleMeterRegistry()))
+                .withBean(AppProperties.class, () -> properties)
                 .withBean(JdbcConnectionDetails.class, () -> connection);
         runner.run(context -> assertThat(context).hasSingleBean(PostgresBucketStore.class));
 

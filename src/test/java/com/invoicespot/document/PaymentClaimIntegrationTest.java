@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -284,5 +285,75 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.claims[*].documentNumber", contains("INV-0001")));
         mockMvc.perform(get("/api/v1/payment-claims").header(HttpHeaders.AUTHORIZATION, bearer(createUser())))
                 .andExpect(jsonPath("$.claims").isEmpty());
+    }
+
+    @Test
+    @DisplayName("deleting a confirmed report's payment shows it as not confirmed, and the client may report it again")
+    void paymentDeleted() throws Exception {
+        Shared invoice = invoice();
+        report(invoice, reported("150", today, "UPI", "X9")).andExpect(status().isOk());
+        decide(bearer(owner), invoice, claimId(invoice, 0), "confirm", "{}").andExpect(status().isOk());
+        String payment = JsonPath.read(
+                document(invoice).andReturn().getResponse().getContentAsString(),
+                "$.document.paymentRecords[0]._id");
+
+        mockMvc.perform(delete("/api/v1/document/{id}/payment/{payment}", invoice.id(), payment)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/document/{id}/activity", invoice.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.events[0].type").value("PAYMENT_REPORT_DISMISSED"))
+                .andExpect(jsonPath("$.events[0].detail")
+                        .value("USD 150.00 · UPI · Ref. X9 · Its payment was deleted"))
+                .andExpect(jsonPath("$.events[0].byYou").value(true))
+                .andExpect(jsonPath("$.events[1].type").value("PAYMENT_DELETED"));
+        claims(bearer(owner), invoice)
+                .andExpect(jsonPath("$.claims[0].status").value("DISMISSED"))
+                .andExpect(jsonPath("$.claims[0].dismissReason").value("Its payment was deleted"));
+        mockMvc.perform(get("/api/v1/public/share/{token}", invoice.token()))
+                .andExpect(jsonPath("$.balance").value(200.0))
+                .andExpect(jsonPath("$.paymentReports[0].status").value("DISMISSED"))
+                .andExpect(content().string(not(containsString("Its payment was deleted"))));
+        report(invoice, reported("150", today, "UPI", "X9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentReports[*].status", contains("PENDING", "DISMISSED")));
+    }
+
+    @Test
+    @DisplayName("voiding an invoice dismisses the reports waiting on it, and the client sees they weren't confirmed")
+    void documentVoided() throws Exception {
+        Shared invoice = invoice();
+        report(invoice, reported("30", today, "UPI", "V1")).andExpect(status().isOk());
+        report(invoice, reported("40", today, "BANK_TRANSFER", null)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/payment-claims").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.claims[*].documentNumber", contains("INV-0001", "INV-0001")));
+
+        mockMvc.perform(post("/api/v1/document/{id}/void", invoice.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Sent to the wrong client\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/payment-claims").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.claims").isEmpty());
+        claims(bearer(owner), invoice)
+                .andExpect(jsonPath("$.claims[*].status", contains("DISMISSED", "DISMISSED")))
+                .andExpect(jsonPath(
+                        "$.claims[*].dismissReason", contains("The document was voided", "The document was voided")));
+        mockMvc.perform(get("/api/v1/document/{id}/activity", invoice.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.events[0].type").value("PAYMENT_REPORT_DISMISSED"))
+                .andExpect(jsonPath("$.events[0].detail")
+                        .value("USD 40.00 · Bank transfer · The document was voided"))
+                .andExpect(jsonPath("$.events[0].byYou").value(true))
+                .andExpect(jsonPath("$.events[1].type").value("PAYMENT_REPORT_DISMISSED"))
+                .andExpect(jsonPath("$.events[1].detail")
+                        .value("USD 30.00 · UPI · Ref. V1 · The document was voided"))
+                .andExpect(jsonPath("$.events[2].type").value("VOIDED"));
+        mockMvc.perform(get("/api/v1/public/share/{token}", invoice.token()))
+                .andExpect(jsonPath("$.state").value("void"))
+                .andExpect(jsonPath("$.paymentReports[*].status", contains("DISMISSED", "DISMISSED")))
+                .andExpect(content().string(not(containsString("The document was voided"))));
     }
 }

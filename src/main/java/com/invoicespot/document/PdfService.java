@@ -332,7 +332,7 @@ public class PdfService {
                     quantity(item),
                     money(item.getUnitPrice(), currency),
                     percent(item.getDiscount()),
-                    percent(item.getTaxRate()),
+                    percent(DocumentTotals.rate(document, item)),
                     money(DocumentTotals.lineTotal(item), currency),
                     item.getHsnSac()));
         }

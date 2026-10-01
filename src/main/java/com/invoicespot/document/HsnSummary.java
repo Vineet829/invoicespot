@@ -33,7 +33,7 @@ final class HsnSummary {
         for (TaxSummary group : document.getTaxSummaries()) {
             Map<String, BigDecimal> taxable = new TreeMap<>(CODES);
             for (BillingItem item : document.getBillingItems()) {
-                BigDecimal rate = item.getTaxRate() == null ? BigDecimal.ZERO : item.getTaxRate();
+                BigDecimal rate = DocumentTotals.rate(document, item);
                 if (rate.compareTo(group.getRate()) == 0) {
                     String code = item.getHsnSac() == null ? "" : item.getHsnSac();
                     taxable.merge(code, DocumentTotals.lineTotal(item), BigDecimal::add);

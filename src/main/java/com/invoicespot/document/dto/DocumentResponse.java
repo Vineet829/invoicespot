@@ -12,6 +12,7 @@ import com.invoicespot.document.DocumentType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,7 +29,7 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant issuedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant voidedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) String voidReason,
-        Instant dueDate,
+        LocalDate dueDate,
         String additionalInfo,
         String termsConditions,
         DocumentStatus status,
@@ -63,17 +64,20 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRemindedAt,
         boolean showPaymentDetails) {
 
-    public static DocumentResponse from(Document document, Instant startOfToday) {
-        return from(document, startOfToday, null);
+    public static DocumentResponse from(Document document, Instant startOfToday, ZoneId zone) {
+        return from(document, startOfToday, zone, null);
     }
 
     // One document on its own also names the document it came from, the
     // copies made of it and, for an invoice or receipt, its credit notes.
-    public static DocumentResponse detail(Document document, Instant startOfToday, List<Document> copies) {
-        return from(document, startOfToday, copies.stream().map(DocumentLink::from).toList());
+    public static DocumentResponse detail(
+            Document document, Instant startOfToday, ZoneId zone, List<Document> copies) {
+        return from(document, startOfToday, zone, copies.stream().map(DocumentLink::from).toList());
     }
 
-    private static DocumentResponse from(Document document, Instant startOfToday, List<DocumentLink> copies) {
+    // A due date is sent as its day in the business's time zone.
+    private static DocumentResponse from(
+            Document document, Instant startOfToday, ZoneId zone, List<DocumentLink> copies) {
         CustomerSnapshot snapshot = document.getCustomerSnapshot();
         DocumentCustomerDto customer = snapshot == null
                 ? null
@@ -108,7 +112,7 @@ public record DocumentResponse(
                 document.getIssuedAt(),
                 document.getVoidedAt(),
                 document.getVoidReason(),
-                document.getDueDate(),
+                document.dueDay(zone),
                 document.getAdditionalInfo(),
                 document.getTermsConditions(),
                 document.getStatus(),

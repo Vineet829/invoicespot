@@ -46,7 +46,7 @@ public final class DocumentTotals {
         for (BillingItem item : document.getBillingItems()) {
             BigDecimal line = lineTotal(item);
             subTotal = subTotal.add(line);
-            taxable.merge(orZero(item.getTaxRate()), line, BigDecimal::add);
+            taxable.merge(rate(document, item), line, BigDecimal::add);
         }
         boolean gst = document.getTaxRegime() == TaxRegime.GST_INDIA && document.getSupplyType() != null;
         BigDecimal salesTax = BigDecimal.ZERO.setScale(2);
@@ -62,6 +62,12 @@ public final class DocumentTotals {
         document.setSubTotal(subTotal);
         document.setSalesTax(salesTax);
         document.setTotal(subTotal.add(salesTax));
+    }
+
+    // The rate a line is taxed at: its own, or none on an export under a LUT,
+    // whose draft keeps its lines' rates until it is issued at 0%.
+    static BigDecimal rate(Document document, BillingItem item) {
+        return document.getSupplyType() == SupplyType.EXPORT_LUT ? BigDecimal.ZERO : orZero(item.getTaxRate());
     }
 
     static TaxSummary summary(BigDecimal rate, BigDecimal taxable, SupplyType supply) {

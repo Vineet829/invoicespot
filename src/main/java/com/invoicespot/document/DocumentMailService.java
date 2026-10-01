@@ -19,6 +19,7 @@ import com.invoicespot.user.DemoAccountGuard;
 import jakarta.mail.MessagingException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -175,10 +176,12 @@ public class DocumentMailService {
                 ? defaults.subject()
                 : request.subject().replaceAll("[\\r\\n]+", " ").trim();
         String message = isBlank(request.message()) ? defaults.message() : request.message();
+        ShareService.SentLink link = null;
         if (subject.contains("{link}") || message.contains("{link}")) {
-            Map<String, String> link = Map.of("link", portalService.linkToSend(access, customerId).url());
-            subject = Placeholders.fill(subject, link);
-            message = Placeholders.fill(message, link);
+            link = portalService.linkForEmail(access, customerId);
+            Map<String, String> values = Map.of("link", link.url());
+            subject = Placeholders.fill(subject, values);
+            message = Placeholders.fill(message, values);
         }
         try {
             mailService.sendFromBusiness(to, replyTo(access), subject, message);
@@ -186,6 +189,9 @@ public class DocumentMailService {
             LOGGER.error("Failed to email the portal link of client {}", customerId, exception);
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY, "The portal link could not be emailed. Please try again later.");
+        }
+        if (link != null) {
+            portalService.keep(access, customerId, link);
         }
     }
 
@@ -227,14 +233,16 @@ public class DocumentMailService {
                 : request.subject().replaceAll("[\\r\\n]+", " ").trim();
         String message = isBlank(request.message()) ? defaults.message() : request.message();
         // A {link} still in the email becomes the document's link, made now
-        // if it has none that can be shown again.
+        // if it has none. One that replaces a link that can't be shown again
+        // is made only once the email has gone, so an email that fails leaves
+        // the client's link working.
         DocumentEnvelope envelope = pdf.envelope();
+        Optional<ShareService.SentLink> link = Optional.empty();
         if (envelope != null && linksIn(envelope, new EmailText(subject, message))) {
-            Map<String, String> link = Map.of(
-                    "link",
-                    shareService.linkForEmail(access, envelope.documentId(), true, access.user()).orElse(""));
-            subject = Placeholders.fill(subject, link);
-            message = Placeholders.fill(message, link);
+            link = shareService.linkForEmail(access, envelope.documentId(), true, access.user());
+            Map<String, String> values = Map.of("link", link.map(ShareService.SentLink::url).orElse(""));
+            subject = Placeholders.fill(subject, values);
+            message = Placeholders.fill(message, values);
         }
         try {
             mailService.sendDocument(to, replyTo(access), subject, message, pdf.fileName(), pdf.content());
@@ -243,6 +251,7 @@ public class DocumentMailService {
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY, "The " + kind + " could not be emailed. Please try again later.");
         }
+        link.ifPresent(made -> shareService.keep(access, envelope.documentId(), made, access.user()));
         sent.accept(to);
     }
 
@@ -281,7 +290,10 @@ public class DocumentMailService {
                 text,
                 linksIn(envelope, text)
                         ? new ShareService.EmailLink(
-                                shareService.linkForEmail(access, envelope.documentId(), false, null).orElse(""), null)
+                                shareService.linkForEmail(access, envelope.documentId(), false, null)
+                                        .map(ShareService.SentLink::url)
+                                        .orElse(""),
+                                null)
                         : NO_LINK);
     }
 

@@ -6,7 +6,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -45,6 +47,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.MailSendException;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -362,5 +365,45 @@ class ClientPortalIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.linkReplaced").value(true));
         open(token).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a client's portal link keeps working when the email that would replace it fails to send")
+    void failedEmailKeepsLink() throws Exception {
+        when(mailSender.createMimeMessage()).thenAnswer(invocation -> new MimeMessage((Session) null));
+        doThrow(new MailSendException("down")).doNothing().when(mailSender).send(any(MimeMessage.class));
+        String acme = customer("Acme");
+        String old = portal(acme);
+        jdbcTemplate.update(
+                "update portal_links set token_sealed = null"
+                        + " where customer_pkid = (select pkid from customers where id = ?)",
+                UUID.fromString(acme));
+
+        mockMvc.perform(post("/api/v1/customer/{id}/portal/email", acme)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadGateway());
+        open(old).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from portal_links"
+                                + " where customer_pkid = (select pkid from customers where id = ?)",
+                        Long.class,
+                        UUID.fromString(acme)))
+                .isEqualTo(1);
+        mockMvc.perform(get("/api/v1/customer/{id}/portal/email", acme)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.note", containsString("Sending replaces this client's portal link made on")));
+
+        mockMvc.perform(post("/api/v1/customer/{id}/portal/email", acme)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        List<String[]> sent = sentEmails();
+        String token = portalLink(sent.get(sent.size() - 1)[1]);
+        assertThat(token).isNotEqualTo(old);
+        open(old).andExpect(status().isNotFound());
+        open(token).andExpect(status().isOk());
     }
 }

@@ -89,5 +89,9 @@ class HsnSummaryTest {
         Document export = gst(SupplyType.EXPORT_LUT, line("998314", "1000", "0"));
         assertThat(HsnSummary.of(export)).map(HsnSummaryTest::row)
                 .containsExactly("998314 0 1000.00 0.00 0.00 0.00 0.00");
+        // A draft keeps its line's rate until it is issued at 0%.
+        Document draft = gst(SupplyType.EXPORT_LUT, line("998314", "1000", "18"));
+        assertThat(HsnSummary.of(draft)).map(HsnSummaryTest::row)
+                .containsExactly("998314 0 1000.00 0.00 0.00 0.00 0.00");
     }
 }

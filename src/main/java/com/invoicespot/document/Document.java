@@ -24,6 +24,8 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
@@ -228,6 +230,16 @@ public class Document extends BaseEntity {
 
     public DocumentState state() {
         return isVoid() ? DocumentState.VOID : isDraft() ? DocumentState.DRAFT : DocumentState.ISSUED;
+    }
+
+    // A due date is a day in the business's calendar, kept as noon that day in
+    // the business's time zone.
+    public static Instant dueAt(LocalDate day, ZoneId zone) {
+        return day == null ? null : day.atTime(LocalTime.NOON).atZone(zone).toInstant();
+    }
+
+    public LocalDate dueDay(ZoneId zone) {
+        return dueDate == null ? null : LocalDate.ofInstant(dueDate, zone);
     }
 
     // An issued quotation nobody answered is no longer open once the last day

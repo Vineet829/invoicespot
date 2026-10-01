@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,9 +20,12 @@ import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,12 +35,16 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
 class RecurringIntegrationTest extends IntegrationTest {
 
     @Autowired
     private RecurringService recurring;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private User owner;
@@ -135,6 +143,34 @@ class RecurringIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.notifications[0].type").value("RECURRING_CREATED"))
                 .andExpect(jsonPath("$.notifications[0].message")
                         .value("Invoice INV-0002 for Beta LLC was made by its monthly schedule"));
+    }
+
+    @Test
+    @DisplayName("each invoice is due as the payment terms say from its day, at noon in the business's time zone")
+    void dueDate() throws Exception {
+        // Twelve or thirteen hours ahead of UTC, so its days are often not UTC's.
+        ZoneId zone = ZoneId.of("Pacific/Auckland");
+        mockMvc.perform(put("/api/v1/settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0,
+                                 "taxLabel": "Tax", "timeZone": "Pacific/Auckland"}
+                                """))
+                .andExpect(status().isOk());
+        LocalDate day = LocalDate.now(zone);
+        scheduleId(document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(day));
+
+        recurring.makeDue(Instant.now());
+
+        String made = JsonPath.read(
+                list().andReturn().getResponse().getContentAsString(), "$.schedules[0].lastInvoice._id");
+        mockMvc.perform(get("/api/v1/document/{id}", made).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.document.dueDate").value(day.plusDays(7).toString()));
+        assertThat(jdbc.queryForObject(
+                                "select due_date from documents where id = ?", Timestamp.class, UUID.fromString(made))
+                        .toInstant())
+                .isEqualTo(day.plusDays(7).atTime(LocalTime.NOON).atZone(zone).toInstant());
     }
 
     @Test

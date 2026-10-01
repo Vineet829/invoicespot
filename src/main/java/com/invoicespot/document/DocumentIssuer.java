@@ -9,7 +9,6 @@ import com.invoicespot.user.User;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -71,6 +70,9 @@ public class DocumentIssuer {
             throw new ApiException(HttpStatus.BAD_REQUEST, "A document can't be dated after today");
         }
         document.setIssueDate(issueDate);
+        // The client as the draft was saved, before it is refreshed: it tells
+        // a chosen place of supply from one worked out from the client.
+        CustomerSnapshot saved = document.getCustomerSnapshot();
         // A credit note keeps the client as its invoice named them.
         Customer customer = document.getCustomer();
         if (customer != null && document.getDocumentType() != DocumentType.CREDIT_NOTE) {
@@ -79,15 +81,12 @@ public class DocumentIssuer {
         document.setSeller(SellerSnapshot.of(document.getBusiness()));
         document.setTaxLabel(settings.getTaxLabel());
         if (document.getDocumentType() == DocumentType.INVOICE && document.getDueDate() == null) {
-            document.setDueDate(issueDate.plusDays(settings.getPaymentTermsDays())
-                    .atTime(LocalTime.NOON)
-                    .atZone(zone)
-                    .toInstant());
+            document.setDueDate(Document.dueAt(issueDate.plusDays(settings.getPaymentTermsDays()), zone));
         }
         // A credit note keeps the supply of what it credits.
         boolean taxDocument = document.getDocumentType() != DocumentType.QUOTATION;
         if (document.getDocumentType() != DocumentType.CREDIT_NOTE) {
-            gstSupply.placeAtIssue(document);
+            gstSupply.placeAtIssue(document, saved);
         }
         DocumentTotals.apply(document);
         if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {

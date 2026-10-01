@@ -33,7 +33,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
@@ -69,6 +68,7 @@ public class DocumentService {
     private final RefundService refunds;
     private final GstSupply gstSupply;
     private final RecurringScheduleRepository scheduleRepository;
+    private final PaymentClaimRepository claimRepository;
     private final DocumentActivity activity;
     private final NotificationService notificationService;
     private final Clock clock;
@@ -85,6 +85,7 @@ public class DocumentService {
             RefundService refunds,
             GstSupply gstSupply,
             RecurringScheduleRepository scheduleRepository,
+            PaymentClaimRepository claimRepository,
             DocumentActivity activity,
             NotificationService notificationService,
             Clock clock) {
@@ -99,6 +100,7 @@ public class DocumentService {
         this.refunds = refunds;
         this.gstSupply = gstSupply;
         this.scheduleRepository = scheduleRepository;
+        this.claimRepository = claimRepository;
         this.activity = activity;
         this.notificationService = notificationService;
         this.clock = clock;
@@ -116,8 +118,9 @@ public class DocumentService {
         document.setCustomer(customer);
         document.setCustomerSnapshot(CustomerSnapshot.of(customer));
         document.setDocumentType(documentType(request.documentType()));
-        document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
-        document.setDueDate(takesDueDate(document) ? request.dueDate() : null);
+        ZoneId zone = zoneOf(access.businessPkid());
+        document.setIssueDate(issueDate(request.issueDate(), zone));
+        document.setDueDate(takesDueDate(document) ? dueAt(request.dueDate(), zone) : null);
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
         document.setShowPaymentDetails(!Boolean.FALSE.equals(request.showPaymentDetails()));
@@ -157,6 +160,10 @@ public class DocumentService {
         document.setVoidReason(request.reason().trim());
         document.setOverdueAlertedAt(null);
         activity.record(document, DocumentEventType.VOIDED, document.getVoidReason(), actor(access));
+        // Reports still waiting can't be confirmed on a void document, so they are dismissed.
+        claimRepository.findByDocumentAndStatusOrderByCreatedAtAscPkidAsc(document, PaymentClaim.Status.PENDING)
+                .forEach(claim -> PaymentClaimService.dismissed(
+                        claim, "The document was voided", actor(access), document.getVoidedAt(), activity));
         if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {
             creditNotes.voided(document, actor(access));
         }
@@ -167,9 +174,11 @@ public class DocumentService {
     @Transactional
     public DocumentResponse issue(BusinessAccess access, String id, IssueDocumentRequest request) {
         Document document = lockInBusiness(access, id);
+        ZoneId zone = zoneOf(access.businessPkid());
+        Instant due = dueAt(request.dueDate(), zone);
         boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
-        if (document.isDraft() && request.dueDate() != null && takesDueDate(document)) {
-            document.setDueDate(request.dueDate());
+        if (document.isDraft() && due != null && takesDueDate(document)) {
+            document.setDueDate(due);
         }
         if (document.isDraft() && !takesDueDate(document)) {
             document.setDueDate(null);
@@ -177,7 +186,7 @@ public class DocumentService {
         if (document.isDraft() && request.exchangeRate() != null && !creditNote) {
             exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
         }
-        documentIssuer.issue(document, issueDate(request.issueDate(), zoneOf(access.businessPkid())), actor(access));
+        documentIssuer.issue(document, issueDate(request.issueDate(), zone), actor(access));
         if (creditNote) {
             creditNotes.issued(document, actor(access));
         }
@@ -198,7 +207,7 @@ public class DocumentService {
                 search.page(),
                 search.size(),
                 result.getContent().stream()
-                        .map(document -> DocumentResponse.from(document, startOfToday))
+                        .map(document -> DocumentResponse.from(document, startOfToday, zone))
                         .toList());
     }
 
@@ -224,9 +233,11 @@ public class DocumentService {
     }
 
     private DocumentResponse respond(Document document) {
+        ZoneId zone = zoneOf(document.getBusiness().getPkid());
         return DocumentResponse.detail(
                 document,
-                startOfToday(zoneOf(document.getBusiness().getPkid())),
+                startOfToday(zone),
+                zone,
                 documentRepository.findBySourceOrderByCreatedAtAscPkidAsc(document));
     }
 
@@ -419,8 +430,9 @@ public class DocumentService {
         if (request.issueDate() != null) {
             document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
         }
-        if (request.dueDate() != null) {
-            document.setDueDate(request.dueDate());
+        Instant due = dueAt(request.dueDate(), zoneOf(access.businessPkid()));
+        if (due != null) {
+            document.setDueDate(due);
         }
         if (!takesDueDate(document)) {
             document.setDueDate(null);
@@ -556,20 +568,25 @@ public class DocumentService {
                 ? copyOf(original.getCustomerSnapshot())
                 : CustomerSnapshot.of(original.getCustomer()));
         copy.setDocumentType(type);
-        copy.setDueDate(LocalDate.now(clock.withZone(zone))
-                .plusDays(settings.getPaymentTermsDays())
-                .atTime(LocalTime.NOON)
-                .atZone(zone)
-                .toInstant());
+        copy.setDueDate(Document.dueAt(
+                LocalDate.now(clock.withZone(zone)).plusDays(settings.getPaymentTermsDays()), zone));
         copy.setAdditionalInfo(original.getAdditionalInfo());
         copy.setTermsConditions(original.getTermsConditions());
         copy.setShowPaymentDetails(original.isShowPaymentDetails());
         copy.setCurrency(original.getCurrency());
-        // A GST copy goes where the original went, until it is saved again.
-        copy.setPlaceOfSupply(original.getPlaceOfSupply());
-        copy.setSupplyType(original.getSupplyType());
-        copy.setReverseCharge(original.isReverseCharge());
+        // The original's rate, while it is still to the reporting currency;
+        // like any draft's, it can change until the copy is issued.
+        if (settings.getBaseCurrency().equals(original.getExchangeBase())) {
+            copy.setExchangeRate(original.getExchangeRate());
+            copy.setExchangeBase(original.getExchangeBase());
+        }
         copy.setBillingItems(original.getBillingItems().stream().map(DocumentService::copyOf).toList());
+        // A GST copy goes where the original was sent by choice, else where its
+        // client is now, with the original's reverse charge and export choice,
+        // under the business's regime as a draft is saved.
+        copy.setSupplyType(original.getSupplyType());
+        String chosen = GstSupply.chosenPlace(original, original.getCustomerSnapshot());
+        gstSupply.place(copy, chosen, original.isReverseCharge(), null);
         DocumentTotals.apply(copy);
         return documentRepository.save(copy);
     }
@@ -714,6 +731,8 @@ public class DocumentService {
                         .add(DocumentTotals.withheld(document))
                         .subtract(payment.getAmountPaid())
                         .subtract(payment.getTdsAmount()));
+        // Found before the payment goes, as deleting it unlinks the report.
+        Optional<PaymentClaim> confirmed = claimRepository.findByPayment(payment);
         document.getPayments().remove(payment);
         DocumentTotals.settle(document);
         activity.record(
@@ -721,6 +740,8 @@ public class DocumentService {
                 DocumentEventType.PAYMENT_DELETED,
                 DocumentActivity.paymentDetail(document, payment),
                 actor(access));
+        confirmed.ifPresent(claim -> PaymentClaimService.dismissed(
+                claim, "Its payment was deleted", actor(access), Instant.now(clock), activity));
         return respond(document);
     }
 
@@ -971,6 +992,23 @@ public class DocumentService {
         }
     }
 
+    // A due date comes as a day in the business's calendar, YYYY-MM-DD. A
+    // moment from an older client counts as the day it falls on in the
+    // business's time zone, the day its PDF and emails always gave it.
+    private static Instant dueAt(String value, ZoneId zone) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            LocalDate day = value.length() == 10
+                    ? LocalDate.parse(value)
+                    : LocalDate.ofInstant(Instant.parse(value), zone);
+            return Document.dueAt(day, zone);
+        } catch (DateTimeParseException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter the due date as YYYY-MM-DD");
+        }
+    }
+
     // The rate from a draft's currency to the reporting currency, typed in as
     // "1 {currency} = x {base}"; a blank one removes it. A document in the
     // reporting currency has none, and a new currency needs a new rate.
@@ -1012,9 +1050,14 @@ public class DocumentService {
                     HttpStatus.CONFLICT,
                     "A credit note keeps the client, currency and exchange rate of the document it credits");
         }
-        if (request.dueDate() != null) {
+        if (hasDueDate(request)) {
             throw new ApiException(HttpStatus.CONFLICT, "A credit note has no due date");
         }
+    }
+
+    // A blank due date is none, as dueAt reads it.
+    private static boolean hasDueDate(UpdateDocumentRequest request) {
+        return request.dueDate() != null && !request.dueDate().isBlank();
     }
 
     // Only the due date, notes and terms of an issued document change; a
@@ -1041,10 +1084,10 @@ public class DocumentService {
                 || request.billingItems() != null) {
             throw new ApiException(HttpStatus.CONFLICT, LOCKED);
         }
-        if (request.dueDate() != null && document.getDocumentType() == DocumentType.RECEIPT) {
+        if (hasDueDate(request) && document.getDocumentType() == DocumentType.RECEIPT) {
             throw new ApiException(HttpStatus.CONFLICT, "A receipt has no due date");
         }
-        if (request.dueDate() != null && document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+        if (hasDueDate(request) && document.getDocumentType() == DocumentType.CREDIT_NOTE) {
             throw new ApiException(HttpStatus.CONFLICT, "A credit note has no due date");
         }
     }

@@ -120,6 +120,15 @@ class PdfGoldenTest {
     }
 
     @Test
+    @DisplayName("a GST export under a LUT prints the same whatever rates its lines keep")
+    void gstExportKeepingRates() throws IOException {
+        Document export = PdfFixtures.gstExport();
+        export.getBillingItems().get(0).setTaxRate(new BigDecimal("18"));
+        DocumentTotals.apply(export);
+        assertGolden("gst-export", service.html(kept(export), seller, PdfFixtures.settings()));
+    }
+
+    @Test
     @DisplayName("a draft invoice")
     void draft() throws IOException {
         assertGolden("draft-invoice", service.html(PdfFixtures.draft(), seller, PdfFixtures.settings()));

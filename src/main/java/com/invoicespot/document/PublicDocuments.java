@@ -158,7 +158,7 @@ public class PublicDocuments {
                 document.getStatus(),
                 DocumentTotals.isOverdue(document, startOfToday),
                 document.getIssueDate(),
-                document.getDueDate(),
+                document.dueDay(zone),
                 document.getCurrency(),
                 sellerParty(document, seller),
                 new PublicParty(

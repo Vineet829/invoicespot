@@ -69,7 +69,7 @@ public class Overview {
                 counts.partial(),
                 counts.unpaid(),
                 counts.overdue(),
-                payments(businessPkid, currency));
+                payments(businessPkid, currency, zone));
     }
 
     // The currencies of the business's invoices and receipts, its default first.
@@ -131,7 +131,8 @@ public class Overview {
                 .single();
     }
 
-    private List<OverviewPayment> payments(Long businessPkid, String currency) {
+    // A document's due date is its day in the business's time zone.
+    private List<OverviewPayment> payments(Long businessPkid, String currency, ZoneId zone) {
         return jdbc.sql("""
                         select p.id, p.paid_by, p.date_paid, p.payment_method, p.additional_info, p.amount_paid,
                                d.id as document_id, d.document_type, d.document_number, d.total, d.status,
@@ -158,7 +159,7 @@ public class Overview {
                                     result.getString("document_number"),
                                     result.getBigDecimal("total"),
                                     result.getString("status"),
-                                    due == null ? null : due.toInstant()));
+                                    due == null ? null : LocalDate.ofInstant(due.toInstant(), zone)));
                 })
                 .list();
     }

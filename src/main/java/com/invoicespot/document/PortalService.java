@@ -97,12 +97,15 @@ public class PortalService {
     }
 
     private ShareLinkResponse newLink(Customer customer, BusinessAccess access) {
+        return newLink(customer, access, SecretTokens.generate());
+    }
+
+    private ShareLinkResponse newLink(Customer customer, BusinessAccess access, String token) {
         Instant now = Instant.now(clock);
         linkRepository.findByCustomerAndRevokedAtIsNull(customer).ifPresent(active -> {
             active.setRevokedAt(now);
             linkRepository.saveAndFlush(active);
         });
-        String token = SecretTokens.generate();
         PortalLink link = new PortalLink();
         link.setBusiness(customer.getBusiness());
         link.setCustomer(customer);
@@ -131,24 +134,46 @@ public class PortalService {
                 .orElseGet(() -> new ShareService.EmailLink(null, null));
     }
 
+    // The link an email to a client carries: their current one when it can
+    // be shown again, or a new one. A new one that replaces a link that can't
+    // be shown again is made only once the email has gone (keep), so an email
+    // that fails leaves the old link working.
+    @Transactional
+    public ShareService.SentLink linkForEmail(BusinessAccess access, String customerId) {
+        return linkToSend(access, customerId, true);
+    }
+
+    // Makes the link an email that has gone carries, when it waited to
+    // replace the client's current one.
+    @Transactional
+    public void keep(BusinessAccess access, String customerId, ShareService.SentLink link) {
+        if (link.token() != null) {
+            newLink(requireInBusiness(access, customerId, true), access, link.token());
+        }
+    }
+
     // The link to send a client: their current one when it can be shown
     // again, or a new one. The client is locked, so two messages at once
-    // share one new link.
-    @Transactional
-    public ShareService.SentLink linkToSend(BusinessAccess access, String customerId) {
+    // share one new link, unless each waits for its email to replace one.
+    private ShareService.SentLink linkToSend(BusinessAccess access, String customerId, boolean later) {
         Customer customer = requireInBusiness(access, customerId, true);
         Optional<PortalLink> active = linkRepository.findByCustomerAndRevokedAtIsNull(customer);
         Optional<String> current = active.flatMap(this::recovered);
-        return current.isPresent()
-                ? new ShareService.SentLink(current.get(), false)
-                : new ShareService.SentLink(newLink(customer, access).url(), active.isPresent());
+        if (current.isPresent()) {
+            return new ShareService.SentLink(current.get(), false, null);
+        }
+        if (active.isPresent() && later) {
+            String token = SecretTokens.generate();
+            return new ShareService.SentLink(address(token), true, token);
+        }
+        return new ShareService.SentLink(newLink(customer, access).url(), active.isPresent(), null);
     }
 
     // A WhatsApp message with the client's portal link, to their number when
     // there is one WhatsApp can use.
     @Transactional
     public WhatsAppShareResponse whatsApp(BusinessAccess access, String customerId) {
-        ShareService.SentLink link = linkToSend(access, customerId);
+        ShareService.SentLink link = linkToSend(access, customerId, false);
         Customer customer = requireInBusiness(access, customerId);
         Business business = customer.getBusiness();
         String text = Placeholders.fill(WHATSAPP_MESSAGE, Map.of(
@@ -206,13 +231,13 @@ public class PortalService {
                                 account.due(),
                                 account.overdue()))
                         .toList(),
-                documents.getContent().stream().map(document -> entry(document, startOfToday)).toList(),
+                documents.getContent().stream().map(document -> entry(document, startOfToday, zone)).toList(),
                 documents.getTotalElements(),
                 number,
                 documents.getTotalPages());
     }
 
-    private static PortalResponse.Entry entry(Document document, Instant startOfToday) {
+    private static PortalResponse.Entry entry(Document document, Instant startOfToday, ZoneId zone) {
         boolean invoice = document.getDocumentType() == DocumentType.INVOICE;
         return new PortalResponse.Entry(
                 document.getDocumentType(),
@@ -224,7 +249,7 @@ public class PortalService {
                 document.getAcceptedAt(),
                 document.getDeclinedAt(),
                 document.getIssueDate(),
-                document.getDueDate(),
+                document.dueDay(zone),
                 document.getCurrency(),
                 document.getTotal(),
                 invoice ? (document.isVoid() ? BigDecimal.ZERO : DocumentTotals.balanceDue(document)) : null);

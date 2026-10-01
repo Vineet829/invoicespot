@@ -48,7 +48,7 @@ public class GstSupply {
         }
         String seller = sellerState(document.getBusiness());
         String place = requestedPlace == null || requestedPlace.isBlank()
-                ? defaultPlace(document, seller)
+                ? defaultPlace(document.getCustomerSnapshot(), seller)
                 : requestedPlace.trim();
         if (place != null && !GstStates.isPlace(place)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Choose the place of supply from the list");
@@ -63,16 +63,29 @@ public class GstSupply {
         document.setSupplyType(type);
         document.setReverseCharge(recipientPays);
         document.setLutReference(type == SupplyType.EXPORT_LUT ? settings.getLutReference() : null);
+    }
+
+    // As a draft is issued: its reverse charge and export choice as last
+    // saved, under the business's regime now. A place that was chosen stays;
+    // one worked out from the client it was saved with is worked out again
+    // from the client as it is issued.
+    public void placeAtIssue(Document document, CustomerSnapshot saved) {
+        place(document, chosenPlace(document, saved), null, null);
         zeroRatedExport(document);
     }
 
-    // As a draft is issued: its place, reverse charge and export choice as
-    // last saved, under the business's regime now.
-    public void placeAtIssue(Document document) {
-        place(document, document.getPlaceOfSupply(), null, null);
+    // The place chosen for a document: the one it has, unless that is the
+    // place worked out from the client it was saved with, as the editor
+    // tells them apart.
+    static String chosenPlace(Document document, CustomerSnapshot saved) {
+        String place = document.getPlaceOfSupply();
+        return place == null || place.equals(defaultPlace(saved, document.getSellerStateCode())) ? null : place;
     }
 
-    // An export under a LUT charges no tax, so its lines are stored at 0%.
+    // An export under a LUT charges no tax, so it is issued with its lines at
+    // 0%. A draft keeps the rates its lines were given (a credit note's stay
+    // at 0%, since its supply never changes), so they are charged again if it
+    // goes elsewhere before it is issued.
     static void zeroRatedExport(Document document) {
         if (document.getSupplyType() == SupplyType.EXPORT_LUT) {
             document.getBillingItems().forEach(item -> item.setTaxRate(BigDecimal.ZERO));
@@ -136,8 +149,7 @@ public class GstSupply {
         return type;
     }
 
-    private static String defaultPlace(Document document, String seller) {
-        CustomerSnapshot client = document.getCustomerSnapshot();
+    private static String defaultPlace(CustomerSnapshot client, String seller) {
         if (client != null && client.getGstin() != null) {
             return Gstin.stateCode(client.getGstin());
         }

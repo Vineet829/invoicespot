@@ -56,6 +56,7 @@ class DocumentServiceTest {
     @Mock private RefundService refunds;
     @Mock private GstSupply gstSupply;
     @Mock private RecurringScheduleRepository scheduleRepository;
+    @Mock private PaymentClaimRepository claimRepository;
     @Mock private DocumentActivity activity;
     @Mock private NotificationService notificationService;
     private DocumentService service;
@@ -74,6 +75,7 @@ class DocumentServiceTest {
                 refunds,
                 gstSupply,
                 scheduleRepository,
+                claimRepository,
                 activity,
                 notificationService,
                 CLOCK);

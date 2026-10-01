@@ -259,16 +259,22 @@ class PdfServiceTest {
     }
 
     @Test
-    @DisplayName("a logo uploaded to this server is embedded; a remote one is never fetched")
+    @DisplayName("a logo uploaded to this server is embedded unless it is a WebP; a remote one is never fetched")
     void logo() throws Exception {
         Files.write(uploads.resolve("brand.png"), PNG);
+        Files.write(uploads.resolve("brand.webp"), PNG);
         Business local = seller("Ada Analytics");
         local.setLogo("/uploads/brand.png");
         Business remote = seller("Ada Analytics");
         remote.setLogo("https://example.com/brand.png");
+        // PDFs can't show WebP, so a WebP logo from before is left out. The settings screen warns
+        // of this with a copy of the rule (the client's settings/logo.js), so keep the two in step.
+        Business webp = seller("Ada Analytics");
+        webp.setLogo("/uploads/brand.webp");
 
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), local, SETTINGS)).contains("data:image/png;base64,");
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), remote, SETTINGS)).doesNotContain("example.com");
+        assertThat(service.html(sampleDocument(DocumentType.INVOICE), webp, SETTINGS)).doesNotContain("class=\"logo\"");
         assertThat(new String(service.render(sampleDocument(DocumentType.INVOICE), local, SETTINGS), 0, 5)).isEqualTo("%PDF-");
     }
 

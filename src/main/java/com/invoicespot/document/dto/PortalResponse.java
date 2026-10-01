@@ -43,7 +43,7 @@ public record PortalResponse(
             @JsonInclude(JsonInclude.Include.NON_NULL) Instant acceptedAt,
             @JsonInclude(JsonInclude.Include.NON_NULL) Instant declinedAt,
             LocalDate issueDate,
-            @JsonInclude(JsonInclude.Include.NON_NULL) Instant dueDate,
+            @JsonInclude(JsonInclude.Include.NON_NULL) LocalDate dueDate,
             String currency,
             BigDecimal total,
             @JsonInclude(JsonInclude.Include.NON_NULL) BigDecimal balance) {}

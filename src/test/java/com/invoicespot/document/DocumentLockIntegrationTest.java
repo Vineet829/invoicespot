@@ -101,7 +101,7 @@ class DocumentLockIntegrationTest extends IntegrationTest {
                 {"dueDate": "2026-12-01T12:00:00Z", "additionalInfo": "Thanks", "termsConditions": "Net 30"}
                 """)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01T12:00:00Z"))
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01"))
                 .andExpect(jsonPath("$.updatedDocument.additionalInfo").value("Thanks"))
                 .andExpect(jsonPath("$.updatedDocument.termsConditions").value("Net 30"))
                 .andExpect(jsonPath("$.updatedDocument.total").value(110.0));
@@ -149,7 +149,7 @@ class DocumentLockIntegrationTest extends IntegrationTest {
         change(draft, "{" + due + "}").andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
         String invoice = document("Invoice", true);
         change(invoice, "{" + due + "}")
-                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01T12:00:00Z"));
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01"));
         change(invoice, "{\"documentType\": \"Receipt\"}")
                 .andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
         send(post("/api/v1/document/{id}/issue", draft), "{" + due + "}")

@@ -153,10 +153,10 @@ class DraftIntegrationTest extends IntegrationTest {
         LocalDate day = LocalDate.now(ZONE).minusDays(4);
 
         issue(draft(), "{\"issueDate\": \"" + day + "\"}")
-                .andExpect(jsonPath("$.updatedDocument.dueDate").value(dueNoon(day.plusDays(15))));
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value(day.plusDays(15).toString()));
         String due = dueNoon(day.plusDays(30));
         issue(invoice(true, "500", ", \"dueDate\": \"" + dueNoon(day) + "\""), "{\"dueDate\": \"" + due + "\"}")
-                .andExpect(jsonPath("$.updatedDocument.dueDate").value(due));
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value(day.plusDays(30).toString()));
     }
 
     @Test

@@ -178,7 +178,7 @@ public class DemoDataSeeder {
                 clientId,
                 null,
                 plan.type().getValue(),
-                plan.issued().plusDays(14).atTime(LocalTime.NOON).atZone(zone).toInstant(),
+                plan.issued().plusDays(14).toString(),
                 DemoData.NOTES,
                 DemoData.TERMS,
                 TAX_RATE.toPlainString(),
