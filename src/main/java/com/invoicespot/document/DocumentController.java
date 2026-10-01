@@ -12,7 +12,9 @@ import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.IssueDocumentRequest;
 import com.invoicespot.document.dto.PaymentResultResponse;
+import com.invoicespot.document.dto.RefundRequest;
 import com.invoicespot.document.dto.SingleDocumentResponse;
+import com.invoicespot.document.dto.TaxRateSuggestionsResponse;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.document.dto.UpdatedDocumentResponse;
@@ -39,10 +41,18 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final DocumentExport documentExport;
+    private final TaxRateSuggestions taxRateSuggestions;
 
-    public DocumentController(DocumentService documentService, DocumentExport documentExport) {
+    public DocumentController(
+            DocumentService documentService, DocumentExport documentExport, TaxRateSuggestions taxRateSuggestions) {
         this.documentService = documentService;
         this.documentExport = documentExport;
+        this.taxRateSuggestions = taxRateSuggestions;
+    }
+
+    @GetMapping("/tax-rates")
+    public TaxRateSuggestionsResponse taxRates(@Requires(Permission.VIEW_RECORDS) BusinessAccess access) {
+        return taxRateSuggestions.suggest(access);
     }
 
     @PostMapping("/create")
@@ -136,6 +146,36 @@ public class DocumentController {
                 true, "Payment has been deleted", documentService.deletePayment(access, id, paymentId));
     }
 
+    // Money paid back when a credit note leaves a document overpaid.
+    @PostMapping("/{id}/refund")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PaymentResultResponse addRefund(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @Valid @RequestBody RefundRequest request) {
+        return new PaymentResultResponse(
+                true, "Refund has been recorded", documentService.addRefund(access, id, request));
+    }
+
+    @PatchMapping("/{id}/refund/{refundId}")
+    public PaymentResultResponse updateRefund(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @PathVariable String refundId,
+            @Valid @RequestBody RefundRequest request) {
+        return new PaymentResultResponse(
+                true, "Refund has been updated", documentService.updateRefund(access, id, refundId, request));
+    }
+
+    @DeleteMapping("/{id}/refund/{refundId}")
+    public PaymentResultResponse deleteRefund(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @PathVariable String id,
+            @PathVariable String refundId) {
+        return new PaymentResultResponse(
+                true, "Refund has been deleted", documentService.deleteRefund(access, id, refundId));
+    }
+
     @GetMapping("/{id}")
     public SingleDocumentResponse getOne(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
@@ -155,7 +195,7 @@ public class DocumentController {
             @PathVariable String id,
             @RequestBody(required = false) IssueDocumentRequest request) {
         DocumentResponse issued = documentService.issue(
-                access, id, request == null ? new IssueDocumentRequest(null, null) : request);
+                access, id, request == null ? new IssueDocumentRequest(null, null, null) : request);
         return new UpdatedDocumentResponse(
                 true, issued.documentType().getValue() + " " + issued.documentNumber() + " was issued", issued);
     }
@@ -168,6 +208,13 @@ public class DocumentController {
         DocumentResponse voided = documentService.voidDocument(access, id, request);
         return new UpdatedDocumentResponse(
                 true, voided.documentType().getValue() + " " + voided.documentNumber() + " is void", voided);
+    }
+
+    @PostMapping("/{id}/credit-note")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreatedDocumentResponse creditNote(
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+        return new CreatedDocumentResponse(true, documentService.creditNote(access, id));
     }
 
     @PostMapping("/{id}/convert")

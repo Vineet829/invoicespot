@@ -3,6 +3,8 @@ package com.invoicespot.document;
 import com.invoicespot.business.Business;
 import com.invoicespot.common.BaseEntity;
 import com.invoicespot.customer.Customer;
+import com.invoicespot.tax.SupplyType;
+import com.invoicespot.tax.TaxRegime;
 import com.invoicespot.user.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -10,6 +12,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -47,6 +51,19 @@ public class Document extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_pkid")
     private Document source;
+
+    // A credit note names the invoice or receipt it credits, and why.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "credited_pkid", updatable = false)
+    private Document credited;
+
+    @Column(name = "credit_reason", length = 500)
+    private String creditReason;
+
+    // The credit notes made against this invoice or receipt, in any state.
+    @OneToMany(mappedBy = "credited")
+    @OrderBy("pkid")
+    private List<Document> creditNotes = new ArrayList<>();
 
     // A client answers a quotation once: they accept it, or decline it and
     // may say why.
@@ -120,26 +137,77 @@ public class Document extends BaseEntity {
     @Column(name = "sales_tax", nullable = false, precision = 19, scale = 2)
     private BigDecimal salesTax = BigDecimal.ZERO;
 
-    @Column(name = "rates", nullable = false, precision = 7, scale = 4)
-    private BigDecimal rates = BigDecimal.ZERO;
-
     @Column(name = "total", nullable = false, precision = 19, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
     @Column(name = "currency", length = 10)
     private String currency;
 
+    // "1 {currency} = {exchangeRate} {exchangeBase}", typed in for a document
+    // in another currency than the reporting one it was typed against.
+    @Column(name = "exchange_rate", precision = 20, scale = 10)
+    private BigDecimal exchangeRate;
+
+    @Column(name = "exchange_base", length = 3)
+    private String exchangeBase;
+
+    // In India GST mode: the seller's state, where the supply goes, how it is
+    // taxed, whether the recipient pays the tax, and the LUT an export went
+    // under. A draft follows the business's regime; an issued document keeps
+    // its own.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tax_regime", nullable = false, length = 20)
+    private TaxRegime taxRegime = TaxRegime.STANDARD;
+
+    @Column(name = "seller_state_code", length = 2)
+    private String sellerStateCode;
+
+    @Column(name = "place_of_supply", length = 2)
+    private String placeOfSupply;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "supply_type", length = 20)
+    private SupplyType supplyType;
+
+    @Column(name = "reverse_charge", nullable = false)
+    private boolean reverseCharge;
+
+    @Column(name = "lut_reference", length = 40)
+    private String lutReference;
+
+    // The money received; tax the client withheld is kept apart.
     @Column(name = "total_amount_received", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmountReceived = BigDecimal.ZERO;
+
+    @Column(name = "total_tds", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalTds = BigDecimal.ZERO;
+
+    // The total of this document's issued credit notes.
+    @Column(name = "total_credited", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalCredited = BigDecimal.ZERO;
+
+    // The total paid back to the client.
+    @Column(name = "total_refunded", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalRefunded = BigDecimal.ZERO;
 
     @ElementCollection
     @CollectionTable(name = "document_billing_items", joinColumns = @JoinColumn(name = "document_pkid"))
     @OrderColumn(name = "position")
     private List<BillingItem> billingItems = new ArrayList<>();
 
+    // The tax charged at each rate, lowest rate first.
+    @ElementCollection
+    @CollectionTable(name = "document_tax_summaries", joinColumns = @JoinColumn(name = "document_pkid"))
+    @OrderBy("rate ASC")
+    private List<TaxSummary> taxSummaries = new ArrayList<>();
+
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("datePaid ASC, pkid ASC")
     private List<Payment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("dateRefunded, pkid")
+    private List<Refund> refunds = new ArrayList<>();
 
     public boolean isDraft() {
         return issuedAt == null;

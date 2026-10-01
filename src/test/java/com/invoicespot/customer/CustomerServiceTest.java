@@ -67,7 +67,8 @@ class CustomerServiceTest {
     }
 
     private static CreateCustomerRequest request(String name, String email, String phone) {
-        return new CreateCustomerRequest(name, email, phone, "29ABCDE1234F1Z5", "addr", "city", "country");
+        return new CreateCustomerRequest(
+                name, email, phone, "29ABCDE1234F1Z5", "addr", "city", "country", null, null);
     }
 
     @Test

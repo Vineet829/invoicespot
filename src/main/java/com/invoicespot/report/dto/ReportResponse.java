@@ -10,4 +10,7 @@ public record ReportResponse(
         LocalDate to,
         LocalDate today,
         List<Integer> years,
-        List<CurrencyReport> currencies) {}
+        String view,
+        String baseCurrency,
+        List<CurrencyReport> currencies,
+        List<NotConvertedTotals> notConverted) {}

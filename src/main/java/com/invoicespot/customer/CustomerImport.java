@@ -8,6 +8,7 @@ import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.ImportPreviewResponse;
 import com.invoicespot.customer.dto.ImportResultResponse;
 import com.invoicespot.customer.dto.ImportRow;
+import com.invoicespot.tax.Gstin;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.io.IOException;
@@ -42,7 +43,7 @@ public class CustomerImport {
     static final int MOST_ROWS = 1000;
 
     private static final List<String> FIELDS =
-            List.of("name", "email", "phoneNumber", "vatTinNo", "address", "city", "country");
+            List.of("name", "email", "phoneNumber", "vatTinNo", "address", "city", "country", "gstin");
     private static final Map<String, String> COLUMNS = Map.ofEntries(
             entry("name", "name"),
             entry("client", "name"),
@@ -60,6 +61,9 @@ public class CustomerImport {
             entry("tin", "vatTinNo"),
             entry("vat number", "vatTinNo"),
             entry("tax id", "vatTinNo"),
+            entry("gstin", "gstin"),
+            entry("gst number", "gstin"),
+            entry("gst no", "gstin"),
             entry("address", "address"),
             entry("city", "city"),
             entry("country", "country"));
@@ -142,7 +146,9 @@ public class CustomerImport {
                     values.get("vatTinNo"),
                     values.get("address"),
                     values.get("city"),
-                    values.get("country"));
+                    values.get("country"),
+                    values.get("gstin"),
+                    null);
             List<String> problems = problems(request);
             String email = request.email() == null ? null : request.email().toLowerCase(Locale.ROOT);
             if (email != null && existing.contains(email)) {
@@ -162,6 +168,7 @@ public class CustomerImport {
                     request.address(),
                     request.city(),
                     request.country(),
+                    request.gstin(),
                     problems));
         }
         return rows;
@@ -183,6 +190,9 @@ public class CustomerImport {
                 .sorted(Comparator.comparing(violation -> FIELDS.indexOf(violation.getPropertyPath().toString())))
                 .map(ConstraintViolation::getMessage)
                 .forEach(problems::add);
+        if (request.gstin() != null && !Gstin.isValid(request.gstin().trim().toUpperCase(Locale.ROOT))) {
+            problems.add("The GSTIN isn't valid");
+        }
         return problems;
     }
 

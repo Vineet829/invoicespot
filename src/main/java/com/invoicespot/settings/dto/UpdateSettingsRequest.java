@@ -65,4 +65,16 @@ public record UpdateSettingsRequest(
                 Integer reminderEveryDays,
         @Min(value = 1, message = "Send from 1 to 10 reminders an invoice")
                 @Max(value = 10, message = "Send from 1 to 10 reminders an invoice")
-                Integer reminderMax) {}
+                Integer reminderMax,
+        @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD")
+                String baseCurrency,
+        @Size(max = 20, message = "Prefixes can be at most 20 characters")
+                @Pattern(
+                        regexp = "[\\p{L}\\p{N} ._/#-]*",
+                        message = "Prefixes can use letters, numbers, spaces and . _ / # -")
+                String creditNotePrefix,
+        @Min(value = 1, message = "The next number must be at least 1")
+                @Max(value = 999_999_999, message = "The next number can be at most 999,999,999")
+                Integer nextCreditNoteNumber,
+        String taxRegime,
+        @Size(max = 40, message = "The LUT reference can be at most 40 characters") String lutReference) {}

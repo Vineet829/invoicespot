@@ -112,6 +112,23 @@ class PdfRenderingTest {
     }
 
     @Test
+    @DisplayName("lines taxed at two rates show each line's rate, a tax row per rate and a table of both")
+    void twoRates() {
+        String text = PdfText.of(service.render(PdfFixtures.twoRates(), seller, PdfFixtures.settings()))
+                .replaceAll("\\s+", " ");
+
+        assertThat(text).contains(
+                "Printed guides 4 450.00 0% 5% 1,800.00",
+                "Design sprint 1 1,00,000.00 0% 18% 1,00,000.00",
+                "GST (5%) INR 90.00",
+                "GST (18%) INR 18,000.00",
+                "RATE TAXABLE TAX",
+                "5% INR 1,800.00 INR 90.00",
+                "18% INR 1,00,000.00 INR 18,000.00",
+                "Balance due INR 1,19,890.00");
+    }
+
+    @Test
     @DisplayName("a quotation shows its total and when it is valid until")
     void quotation() {
         String text = PdfText.of(service.render(PdfFixtures.quotation(), seller, PdfFixtures.settings()));
@@ -146,8 +163,10 @@ class PdfRenderingTest {
         assertThat(text).contains(
                 "Statement",
                 "Payment for INV-0040 (Bank Transfer)",
+                "Credit note CN-0001 for INV-0040",
+                "Credited INR 20,000.00",
                 "Overdue",
-                "INR 1,00,000.00",
+                "INR 80,000.00",
                 "Amount due",
                 "USD 0.00");
     }

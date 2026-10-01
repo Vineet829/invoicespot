@@ -28,11 +28,13 @@ public class DocumentNumbering {
             case INVOICE -> settings.getInvoicePrefix();
             case QUOTATION -> settings.getQuotationPrefix();
             case RECEIPT -> settings.getReceiptPrefix();
+            case CREDIT_NOTE -> settings.getCreditNotePrefix();
         };
         int number = switch (type) {
             case INVOICE -> settings.getNextInvoiceNumber();
             case QUOTATION -> settings.getNextQuotationNumber();
             case RECEIPT -> settings.getNextReceiptNumber();
+            case CREDIT_NOTE -> settings.getNextCreditNoteNumber();
         };
         while (documentRepository.existsByBusinessPkidAndDocumentNumber(businessPkid, format(prefix, number))) {
             number++;
@@ -41,6 +43,7 @@ public class DocumentNumbering {
             case INVOICE -> settings.setNextInvoiceNumber(number + 1);
             case QUOTATION -> settings.setNextQuotationNumber(number + 1);
             case RECEIPT -> settings.setNextReceiptNumber(number + 1);
+            case CREDIT_NOTE -> settings.setNextCreditNoteNumber(number + 1);
         }
         return format(prefix, number);
     }

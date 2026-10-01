@@ -1,6 +1,9 @@
 package com.invoicespot.document;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -77,6 +80,34 @@ class PaymentIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.document.status").value("Not Paid"))
                 .andExpect(jsonPath("$.document.paymentRecords").isEmpty());
+    }
+
+    @Test
+    @DisplayName("a payment can come by UPI or by cheque, and its receipt says so")
+    void upiAndCheque() throws Exception {
+        User owner = createUser();
+        String documentId = createDocument(owner, "Invoice");
+
+        pay(owner, documentId, "{\"amountPaid\": 30, \"paymentMethod\": \"UPI\"}").andExpect(status().isCreated());
+        String body = pay(owner, documentId, "{\"amountPaid\": 70, \"paymentMethod\": \"Cheque\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.document.paymentRecords[*].paymentMethod", contains("UPI", "Cheque")))
+                .andExpect(jsonPath("$.document.status").value("Paid"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String payment = JsonPath.read(body, "$.document.paymentRecords[0]._id");
+
+        byte[] receipt = mockMvc.perform(get("/api/v1/document/{id}/payment/{payment}/receipt", documentId, payment)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsByteArray();
+        assertThat(PdfText.of(receipt)).contains("Paid by UPI");
+        pay(owner, createDocument(owner, "Invoice"), "{\"amountPaid\": 10, \"paymentMethod\": \"Barter\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid payment method: Barter"));
     }
 
     @Test

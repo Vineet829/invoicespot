@@ -2,6 +2,8 @@ package com.invoicespot.document;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +44,36 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
 
     List<Document> findBySourceOrderByCreatedAtAscPkidAsc(Document source);
 
+    // A business's issued documents of some types dated in a period, made in
+    // India GST mode.
+    @Query("""
+            select d from Document d
+            where d.business.pkid = :businessPkid and d.documentType in :types
+              and d.issuedAt is not null and d.voidedAt is null
+              and d.issueDate between :from and :to
+              and d.taxRegime = com.invoicespot.tax.TaxRegime.GST_INDIA and d.supplyType is not null
+            order by d.issueDate, d.documentNumber, d.pkid
+            """)
+    List<Document> findGstDatedIn(
+            @Param("businessPkid") Long businessPkid,
+            @Param("types") Collection<DocumentType> types,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    // How many of them were made outside GST mode.
+    @Query("""
+            select count(d) from Document d
+            where d.business.pkid = :businessPkid and d.documentType in :types
+              and d.issuedAt is not null and d.voidedAt is null
+              and d.issueDate between :from and :to
+              and (d.taxRegime <> com.invoicespot.tax.TaxRegime.GST_INDIA or d.supplyType is null)
+            """)
+    long countOutsideGstDatedIn(
+            @Param("businessPkid") Long businessPkid,
+            @Param("types") Collection<DocumentType> types,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
     // Unpaid issued invoices due before a moment that nobody was yet told about.
     @EntityGraph(attributePaths = {"business"})
     @Query("""
@@ -75,4 +107,13 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from Document d where d.id = :externalId")
     Optional<Document> findForUpdateByExternalId(@Param("externalId") UUID externalId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.pkid = :pkid")
+    Optional<Document> findForUpdateByPkid(@Param("pkid") Long pkid);
+
+    // The document a credit note credits, read without loading the note, so
+    // that the invoice can be locked first.
+    @Query(value = "select credited_pkid from documents where id = :externalId", nativeQuery = true)
+    Optional<Long> findCreditedPkid(@Param("externalId") UUID externalId);
 }

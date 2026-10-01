@@ -26,10 +26,11 @@ public record PublicDocumentResponse(
         List<BillingItemResponse> items,
         BigDecimal subTotal,
         String taxLabel,
-        String rates,
+        List<TaxResponse> taxes,
         BigDecimal salesTax,
         BigDecimal total,
         BigDecimal received,
+        BigDecimal taxWithheld,
         BigDecimal balance,
         String notes,
         String terms,
@@ -37,4 +38,14 @@ public record PublicDocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant declinedAt,
         boolean expired,
         boolean canAccept,
-        boolean canDecline) {}
+        boolean canDecline,
+        BigDecimal credited,
+        BigDecimal refunded,
+        BigDecimal refundDue,
+        @JsonInclude(JsonInclude.Include.NON_NULL) PublicCreditedDocument credits,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String creditReason,
+        @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst) {
+
+    // The invoice or receipt a credit note credits, as its client knows it.
+    public record PublicCreditedDocument(DocumentType documentType, String documentNumber, LocalDate issueDate) {}
+}

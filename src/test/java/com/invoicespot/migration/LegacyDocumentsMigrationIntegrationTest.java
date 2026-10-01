@@ -196,4 +196,57 @@ class LegacyDocumentsMigrationIntegrationTest extends IntegrationTest {
                         "select count(*) from documents where issued_at is distinct from created_at", Long.class))
                 .isZero();
     }
+
+    @Test
+    @DisplayName("each old line keeps its quantity, and one saved without a quantity counts 0, as it always did")
+    void quantitiesKept() {
+        database.migrateToLatest();
+
+        assertThat(jdbc.queryForList(
+                        "select item_name || ' ' || quantity from document_billing_items order by document_pkid, position",
+                        String.class))
+                .containsExactly(
+                        "Design 1.0000",
+                        "Support 0.0000",
+                        "Hosting 3.0000",
+                        "Consulting 2.0000",
+                        "Workshop 1.0000",
+                        "Retainer 1.0000",
+                        "Audit 1.0000");
+    }
+
+    @Test
+    @DisplayName("each old line keeps its document's rate, and each document's tax at it is what it showed")
+    void ratesKept() {
+        String before = database.recordsFingerprint();
+
+        database.migrateToLatest();
+
+        assertThat(database.recordsFingerprint()).isEqualTo(before);
+        assertThat(jdbc.queryForList("""
+                        select coalesce(d.document_number, '') || ' ' || s.rate || ' '
+                               || (s.taxable = d.sub_total and s.tax = d.sales_tax)
+                        from documents d join document_tax_summaries s on s.document_pkid = d.pkid
+                        order by d.pkid
+                        """, String.class))
+                .containsExactly(
+                        "INV-0001 18.0000 true",
+                        "INV-0002 7.2500 true",
+                        "INV-0003 150.0000 true",
+                        " 0.0000 true",
+                        "REC-0001 0.0000 true",
+                        "QUO-0001 10.0000 true",
+                        "INV-0100 5.0000 true");
+        assertThat(jdbc.queryForList(
+                        "select item_name || ' ' || tax_rate from document_billing_items order by document_pkid, position",
+                        String.class))
+                .containsExactly(
+                        "Design 18.0000",
+                        "Support 7.2500",
+                        "Hosting 7.2500",
+                        "Consulting 0.0000",
+                        "Workshop 0.0000",
+                        "Retainer 10.0000",
+                        "Audit 5.0000");
+    }
 }

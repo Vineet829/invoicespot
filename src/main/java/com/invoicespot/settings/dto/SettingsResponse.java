@@ -1,10 +1,12 @@
 package com.invoicespot.settings.dto;
 
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.tax.TaxRegime;
 import java.math.BigDecimal;
 
 public record SettingsResponse(
         String defaultCurrency,
+        String baseCurrency,
         int paymentTermsDays,
         BigDecimal defaultTaxRate,
         String taxLabel,
@@ -15,19 +17,24 @@ public record SettingsResponse(
         String invoicePrefix,
         String quotationPrefix,
         String receiptPrefix,
+        String creditNotePrefix,
         int nextInvoiceNumber,
         int nextQuotationNumber,
         int nextReceiptNumber,
+        int nextCreditNoteNumber,
         boolean remindersEnabled,
         int reminderDaysBefore,
         boolean reminderOnDue,
         int reminderEveryDays,
         int reminderMax,
+        TaxRegime taxRegime,
+        String lutReference,
         boolean saved) {
 
     public static SettingsResponse from(BusinessSettings settings) {
         return new SettingsResponse(
                 settings.getDefaultCurrency(),
+                settings.getBaseCurrency(),
                 settings.getPaymentTermsDays(),
                 settings.getDefaultTaxRate().stripTrailingZeros(),
                 settings.getTaxLabel(),
@@ -38,14 +45,18 @@ public record SettingsResponse(
                 settings.getInvoicePrefix(),
                 settings.getQuotationPrefix(),
                 settings.getReceiptPrefix(),
+                settings.getCreditNotePrefix(),
                 settings.getNextInvoiceNumber(),
                 settings.getNextQuotationNumber(),
                 settings.getNextReceiptNumber(),
+                settings.getNextCreditNoteNumber(),
                 settings.isRemindersEnabled(),
                 settings.getReminderDaysBefore(),
                 settings.isReminderOnDue(),
                 settings.getReminderEveryDays(),
                 settings.getReminderMax(),
+                settings.getTaxRegime(),
+                settings.getLutReference(),
                 settings.getPkid() != null);
     }
 }

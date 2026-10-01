@@ -114,14 +114,15 @@ public class DemoDataSeeder {
         if (settingsRepository.findByBusinessPkid(owner.businessPkid()).isEmpty()) {
             settingsService.update(owner, new UpdateSettingsRequest(
                     "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS, DemoData.EMAIL_MESSAGE,
-                    ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null));
+                    ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null, null, null, null, null,
+                    null));
         }
         DemoData.ITEMS.forEach(item -> itemService.create(
-                owner, new CreateItemRequest(item.name(), item.description(), item.price())));
+                owner, new CreateItemRequest(item.name(), item.description(), item.price(), null, null, null)));
         List<String> clients = DemoData.CLIENTS.stream()
                 .map(client -> customerService.create(owner, new CreateCustomerRequest(
                                 client.name(), client.email(), client.phone(), null, client.address(),
-                                client.city(), "United States"))
+                                client.city(), "United States", null, null))
                         .id()
                         .toString())
                 .toList();
@@ -172,6 +173,10 @@ public class DemoDataSeeder {
                 "USD",
                 lines(random),
                 plan.issued(),
+                null,
+                null,
+                null,
+                null,
                 null));
         List<LocalDate> paymentDates = new ArrayList<>();
         if (plan.type() == DocumentType.INVOICE) {
@@ -198,7 +203,8 @@ public class DemoDataSeeder {
             DemoData.Item item = pool.remove(random.nextInt(pool.size()));
             int quantity = item.countable() ? 2 + random.nextInt(10) : 1;
             String discount = random.nextInt(10) == 0 ? "10" : "0";
-            lines.add(new BillingItemDto(item.name(), item.price(), quantity, discount));
+            lines.add(new BillingItemDto(
+                    item.name(), item.price(), BigDecimal.valueOf(quantity), discount, null, null, null));
         }
         return lines;
     }
@@ -237,7 +243,7 @@ public class DemoDataSeeder {
             String note,
             Random random) {
         documentService.addPayment(owner, document.id().toString(), new CreatePaymentRequest(
-                date.toString(), amount, METHODS[random.nextInt(METHODS.length)].getValue(), note));
+                date.toString(), amount, METHODS[random.nextInt(METHODS.length)].getValue(), note, null));
     }
 
     private static LocalDate earliest(LocalDate date, LocalDate today) {

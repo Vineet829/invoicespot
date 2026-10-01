@@ -33,6 +33,7 @@
   .badge.partial { background: #eeeaf9; color: #4a3a80; }
   .badge.unpaid { background: #fbe3d8; color: #9c4526; }
   .void-note { margin-top: 10px; color: #9c4526; }
+  .reference { margin-top: 10px; color: #6b7080; }
   .band { background: #f3f2f8; border-radius: 12px; }
   .band td { padding: 14px 16px; }
   .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.8pt; color: #6b7080; margin-bottom: 5px; }
@@ -47,6 +48,16 @@
   .summary td { padding: 4px 0; }
   .summary .v { text-align: right; color: #232735; white-space: nowrap; }
   .summary .balance td { border-top: 1px solid #d9d8e2; padding-top: 10px; font-size: 11pt; color: #30234f; font-weight: bold; }
+  .rates { width: 46%; margin: 18px 0 0 auto; }
+  .rates th { font-size: 8pt; font-weight: normal; text-transform: uppercase; letter-spacing: 0.6pt; color: #6b7080; text-align: left; padding: 0 0 6px; border-bottom: 1px solid #d9d8e2; }
+  .rates td { padding: 5px 0; border-bottom: 1px solid #ecebf1; color: #232735; }
+  .rates .num { text-align: right; white-space: nowrap; }
+  .gst-rates { width: 100%; }
+  .hsn { font-size: 8pt; color: #6b7080; }
+  .words { margin-top: 14px; color: #232735; }
+  .endorsement { margin-top: 6px; color: #30234f; }
+  .signatory { width: 46%; margin: 36px 0 0 auto; text-align: right; page-break-inside: avoid; }
+  .signatory .line { margin-top: 34px; padding-top: 5px; border-top: 1px solid #d9d8e2; color: #6b7080; }
   .notes { margin-top: 26px; page-break-inside: avoid; }
   .notes p { margin: 0; white-space: pre-wrap; }
   .notes .block { margin-bottom: 16px; }
@@ -70,20 +81,55 @@
             <td class="k" th:text="${pdf.dueLabel()}">Due</td>
             <td class="v" th:text="${pdf.due()}">Oct 15, 2026</td>
           </tr>
+          <tr th:if="${pdf.gst() != null}">
+            <td class="k">Reverse charge</td>
+            <td class="v" th:text="${pdf.gst().reverseCharge()}">No</td>
+          </tr>
         </table>
         <span th:if="${pdf.status() != null}" th:class="${'badge ' + pdf.statusTone()}" th:text="${pdf.status()}">Unpaid</span>
         <div th:if="${pdf.voidNote() != null}" class="void-note" th:text="${pdf.voidNote()}">Voided on Oct 3, 2026: Sent to the wrong client</div>
+        <div th:if="${pdf.reference() != null}" class="reference" th:text="${pdf.reference()}">Against invoice INV-0012 dated Sep 1, 2026</div>
       </td>
     </tr>
   </table>
 
   <table th:replace="~{pdf/fragments/parties :: client('Bill to', ${pdf.client()})}"></table>
 
-  <table th:replace="~{pdf/fragments/items :: items(${pdf.items()})}"></table>
+  <table th:replace="~{pdf/fragments/items :: items(${pdf.items()}, ${pdf.ratePerLine()}, ${pdf.rateHeader()})}"></table>
 
   <table th:replace="~{pdf/fragments/totals ::
       totals(${pdf.currency()}, ${pdf.totals()}, ${pdf.balanceLabel()}, ${pdf.balance()})}"></table>
 
+  <th:block th:if="${!pdf.rates().isEmpty()}">
+    <table th:replace="~{pdf/fragments/totals :: rates(${pdf.currency()}, ${pdf.rates()})}"></table>
+  </th:block>
+
+  <th:block th:if="${pdf.gst() != null}">
+    <th:block th:if="${pdf.gst().hsn().isEmpty()}">
+      <table th:replace="~{pdf/fragments/totals ::
+          gstRates(${pdf.currency()}, ${pdf.gst().sgstLabel()}, ${pdf.gst().rates()})}"></table>
+    </th:block>
+    <th:block th:if="${!pdf.gst().hsn().isEmpty()}">
+      <table th:replace="~{pdf/fragments/totals ::
+          hsnRates(${pdf.currency()}, ${pdf.gst().sgstLabel()}, ${pdf.gst().hsn()})}"></table>
+    </th:block>
+    <div class="words" th:text="${pdf.gst().amountInWords()}">Rupees One Lakh Only</div>
+    <div th:if="${pdf.gst().endorsement() != null}" class="endorsement" th:text="${pdf.gst().endorsement()}">Supply meant for export under LUT without payment of IGST</div>
+    <div th:if="${pdf.gst().exchangeNote() != null}" class="muted" th:text="${pdf.gst().exchangeNote()}">1 USD = ₹83.2500</div>
+  </th:block>
+
+  <div class="notes" th:if="${pdf.reason() != null}">
+    <div class="block">
+      <div class="label">Reason for this credit</div>
+      <p th:text="${pdf.reason()}">Returned goods</p>
+    </div>
+  </div>
+
   <div th:replace="~{pdf/fragments/notes :: notes(${pdf.notes()}, ${pdf.terms()})}"></div>
+
+  <div th:if="${pdf.gst() != null}" class="signatory">
+    <div th:text="${pdf.gst().signatory()}">For Business</div>
+    <div class="line">Authorised signatory</div>
+  </div>
 </body>
 </html>

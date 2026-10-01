@@ -6,10 +6,12 @@ import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.document.dto.BillingItemResponse;
+import com.invoicespot.document.dto.GstResponse;
 import com.invoicespot.document.dto.PublicDocumentResponse;
 import com.invoicespot.document.dto.PublicParty;
 import com.invoicespot.document.dto.ShareLinkResponse;
 import com.invoicespot.document.dto.ShareStatusResponse;
+import com.invoicespot.document.dto.TaxResponse;
 import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.BusinessSettings;
@@ -196,7 +198,7 @@ public class ShareService {
     private static PublicParty sellerParty(Document document, Business business) {
         SellerSnapshot kept = Objects.requireNonNullElseGet(document.getSeller(), () -> SellerSnapshot.of(business));
         return new PublicParty(
-                Objects.requireNonNullElse(kept.getName(), ""), kept.getLogo(), PdfService.senderLines(kept));
+                Objects.requireNonNullElse(kept.getName(), ""), kept.getLogo(), PdfService.senderLines(document, kept));
     }
 
     private PublicDocumentResponse publicView(Document document) {
@@ -208,6 +210,8 @@ public class ShareService {
         BigDecimal total = orZero(document.getTotal());
         BigDecimal received = orZero(document.getTotalAmountReceived());
         boolean quotation = document.getDocumentType() == DocumentType.QUOTATION;
+        boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
+        Document credited = document.getCredited();
         boolean voided = document.isVoid();
         boolean expired = document.isExpired(startOfToday);
         boolean answerable = quotation && !voided && !expired
@@ -229,29 +233,33 @@ public class ShareService {
                         client.getName(),
                         null,
                         lines(client.getEmail(), client.getPhoneNumber(), client.getAddress(), client.getCity(),
-                                client.getCountry())),
-                document.getBillingItems().stream()
-                        .map(item -> new BillingItemResponse(
-                                item.getItemName(),
-                                item.getUnitPrice(),
-                                item.getQuantity(),
-                                orZero(item.getDiscount()).stripTrailingZeros().toPlainString(),
-                                DocumentTotals.lineTotal(item)))
-                        .toList(),
+                                client.getCountry(),
+                                client.getGstin() == null ? null : "GSTIN " + client.getGstin())),
+                document.getBillingItems().stream().map(BillingItemResponse::from).toList(),
                 document.getSubTotal(),
                 document.getTaxLabel(),
-                orZero(document.getRates()).stripTrailingZeros().toPlainString(),
+                document.getTaxSummaries().stream().map(TaxResponse::from).toList(),
                 document.getSalesTax(),
                 total,
                 received,
-                quotation ? total : voided ? BigDecimal.ZERO : total.subtract(received).max(BigDecimal.ZERO),
+                orZero(document.getTotalTds()),
+                quotation || creditNote ? total : voided ? BigDecimal.ZERO : DocumentTotals.balanceDue(document),
                 document.getAdditionalInfo(),
                 document.getTermsConditions(),
                 document.getAcceptedAt(),
                 document.getDeclinedAt(),
                 expired,
                 answerable,
-                answerable);
+                answerable,
+                orZero(document.getTotalCredited()),
+                orZero(document.getTotalRefunded()),
+                voided ? BigDecimal.ZERO : DocumentTotals.refundDue(document),
+                credited == null
+                        ? null
+                        : new PublicDocumentResponse.PublicCreditedDocument(
+                                credited.getDocumentType(), credited.getDocumentNumber(), credited.getIssueDate()),
+                document.getCreditReason(),
+                GstResponse.from(document));
     }
 
     private static String clientName(Document document) {

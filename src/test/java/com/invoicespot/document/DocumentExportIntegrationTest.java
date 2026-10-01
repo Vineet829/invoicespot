@@ -88,11 +88,14 @@ class DocumentExportIntegrationTest extends IntegrationTest {
     void documentsCsv() throws Exception {
         String dates = today + "," + today.plusDays(7);
         assertThat(csv(owner, "/api/v1/document/csv")).containsExactly(
-                "﻿Number,Type,Status,Client,Client email,Currency,Subtotal,Tax,Total,Paid,Owed,Issued,Due,Overdue",
-                "REC-0001,Receipt,Paid,Acme,%s,USD,20.00,0.00,20.00,20.00,0.00,%s,%s,No".formatted(email, today, today),
-                "QUO-0001,Quotation,Unpaid,Acme,%s,USD,70.00,0.00,70.00,,,%s,No".formatted(email, dates),
-                "INV-0002,Invoice,Paid,Acme,%s,USD,50.00,0.00,50.00,50.00,0.00,%s,No".formatted(email, dates),
-                "INV-0001,Invoice,Partially paid,Acme,%s,USD,100.00,0.00,100.00,40.00,60.00,%s,%s,Yes"
+                "﻿Number,Type,Status,Client,Client email,Currency,Subtotal,Tax,Total,Paid,Owed,Issued,Due,Overdue,"
+                        + "Tax withheld,Exchange rate,Exchange rate to,Credits,Credited,Refunded",
+                "REC-0001,Receipt,Paid,Acme,%s,USD,20.00,0.00,20.00,20.00,0.00,%s,%s,No,0.00,,,,0.00,0.00"
+                        .formatted(email, today, today),
+                "QUO-0001,Quotation,Unpaid,Acme,%s,USD,70.00,0.00,70.00,,,%s,No,,,,,,".formatted(email, dates),
+                "INV-0002,Invoice,Paid,Acme,%s,USD,50.00,0.00,50.00,50.00,0.00,%s,No,0.00,,,,0.00,0.00"
+                        .formatted(email, dates),
+                "INV-0001,Invoice,Partially paid,Acme,%s,USD,100.00,0.00,100.00,40.00,60.00,%s,%s,Yes,0.00,,,,0.00,0.00"
                         .formatted(email, today, today.minusDays(1)));
     }
 
@@ -113,9 +116,9 @@ class DocumentExportIntegrationTest extends IntegrationTest {
     @DisplayName("payments export newest first, and each owner gets only their own")
     void paymentsCsv() throws Exception {
         assertThat(csv(owner, "/api/v1/document/payments/csv")).containsExactly(
-                "﻿Date,Document,Type,Client,Currency,Amount,Method,Paid by,Notes",
-                today + ",INV-0002,Invoice,Acme,USD,50.00,Cash,Acme,",
-                today + ",INV-0001,Invoice,Acme,USD,40.00,Bank Transfer,Acme,First part");
+                "﻿Date,Document,Type,Client,Currency,Amount,Method,Paid by,Notes,Tax withheld,Kind",
+                today + ",INV-0002,Invoice,Acme,USD,50.00,Cash,Acme,,0.00,Payment",
+                today + ",INV-0001,Invoice,Acme,USD,40.00,Bank Transfer,Acme,First part,0.00,Payment");
         assertThat(csv(createUser(), "/api/v1/document/payments/csv")).hasSize(1);
         assertThat(csv(createUser(), "/api/v1/document/csv")).hasSize(1);
     }

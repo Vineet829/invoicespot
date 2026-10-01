@@ -86,6 +86,38 @@ class PdfGoldenTest {
     }
 
     @Test
+    @DisplayName("an invoice taxed at two rates")
+    void twoRates() throws IOException {
+        assertGolden("two-rate-invoice", service.html(kept(PdfFixtures.twoRates()), seller, PdfFixtures.settings()));
+    }
+
+    @Test
+    @DisplayName("a credit note against an invoice, with its reason")
+    void creditNote() throws IOException {
+        assertGolden("credit-note", service.html(kept(PdfFixtures.creditNote()), seller, PdfFixtures.settings()));
+    }
+
+    @Test
+    @DisplayName("an invoice part paid and part credited")
+    void creditedInvoice() throws IOException {
+        assertGolden(
+                "credited-invoice",
+                service.html(kept(PdfFixtures.creditedInvoice()), seller, PdfFixtures.settings()));
+    }
+
+    @Test
+    @DisplayName("a GST tax invoice within the state, at two rates, summed by HSN/SAC code")
+    void gstInvoice() throws IOException {
+        assertGolden("gst-invoice", service.html(kept(PdfFixtures.gstInvoice()), seller, PdfFixtures.settings()));
+    }
+
+    @Test
+    @DisplayName("a GST export under a LUT, billed in dollars")
+    void gstExport() throws IOException {
+        assertGolden("gst-export", service.html(kept(PdfFixtures.gstExport()), seller, PdfFixtures.settings()));
+    }
+
+    @Test
     @DisplayName("a draft invoice")
     void draft() throws IOException {
         assertGolden("draft-invoice", service.html(PdfFixtures.draft(), seller, PdfFixtures.settings()));

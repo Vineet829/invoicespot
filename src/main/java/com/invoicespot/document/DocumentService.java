@@ -3,6 +3,8 @@ package com.invoicespot.document;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.ExchangeRate;
+import com.invoicespot.common.Percentage;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.document.dto.ActivityEntry;
@@ -14,6 +16,7 @@ import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.DocumentListResponse;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.IssueDocumentRequest;
+import com.invoicespot.document.dto.RefundRequest;
 import com.invoicespot.document.dto.UpdateDocumentRequest;
 import com.invoicespot.document.dto.UpdatePaymentRequest;
 import com.invoicespot.document.dto.VoidDocumentRequest;
@@ -21,6 +24,8 @@ import com.invoicespot.notification.NotificationService;
 import com.invoicespot.notification.NotificationType;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
+import com.invoicespot.tax.Gstin;
+import com.invoicespot.tax.HsnSac;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
@@ -47,7 +52,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DocumentService {
 
-    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
     private static final String LOCKED = "An issued document keeps its client, lines, tax and issue date."
             + " Void it and duplicate it to change them";
 
@@ -58,6 +62,9 @@ public class DocumentService {
     private final SettingsService settingsService;
     private final BusinessRepository businessRepository;
     private final DocumentIssuer documentIssuer;
+    private final CreditNoteService creditNotes;
+    private final RefundService refunds;
+    private final GstSupply gstSupply;
     private final RecurringScheduleRepository scheduleRepository;
     private final DocumentActivity activity;
     private final NotificationService notificationService;
@@ -71,6 +78,9 @@ public class DocumentService {
             SettingsService settingsService,
             BusinessRepository businessRepository,
             DocumentIssuer documentIssuer,
+            CreditNoteService creditNotes,
+            RefundService refunds,
+            GstSupply gstSupply,
             RecurringScheduleRepository scheduleRepository,
             DocumentActivity activity,
             NotificationService notificationService,
@@ -82,6 +92,9 @@ public class DocumentService {
         this.settingsService = settingsService;
         this.businessRepository = businessRepository;
         this.documentIssuer = documentIssuer;
+        this.creditNotes = creditNotes;
+        this.refunds = refunds;
+        this.gstSupply = gstSupply;
         this.scheduleRepository = scheduleRepository;
         this.activity = activity;
         this.notificationService = notificationService;
@@ -104,9 +117,10 @@ public class DocumentService {
         document.setDueDate(request.dueDate());
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
-        document.setRates(percentage(request.rates(), "Tax rate"));
         document.setCurrency(request.currency());
-        document.setBillingItems(toBillingItems(request.billingItems()));
+        exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
+        document.setBillingItems(toBillingItems(request.billingItems(), percentage(request.rates(), "Tax rate")));
+        gstSupply.place(document, request.placeOfSupply(), request.reverseCharge(), request.exportType());
         DocumentTotals.apply(document);
         documentRepository.save(document);
         activity.record(document, DocumentEventType.CREATED, null, actor(access));
@@ -131,6 +145,7 @@ public class DocumentService {
         if (!document.getPayments().isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "Delete its payments before voiding it");
         }
+        CreditNoteService.requireNoCreditNotes(document);
         if (scheduleRepository.findByTemplate(document).isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "This invoice repeats. Stop its schedule before voiding it");
         }
@@ -138,6 +153,9 @@ public class DocumentService {
         document.setVoidReason(request.reason().trim());
         document.setOverdueAlertedAt(null);
         activity.record(document, DocumentEventType.VOIDED, document.getVoidReason(), actor(access));
+        if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            creditNotes.voided(document, actor(access));
+        }
         return respond(document);
     }
 
@@ -145,10 +163,17 @@ public class DocumentService {
     @Transactional
     public DocumentResponse issue(BusinessAccess access, String id, IssueDocumentRequest request) {
         Document document = lockInBusiness(access, id);
-        if (document.isDraft() && request.dueDate() != null) {
+        boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
+        if (document.isDraft() && request.dueDate() != null && !creditNote) {
             document.setDueDate(request.dueDate());
         }
+        if (document.isDraft() && request.exchangeRate() != null && !creditNote) {
+            exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
+        }
         documentIssuer.issue(document, issueDate(request.issueDate(), zoneOf(access.businessPkid())), actor(access));
+        if (creditNote) {
+            creditNotes.issued(document, actor(access));
+        }
         return respond(document);
     }
 
@@ -276,6 +301,14 @@ public class DocumentService {
         if (!document.isDraft()) {
             requireOnlyDetails(document, request);
         }
+        if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            requireOnlyCreditLines(request);
+            if (request.creditReason() != null) {
+                document.setCreditReason(request.creditReason().isBlank() ? null : request.creditReason().trim());
+            }
+        } else if (request.creditReason() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Only a credit note has a reason to credit");
+        }
         if (request.customerId() != null) {
             Customer customer = findCustomer(access.businessPkid(), request.customerId(), null)
                     .orElseThrow(DocumentService::customerNotFound);
@@ -302,14 +335,28 @@ public class DocumentService {
         if (request.termsConditions() != null) {
             document.setTermsConditions(request.termsConditions());
         }
-        if (request.rates() != null) {
-            document.setRates(percentage(request.rates(), "Tax rate"));
-        }
+        boolean currencyChanged = request.currency() != null && !request.currency().equals(document.getCurrency());
         if (request.currency() != null) {
             document.setCurrency(request.currency());
         }
+        if (document.isDraft()) {
+            exchangeRate(document, request.exchangeRate(), currencyChanged, access.businessPkid());
+        }
+        // Lines sent without a rate take the rate sent with them, else the one
+        // rate the draft had; a rate sent alone applies to every line.
         if (request.billingItems() != null) {
-            document.setBillingItems(toBillingItems(request.billingItems()));
+            BigDecimal rate = request.rates() != null
+                    ? percentage(request.rates(), "Tax rate")
+                    : Objects.requireNonNullElse(DocumentTotals.singleRate(document), BigDecimal.ZERO);
+            document.setBillingItems(toBillingItems(request.billingItems(), rate));
+        } else if (request.rates() != null) {
+            BigDecimal rate = percentage(request.rates(), "Tax rate");
+            document.getBillingItems().forEach(item -> item.setTaxRate(rate));
+        }
+        if (document.isDraft() && document.getDocumentType() != DocumentType.CREDIT_NOTE) {
+            gstSupply.place(document, request.placeOfSupply(), request.reverseCharge(), request.exportType());
+        } else if (document.isDraft()) {
+            GstSupply.zeroRatedExport(document);
         }
         if (document.isDraft()) {
             DocumentTotals.apply(document);
@@ -327,11 +374,24 @@ public class DocumentService {
         Document original = requireInBusiness(
                 access, id, "That document does not exist",
                 "You are not authorized to copy this document. It's not yours");
+        if (original.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT, "Make a new credit note from the document it credits instead");
+        }
         User actor = actor(access);
         Document copy = copyOf(original, original.getDocumentType(), true, actor);
         activity.record(copy, DocumentEventType.COPIED_FROM, original.getDocumentNumber(), actor);
         activity.record(original, DocumentEventType.COPIED_TO, null, actor);
         return respond(copy);
+    }
+
+    // A draft credit note for an issued invoice or receipt.
+    @Transactional
+    public DocumentResponse creditNote(BusinessAccess access, String id) {
+        Document credited = requireInBusiness(
+                access, id, "That document does not exist",
+                "You are not authorized to credit this document. It's not yours");
+        return respond(creditNotes.create(credited, actor(access)));
     }
 
     @Transactional
@@ -399,23 +459,29 @@ public class DocumentService {
                 .toInstant());
         copy.setAdditionalInfo(original.getAdditionalInfo());
         copy.setTermsConditions(original.getTermsConditions());
-        copy.setRates(original.getRates());
         copy.setCurrency(original.getCurrency());
+        // A GST copy goes where the original went, until it is saved again.
+        copy.setPlaceOfSupply(original.getPlaceOfSupply());
+        copy.setSupplyType(original.getSupplyType());
+        copy.setReverseCharge(original.isReverseCharge());
         copy.setBillingItems(original.getBillingItems().stream().map(DocumentService::copyOf).toList());
         DocumentTotals.apply(copy);
         return documentRepository.save(copy);
     }
 
-    private static BillingItem copyOf(BillingItem original) {
+    static BillingItem copyOf(BillingItem original) {
         BillingItem item = new BillingItem();
         item.setItemName(original.getItemName());
         item.setUnitPrice(original.getUnitPrice());
         item.setQuantity(original.getQuantity());
+        item.setUnit(original.getUnit());
+        item.setTaxRate(original.getTaxRate());
         item.setDiscount(original.getDiscount());
+        item.setHsnSac(original.getHsnSac());
         return item;
     }
 
-    private static CustomerSnapshot copyOf(CustomerSnapshot original) {
+    static CustomerSnapshot copyOf(CustomerSnapshot original) {
         if (original == null) {
             return null;
         }
@@ -428,6 +494,8 @@ public class DocumentService {
         snapshot.setCity(original.getCity());
         snapshot.setCountry(original.getCountry());
         snapshot.setPhoneNumber(original.getPhoneNumber());
+        snapshot.setGstin(original.getGstin());
+        snapshot.setStateCode(original.getStateCode());
         return snapshot;
     }
 
@@ -459,15 +527,20 @@ public class DocumentService {
         if (document.getDocumentType() == DocumentType.RECEIPT) {
             throw new ApiException(HttpStatus.CONFLICT, "A receipt is already paid in full");
         }
+        if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            throw new ApiException(HttpStatus.CONFLICT, "A credit note can't take payments");
+        }
         Payment payment = new Payment();
         payment.setDocument(document);
         CustomerSnapshot customer = document.getCustomerSnapshot();
         payment.setPaidBy(customer == null ? null : customer.getName());
         payment.setDatePaid(paymentDate(request.datePaid()));
-        payment.setAmountPaid(paymentAmount(request.amountPaid()));
+        Amounts amounts = paymentAmounts(request.amountPaid(), request.tdsAmount());
+        payment.setAmountPaid(amounts.received());
+        payment.setTdsAmount(amounts.withheld());
         payment.setPaymentMethod(paymentMethod(request.paymentMethod()));
         payment.setAdditionalInfo(request.additionalInfo());
-        requireWithinBalance(document, payment.getAmountPaid());
+        requireWithinBalance(document, amounts.settled());
         document.getPayments().add(payment);
         DocumentTotals.settle(document);
         documentRepository.flush();
@@ -494,10 +567,17 @@ public class DocumentService {
         if (request.additionalInfo() != null) {
             payment.setAdditionalInfo(request.additionalInfo());
         }
-        if (request.amountPaid() != null) {
-            BigDecimal amount = paymentAmount(request.amountPaid());
-            requireWithinBalance(document, amount.subtract(payment.getAmountPaid()));
-            payment.setAmountPaid(amount);
+        if (request.amountPaid() != null || request.tdsAmount() != null) {
+            Amounts amounts = paymentAmounts(
+                    Objects.requireNonNullElse(request.amountPaid(), payment.getAmountPaid()),
+                    Objects.requireNonNullElse(request.tdsAmount(), payment.getTdsAmount()));
+            BigDecimal change = amounts.settled().subtract(payment.getAmountPaid()).subtract(payment.getTdsAmount());
+            requireWithinBalance(document, change);
+            RefundService.requireCovered(
+                    document,
+                    DocumentTotals.received(document).add(DocumentTotals.withheld(document)).add(change));
+            payment.setAmountPaid(amounts.received());
+            payment.setTdsAmount(amounts.withheld());
         }
         DocumentTotals.settle(document);
         activity.record(
@@ -513,6 +593,12 @@ public class DocumentService {
     public DocumentResponse deletePayment(BusinessAccess access, String id, String paymentId) {
         Document document = lockInBusiness(access, id);
         Payment payment = requirePayment(document, paymentId);
+        RefundService.requireCovered(
+                document,
+                DocumentTotals.received(document)
+                        .add(DocumentTotals.withheld(document))
+                        .subtract(payment.getAmountPaid())
+                        .subtract(payment.getTdsAmount()));
         document.getPayments().remove(payment);
         DocumentTotals.settle(document);
         activity.record(
@@ -520,6 +606,27 @@ public class DocumentService {
                 DocumentEventType.PAYMENT_DELETED,
                 DocumentActivity.paymentDetail(document, payment),
                 actor(access));
+        return respond(document);
+    }
+
+    @Transactional
+    public DocumentResponse addRefund(BusinessAccess access, String id, RefundRequest request) {
+        Document document = lockInBusiness(access, id);
+        refunds.add(document, request, actor(access));
+        return respond(document);
+    }
+
+    @Transactional
+    public DocumentResponse updateRefund(BusinessAccess access, String id, String refundId, RefundRequest request) {
+        Document document = lockInBusiness(access, id);
+        refunds.update(document, refundId, request, actor(access));
+        return respond(document);
+    }
+
+    @Transactional
+    public DocumentResponse deleteRefund(BusinessAccess access, String id, String refundId) {
+        Document document = lockInBusiness(access, id);
+        refunds.delete(document, refundId, actor(access));
         return respond(document);
     }
 
@@ -557,7 +664,9 @@ public class DocumentService {
                         document,
                         payment,
                         number,
-                        paidSoFar.stream().map(Payment::getAmountPaid).reduce(BigDecimal.ZERO, BigDecimal::add),
+                        paidSoFar.stream()
+                                .map(paid -> paid.getAmountPaid().add(paid.getTdsAmount()))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add),
                         document.getBusiness()),
                 receiptEnvelope(document, number));
     }
@@ -594,14 +703,11 @@ public class DocumentService {
     ReminderFacts reminderFacts(Document document) {
         ZoneId zone = zoneOf(document.getBusiness().getPkid());
         CustomerSnapshot customer = document.getCustomerSnapshot();
-        BigDecimal total = document.getTotal() == null ? BigDecimal.ZERO : document.getTotal();
-        BigDecimal received =
-                document.getTotalAmountReceived() == null ? BigDecimal.ZERO : document.getTotalAmountReceived();
         return new ReminderFacts(
                 document.getDocumentType().getValue() + " " + document.getDocumentNumber(),
                 customer == null ? null : customer.getName(),
                 customer == null ? null : customer.getEmail(),
-                DocumentActivity.amount(document, total.subtract(received)),
+                DocumentActivity.amount(document, DocumentTotals.balanceDue(document)),
                 document.getDueDate() == null ? null : PdfService.DATE.format(document.getDueDate().atZone(zone)),
                 DocumentTotals.isOverdue(document, startOfToday(zone)));
     }
@@ -640,8 +746,12 @@ public class DocumentService {
 
     // The document, locked until the transaction ends, so two changes to it
     // take turns.
+    // A credit note's document is locked before the note, as everything that
+    // changes both does.
     private Document lockInBusiness(BusinessAccess access, String id) {
-        Document document = externalId(id)
+        Optional<UUID> external = externalId(id);
+        external.flatMap(documentRepository::findCreditedPkid).ifPresent(documentRepository::findForUpdateByPkid);
+        Document document = external
                 .flatMap(documentRepository::findForUpdateByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist!"));
         if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
@@ -659,8 +769,14 @@ public class DocumentService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That payment does not exist"));
     }
 
+    // A payment settles at most what is still owed, counting the tax the
+    // client withholds and what credit notes took off.
     private static void requireWithinBalance(Document document, BigDecimal extra) {
-        BigDecimal owed = document.getTotal().subtract(DocumentTotals.received(document));
+        BigDecimal owed = document.getTotal()
+                .subtract(document.getTotalCredited())
+                .subtract(DocumentTotals.received(document))
+                .subtract(DocumentTotals.withheld(document))
+                .add(document.getTotalRefunded());
         if (extra.compareTo(owed) > 0) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -669,12 +785,33 @@ public class DocumentService {
         }
     }
 
-    private static BigDecimal paymentAmount(BigDecimal amount) {
-        if (amount == null || amount.signum() <= 0) {
+    // Money received and tax the client withheld from a payment.
+    private record Amounts(BigDecimal received, BigDecimal withheld) {
+
+        BigDecimal settled() {
+            return received.add(withheld);
+        }
+    }
+
+    // Neither below nothing, each to the cent, and together more than nothing:
+    // a payment can be only the tax withheld.
+    private static Amounts paymentAmounts(BigDecimal received, BigDecimal withheld) {
+        Amounts amounts = new Amounts(cents(received, "An amount"), cents(withheld, "Tax withheld"));
+        if (amounts.settled().signum() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter an amount greater than zero");
+        }
+        return amounts;
+    }
+
+    private static BigDecimal cents(BigDecimal amount, String label) {
+        if (amount == null) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        if (amount.signum() < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Enter an amount greater than zero");
         }
         if (amount.stripTrailingZeros().scale() > 2) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "An amount can have at most 2 decimals");
+            throw new ApiException(HttpStatus.BAD_REQUEST, label + " can have at most 2 decimals");
         }
         return amount.setScale(2);
     }
@@ -689,6 +826,52 @@ public class DocumentService {
                     : LocalDate.ofInstant(Instant.parse(value), ZoneOffset.UTC);
         } catch (DateTimeParseException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Enter the payment date as YYYY-MM-DD");
+        }
+    }
+
+    // The rate from a draft's currency to the reporting currency, typed in as
+    // "1 {currency} = x {base}"; a blank one removes it. A document in the
+    // reporting currency has none, and a new currency needs a new rate.
+    private void exchangeRate(Document document, String value, boolean currencyChanged, Long businessPkid) {
+        BigDecimal rate = ExchangeRate.parse(value);
+        if (rate != null) {
+            String base = settingsService.forBusiness(businessPkid).getBaseCurrency();
+            if (document.getCurrency() == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Choose the currency before its exchange rate");
+            }
+            if (document.getCurrency().equals(base)) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "A document in " + base + ", your reporting currency, needs no exchange rate");
+            }
+            document.setExchangeRate(rate);
+            document.setExchangeBase(base);
+        } else if (value != null
+                || currencyChanged
+                || Objects.equals(document.getCurrency(), document.getExchangeBase())) {
+            document.setExchangeRate(null);
+            document.setExchangeBase(null);
+        }
+    }
+
+    // A credit note keeps the client, currency and exchange rate of what it
+    // credits, and has no due date; its lines, date, notes and reason change
+    // while it is a draft.
+    private static void requireOnlyCreditLines(UpdateDocumentRequest request) {
+        if (request.customerId() != null
+                || request.customer() != null
+                || request.documentType() != null
+                || request.currency() != null
+                || request.exchangeRate() != null
+                || request.placeOfSupply() != null
+                || request.reverseCharge() != null
+                || request.exportType() != null) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "A credit note keeps the client, currency and exchange rate of the document it credits");
+        }
+        if (request.dueDate() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "A credit note has no due date");
         }
     }
 
@@ -708,11 +891,19 @@ public class DocumentService {
                 || request.issueDate() != null
                 || request.rates() != null
                 || request.currency() != null
+                || request.exchangeRate() != null
+                || request.creditReason() != null
+                || request.placeOfSupply() != null
+                || request.reverseCharge() != null
+                || request.exportType() != null
                 || request.billingItems() != null) {
             throw new ApiException(HttpStatus.CONFLICT, LOCKED);
         }
         if (request.dueDate() != null && document.getDocumentType() == DocumentType.RECEIPT) {
             throw new ApiException(HttpStatus.CONFLICT, "A receipt has no due date");
+        }
+        if (request.dueDate() != null && document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            throw new ApiException(HttpStatus.CONFLICT, "A credit note has no due date");
         }
     }
 
@@ -757,10 +948,13 @@ public class DocumentService {
         snapshot.setCity(dto.city());
         snapshot.setCountry(dto.country());
         snapshot.setPhoneNumber(dto.phoneNumber());
+        snapshot.setGstin(Gstin.parse(dto.gstin()));
+        snapshot.setStateCode(snapshot.getGstin() == null ? null : Gstin.stateCode(snapshot.getGstin()));
         return snapshot;
     }
 
-    private static List<BillingItem> toBillingItems(List<BillingItemDto> items) {
+    // Each line is taxed at its own rate, or at the given one when it has none.
+    private static List<BillingItem> toBillingItems(List<BillingItemDto> items, BigDecimal defaultRate) {
         List<BillingItem> result = new ArrayList<>();
         if (items == null) {
             return result;
@@ -769,33 +963,20 @@ public class DocumentService {
             BillingItem item = new BillingItem();
             item.setItemName(dto.itemName());
             item.setUnitPrice(dto.unitPrice());
-            item.setQuantity(dto.quantity());
+            item.setQuantity(dto.quantity() == null ? BigDecimal.ZERO : dto.quantity());
+            item.setUnit(dto.unit() == null || dto.unit().isBlank() ? null : dto.unit().trim());
             item.setDiscount(percentage(dto.discount(), "Discount"));
+            item.setTaxRate(dto.taxRate() == null || dto.taxRate().isBlank()
+                    ? defaultRate
+                    : percentage(dto.taxRate(), "Tax rate"));
+            item.setHsnSac(HsnSac.parse(dto.hsnSac()));
             result.add(item);
         }
         return result;
     }
 
     private static BigDecimal percentage(String value, String label) {
-        if (value == null || value.isBlank()) {
-            return BigDecimal.ZERO;
-        }
-        try {
-            BigDecimal number = new BigDecimal(value.trim());
-            if (number.signum() >= 0
-                    && number.compareTo(ONE_HUNDRED) <= 0
-                    && number.stripTrailingZeros().scale() <= 4) {
-                return number;
-            }
-        } catch (NumberFormatException exception) {
-            throw percentageError(label);
-        }
-        throw percentageError(label);
-    }
-
-    private static ApiException percentageError(String label) {
-        return new ApiException(
-                HttpStatus.BAD_REQUEST, label + " must be a number from 0 to 100, with up to 4 decimals");
+        return Objects.requireNonNullElse(Percentage.parse(value, label), BigDecimal.ZERO);
     }
 
     static String pdfFileName(Document document) {
@@ -808,15 +989,22 @@ public class DocumentService {
         return (number.isBlank() ? "document" : number) + ".pdf";
     }
 
+    // A credit note is made from the document it credits, not chosen.
     private static DocumentType documentType(String value) {
         if (value == null) {
             return DocumentType.INVOICE;
         }
+        DocumentType type;
         try {
-            return DocumentType.fromValue(value);
+            type = DocumentType.fromValue(value);
         } catch (IllegalArgumentException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid document type: " + value);
         }
+        if (type == DocumentType.CREDIT_NOTE) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Make a credit note from the invoice or receipt it credits");
+        }
+        return type;
     }
 
     private static PaymentMethod paymentMethod(String value) {

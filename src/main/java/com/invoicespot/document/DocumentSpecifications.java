@@ -35,8 +35,10 @@ final class DocumentSpecifications {
                 predicates.add(cb.isNotNull(root.get("issuedAt")));
                 predicates.add(cb.isNull(root.get("voidedAt")));
             }
+            // A credit note has no payment status.
             if (search.status() != null) {
                 predicates.add(cb.equal(root.get("status"), search.status()));
+                predicates.add(cb.notEqual(root.get("documentType"), DocumentType.CREDIT_NOTE));
             }
             if (search.type() != null) {
                 predicates.add(cb.equal(root.get("documentType"), search.type()));

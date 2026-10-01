@@ -20,5 +20,10 @@ public enum DocumentEventType {
     RECURRING,
     ISSUED,
     VOIDED,
-    DECLINED
+    DECLINED,
+    CREDITED,
+    CREDIT_VOIDED,
+    REFUND_RECORDED,
+    REFUND_EDITED,
+    REFUND_DELETED
 }

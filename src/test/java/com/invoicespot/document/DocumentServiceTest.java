@@ -52,6 +52,9 @@ class DocumentServiceTest {
     @Mock private SettingsService settingsService;
     @Mock private BusinessRepository businessRepository;
     @Mock private DocumentIssuer documentIssuer;
+    @Mock private CreditNoteService creditNotes;
+    @Mock private RefundService refunds;
+    @Mock private GstSupply gstSupply;
     @Mock private RecurringScheduleRepository scheduleRepository;
     @Mock private DocumentActivity activity;
     @Mock private NotificationService notificationService;
@@ -67,6 +70,9 @@ class DocumentServiceTest {
                 settingsService,
                 businessRepository,
                 documentIssuer,
+                creditNotes,
+                refunds,
+                gstSupply,
                 scheduleRepository,
                 activity,
                 notificationService,
@@ -112,8 +118,8 @@ class DocumentServiceTest {
     private static CreateDocumentRequest documentRequest(String type, Boolean draft) {
         return new CreateDocumentRequest(
                 CUSTOMER_ID.toString(),
-                new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1"),
-                type, null, null, null, null, "USD", null, null, draft);
+                new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1", null, null),
+                type, null, null, null, null, "USD", null, null, draft, null, null, null, null);
     }
 
     @Test
@@ -193,7 +199,7 @@ class DocumentServiceTest {
         when(documentRepository.findForUpdateByExternalId(id)).thenReturn(Optional.of(draft));
 
         assertThatThrownBy(() -> service.addPayment(
-                        access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, null)))
+                        access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, null, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Issue this draft before recording a payment")
                 .extracting(e -> ((ApiException) e).getStatus())
@@ -213,7 +219,7 @@ class DocumentServiceTest {
         User member = userWithPkid(1L);
         when(userRepository.getReferenceById(1L)).thenReturn(member);
 
-        service.addPayment(access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, "note"));
+        service.addPayment(access(1L), id.toString(), new CreatePaymentRequest(null, new BigDecimal("50"), null, "note", null));
 
         assertThat(document.getPayments()).hasSize(1);
         Payment payment = document.getPayments().get(0);
@@ -229,10 +235,10 @@ class DocumentServiceTest {
     private static CreateDocumentRequest requestWith(String rates, String discount) {
         return new CreateDocumentRequest(
                 CUSTOMER_ID.toString(),
-                new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1"),
+                new DocumentCustomerDto("Beta", "b@x.com", null, null, null, null, null, "+1", null, null),
                 "Invoice", null, null, null, rates, "USD",
-                List.of(new BillingItemDto("Design", new BigDecimal("100"), 1, discount)),
-                null, null);
+                List.of(new BillingItemDto("Design", new BigDecimal("100"), BigDecimal.ONE, discount, null, null, null)),
+                null, null, null, null, null, null);
     }
 
     @Test
@@ -243,7 +249,7 @@ class DocumentServiceTest {
 
         ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
         verify(documentRepository).save(captor.capture());
-        assertThat(captor.getValue().getRates()).isEqualByComparingTo("18.5");
+        assertThat(captor.getValue().getBillingItems().get(0).getTaxRate()).isEqualByComparingTo("18.5");
         assertThat(captor.getValue().getBillingItems().get(0).getDiscount()).isEqualByComparingTo("12.25");
     }
 
@@ -287,7 +293,7 @@ class DocumentServiceTest {
         BillingItem item = new BillingItem();
         item.setItemName("Design");
         item.setUnitPrice(new BigDecimal("100"));
-        item.setQuantity(1);
+        item.setQuantity(BigDecimal.ONE);
         document.getBillingItems().add(item);
         if (paid != null) {
             Payment payment = new Payment();
@@ -299,7 +305,8 @@ class DocumentServiceTest {
     }
 
     private static UpdateDocumentRequest update(String type, List<BillingItemDto> items) {
-        return new UpdateDocumentRequest(null, null, type, null, null, null, null, null, items, null);
+        return new UpdateDocumentRequest(
+                null, null, type, null, null, null, null, null, items, null, null, null, null, null, null);
     }
 
     @Test
@@ -315,7 +322,7 @@ class DocumentServiceTest {
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
         assertThatThrownBy(() -> service.update(
-                        access(1L), id.toString(), update(null, List.of(new BillingItemDto("Design", new BigDecimal("50"), 1, "0")))))
+                        access(1L), id.toString(), update(null, List.of(new BillingItemDto("Design", new BigDecimal("50"), BigDecimal.ONE, "0", null, null, null)))))
                 .isInstanceOf(ApiException.class)
                 .hasMessageStartingWith("An issued document keeps its client, lines, tax and issue date");
         issued.setVoidedAt(Instant.parse("2026-09-20T10:00:00Z"));

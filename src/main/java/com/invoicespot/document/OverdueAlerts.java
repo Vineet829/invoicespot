@@ -39,7 +39,7 @@ public class OverdueAlerts {
             }
             invoice.setOverdueAlertedAt(now);
             CustomerSnapshot client = invoice.getCustomerSnapshot();
-            BigDecimal owed = invoice.getTotal().subtract(invoice.getTotalAmountReceived());
+            BigDecimal owed = DocumentTotals.balanceDue(invoice);
             notificationService.notify(
                     invoice,
                     NotificationType.INVOICE_OVERDUE,

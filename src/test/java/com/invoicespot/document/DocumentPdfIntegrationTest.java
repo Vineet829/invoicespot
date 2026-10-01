@@ -50,13 +50,15 @@ class DocumentPdfIntegrationTest extends IntegrationTest {
         document.setCurrency("USD");
         document.setSubTotal(new BigDecimal("100"));
         document.setSalesTax(new BigDecimal("18"));
-        document.setRates(new BigDecimal("18"));
+        document.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("100"), new BigDecimal("18")));
         document.setTotal(new BigDecimal("118"));
         document.setTotalAmountReceived(BigDecimal.ZERO);
         BillingItem item = new BillingItem();
         item.setItemName("Consulting");
         item.setUnitPrice(new BigDecimal("100"));
-        item.setQuantity(1);
+        item.setQuantity(BigDecimal.ONE);
+        item.setTaxRate(new BigDecimal("18"));
         item.setDiscount(BigDecimal.ZERO);
         document.getBillingItems().add(item);
         return documentRepository.save(document);

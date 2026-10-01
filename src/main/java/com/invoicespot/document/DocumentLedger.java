@@ -8,5 +8,14 @@ public final class DocumentLedger {
     // For SQL over documents aliased d.
     public static final String COUNTED = "d.issued_at is not null and d.voided_at is null";
 
+    // What is still owed on each invoice: its total less what its credit
+    // notes took off, the money received and the tax the client withheld,
+    // plus what was paid back.
+    public static final String OWED =
+            "(d.total - d.total_credited - d.total_amount_received - d.total_tds + d.total_refunded)";
+
+    // What each invoice or receipt billed; a credit note takes its total off.
+    public static final String BILLED = "(case when d.document_type = 'Credit Note' then -d.total else d.total end)";
+
     private DocumentLedger() {}
 }

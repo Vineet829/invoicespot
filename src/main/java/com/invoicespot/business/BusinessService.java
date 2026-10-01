@@ -5,10 +5,14 @@ import com.invoicespot.audit.AuditLog;
 import com.invoicespot.business.dto.BusinessProfileResponse;
 import com.invoicespot.business.dto.UpdateBusinessRequest;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.settings.BusinessSettingsRepository;
+import com.invoicespot.tax.Gstin;
+import com.invoicespot.tax.TaxRegime;
 import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.User;
 import java.time.Clock;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,7 @@ public class BusinessService {
     private final BusinessMemberRepository memberRepository;
     private final DemoAccountGuard demoAccountGuard;
     private final AuditLog auditLog;
+    private final BusinessSettingsRepository settingsRepository;
     private final Clock clock;
 
     public BusinessService(
@@ -30,11 +35,13 @@ public class BusinessService {
             BusinessMemberRepository memberRepository,
             DemoAccountGuard demoAccountGuard,
             AuditLog auditLog,
+            BusinessSettingsRepository settingsRepository,
             Clock clock) {
         this.businessRepository = businessRepository;
         this.memberRepository = memberRepository;
         this.demoAccountGuard = demoAccountGuard;
         this.auditLog = auditLog;
+        this.settingsRepository = settingsRepository;
         this.clock = clock;
     }
 
@@ -136,7 +143,9 @@ public class BusinessService {
         update(request.postalCode(), business::setPostalCode);
         update(request.country(), business::setCountry);
         update(request.logo(), business::setLogo);
-        update(request.taxId(), business::setTaxId);
+        if (request.taxId() != null) {
+            business.setTaxId(taxId(access.businessPkid(), request.taxId()));
+        }
         return BusinessProfileResponse.from(business, access.role());
     }
 
@@ -155,6 +164,21 @@ public class BusinessService {
 
     private Business require(BusinessAccess access) {
         return require(access.businessPkid());
+    }
+
+    // In India GST mode the tax ID is the business's GSTIN, and must stay one.
+    private String taxId(Long businessPkid, String value) {
+        boolean gst = settingsRepository.findByBusinessPkid(businessPkid)
+                .map(settings -> settings.getTaxRegime() == TaxRegime.GST_INDIA)
+                .orElse(false);
+        if (!gst) {
+            return value.isBlank() ? null : value.trim();
+        }
+        String gstin = value.trim().toUpperCase(Locale.ROOT);
+        if (!Gstin.isValid(gstin)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "In GST mode your tax ID must be a valid GSTIN");
+        }
+        return gstin;
     }
 
     private static void update(String value, Consumer<String> setter) {

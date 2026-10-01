@@ -91,15 +91,16 @@ class CustomerExportIntegrationTest extends IntegrationTest {
         pay(owner, invoice(owner, gamma[0], "USD", "25"), "25");
 
         assertThat(csv(owner, "sort", "name", "dir", "asc")).containsExactly(
-                "﻿Name,Email,Phone,Account number,VAT/TIN,Address,City,Country,Documents,Owed EUR,Owed USD,Added",
-                "Alpha Ltd,%s,'+1 555 0100,%s,29AB,1 Main St,Toronto,Canada,0,0.00,0.00,%s"
+                "﻿Name,Email,Phone,Account number,VAT/TIN,GSTIN,Address,City,Country,Documents,Owed EUR,Owed USD,"
+                        + "Added",
+                "Alpha Ltd,%s,'+1 555 0100,%s,29AB,,1 Main St,Toronto,Canada,0,0.00,0.00,%s"
                         .formatted(alpha[1], alpha[2], today),
-                "Beta LLC,%s,'+1 555 0100,%s,29AB,1 Main St,\"Ottawa, ON\",Canada,2,10.00,60.00,%s"
+                "Beta LLC,%s,'+1 555 0100,%s,29AB,,1 Main St,\"Ottawa, ON\",Canada,2,10.00,60.00,%s"
                         .formatted(beta[1], beta[2], today),
-                "Gamma,%s,'+1 555 0100,%s,29AB,1 Main St,Halifax,Canada,1,0.00,0.00,%s"
+                "Gamma,%s,'+1 555 0100,%s,29AB,,1 Main St,Halifax,Canada,1,0.00,0.00,%s"
                         .formatted(gamma[1], gamma[2], today));
         assertThat(csv(owner, "q", "beta")).hasSize(2).last().asString().startsWith("Beta LLC,");
         assertThat(csv(createUser())).containsExactly(
-                "﻿Name,Email,Phone,Account number,VAT/TIN,Address,City,Country,Documents,Added");
+                "﻿Name,Email,Phone,Account number,VAT/TIN,GSTIN,Address,City,Country,Documents,Added");
     }
 }

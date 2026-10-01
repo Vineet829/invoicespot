@@ -12,6 +12,7 @@ import com.invoicespot.document.BillingItem;
 import com.invoicespot.document.DocumentExport;
 import com.invoicespot.document.DocumentSearch;
 import com.invoicespot.document.DocumentTotals;
+import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.settings.dto.SettingsResponse;
@@ -48,9 +49,10 @@ public class DataExport {
     private static final String README = """
             Invoice Spot export, made on %s.
 
-            documents.csv    Every invoice, quotation and receipt.
+            documents.csv    Every invoice, quotation, receipt and credit note.
             line-items.csv   The lines on each document.
-            payments.csv     Every payment recorded on a document.
+            document-tax.csv The tax on each document at each rate.
+            payments.csv     Every payment and refund recorded on a document.
             clients.csv      Your clients, and what each owes in every currency.
             items.csv        Your saved products and services.
             recurring.csv    The invoices that repeat, and how.
@@ -103,6 +105,7 @@ public class DataExport {
                 .documents(access, DocumentSearch.of(null, null, null, null, false, null, null, null, null, null, 1, 1))
                 .content());
         files.put("line-items.csv", lineItems(businessPkid).content());
+        files.put("document-tax.csv", documentTax(businessPkid).content());
         files.put("payments.csv", documentExport.payments(access).content());
         files.put(
                 "clients.csv",
@@ -126,10 +129,11 @@ public class DataExport {
     private CsvFile lineItems(Long businessPkid) {
         return CsvFile.of(
                 "line-items.csv",
-                List.of("Document", "Type", "Line", "Item", "Quantity", "Unit price", "Discount %", "Line total"),
+                List.of("Document", "Type", "Line", "Item", "Quantity", "Unit price", "Discount %", "Line total",
+                        "Unit", "Tax %", "HSN/SAC"),
                 jdbc.sql("""
                                 select d.document_number, d.document_type, i.position, i.item_name, i.quantity,
-                                       i.unit_price, i.discount
+                                       i.unit_price, i.discount, i.unit, i.tax_rate, i.hsn_sac
                                 from document_billing_items i
                                 join documents d on d.pkid = i.document_pkid
                                 where d.business_pkid = :business
@@ -138,7 +142,7 @@ public class DataExport {
                         .param("business", businessPkid)
                         .query((result, rowNumber) -> {
                             BillingItem item = new BillingItem();
-                            item.setQuantity((Integer) result.getObject("quantity"));
+                            item.setQuantity(result.getBigDecimal("quantity"));
                             item.setUnitPrice(result.getBigDecimal("unit_price"));
                             item.setDiscount(result.getBigDecimal("discount"));
                             return Arrays.<Object>asList(
@@ -146,10 +150,44 @@ public class DataExport {
                                     result.getString("document_type"),
                                     result.getInt("position") + 1,
                                     result.getString("item_name"),
-                                    item.getQuantity(),
+                                    BillingItemResponse.plain(item.getQuantity()).toPlainString(),
                                     price(item.getUnitPrice()),
                                     item.getDiscount().stripTrailingZeros().toPlainString(),
-                                    DocumentTotals.lineTotal(item));
+                                    DocumentTotals.lineTotal(item),
+                                    result.getString("unit"),
+                                    BillingItemResponse.plain(result.getBigDecimal("tax_rate")).toPlainString(),
+                                    result.getString("hsn_sac"));
+                        })
+                        .list());
+    }
+
+    // The tax on each document at each rate, as the document worked it out;
+    // the GST split and reverse charge only on documents made in GST mode.
+    private CsvFile documentTax(Long businessPkid) {
+        return CsvFile.of(
+                "document-tax.csv",
+                List.of("Document", "Type", "Rate %", "Taxable", "Tax", "CGST", "SGST", "IGST", "Reverse charge"),
+                jdbc.sql("""
+                                select d.document_number, d.document_type, d.tax_regime, d.reverse_charge,
+                                       s.rate, s.taxable, s.tax, s.cgst, s.sgst, s.igst
+                                from document_tax_summaries s
+                                join documents d on d.pkid = s.document_pkid
+                                where d.business_pkid = :business
+                                order by d.created_at, d.pkid, s.rate
+                                """)
+                        .param("business", businessPkid)
+                        .query((result, rowNumber) -> {
+                            boolean gst = "GST_INDIA".equals(result.getString("tax_regime"));
+                            return Arrays.<Object>asList(
+                                    result.getString("document_number"),
+                                    result.getString("document_type"),
+                                    rate(result.getBigDecimal("rate")),
+                                    result.getBigDecimal("taxable"),
+                                    result.getBigDecimal("tax"),
+                                    gst ? result.getBigDecimal("cgst") : null,
+                                    gst ? result.getBigDecimal("sgst") : null,
+                                    gst ? result.getBigDecimal("igst") : null,
+                                    gst ? (result.getBoolean("reverse_charge") ? "Yes" : "No") : null);
                         })
                         .list());
     }
@@ -157,9 +195,9 @@ public class DataExport {
     private CsvFile items(Long businessPkid) {
         return CsvFile.of(
                 "items.csv",
-                List.of("Name", "Description", "Unit price"),
+                List.of("Name", "Description", "Unit price", "Unit", "Tax %", "HSN/SAC"),
                 jdbc.sql("""
-                                select name, description, unit_price from catalog_items
+                                select name, description, unit_price, unit, tax_rate, hsn_sac from catalog_items
                                 where business_pkid = :business
                                 order by lower(name), pkid
                                 """)
@@ -167,7 +205,10 @@ public class DataExport {
                         .query((result, rowNumber) -> Arrays.<Object>asList(
                                 result.getString("name"),
                                 result.getString("description"),
-                                price(result.getBigDecimal("unit_price"))))
+                                price(result.getBigDecimal("unit_price")),
+                                result.getString("unit"),
+                                rate(result.getBigDecimal("tax_rate")),
+                                result.getString("hsn_sac")))
                         .list());
     }
 
@@ -200,6 +241,11 @@ public class DataExport {
     }
 
     // A unit price keeps up to four decimals, and at least two.
+    // A rate without trailing zeros, when there is one.
+    private static String rate(BigDecimal value) {
+        return value == null ? null : BillingItemResponse.plain(value).toPlainString();
+    }
+
     private static BigDecimal price(BigDecimal value) {
         if (value == null) {
             return null;

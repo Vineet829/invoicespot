@@ -12,5 +12,74 @@
       <td class="v" th:text="${currency + ' ' + balance}">USD 0.00</td>
     </tr>
   </table>
+
+  <!-- A GST invoice's tax at each rate, split as it was charged. -->
+  <table class="rates gst-rates" th:fragment="gstRates(currency, sgstLabel, rows)">
+    <thead>
+      <tr>
+        <th>Rate</th>
+        <th class="num">Taxable</th>
+        <th class="num">CGST</th>
+        <th class="num" th:text="${sgstLabel}">SGST</th>
+        <th class="num">IGST</th>
+        <th class="num">Total tax</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="row : ${rows}">
+        <td th:text="${row.rate()}">18%</td>
+        <td class="num" th:text="${currency + ' ' + row.taxable()}">INR 0.00</td>
+        <td class="num" th:text="${row.cgst()}">0.00</td>
+        <td class="num" th:text="${row.sgst()}">0.00</td>
+        <td class="num" th:text="${row.igst()}">0.00</td>
+        <td class="num" th:text="${row.tax()}">0.00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- A GST invoice's tax by HSN or SAC code within each rate, in place of
+       the rate table once any line has a code. -->
+  <table class="rates gst-rates" th:fragment="hsnRates(currency, sgstLabel, rows)">
+    <thead>
+      <tr>
+        <th>HSN/SAC</th>
+        <th>Rate</th>
+        <th class="num">Taxable</th>
+        <th class="num">CGST</th>
+        <th class="num" th:text="${sgstLabel}">SGST</th>
+        <th class="num">IGST</th>
+        <th class="num">Total tax</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="row : ${rows}">
+        <td th:text="${row.hsnSac()}">998314</td>
+        <td th:text="${row.rate()}">18%</td>
+        <td class="num" th:text="${currency + ' ' + row.taxable()}">INR 0.00</td>
+        <td class="num" th:text="${row.cgst()}">0.00</td>
+        <td class="num" th:text="${row.sgst()}">0.00</td>
+        <td class="num" th:text="${row.igst()}">0.00</td>
+        <td class="num" th:text="${row.tax()}">0.00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- What was taxable at each rate, and the tax charged at it. -->
+  <table class="rates" th:fragment="rates(currency, rows)">
+    <thead>
+      <tr>
+        <th>Rate</th>
+        <th class="num">Taxable</th>
+        <th class="num">Tax</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="row : ${rows}">
+        <td th:text="${row.rate()}">18%</td>
+        <td class="num" th:text="${currency + ' ' + row.taxable()}">USD 0.00</td>
+        <td class="num" th:text="${currency + ' ' + row.tax()}">USD 0.00</td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>

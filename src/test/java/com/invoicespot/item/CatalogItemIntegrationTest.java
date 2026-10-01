@@ -60,6 +60,64 @@ class CatalogItemIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("an item keeps a tax rate and a unit for its lines, and either can be cleared")
+    void rateAndUnit() throws Exception {
+        User owner = createUser();
+        String id = JsonPath.read(
+                create(owner, "{\"name\": \"Consulting\", \"unitPrice\": 80, \"taxRate\": \"18.00\", \"unit\": \" hours \"}")
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.item.taxRate").value(18))
+                        .andExpect(jsonPath("$.item.unit").value("hours"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.item._id");
+        create(owner, "{\"name\": \"Books\", \"unitPrice\": 10}")
+                .andExpect(jsonPath("$.item.taxRate").doesNotExist())
+                .andExpect(jsonPath("$.item.unit").doesNotExist());
+
+        mockMvc.perform(patch("/api/v1/item/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unitPrice\": 90}"))
+                .andExpect(jsonPath("$.item.taxRate").value(18))
+                .andExpect(jsonPath("$.item.unit").value("hours"));
+        mockMvc.perform(patch("/api/v1/item/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taxRate\": \"\", \"unit\": \"\"}"))
+                .andExpect(jsonPath("$.item.taxRate").doesNotExist())
+                .andExpect(jsonPath("$.item.unit").doesNotExist());
+        create(owner, "{\"name\": \"Audit\", \"unitPrice\": 10, \"taxRate\": \"101\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Tax rate must be a number from 0 to 100, with up to 4 decimals"));
+    }
+
+    @Test
+    @DisplayName("an item keeps an HSN or SAC code for GST, without spaces, and anything but 4 to 8 digits is refused")
+    void hsnSac() throws Exception {
+        User owner = createUser();
+        String id = createdId(owner, "{\"name\": \"Consulting\", \"unitPrice\": 80, \"hsnSac\": \" 9983 14 \"}");
+        mockMvc.perform(get("/api/v1/item").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.items[0].hsnSac").value("998314"));
+        mockMvc.perform(patch("/api/v1/item/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unitPrice\": 90}"))
+                .andExpect(jsonPath("$.item.hsnSac").value("998314"));
+        mockMvc.perform(patch("/api/v1/item/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hsnSac\": \"\"}"))
+                .andExpect(jsonPath("$.item.hsnSac").doesNotExist());
+        for (String code : new String[] {"123", "123456789", "99AB", "1234567890123"}) {
+            create(owner, "{\"name\": \"Audit\", \"unitPrice\": 10, \"hsnSac\": \"%s\"}".formatted(code))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Enter an HSN or SAC code of 4 to 8 digits"));
+        }
+    }
+
+    @Test
     @DisplayName("% and _ in a search match themselves, not any text")
     void searchWildcards() throws Exception {
         User owner = createUser();

@@ -2,6 +2,7 @@ package com.invoicespot.document.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.invoicespot.common.ExchangeRate;
 import com.invoicespot.document.CustomerSnapshot;
 import com.invoicespot.document.Document;
 import com.invoicespot.document.DocumentState;
@@ -36,15 +37,24 @@ public record DocumentResponse(
         BigDecimal salesTax,
         String taxLabel,
         String rates,
+        List<TaxResponse> taxes,
         BigDecimal total,
         String currency,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String exchangeRate,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String exchangeBase,
+        @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst,
         BigDecimal totalAmountReceived,
+        LedgerResponse ledger,
         List<BillingItemResponse> billingItems,
         List<PaymentRecordDto> paymentRecords,
+        List<RefundDto> refunds,
         Instant createdAt,
         Instant updatedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) DocumentLink source,
         @JsonInclude(JsonInclude.Include.NON_NULL) List<DocumentLink> copies,
+        @JsonInclude(JsonInclude.Include.NON_NULL) CreditedDocumentResponse creditedDocument,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String creditReason,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<CreditNoteLink> creditNotes,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant acceptedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant declinedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) String declineReason,
@@ -56,8 +66,8 @@ public record DocumentResponse(
         return from(document, startOfToday, null);
     }
 
-    // One document on its own also names the document it came from and the
-    // copies made of it.
+    // One document on its own also names the document it came from, the
+    // copies made of it and, for an invoice or receipt, its credit notes.
     public static DocumentResponse detail(Document document, Instant startOfToday, List<Document> copies) {
         return from(document, startOfToday, copies.stream().map(DocumentLink::from).toList());
     }
@@ -74,16 +84,12 @@ public record DocumentResponse(
                         snapshot.getAddress(),
                         snapshot.getCity(),
                         snapshot.getCountry(),
-                        snapshot.getPhoneNumber());
+                        snapshot.getPhoneNumber(),
+                        snapshot.getGstin(),
+                        snapshot.getStateCode());
 
-        List<BillingItemResponse> billingItems = document.getBillingItems().stream()
-                .map(item -> new BillingItemResponse(
-                        item.getItemName(),
-                        item.getUnitPrice(),
-                        item.getQuantity(),
-                        plain(item.getDiscount()),
-                        DocumentTotals.lineTotal(item)))
-                .toList();
+        List<BillingItemResponse> billingItems =
+                document.getBillingItems().stream().map(BillingItemResponse::from).toList();
 
         List<PaymentRecordDto> paymentRecords =
                 document.getPayments().stream().map(PaymentRecordDto::from).toList();
@@ -109,16 +115,27 @@ public record DocumentResponse(
                 document.getSubTotal(),
                 document.getSalesTax(),
                 document.getTaxLabel(),
-                plain(document.getRates()),
+                rates(document),
+                document.getTaxSummaries().stream().map(TaxResponse::from).toList(),
                 document.getTotal(),
                 document.getCurrency(),
+                ExchangeRate.plain(document.getExchangeRate()),
+                document.getExchangeBase(),
+                GstResponse.from(document),
                 document.getTotalAmountReceived(),
+                LedgerResponse.from(document),
                 billingItems,
                 paymentRecords,
+                document.getRefunds().stream().map(RefundDto::from).toList(),
                 document.getCreatedAt(),
                 document.getUpdatedAt(),
                 copies == null || document.getSource() == null ? null : DocumentLink.from(document.getSource()),
                 copies,
+                document.getCredited() == null ? null : CreditedDocumentResponse.from(document.getCredited()),
+                document.getCreditReason(),
+                copies == null || !credits(document)
+                        ? null
+                        : document.getCreditNotes().stream().map(CreditNoteLink::from).toList(),
                 document.getAcceptedAt(),
                 document.getDeclinedAt(),
                 document.getDeclineReason(),
@@ -127,7 +144,15 @@ public record DocumentResponse(
                 document.getLastRemindedAt());
     }
 
-    private static String plain(BigDecimal value) {
-        return value == null ? "0" : value.stripTrailingZeros().toPlainString();
+    // Invoices and receipts are the documents credit notes credit.
+    private static boolean credits(Document document) {
+        return document.getDocumentType() == DocumentType.INVOICE
+                || document.getDocumentType() == DocumentType.RECEIPT;
+    }
+
+    // The one rate every line is taxed at, or none when they differ.
+    private static String rates(Document document) {
+        BigDecimal rate = DocumentTotals.singleRate(document);
+        return rate == null ? null : BillingItemResponse.plain(rate).toPlainString();
     }
 }

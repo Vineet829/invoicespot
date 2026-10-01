@@ -65,6 +65,10 @@
       <td>
         <div class="label">Amount received</div>
         <div class="amount" th:text="${receipt.currency() + ' ' + receipt.amount()}">USD 0.00</div>
+        <th:block th:if="${receipt.withheld() != null}">
+          <div class="method" th:text="${'Tax withheld by you (TDS) ' + receipt.currency() + ' ' + receipt.withheld()}">Tax withheld by you (TDS) USD 0.00</div>
+          <div class="method" th:text="${'Settles ' + receipt.currency() + ' ' + receipt.settles()}">Settles USD 0.00</div>
+        </th:block>
         <div class="method" th:text="${'Paid by ' + receipt.method()}">Paid by Cash</div>
         <div class="method" th:if="${receipt.note() != null}" th:text="${receipt.note()}">Deposit</div>
       </td>

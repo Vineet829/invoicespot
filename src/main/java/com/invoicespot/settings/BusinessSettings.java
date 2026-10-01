@@ -2,8 +2,11 @@ package com.invoicespot.settings;
 
 import com.invoicespot.business.Business;
 import com.invoicespot.common.BaseEntity;
+import com.invoicespot.tax.TaxRegime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
@@ -24,6 +27,19 @@ public class BusinessSettings extends BaseEntity {
 
     @Column(name = "default_currency", nullable = false, length = 3)
     private String defaultCurrency = "USD";
+
+    // Reports can show every amount in it, at each document's exchange rate.
+    @Column(name = "base_currency", nullable = false, length = 3)
+    private String baseCurrency = "USD";
+
+    // India GST mode, and the letter of undertaking that lets the business
+    // export without paying IGST.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tax_regime", nullable = false, length = 20)
+    private TaxRegime taxRegime = TaxRegime.STANDARD;
+
+    @Column(name = "lut_reference", length = 40)
+    private String lutReference;
 
     @Column(name = "payment_terms_days", nullable = false)
     private int paymentTermsDays = 7;
@@ -63,6 +79,12 @@ public class BusinessSettings extends BaseEntity {
 
     @Column(name = "next_receipt_number", nullable = false)
     private int nextReceiptNumber = 1;
+
+    @Column(name = "credit_note_prefix", nullable = false, length = 20)
+    private String creditNotePrefix = "CN-";
+
+    @Column(name = "next_credit_note_number", nullable = false)
+    private int nextCreditNoteNumber = 1;
 
     @Column(name = "reminders_enabled", nullable = false)
     private boolean remindersEnabled;

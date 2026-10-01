@@ -23,6 +23,12 @@ public class CustomerSnapshot {
     @Column(name = "customer_vat_tin_no")
     private String vatTinNo;
 
+    @Column(name = "customer_gstin", length = 15)
+    private String gstin;
+
+    @Column(name = "customer_state_code", length = 2)
+    private String stateCode;
+
     @Column(name = "customer_address")
     private String address;
 
@@ -42,6 +48,8 @@ public class CustomerSnapshot {
         snapshot.setEmail(customer.getEmail());
         snapshot.setAccountNo(customer.getAccountNo());
         snapshot.setVatTinNo(customer.getVatTinNo());
+        snapshot.setGstin(customer.getGstin());
+        snapshot.setStateCode(customer.getStateCode());
         snapshot.setAddress(customer.getAddress());
         snapshot.setCity(customer.getCity());
         snapshot.setCountry(customer.getCountry());

@@ -12,6 +12,8 @@ import com.invoicespot.customer.dto.CustomerSummaryResponse;
 import com.invoicespot.customer.dto.UpdateCustomerRequest;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
+import com.invoicespot.tax.GstStates;
+import com.invoicespot.tax.Gstin;
 import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -25,6 +27,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -80,6 +83,7 @@ public class CustomerService {
         customer.setEmail(email);
         customer.setPhoneNumber(request.phoneNumber().trim());
         customer.setVatTinNo(vatTinNo(request.vatTinNo()));
+        gst(customer, request.gstin(), request.stateCode());
         customer.setAddress(request.address());
         customer.setCity(request.city());
         customer.setCountry(request.country());
@@ -136,7 +140,8 @@ public class CustomerService {
                 .sorted()
                 .toList();
         List<String> header = new ArrayList<>(List.of(
-                "Name", "Email", "Phone", "Account number", "VAT/TIN", "Address", "City", "Country", "Documents"));
+                "Name", "Email", "Phone", "Account number", "VAT/TIN", "GSTIN", "Address", "City", "Country",
+                "Documents"));
         currencies.forEach(currency -> header.add("Owed " + currency));
         header.add("Added");
         return CsvFile.of(
@@ -150,6 +155,7 @@ public class CustomerService {
                                     contact.phoneNumber(),
                                     contact.accountNo(),
                                     contact.vatTinNo(),
+                                    contact.gstin(),
                                     contact.address(),
                                     contact.city(),
                                     contact.country(),
@@ -211,6 +217,13 @@ public class CustomerService {
         if (request.vatTinNo() != null) {
             customer.setVatTinNo(vatTinNo(request.vatTinNo()));
         }
+        if (request.gstin() != null || request.stateCode() != null) {
+            gst(
+                    customer,
+                    Objects.requireNonNullElse(request.gstin(), Objects.requireNonNullElse(customer.getGstin(), "")),
+                    Objects.requireNonNullElse(
+                            request.stateCode(), Objects.requireNonNullElse(customer.getStateCode(), "")));
+        }
         if (request.address() != null) {
             customer.setAddress(request.address());
         }
@@ -265,6 +278,20 @@ public class CustomerService {
 
     private static ApiException duplicateEmail() {
         return new ApiException(HttpStatus.CONFLICT, "You already have a customer with that email address");
+    }
+
+    // A GSTIN sets the state it was issued in; without one, the state is any
+    // GST state code or outside India, or none. Blank clears either.
+    private static void gst(Customer customer, String gstinValue, String stateValue) {
+        String gstin = Gstin.parse(gstinValue);
+        String state = stateValue == null || stateValue.isBlank() ? null : stateValue.trim();
+        if (gstin != null) {
+            state = Gstin.stateCode(gstin);
+        } else if (state != null && !GstStates.isPlace(state)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Choose the client's state from the list");
+        }
+        customer.setGstin(gstin);
+        customer.setStateCode(state);
     }
 
     private static String vatTinNo(String value) {

@@ -21,4 +21,8 @@ public record CreateDocumentRequest(
                 @Size(max = 200, message = "A document can have at most 200 items")
                 List<@Valid BillingItemDto> billingItems,
         LocalDate issueDate,
-        Boolean draft) {}
+        Boolean draft,
+        String exchangeRate,
+        String placeOfSupply,
+        Boolean reverseCharge,
+        String exportType) {}

@@ -16,22 +16,26 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 // Issuing a draft: it is dated, takes the next number, and keeps the client,
-// the business and the name of its tax as they are at that moment.
+// the business and the name of its tax as they are at that moment. A credit
+// note is first checked against the document it credits.
 @Component
 public class DocumentIssuer {
 
     private final SettingsService settingsService;
     private final DocumentNumbering documentNumbering;
+    private final GstSupply gstSupply;
     private final DocumentActivity activity;
     private final Clock clock;
 
     public DocumentIssuer(
             SettingsService settingsService,
             DocumentNumbering documentNumbering,
+            GstSupply gstSupply,
             DocumentActivity activity,
             Clock clock) {
         this.settingsService = settingsService;
         this.documentNumbering = documentNumbering;
+        this.gstSupply = gstSupply;
         this.activity = activity;
         this.clock = clock;
     }
@@ -61,8 +65,9 @@ public class DocumentIssuer {
             throw new ApiException(HttpStatus.BAD_REQUEST, "A document can't be dated after today");
         }
         document.setIssueDate(issueDate);
+        // A credit note keeps the client as its invoice named them.
         Customer customer = document.getCustomer();
-        if (customer != null) {
+        if (customer != null && document.getDocumentType() != DocumentType.CREDIT_NOTE) {
             document.setCustomerSnapshot(CustomerSnapshot.of(customer));
         }
         document.setSeller(SellerSnapshot.of(document.getBusiness()));
@@ -73,8 +78,22 @@ public class DocumentIssuer {
                     .atZone(zone)
                     .toInstant());
         }
+        // A credit note keeps the supply of what it credits.
+        boolean taxDocument = document.getDocumentType() != DocumentType.QUOTATION;
+        if (document.getDocumentType() != DocumentType.CREDIT_NOTE) {
+            gstSupply.placeAtIssue(document);
+        }
         DocumentTotals.apply(document);
+        if (document.getDocumentType() == DocumentType.CREDIT_NOTE) {
+            CreditNoteService.requireRoom(document, issueDate);
+        }
+        if (taxDocument) {
+            GstSupply.requireIssuable(document);
+        }
         document.setDocumentNumber(documentNumbering.next(businessPkid, document.getDocumentType()));
+        if (taxDocument) {
+            GstSupply.requireNumber(document);
+        }
         document.setIssuedAt(Instant.now(clock));
         activity.record(document, DocumentEventType.ISSUED, document.getDocumentNumber(), actor);
     }

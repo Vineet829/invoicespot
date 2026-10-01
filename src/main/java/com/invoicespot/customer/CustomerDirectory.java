@@ -28,7 +28,8 @@ class CustomerDirectory {
             c.business_pkid = :business
               and (lower(c.name) like :pattern escape '!'
                    or lower(c.email) like :pattern escape '!'
-                   or lower(coalesce(c.account_no, '')) like :pattern escape '!')
+                   or lower(coalesce(c.account_no, '')) like :pattern escape '!'
+                   or lower(coalesce(c.gstin, '')) like :pattern escape '!')
             """;
 
     record Row(long pkid, long documents) {}
@@ -40,6 +41,7 @@ class CustomerDirectory {
             String phoneNumber,
             String accountNo,
             String vatTinNo,
+            String gstin,
             String address,
             String city,
             String country,
@@ -60,7 +62,7 @@ class CustomerDirectory {
         List<Row> rows = jdbc.sql("""
                         select c.pkid,
                                count(d.pkid) as documents,
-                               coalesce(sum(d.total - d.total_amount_received) filter (
+                               coalesce(sum(%s) filter (
                                    where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
                         from customers c
@@ -69,8 +71,8 @@ class CustomerDirectory {
                         group by c.pkid
                         order by %s %s, c.pkid %s
                         limit :limit offset :offset
-                        """.formatted(DocumentLedger.COUNTED, MATCHING, ORDER_BY.get(search.sort()), direction,
-                                direction))
+                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
+                                ORDER_BY.get(search.sort()), direction, direction))
                 .param("business", businessPkid)
                 .param("pattern", pattern)
                 .param("currency", currency)
@@ -90,10 +92,10 @@ class CustomerDirectory {
     List<Contact> contacts(Long businessPkid, CustomerSearch search, String currency) {
         String direction = search.ascending() ? "asc" : "desc";
         return jdbc.sql("""
-                        select c.pkid, c.name, c.email, c.phone_number, c.account_no, c.vat_tin_no, c.address,
-                               c.city, c.country, c.created_at,
+                        select c.pkid, c.name, c.email, c.phone_number, c.account_no, c.vat_tin_no, c.gstin,
+                               c.address, c.city, c.country, c.created_at,
                                count(d.pkid) as documents,
-                               coalesce(sum(d.total - d.total_amount_received) filter (
+                               coalesce(sum(%s) filter (
                                    where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
                         from customers c
@@ -101,8 +103,8 @@ class CustomerDirectory {
                         where %s
                         group by c.pkid
                         order by %s %s, c.pkid %s
-                        """.formatted(DocumentLedger.COUNTED, MATCHING, ORDER_BY.get(search.sort()), direction,
-                                direction))
+                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
+                                ORDER_BY.get(search.sort()), direction, direction))
                 .param("business", businessPkid)
                 .param("pattern", SearchText.containing(search.query()))
                 .param("currency", currency)
@@ -113,6 +115,7 @@ class CustomerDirectory {
                         result.getString("phone_number"),
                         result.getString("account_no"),
                         result.getString("vat_tin_no"),
+                        result.getString("gstin"),
                         result.getString("address"),
                         result.getString("city"),
                         result.getString("country"),
@@ -124,13 +127,13 @@ class CustomerDirectory {
     // What each of a business's clients still owes, per currency.
     List<Balance> balancesOf(Long businessPkid) {
         return jdbc.sql("""
-                        select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
+                        select d.customer_pkid, d.currency, sum(%s) as outstanding
                         from documents d
                         where d.business_pkid = :business and d.customer_pkid is not null and %s
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         group by d.customer_pkid, d.currency
-                        having sum(d.total - d.total_amount_received) > 0
-                        """.formatted(DocumentLedger.COUNTED))
+                        having sum(%s) > 0
+                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, DocumentLedger.OWED))
                 .param("business", businessPkid)
                 .query((result, rowNumber) -> new Balance(
                         result.getLong("customer_pkid"),
@@ -144,14 +147,14 @@ class CustomerDirectory {
             return List.of();
         }
         return jdbc.sql("""
-                        select d.customer_pkid, d.currency, sum(d.total - d.total_amount_received) as outstanding
+                        select d.customer_pkid, d.currency, sum(%s) as outstanding
                         from documents d
                         where d.customer_pkid in (:customers) and %s
                           and d.document_type = 'Invoice' and d.status <> 'Paid'
                         group by d.customer_pkid, d.currency
-                        having sum(d.total - d.total_amount_received) > 0
+                        having sum(%s) > 0
                         order by outstanding desc, d.currency
-                        """.formatted(DocumentLedger.COUNTED))
+                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, DocumentLedger.OWED))
                 .param("customers", customerPkids)
                 .query((result, rowNumber) -> new Balance(
                         result.getLong("customer_pkid"),
@@ -164,20 +167,21 @@ class CustomerDirectory {
         return jdbc.sql("""
                         select d.currency,
                                count(*) as documents,
-                               coalesce(sum(d.total) filter (where d.document_type <> 'Quotation'), 0) as billed,
-                               coalesce(sum(d.total_amount_received)
+                               coalesce(sum(%s) filter (where d.document_type <> 'Quotation'), 0) as billed,
+                               coalesce(sum(d.total_amount_received - d.total_refunded)
                                    filter (where d.document_type <> 'Quotation'), 0) as paid,
-                               coalesce(sum(d.total - d.total_amount_received)
+                               coalesce(sum(%s)
                                    filter (where d.document_type = 'Invoice' and d.status <> 'Paid'), 0)
                                    as outstanding,
-                               coalesce(sum(d.total - d.total_amount_received)
+                               coalesce(sum(%s)
                                    filter (where d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.due_date < :startOfToday), 0) as overdue
                         from documents d
                         where d.customer_pkid = :customer and %s
                         group by d.currency
                         order by billed desc, d.currency
-                        """.formatted(DocumentLedger.COUNTED))
+                        """.formatted(
+                                DocumentLedger.BILLED, DocumentLedger.OWED, DocumentLedger.OWED, DocumentLedger.COUNTED))
                 .param("customer", customerPkid)
                 .param("startOfToday", Timestamp.from(startOfToday))
                 .query((result, rowNumber) -> new CustomerTotals(

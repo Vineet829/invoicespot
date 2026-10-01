@@ -39,6 +39,14 @@ public class Customer extends BaseEntity {
     @Column(name = "vat_tin_no", length = 50)
     private String vatTinNo;
 
+    // The client's Indian GST number, and the state or territory they are in
+    // as GST codes it, or "96" outside India.
+    @Column(name = "gstin", length = 15)
+    private String gstin;
+
+    @Column(name = "state_code", length = 2)
+    private String stateCode;
+
     @Column(name = "address")
     private String address;
 

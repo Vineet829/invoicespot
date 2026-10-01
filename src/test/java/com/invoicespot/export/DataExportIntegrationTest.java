@@ -72,12 +72,15 @@ class DataExportIntegrationTest extends IntegrationTest {
         String invoice = JsonPath.read(
                 send(owner, "/api/v1/document/create", """
                         {"customerId": "%s", "documentType": "Invoice", "currency": "USD",
-                         "billingItems": [{"itemName": "Design", "unitPrice": 50, "quantity": 2, "discount": "10"},
-                                          {"itemName": "Hosting", "unitPrice": 0.1234, "quantity": 3}]}
+                         "billingItems": [{"itemName": "Design", "unitPrice": 50, "quantity": 2, "discount": "10",
+                                           "unit": "hours", "hsnSac": "9983 14"},
+                                          {"itemName": "Hosting", "unitPrice": 0.1234, "quantity": 3.5, "taxRate": "18"}]}
                         """.formatted(client)),
                 "$.newDocument._id");
         send(owner, "/api/v1/document/" + invoice + "/payment", "{\"amountPaid\": 40, \"paymentMethod\": \"Cash\"}");
-        send(owner, "/api/v1/item", "{\"name\": \"Logo design\", \"unitPrice\": 12.5}");
+        send(owner, "/api/v1/item", """
+                {"name": "Logo design", "unitPrice": 12.5, "unit": "hours", "taxRate": "18", "hsnSac": "998391"}
+                """);
         send(owner, "/api/v1/recurring", """
                 {"documentId": "%s", "frequency": "monthly", "startDate": "%s", "maxRuns": 3}
                 """.formatted(invoice, today.plusDays(1)));
@@ -85,20 +88,24 @@ class DataExportIntegrationTest extends IntegrationTest {
         Map<String, String> files = export(owner);
 
         assertThat(files.keySet()).containsExactly(
-                "README.txt", "documents.csv", "line-items.csv", "payments.csv", "clients.csv", "items.csv",
-                "recurring.csv", "settings.json", "business.json", "profile.json");
+                "README.txt", "documents.csv", "line-items.csv", "document-tax.csv", "payments.csv", "clients.csv",
+                "items.csv", "recurring.csv", "settings.json", "business.json", "profile.json");
         assertThat(files.get("README.txt")).startsWith("Invoice Spot export, made on " + today + ".");
         assertThat(lines(files.get("documents.csv"))).hasSize(2).last().asString()
                 .startsWith("INV-0001,Invoice,Partially paid,Acme,");
         assertThat(lines(files.get("line-items.csv"))).containsExactly(
-                "﻿Document,Type,Line,Item,Quantity,Unit price,Discount %,Line total",
-                "INV-0001,Invoice,1,Design,2,50.00,10,90.00",
-                "INV-0001,Invoice,2,Hosting,3,0.1234,0,0.37");
+                "﻿Document,Type,Line,Item,Quantity,Unit price,Discount %,Line total,Unit,Tax %,HSN/SAC",
+                "INV-0001,Invoice,1,Design,2,50.00,10,90.00,hours,0,998314",
+                "INV-0001,Invoice,2,Hosting,3.5,0.1234,0,0.43,,18,");
+        assertThat(lines(files.get("document-tax.csv"))).containsExactly(
+                "﻿Document,Type,Rate %,Taxable,Tax,CGST,SGST,IGST,Reverse charge",
+                "INV-0001,Invoice,0,90.00,0.00,,,,",
+                "INV-0001,Invoice,18,0.43,0.08,,,,");
         assertThat(lines(files.get("payments.csv"))).hasSize(2).last().asString()
-                .isEqualTo(today + ",INV-0001,Invoice,Acme,USD,40.00,Cash,Acme,");
+                .isEqualTo(today + ",INV-0001,Invoice,Acme,USD,40.00,Cash,Acme,,0.00,Payment");
         assertThat(lines(files.get("clients.csv"))).hasSize(2).last().asString().startsWith("Acme,acme-");
         assertThat(lines(files.get("items.csv"))).containsExactly(
-                "﻿Name,Description,Unit price", "Logo design,,12.50");
+                "﻿Name,Description,Unit price,Unit,Tax %,HSN/SAC", "Logo design,,12.50,hours,18,998391");
         assertThat(lines(files.get("recurring.csv"))).containsExactly(
                 "﻿Invoice,Client,Repeats,First invoice,Next invoice,Ends on,Most invoices,Made,"
                         + "Emailed automatically,Paused",

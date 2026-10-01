@@ -1,18 +1,25 @@
 package com.invoicespot.settings;
 
+import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
+import com.invoicespot.tax.Gstin;
+import com.invoicespot.tax.TaxRegime;
 import java.time.DateTimeException;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SettingsService {
+
+    private static final String GST_PREFIX = "[A-Za-z0-9/-]{0,12}";
 
     private final BusinessSettingsRepository settingsRepository;
     private final BusinessRepository businessRepository;
@@ -40,6 +47,13 @@ public class SettingsService {
             created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
             return created;
         });
+        // The reporting currency follows the default currency until it is
+        // set to another one.
+        if (request.baseCurrency() != null) {
+            settings.setBaseCurrency(request.baseCurrency());
+        } else if (settings.getBaseCurrency().equals(settings.getDefaultCurrency())) {
+            settings.setBaseCurrency(request.defaultCurrency());
+        }
         settings.setDefaultCurrency(request.defaultCurrency());
         settings.setPaymentTermsDays(request.paymentTermsDays());
         settings.setDefaultTaxRate(request.defaultTaxRate());
@@ -66,6 +80,12 @@ public class SettingsService {
         if (request.nextReceiptNumber() != null) {
             settings.setNextReceiptNumber(request.nextReceiptNumber());
         }
+        if (request.creditNotePrefix() != null) {
+            settings.setCreditNotePrefix(request.creditNotePrefix());
+        }
+        if (request.nextCreditNoteNumber() != null) {
+            settings.setNextCreditNoteNumber(request.nextCreditNoteNumber());
+        }
         if (request.remindersEnabled() != null) {
             settings.setRemindersEnabled(request.remindersEnabled());
         }
@@ -81,8 +101,48 @@ public class SettingsService {
         if (request.reminderMax() != null) {
             settings.setReminderMax(request.reminderMax());
         }
+        if (request.lutReference() != null) {
+            settings.setLutReference(blankToNull(request.lutReference().trim()));
+        }
+        if (request.taxRegime() != null) {
+            settings.setTaxRegime(regime(request.taxRegime()));
+        }
+        if (settings.getTaxRegime() == TaxRegime.GST_INDIA) {
+            requireGst(access.businessPkid(), settings);
+        }
         settingsRepository.save(settings);
         return SettingsResponse.from(settings);
+    }
+
+    // India GST mode needs the business's GSTIN, reports in rupees, and
+    // numbers invoices only with letters, digits, / and -, at most 16 long.
+    private void requireGst(Long businessPkid, BusinessSettings settings) {
+        Business business = businessRepository.findById(businessPkid).orElseThrow();
+        String gstin = business.getTaxId() == null ? null : business.getTaxId().trim().toUpperCase(Locale.ROOT);
+        if (!Gstin.isValid(gstin)) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Add your business's GSTIN under Settings → Business before turning on GST mode");
+        }
+        business.setTaxId(gstin);
+        settings.setBaseCurrency("INR");
+        for (String prefix : List.of(
+                settings.getInvoicePrefix(), settings.getReceiptPrefix(), settings.getCreditNotePrefix())) {
+            if (!prefix.matches(GST_PREFIX)) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "In GST mode, invoice, receipt and credit note prefixes can use only letters, digits, "
+                                + "/ and -, up to 12 characters");
+            }
+        }
+    }
+
+    private static TaxRegime regime(String value) {
+        try {
+            return TaxRegime.valueOf(value.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Choose standard tax or India GST");
+        }
     }
 
     private static String zone(String value) {

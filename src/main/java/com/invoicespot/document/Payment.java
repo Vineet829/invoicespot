@@ -31,6 +31,10 @@ public class Payment extends BaseEntity {
     @Column(name = "amount_paid", nullable = false, precision = 19, scale = 2)
     private BigDecimal amountPaid;
 
+    // Tax the client withheld from this payment and paid in for the business.
+    @Column(name = "tds_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal tdsAmount = BigDecimal.ZERO;
+
     @Column(name = "payment_method", nullable = false, length = 30)
     private PaymentMethod paymentMethod = PaymentMethod.CASH;
 

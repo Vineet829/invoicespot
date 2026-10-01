@@ -11,6 +11,7 @@ public record OverviewResponse(
         long clients,
         BigDecimal expectedIncome,
         BigDecimal cashReceived,
+        BigDecimal taxWithheld,
         BigDecimal cashPending,
         long paid,
         long partial,

@@ -11,6 +11,7 @@ public record ImportRow(
         String address,
         String city,
         String country,
+        String gstin,
         List<String> problems) {
 
     public boolean ready() {
@@ -18,6 +19,6 @@ public record ImportRow(
     }
 
     public CreateCustomerRequest request() {
-        return new CreateCustomerRequest(name, email, phoneNumber, vatTinNo, address, city, country);
+        return new CreateCustomerRequest(name, email, phoneNumber, vatTinNo, address, city, country, gstin, null);
     }
 }

@@ -4,6 +4,8 @@ import com.invoicespot.business.Business;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.tax.SupplyType;
+import com.invoicespot.tax.TaxRegime;
 import com.invoicespot.upload.UploadService;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -88,8 +90,9 @@ final class PdfFixtures {
         BillingItem item = new BillingItem();
         item.setItemName(name);
         item.setUnitPrice(new BigDecimal(price));
-        item.setQuantity(quantity);
+        item.setQuantity(BigDecimal.valueOf(quantity));
         item.setDiscount(new BigDecimal(discount));
+        item.setTaxRate(new BigDecimal("18"));
         return item;
     }
 
@@ -102,7 +105,6 @@ final class PdfFixtures {
         document.setCreatedAt(Instant.parse("2026-09-30T20:00:00Z"));
         document.setIssuedAt(Instant.parse("2026-09-30T20:00:00Z"));
         document.setIssueDate(LocalDate.of(2026, 10, 1));
-        document.setRates(new BigDecimal("18"));
         document.setTaxLabel("GST");
         document.setAdditionalInfo("Thanks for your business.\nPayments within 15 days, please.");
         document.setTermsConditions("Late payments carry 1.5% interest a month.");
@@ -119,6 +121,8 @@ final class PdfFixtures {
         invoice.getBillingItems().add(line("Prototype & <review>", "12500", 2, "10"));
         invoice.setSubTotal(new BigDecimal("122500.00"));
         invoice.setSalesTax(new BigDecimal("22050.00"));
+        invoice.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("122500.00"), new BigDecimal("22050.00")));
         invoice.setTotal(new BigDecimal("144550.00"));
         invoice.setTotalAmountReceived(new BigDecimal("44550.00"));
         invoice.getPayments().add(payment(invoice));
@@ -137,6 +141,8 @@ final class PdfFixtures {
         draft.getBillingItems().add(line("Design sprint", "100000", 1, "0"));
         draft.setSubTotal(new BigDecimal("100000.00"));
         draft.setSalesTax(new BigDecimal("18000.00"));
+        draft.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("100000.00"), new BigDecimal("18000.00")));
         draft.setTotal(new BigDecimal("118000.00"));
         draft.setTotalAmountReceived(BigDecimal.ZERO);
         return draft;
@@ -151,6 +157,20 @@ final class PdfFixtures {
         voided.setVoidedAt(Instant.parse("2026-10-03T05:00:00Z"));
         voided.setVoidReason("Sent to the wrong client & <branch>");
         return voided;
+    }
+
+    // An invoice whose lines are taxed at two rates, worked out as the app
+    // works them out.
+    static Document twoRates() {
+        Document invoice = document(DocumentType.INVOICE, "INV-0043", "INR");
+        invoice.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
+        invoice.setStatus(DocumentStatus.NOT_PAID);
+        BillingItem books = line("Printed guides", "450", 4, "0");
+        books.setTaxRate(new BigDecimal("5"));
+        invoice.getBillingItems().add(books);
+        invoice.getBillingItems().add(line("Design sprint", "100000", 1, "0"));
+        DocumentTotals.apply(invoice);
+        return invoice;
     }
 
     static Payment payment(Document invoice) {
@@ -171,9 +191,77 @@ final class PdfFixtures {
         quotation.getBillingItems().add(line("Weekly check-in", "150", 4, "5"));
         quotation.setSubTotal(new BigDecimal("2970.00"));
         quotation.setSalesTax(new BigDecimal("534.60"));
+        quotation.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("2970.00"), new BigDecimal("534.60")));
         quotation.setTotal(new BigDecimal("3504.60"));
         quotation.setTotalAmountReceived(BigDecimal.ZERO);
         return quotation;
+    }
+
+    // A credit note for one returned prototype on the invoice above, with the
+    // reason, and characters to escape.
+    static Document creditNote() {
+        Document invoice = invoice();
+        Document note = document(DocumentType.CREDIT_NOTE, "CN-0003", "INR");
+        note.setIssueDate(LocalDate.of(2026, 10, 6));
+        note.setCredited(invoice);
+        note.setCreditReason("One prototype came back & <wasn't used>");
+        note.getBillingItems().add(line("Prototype & <review>", "12500", 1, "0"));
+        DocumentTotals.apply(note);
+        invoice.getCreditNotes().add(note);
+        return note;
+    }
+
+    // The invoice above, part paid, with that credit note issued against it.
+    static Document creditedInvoice() {
+        Document invoice = creditNote().getCredited();
+        invoice.setTotalCredited(new BigDecimal("14750.00"));
+        return invoice;
+    }
+
+    // A GST tax invoice within Maharashtra, at two rates, to a registered client.
+    static Document gstInvoice() {
+        Document invoice = document(DocumentType.INVOICE, "INV/0044", "INR");
+        invoice.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
+        invoice.setStatus(DocumentStatus.NOT_PAID);
+        invoice.setTaxRegime(TaxRegime.GST_INDIA);
+        invoice.setSellerStateCode("27");
+        invoice.setPlaceOfSupply("27");
+        invoice.setSupplyType(SupplyType.INTRA);
+        invoice.getCustomerSnapshot().setGstin("27AAACB1234C1ZF");
+        invoice.getCustomerSnapshot().setStateCode("27");
+        BillingItem guides = line("Printed guides", "450", 4, "0");
+        guides.setTaxRate(new BigDecimal("5"));
+        guides.setHsnSac("4901");
+        invoice.getBillingItems().add(guides);
+        BillingItem sprint = line("Design sprint", "100000", 1, "0");
+        sprint.setHsnSac("998391");
+        invoice.getBillingItems().add(sprint);
+        DocumentTotals.apply(invoice);
+        return invoice;
+    }
+
+    // An export to the United States under the business's LUT, billed in
+    // dollars and valued in rupees.
+    static Document gstExport() {
+        Document invoice = document(DocumentType.INVOICE, "INV/0045", "USD");
+        invoice.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
+        invoice.setStatus(DocumentStatus.NOT_PAID);
+        invoice.setTaxRegime(TaxRegime.GST_INDIA);
+        invoice.setSellerStateCode("27");
+        invoice.setPlaceOfSupply("96");
+        invoice.setSupplyType(SupplyType.EXPORT_LUT);
+        invoice.setLutReference("AD270924012345X");
+        invoice.setExchangeRate(new BigDecimal("83.2500000000"));
+        invoice.setExchangeBase("INR");
+        invoice.getCustomerSnapshot().setCountry("United States");
+        invoice.getCustomerSnapshot().setStateCode("96");
+        invoice.getCustomerSnapshot().setVatTinNo(null);
+        BillingItem sprint = line("Design sprint", "1200", 1, "0");
+        sprint.setTaxRate(BigDecimal.ZERO);
+        invoice.getBillingItems().add(sprint);
+        DocumentTotals.apply(invoice);
+        return invoice;
     }
 
     // A receipt: a document for a sale paid in full on the spot.
@@ -183,6 +271,8 @@ final class PdfFixtures {
         receipt.getBillingItems().add(line("Consulting hour", "4000", 3, "0"));
         receipt.setSubTotal(new BigDecimal("12000.00"));
         receipt.setSalesTax(new BigDecimal("2160.00"));
+        receipt.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("12000.00"), new BigDecimal("2160.00")));
         receipt.setTotal(new BigDecimal("14160.00"));
         receipt.setTotalAmountReceived(new BigDecimal("14160.00"));
         return receipt;
@@ -201,7 +291,7 @@ final class PdfFixtures {
         return customer;
     }
 
-    // Two currencies: rupees still overdue, dollars settled.
+    // Two currencies: rupees part credited and still overdue, dollars settled.
     static List<Statements.Account> accounts() {
         return List.of(
                 new Statements.Account(
@@ -210,11 +300,15 @@ final class PdfFixtures {
                                 new Statements.Line(LocalDate.of(2026, 8, 1), "Invoice INV-0040",
                                         new BigDecimal("144550.00"), null, new BigDecimal("144550.00")),
                                 new Statements.Line(LocalDate.of(2026, 9, 2), "Payment for INV-0040 (Bank Transfer)",
-                                        null, new BigDecimal("44550.00"), new BigDecimal("100000.00"))),
+                                        null, new BigDecimal("44550.00"), new BigDecimal("100000.00")),
+                                new Statements.Line(LocalDate.of(2026, 9, 10), "Credit note CN-0001 for INV-0040",
+                                        null, new BigDecimal("20000.00"), new BigDecimal("80000.00"))),
                         new BigDecimal("144550.00"),
                         new BigDecimal("44550.00"),
-                        new BigDecimal("100000.00"),
-                        new BigDecimal("100000.00")),
+                        new BigDecimal("20000.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("80000.00"),
+                        new BigDecimal("80000.00")),
                 new Statements.Account(
                         "USD",
                         List.of(
@@ -224,6 +318,8 @@ final class PdfFixtures {
                                         null, new BigDecimal("1200.00"), BigDecimal.ZERO)),
                         new BigDecimal("1200.00"),
                         new BigDecimal("1200.00"),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO));
     }

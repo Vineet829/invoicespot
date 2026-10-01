@@ -3,6 +3,7 @@ package com.invoicespot.item;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Percentage;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.item.dto.CreateItemRequest;
 import com.invoicespot.item.dto.ItemListResponse;
@@ -12,6 +13,7 @@ import com.invoicespot.user.UserRepository;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
+import com.invoicespot.tax.HsnSac;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -64,6 +66,9 @@ public class CatalogItemService {
         item.setName(name);
         item.setDescription(blankToNull(request.description()));
         item.setUnitPrice(request.unitPrice() == null ? BigDecimal.ZERO : request.unitPrice());
+        item.setTaxRate(Percentage.parse(request.taxRate(), "Tax rate"));
+        item.setUnit(blankToNull(request.unit()));
+        item.setHsnSac(HsnSac.parse(request.hsnSac()));
         itemRepository.save(item);
         return ItemResponse.from(item);
     }
@@ -84,6 +89,17 @@ public class CatalogItemService {
         }
         if (request.unitPrice() != null) {
             item.setUnitPrice(request.unitPrice());
+        }
+        // A blank rate or unit clears it: the item then leaves lines at the
+        // business's default rate, or without a unit.
+        if (request.taxRate() != null) {
+            item.setTaxRate(Percentage.parse(request.taxRate(), "Tax rate"));
+        }
+        if (request.unit() != null) {
+            item.setUnit(blankToNull(request.unit()));
+        }
+        if (request.hsnSac() != null) {
+            item.setHsnSac(HsnSac.parse(request.hsnSac()));
         }
         return ItemResponse.from(item);
     }

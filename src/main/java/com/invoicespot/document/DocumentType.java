@@ -5,7 +5,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum DocumentType {
     INVOICE("Invoice"),
     RECEIPT("Receipt"),
-    QUOTATION("Quotation");
+    QUOTATION("Quotation"),
+    CREDIT_NOTE("Credit Note");
 
     private final String value;
 

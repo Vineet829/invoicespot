@@ -10,4 +10,6 @@ public record DocumentCustomerDto(
         @Size(max = 255, message = "Addresses can be at most 255 characters") String address,
         @Size(max = 255, message = "City names can be at most 255 characters") String city,
         @Size(max = 255, message = "Country names can be at most 255 characters") String country,
-        @Size(max = 30, message = "Phone numbers can be at most 30 characters") String phoneNumber) {}
+        @Size(max = 30, message = "Phone numbers can be at most 30 characters") String phoneNumber,
+        @Size(max = 20, message = "Enter a valid GSTIN, such as 27AAPFU0939F1ZV") String gstin,
+        @Size(max = 2, message = "Choose the client's state from the list") String stateCode) {}

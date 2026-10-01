@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.CsvFile;
+import com.invoicespot.common.ExchangeRate;
 import com.invoicespot.settings.SettingsService;
 import java.time.Clock;
 import java.time.Instant;
@@ -38,8 +39,9 @@ public class DocumentExport {
     }
 
     // Every document the list's filters match, in the list's order. A
-    // quotation is an offer, a draft isn't billed yet and a void document no
-    // longer is, so nothing is paid or owed on them.
+    // quotation is an offer, a draft isn't billed yet, a void document no
+    // longer is and a credit note is money taken off another document, so
+    // nothing is paid or owed on them. A credit note names what it credits.
     @Transactional(readOnly = true)
     public CsvFile documents(BusinessAccess access, DocumentSearch search) {
         ZoneId zone = zoneOf(access.businessPkid());
@@ -50,11 +52,14 @@ public class DocumentExport {
         return CsvFile.of(
                 "invoice-spot-documents-" + today + ".csv",
                 List.of("Number", "Type", "Status", "Client", "Client email", "Currency", "Subtotal", "Tax", "Total",
-                        "Paid", "Owed", "Issued", "Due", "Overdue"),
+                        "Paid", "Owed", "Issued", "Due", "Overdue", "Tax withheld", "Exchange rate",
+                        "Exchange rate to", "Credits", "Credited", "Refunded"),
                 documents.stream()
                         .map(document -> {
                             CustomerSnapshot client = document.getCustomerSnapshot();
+                            boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
                             boolean unbilled = document.getDocumentType() == DocumentType.QUOTATION
+                                    || creditNote
                                     || document.state() != DocumentState.ISSUED;
                             return Arrays.<Object>asList(
                                     document.getDocumentNumber(),
@@ -62,7 +67,7 @@ public class DocumentExport {
                                     switch (document.state()) {
                                         case DRAFT -> "Draft";
                                         case VOID -> "Void";
-                                        case ISSUED -> STATUS.get(document.getStatus());
+                                        case ISSUED -> creditNote ? "Issued" : STATUS.get(document.getStatus());
                                     },
                                     client == null ? null : client.getName(),
                                     client == null ? null : client.getEmail(),
@@ -71,41 +76,59 @@ public class DocumentExport {
                                     document.getSalesTax(),
                                     document.getTotal(),
                                     unbilled ? null : document.getTotalAmountReceived(),
-                                    unbilled ? null : document.getTotal().subtract(document.getTotalAmountReceived()),
+                                    unbilled ? null : DocumentTotals.balanceDue(document),
                                     document.getIssueDate(),
                                     document.getDueDate() == null
                                             ? null
                                             : LocalDate.ofInstant(document.getDueDate(), zone),
-                                    DocumentTotals.isOverdue(document, startOfToday) ? "Yes" : "No");
+                                    DocumentTotals.isOverdue(document, startOfToday) ? "Yes" : "No",
+                                    unbilled ? null : document.getTotalTds(),
+                                    ExchangeRate.plain(document.getExchangeRate()),
+                                    document.getExchangeBase(),
+                                    document.getCredited() == null ? null : document.getCredited().getDocumentNumber(),
+                                    unbilled ? null : document.getTotalCredited(),
+                                    unbilled ? null : document.getTotalRefunded());
                         })
                         .toList());
     }
 
-    // Every payment recorded on the owner's documents, newest first.
+    // Every payment recorded on the owner's documents, and every refund as a
+    // negative amount, newest first.
     @Transactional(readOnly = true)
     public CsvFile payments(BusinessAccess access) {
         return CsvFile.of(
                 "invoice-spot-payments-" + LocalDate.now(clock.withZone(zoneOf(access.businessPkid()))) + ".csv",
-                List.of("Date", "Document", "Type", "Client", "Currency", "Amount", "Method", "Paid by", "Notes"),
+                List.of("Date", "Document", "Type", "Client", "Currency", "Amount", "Method", "Paid by", "Notes",
+                        "Tax withheld", "Kind"),
                 jdbc.sql("""
-                                select p.date_paid, d.document_number, d.document_type, d.customer_name, d.currency,
-                                       p.amount_paid, p.payment_method, p.paid_by, p.additional_info
+                                select p.date_paid as day, p.pkid as sequence, d.document_number, d.document_type,
+                                       d.customer_name, d.currency, p.amount_paid as amount, p.payment_method,
+                                       p.paid_by, p.additional_info as notes, p.tds_amount, 'Payment' as kind
                                 from payments p
                                 join documents d on d.pkid = p.document_pkid
                                 where d.business_pkid = :business
-                                order by p.date_paid desc, p.pkid desc
+                                union all
+                                select r.date_refunded, r.pkid, d.document_number, d.document_type,
+                                       d.customer_name, d.currency, -r.amount, r.payment_method,
+                                       null, r.reference, null, 'Refund'
+                                from refunds r
+                                join documents d on d.pkid = r.document_pkid
+                                where d.business_pkid = :business
+                                order by day desc, kind desc, sequence desc
                                 """)
                         .param("business", access.businessPkid())
                         .query((result, rowNumber) -> Arrays.<Object>asList(
-                                result.getObject("date_paid", LocalDate.class),
+                                result.getObject("day", LocalDate.class),
                                 result.getString("document_number"),
                                 result.getString("document_type"),
                                 result.getString("customer_name"),
                                 result.getString("currency"),
-                                result.getBigDecimal("amount_paid"),
+                                result.getBigDecimal("amount"),
                                 result.getString("payment_method"),
                                 result.getString("paid_by"),
-                                result.getString("additional_info")))
+                                result.getString("notes"),
+                                result.getBigDecimal("tds_amount"),
+                                result.getString("kind")))
                         .list());
     }
 

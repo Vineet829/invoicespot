@@ -9,11 +9,11 @@ import org.apache.pdfbox.text.PDFTextStripper;
 
 // The text a PDF shows, as PDFBox reads it, so tests can check a PDF by what
 // it says rather than by the HTML it was made from.
-final class PdfText {
+public final class PdfText {
 
     private PdfText() {}
 
-    static String of(byte[] pdf) {
+    public static String of(byte[] pdf) {
         try (PDDocument document = PDDocument.load(pdf)) {
             return new PDFTextStripper().getText(document);
         } catch (IOException exception) {

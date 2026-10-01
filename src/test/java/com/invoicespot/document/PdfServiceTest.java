@@ -6,6 +6,8 @@ import com.invoicespot.business.Business;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.tax.SupplyType;
+import com.invoicespot.tax.TaxRegime;
 import com.invoicespot.upload.UploadService;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -66,7 +68,8 @@ class PdfServiceTest {
         BillingItem item = new BillingItem();
         item.setItemName(name);
         item.setUnitPrice(new BigDecimal(price));
-        item.setQuantity(quantity);
+        item.setQuantity(BigDecimal.valueOf(quantity));
+        item.setTaxRate(new BigDecimal("18"));
         item.setDiscount(new BigDecimal(discount));
         return item;
     }
@@ -87,7 +90,8 @@ class PdfServiceTest {
         document.setIssueDate(LocalDate.of(2026, 9, 30));
         document.setDueDate(Instant.parse("2026-10-15T06:30:00Z"));
         document.setCurrency("USD");
-        document.setRates(new BigDecimal("18"));
+        document.getTaxSummaries().add(
+                new TaxSummary(new BigDecimal("18.0000"), new BigDecimal("1225.00"), new BigDecimal("220.50")));
         document.setSubTotal(new BigDecimal("1225.00"));
         document.setSalesTax(new BigDecimal("220.50"));
         document.setTotal(new BigDecimal("1445.50"));
@@ -121,6 +125,27 @@ class PdfServiceTest {
                 .contains("Pune, India")
                 .contains("Thanks for your business.")
                 .doesNotContain("VAT / TIN");
+    }
+
+    @Test
+    @DisplayName("within a union territory without a legislature, SGST is called UTGST")
+    void unionTerritory() {
+        Document document = sampleDocument(DocumentType.INVOICE);
+        document.getBillingItems().forEach(item -> item.setTaxRate(new BigDecimal("18")));
+        document.setTaxRegime(TaxRegime.GST_INDIA);
+        document.setSellerStateCode("04");
+        document.setPlaceOfSupply("04");
+        document.setSupplyType(SupplyType.INTRA);
+        DocumentTotals.apply(document);
+
+        String html = service.html(document, seller("Ada Analytics"), SETTINGS);
+
+        assertThat(html).contains(
+                "UTGST 9%",
+                "<th class=\"num\">UTGST</th>",
+                "Place of supply: 04 – Chandigarh",
+                "State: Chandigarh (04)",
+                "Tax Invoice");
     }
 
     @Test
@@ -175,6 +200,8 @@ class PdfServiceTest {
                                 new BigDecimal("200.00"), new BigDecimal("1000.00"))),
                 new BigDecimal("1200.00"),
                 new BigDecimal("200.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 new BigDecimal("1000.00"),
                 new BigDecimal(overdue));
     }

@@ -8,6 +8,8 @@ public enum PaymentMethod {
     PAYPAL("PayPal"),
     CREDIT_CARD("Credit Card"),
     BANK_TRANSFER("Bank Transfer"),
+    UPI("UPI"),
+    CHEQUE("Cheque"),
     OTHERS("Others");
 
     private final String value;

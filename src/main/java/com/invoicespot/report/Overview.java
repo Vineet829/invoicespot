@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class Overview {
 
-    private record Money(BigDecimal expected, BigDecimal received) {}
+    private record Money(BigDecimal expected, BigDecimal received, BigDecimal withheld) {}
 
     private record Counts(long documents, long paid, long partial, long unpaid, long overdue) {}
 
@@ -63,7 +63,8 @@ public class Overview {
                         .single(),
                 money.expected(),
                 money.received(),
-                money.expected().subtract(money.received()),
+                money.withheld(),
+                money.expected().subtract(money.received()).subtract(money.withheld()).max(BigDecimal.ZERO),
                 counts.paid(),
                 counts.partial(),
                 counts.unpaid(),
@@ -91,17 +92,19 @@ public class Overview {
 
     private Money money(Long businessPkid, String currency) {
         return jdbc.sql("""
-                        select coalesce(sum(d.total), 0) as expected,
-                               coalesce(sum(d.total_amount_received), 0) as received
+                        select coalesce(sum(%s), 0) as expected,
+                               coalesce(sum(d.total_amount_received - d.total_refunded), 0) as received,
+                               coalesce(sum(d.total_tds), 0) as withheld
                         from documents d
                         where d.business_pkid = :business and %s and d.document_type <> 'Quotation'
                           and coalesce(d.currency, '') = :currency
-                        """.formatted(DocumentLedger.COUNTED))
+                        """.formatted(DocumentLedger.BILLED, DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> new Money(
                         result.getBigDecimal("expected").setScale(2),
-                        result.getBigDecimal("received").setScale(2)))
+                        result.getBigDecimal("received").setScale(2),
+                        result.getBigDecimal("withheld").setScale(2)))
                 .single();
     }
 
@@ -115,7 +118,7 @@ public class Overview {
                                count(*) filter (where document_type = 'Invoice' and status <> 'Paid'
                                    and due_date < :startOfToday) as overdue
                         from documents d
-                        where d.business_pkid = :business and %s
+                        where d.business_pkid = :business and %s and d.document_type <> 'Credit Note'
                         """.formatted(DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("startOfToday", Timestamp.from(startOfToday.toInstant()))
