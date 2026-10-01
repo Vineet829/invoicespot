@@ -11,11 +11,8 @@ import AuthVisual from "../components/AuthVisual";
 import {
   ArrowIcon,
   EyeIcon,
-  GitHubIcon,
-  GoogleIcon,
   GuestIcon,
   GUEST_CREDENTIALS,
-  OAUTH_BASE,
 } from "../components/authCommon";
 import {
   PasswordStrength,
@@ -250,11 +247,6 @@ const RegisterPage = () => {
                         ? "Creating account…"
                         : "Create account"}
                     </button>
-                    <p className={`${auth.terms} ${rise}`} style={delay(0.54)}>
-                      By creating an account, you agree to the{" "}
-                      <Link to="#">Terms of Service</Link> and{" "}
-                      <Link to="#">Privacy Policy</Link>.
-                    </p>
                   </div>
 
                   <div className={auth.alt}>
@@ -263,44 +255,20 @@ const RegisterPage = () => {
                       style={delay(0.6)}
                     >
                       <div className={auth.dividerLine} />
-                      <span className={auth.dividerText}>or continue with</span>
+                      <span className={auth.dividerText}>or</span>
                       <div className={auth.dividerLine} />
                     </div>
 
-                    <div
-                      className={`${auth.socialThree} ${rise}`}
+                    <button
+                      type="button"
+                      className={`${auth.ghost} ${rise}`}
                       style={delay(0.66)}
+                      onClick={handleGuestLogin}
+                      disabled={busy}
                     >
-                      <button
-                        type="button"
-                        className={`${auth.ghost} ${auth.tight}`}
-                        onClick={() =>
-                          window.open(`${OAUTH_BASE}/google`, "_self")
-                        }
-                      >
-                        <GoogleIcon />
-                        Google
-                      </button>
-                      <button
-                        type="button"
-                        className={`${auth.ghost} ${auth.tight}`}
-                        onClick={() =>
-                          window.open(`${OAUTH_BASE}/github`, "_self")
-                        }
-                      >
-                        <GitHubIcon />
-                        GitHub
-                      </button>
-                      <button
-                        type="button"
-                        className={`${auth.ghost} ${auth.tight}`}
-                        onClick={handleGuestLogin}
-                        disabled={busy}
-                      >
-                        <GuestIcon />
-                        {loggingIn ? "Opening demo…" : "Guest"}
-                      </button>
-                    </div>
+                      <GuestIcon />
+                      {loggingIn ? "Opening demo…" : "Guest"}
+                    </button>
                   </div>
 
                   <div className={`${auth.foot} ${rise}`} style={delay(0.72)}>

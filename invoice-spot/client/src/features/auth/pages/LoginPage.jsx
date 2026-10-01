@@ -13,12 +13,9 @@ import TwoFactorStep from "../components/TwoFactorStep";
 import {
   ArrowIcon,
   EyeIcon,
-  GitHubIcon,
-  GoogleIcon,
   GuestIcon,
   MailIcon,
   GUEST_CREDENTIALS,
-  OAUTH_BASE,
 } from "../components/authCommon";
 import { auth, fieldError, passwordToggle, rise } from "../components/authForm";
 
@@ -224,41 +221,6 @@ const LoginPage = () => {
                   </button>
 
                   <div className={auth.alt}>
-                    <div
-                      className={`${auth.divider} ${rise}`}
-                      style={delay(0.48)}
-                    >
-                      <div className={auth.dividerLine} />
-                      <span className={auth.dividerText}>or continue with</span>
-                      <div className={auth.dividerLine} />
-                    </div>
-
-                    <div
-                      className={`${auth.social} ${rise}`}
-                      style={delay(0.54)}
-                    >
-                      <button
-                        type="button"
-                        className={auth.ghost}
-                        onClick={() =>
-                          window.open(`${OAUTH_BASE}/google`, "_self")
-                        }
-                      >
-                        <GoogleIcon />
-                        Google
-                      </button>
-                      <button
-                        type="button"
-                        className={auth.ghost}
-                        onClick={() =>
-                          window.open(`${OAUTH_BASE}/github`, "_self")
-                        }
-                      >
-                        <GitHubIcon />
-                        GitHub
-                      </button>
-                    </div>
-
                     <div
                       className={`${auth.divider} ${rise}`}
                       style={delay(0.6)}
