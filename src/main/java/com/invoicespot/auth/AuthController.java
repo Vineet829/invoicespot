@@ -6,19 +6,15 @@ import com.invoicespot.auth.dto.LogoutResponse;
 import com.invoicespot.auth.dto.TwoFactorChallengeResponse;
 import com.invoicespot.auth.dto.TwoFactorSignInRequest;
 import com.invoicespot.common.ApiException;
-import com.invoicespot.config.AppProperties;
 import com.invoicespot.ratelimit.RateLimit;
 import com.invoicespot.ratelimit.RateLimiter;
 import com.invoicespot.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,14 +29,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final RateLimiter rateLimiter;
-    private final AppProperties.Cookie cookieProperties;
-    private final Duration refreshTokenTtl;
+    private final RefreshCookies refreshCookies;
 
-    public AuthController(AuthService authService, RateLimiter rateLimiter, AppProperties properties) {
+    public AuthController(AuthService authService, RateLimiter rateLimiter, RefreshCookies refreshCookies) {
         this.authService = authService;
         this.rateLimiter = rateLimiter;
-        this.cookieProperties = properties.cookie();
-        this.refreshTokenTtl = properties.jwt().refreshTokenTtl();
+        this.refreshCookies = refreshCookies;
     }
 
     @PostMapping("/login")
@@ -81,7 +75,7 @@ public class AuthController {
     }
 
     private ResponseEntity<Object> signedIn(TokenBundle bundle, HttpServletResponse response) {
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
+        refreshCookies.set(response, bundle.refreshToken());
         return ResponseEntity.ok(bodyOf(bundle));
     }
 
@@ -94,13 +88,13 @@ public class AuthController {
         }
         Optional<TokenBundle> refreshed = authService.refresh(refreshCookie);
         if (refreshed.isEmpty()) {
-            response.addHeader(HttpHeaders.SET_COOKIE, clearedCookie().toString());
+            refreshCookies.clear(response);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         // A refresh within moments of another keeps the cookie the other set.
         TokenBundle bundle = refreshed.get();
         if (bundle.refreshToken() != null) {
-            response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(bundle.refreshToken()).toString());
+            refreshCookies.set(response, bundle.refreshToken());
         }
         return ResponseEntity.ok(bodyOf(bundle));
     }
@@ -114,7 +108,7 @@ public class AuthController {
             return ResponseEntity.noContent().build();
         }
         Optional<String> message = authService.logout(refreshCookie);
-        response.addHeader(HttpHeaders.SET_COOKIE, clearedCookie().toString());
+        refreshCookies.clear(response);
         return message.map(text -> ResponseEntity.ok(new LogoutResponse(true, text)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
@@ -128,21 +122,5 @@ public class AuthController {
                 user.getUsername(),
                 user.getProvider(),
                 bundle.accessToken());
-    }
-
-    private ResponseCookie refreshCookie(String value) {
-        return baseCookie(value).maxAge(refreshTokenTtl).build();
-    }
-
-    private ResponseCookie clearedCookie() {
-        return baseCookie("").maxAge(0).build();
-    }
-
-    private ResponseCookie.ResponseCookieBuilder baseCookie(String value) {
-        return ResponseCookie.from(cookieProperties.refreshName(), value)
-                .httpOnly(true)
-                .secure(cookieProperties.secure())
-                .path(cookieProperties.path())
-                .sameSite(cookieProperties.sameSite());
     }
 }

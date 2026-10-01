@@ -7,6 +7,7 @@ import com.invoicespot.customer.Customer;
 import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.payment.UpiPayment;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
 import com.invoicespot.tax.AmountInWords;
 import com.invoicespot.tax.GstStates;
 import com.invoicespot.tax.SupplyType;
@@ -63,21 +64,31 @@ public class PdfService {
     }
 
     String html(Document document, Business seller, BusinessSettings settings) {
-        Context context = new Context(Locale.ENGLISH);
+        Context context = context(settings.getPdfTemplate());
         context.setVariable("pdf", view(document, seller, settings));
         return templateEngine.process("pdf/document", context);
     }
 
     byte[] renderReceipt(
-            Document document, Payment payment, String number, BigDecimal paidToDate, Business seller) {
-        return toPdf(receiptHtml(document, payment, number, paidToDate, seller));
+            Document document,
+            Payment payment,
+            String number,
+            BigDecimal paidToDate,
+            Business seller,
+            PdfTemplate template) {
+        return toPdf(receiptHtml(document, payment, number, paidToDate, seller, template));
     }
 
     // A payment receipt: what was received, how, any tax the client withheld
     // from it, and what the document still owed once this payment had been
     // made.
     String receiptHtml(
-            Document document, Payment payment, String number, BigDecimal paidToDate, Business seller) {
+            Document document,
+            Payment payment,
+            String number,
+            BigDecimal paidToDate,
+            Business seller,
+            PdfTemplate template) {
         CustomerSnapshot client = Optional.ofNullable(document.getCustomerSnapshot()).orElseGet(CustomerSnapshot::new);
         BigDecimal total = orZero(document.getTotal());
         // Credit notes issued by the day of the payment, so the receipt stays
@@ -91,7 +102,7 @@ public class PdfService {
                 .filter(refund -> !refund.getDateRefunded().isAfter(payment.getDatePaid()))
                 .map(Refund::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        Context context = new Context(Locale.ENGLISH);
+        Context context = context(template);
         String documentTitle = document.getDocumentType().getValue() + " " + value(document.getDocumentNumber());
         String currency = value(document.getCurrency());
         context.setVariable("receipt", new ReceiptView(
@@ -130,12 +141,22 @@ public class PdfService {
         return templateEngine.process("pdf/receipt", context);
     }
 
-    byte[] renderStatement(Business seller, Customer customer, LocalDate day, List<Statements.Account> accounts) {
-        return toPdf(statementHtml(seller, customer, day, accounts));
+    byte[] renderStatement(
+            Business seller,
+            Customer customer,
+            LocalDate day,
+            List<Statements.Account> accounts,
+            PdfTemplate template) {
+        return toPdf(statementHtml(seller, customer, day, accounts, template));
     }
 
-    String statementHtml(Business seller, Customer customer, LocalDate day, List<Statements.Account> accounts) {
-        Context context = new Context(Locale.ENGLISH);
+    String statementHtml(
+            Business seller,
+            Customer customer,
+            LocalDate day,
+            List<Statements.Account> accounts,
+            PdfTemplate template) {
+        Context context = context(template);
         context.setVariable("statement", new StatementView(
                 seller(seller),
                 DATE.format(day),
@@ -578,6 +599,14 @@ public class PdfService {
         } catch (IOException exception) {
             return Optional.empty();
         }
+    }
+
+    // Every PDF starts from the business's template: Classic, or a theme
+    // laid over it.
+    private static Context context(PdfTemplate template) {
+        Context context = new Context(Locale.ENGLISH);
+        context.setVariable("theme", template.theme());
+        return context;
     }
 
     private static byte[] toPdf(String html) {

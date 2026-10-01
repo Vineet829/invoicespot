@@ -40,9 +40,6 @@ public class User extends BaseEntity {
     @Column(name = "provider", nullable = false, length = 30)
     private String provider = "email";
 
-    @Column(name = "google_id")
-    private String googleId;
-
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;
 

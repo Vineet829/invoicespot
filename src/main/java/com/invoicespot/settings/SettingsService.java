@@ -104,6 +104,9 @@ public class SettingsService {
         if (request.taxRegime() != null) {
             settings.setTaxRegime(regime(request.taxRegime()));
         }
+        if (request.pdfTemplate() != null) {
+            settings.setPdfTemplate(pdfTemplate(request.pdfTemplate()));
+        }
         if (settings.getTaxRegime() == TaxRegime.GST_INDIA) {
             requireGst(access.businessPkid(), settings);
         }
@@ -162,6 +165,14 @@ public class SettingsService {
             return TaxRegime.valueOf(value.trim());
         } catch (IllegalArgumentException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Choose standard tax or India GST");
+        }
+    }
+
+    private static PdfTemplate pdfTemplate(String value) {
+        try {
+            return PdfTemplate.valueOf(value.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Choose the Classic, Modern or Compact template");
         }
     }
 

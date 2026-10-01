@@ -3,6 +3,8 @@ package com.invoicespot.document;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.invoicespot.business.Business;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -142,7 +144,12 @@ class PdfRenderingTest {
     void paymentReceipt() {
         Document invoice = PdfFixtures.invoice();
         String text = PdfText.of(service.renderReceipt(
-                invoice, invoice.getPayments().get(0), "INV-0042-P1", new BigDecimal("44550.00"), seller));
+                invoice,
+                invoice.getPayments().get(0),
+                "INV-0042-P1",
+                new BigDecimal("44550.00"),
+                seller,
+                PdfTemplate.CLASSIC));
 
         assertThat(text).contains(
                 "Payment receipt",
@@ -158,7 +165,11 @@ class PdfRenderingTest {
     @DisplayName("a statement shows each currency's ledger, what is overdue and the amount due")
     void statement() {
         String text = PdfText.of(service.renderStatement(
-                seller, PdfFixtures.customer(), LocalDate.of(2026, 10, 3), PdfFixtures.accounts()));
+                seller,
+                PdfFixtures.customer(),
+                LocalDate.of(2026, 10, 3),
+                PdfFixtures.accounts(),
+                PdfTemplate.CLASSIC));
 
         assertThat(text).contains(
                 "Statement",
@@ -169,5 +180,25 @@ class PdfRenderingTest {
                 "INR 80,000.00",
                 "Amount due",
                 "USD 0.00");
+    }
+
+    @Test
+    @DisplayName("every template renders invoices, payment receipts and statements, with their page numbers")
+    void templates() {
+        for (PdfTemplate template : PdfTemplate.values()) {
+            BusinessSettings settings = PdfFixtures.settings();
+            settings.setPdfTemplate(template);
+            Document invoice = PdfFixtures.invoice();
+
+            String document = PdfText.of(service.render(invoice, seller, settings));
+            String receipt = PdfText.of(service.renderReceipt(
+                    invoice, invoice.getPayments().get(0), "INV-0042-P1", new BigDecimal("44550.00"), seller, template));
+            String statement = PdfText.of(service.renderStatement(
+                    seller, PdfFixtures.customer(), LocalDate.of(2026, 10, 3), PdfFixtures.accounts(), template));
+
+            assertThat(document).as(template.name()).contains("Invoice", "INV-0042", "Page 1 of 1");
+            assertThat(receipt).as(template.name()).contains("Payment receipt", "INV-0042-P1");
+            assertThat(statement).as(template.name()).contains("Statement", "Page 1 of");
+        }
     }
 }

@@ -86,13 +86,17 @@ class DataExportIntegrationTest extends IntegrationTest {
         send(owner, "/api/v1/recurring", """
                 {"documentId": "%s", "frequency": "monthly", "startDate": "%s", "maxRuns": 3}
                 """.formatted(invoice, today.plusDays(1)));
+        send(owner, "/api/v1/expense", """
+                {"date": "%s", "vendor": "Printworks", "category": "Office", "amount": 100, "taxAmount": 18,
+                 "taxReclaimable": true, "currency": "USD", "paymentMethod": "UPI"}
+                """.formatted(today));
 
         Map<String, String> files = export(owner);
 
         assertThat(files.keySet()).containsExactly(
                 "README.txt", "documents.csv", "line-items.csv", "document-tax.csv", "payments.csv", "clients.csv",
-                "items.csv", "recurring.csv", "settings.json", "email-templates.json", "business.json",
-                "profile.json");
+                "items.csv", "expenses.csv", "recurring.csv", "settings.json", "email-templates.json",
+                "business.json", "profile.json");
         assertThat(files.get("README.txt")).startsWith("Invoice Spot export, made on " + today + ".");
         assertThat(lines(files.get("documents.csv"))).hasSize(2).last().asString()
                 .startsWith("INV-0001,Invoice,Partially paid,Acme,");
@@ -109,6 +113,10 @@ class DataExportIntegrationTest extends IntegrationTest {
         assertThat(lines(files.get("clients.csv"))).hasSize(2).last().asString().startsWith("Acme,acme-");
         assertThat(lines(files.get("items.csv"))).containsExactly(
                 "﻿Name,Description,Unit price,Unit,Tax %,HSN/SAC", "Logo design,,12.50,hours,18,998391");
+        assertThat(lines(files.get("expenses.csv"))).containsExactly(
+                "\uFEFFDate,Vendor,Category,Currency,Amount,Tax,Tax reclaimable,Total,Exchange rate,"
+                        + "Exchange rate to,Payment method,Reference,Notes",
+                today + ",Printworks,Office,USD,100.00,18.00,Yes,118.00,,,UPI,,");
         assertThat(lines(files.get("recurring.csv"))).containsExactly(
                 "﻿Invoice,Client,Repeats,First invoice,Next invoice,Ends on,Most invoices,Made,"
                         + "Emailed automatically,Paused",
@@ -122,6 +130,7 @@ class DataExportIntegrationTest extends IntegrationTest {
         assertThat(lines(other.get("documents.csv"))).hasSize(1);
         assertThat(lines(other.get("line-items.csv"))).hasSize(1);
         assertThat(lines(other.get("recurring.csv"))).hasSize(1);
+        assertThat(lines(other.get("expenses.csv"))).hasSize(1);
     }
 
     @Test

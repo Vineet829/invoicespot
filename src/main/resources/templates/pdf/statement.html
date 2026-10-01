@@ -47,6 +47,7 @@
   .summary .balance td { border-top: 1px solid #d9d8e2; padding-top: 10px; font-size: 11pt; color: #30234f; font-weight: bold; }
   .empty { margin-top: 26px; }
 </style>
+<th:block th:if="${theme != null}"><style th:replace="~{pdf/fragments/themes :: ${theme}}"></style></th:block>
 </head>
 <body>
   <table class="head">

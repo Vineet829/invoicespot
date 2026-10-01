@@ -51,12 +51,12 @@ class UserServiceTest {
     }
 
     private static UpdateProfileRequest onlyAllowed() {
-        return new UpdateProfileRequest(null, null, null, null, null, null, null, null, "Grace", null);
+        return new UpdateProfileRequest(null, null, null, null, null, null, null, "Grace", null);
     }
 
     private static UpdateProfileRequest with(
             String password, String email, java.util.Set<String> roles) {
-        return new UpdateProfileRequest(password, null, email, null, null, roles, null, null, null, null);
+        return new UpdateProfileRequest(password, null, email, null, null, roles, null, null, null);
     }
 
     @Test

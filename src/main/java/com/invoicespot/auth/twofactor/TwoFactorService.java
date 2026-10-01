@@ -253,6 +253,10 @@ public class TwoFactorService {
     }
 
     private void requirePassword(User user, String password) {
+        // An account made by signing in with Google has no password to confirm.
+        if (user.getPassword() == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "Set a password first");
+        }
         String attempts = "password:" + user.getPkid();
         rateLimiter.requireAvailable(RateLimit.WRONG_PASSWORD, attempts);
         if (user.getPassword() == null || password == null || !passwordEncoder.matches(password, user.getPassword())) {

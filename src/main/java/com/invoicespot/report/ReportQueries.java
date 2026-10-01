@@ -63,6 +63,10 @@ class ReportQueries {
 
     record NotConverted(String currency, long documents, BigDecimal amount) {}
 
+    record Earned(String currency, LocalDate month, BigDecimal income) {}
+
+    record Spent(String currency, LocalDate month, String category, BigDecimal cost) {}
+
     // A document in the reporting currency, or with a rate typed in against it.
     private static final String CONVERTIBLE = "(coalesce(d.currency, '') = :base"
             + " or (d.exchange_rate is not null and d.exchange_base = :base))";
@@ -226,6 +230,51 @@ class ReportQueries {
                         result.getBigDecimal("billed"),
                         result.getBigDecimal("paid"),
                         result.getBigDecimal("withheld")))
+                .list();
+    }
+
+    // What issued invoices and receipts earned before tax, less credit notes,
+    // by the month each is dated.
+    List<Earned> earned(long businessPkid, LocalDate from, LocalDate to) {
+        return jdbc.sql("""
+                        select coalesce(d.currency, '') as currency,
+                               cast(date_trunc('month', d.issue_date) as date) as month,
+                               sum(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)
+                                   as income
+                        from documents d
+                        where d.business_pkid = :business and %s
+                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
+                          and d.issue_date between :from and :to
+                        group by 1, 2
+                        """.formatted(DocumentLedger.COUNTED))
+                .param("business", businessPkid)
+                .param("from", from)
+                .param("to", to)
+                .query((result, rowNumber) -> new Earned(
+                        result.getString("currency"),
+                        result.getObject("month", LocalDate.class),
+                        result.getBigDecimal("income")))
+                .list();
+    }
+
+    // What expenses cost, by the month each was paid and its category: the
+    // amount, and the tax on it unless that can be claimed back.
+    List<Spent> spent(long businessPkid, LocalDate from, LocalDate to) {
+        return jdbc.sql("""
+                        select e.currency, cast(date_trunc('month', e.expense_date) as date) as month, e.category,
+                               sum(e.amount + case when e.tax_reclaimable then 0 else e.tax_amount end) as cost
+                        from expenses e
+                        where e.business_pkid = :business and e.expense_date between :from and :to
+                        group by 1, 2, 3
+                        """)
+                .param("business", businessPkid)
+                .param("from", from)
+                .param("to", to)
+                .query((result, rowNumber) -> new Spent(
+                        result.getString("currency"),
+                        result.getObject("month", LocalDate.class),
+                        result.getString("category"),
+                        result.getBigDecimal("cost")))
                 .list();
     }
 

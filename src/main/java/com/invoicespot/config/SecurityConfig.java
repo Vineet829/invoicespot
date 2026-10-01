@@ -5,9 +5,11 @@ import com.invoicespot.auth.RestAuthenticationEntryPoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,7 +19,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({AppProperties.class, DemoProperties.class, EncryptionProperties.class})
+@EnableConfigurationProperties({
+    AppProperties.class,
+    DemoProperties.class,
+    EncryptionProperties.class,
+    OAuthProperties.class
+})
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -35,8 +42,12 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder(10);
     }
 
+    // Provider sign-in comes in here rather than through the constructor: it
+    // signs people in through AuthService, which needs the password encoder
+    // above.
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http, Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthSignIn) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
@@ -51,10 +62,13 @@ public class SecurityConfig {
                                 "/api/v1/auth/resend_email_token",
                                 "/api/v1/auth/reset_password_request",
                                 "/api/v1/auth/reset_password",
+                                "/api/v1/auth/providers",
+                                "/api/v1/auth/oauth2/**",
                                 "/api/v1/public/**")
                         .permitAll()
                         .anyRequest()
                         .authenticated())
+                .oauth2Login(oauthSignIn)
                 .exceptionHandling(handling -> handling.authenticationEntryPoint(authenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

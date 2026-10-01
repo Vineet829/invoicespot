@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -85,5 +86,35 @@ class JwtServiceTest {
 
         assertThat(at(ISSUED.plusSeconds(540), SECRET).readAccessClaims(token)).isPresent();
         assertThat(at(ISSUED.plusSeconds(660), SECRET).readAccessClaims(token)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a two-factor challenge says how the first step was made, and passes for nothing else")
+    void challengeCarriesTheFirstStep() {
+        JwtService service = at(ISSUED, SECRET);
+        UUID user = UUID.randomUUID();
+        String google = service.issueTwoFactorChallenge(userWithId(user), "With Google");
+        String password = service.issueTwoFactorChallenge(userWithId(user), null);
+
+        assertThat(service.readTwoFactorChallenge(google)).contains(new JwtService.Challenge(user, "With Google"));
+        assertThat(service.readTwoFactorChallenge(password)).contains(new JwtService.Challenge(user, null));
+        assertThat(service.readAccessClaims(google)).isEmpty();
+        assertThat(service.readSignedRequest(google)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a signed request keeps its claims for its time, and is neither an access token nor a challenge")
+    void signedRequests() {
+        JwtService service = at(ISSUED, SECRET);
+        String request = service.issueSignedRequest(Map.of("state", "s-1"), Duration.ofMinutes(10));
+
+        assertThat(service.readSignedRequest(request)).hasValueSatisfying(
+                claims -> assertThat(claims).containsEntry("state", "s-1"));
+        assertThat(service.readAccessClaims(request)).isEmpty();
+        assertThat(service.readTwoFactorChallenge(request)).isEmpty();
+        assertThat(at(ISSUED.plus(Duration.ofMinutes(11)), SECRET).readSignedRequest(request)).isEmpty();
+        assertThat(service.readSignedRequest(
+                        service.issueAccessToken(userWithId(UUID.randomUUID()), UUID.randomUUID())))
+                .isEmpty();
     }
 }

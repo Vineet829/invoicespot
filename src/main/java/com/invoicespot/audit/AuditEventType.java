@@ -31,7 +31,8 @@ public enum AuditEventType {
     MEMBER_INVITED,
     INVITATION_RESENT,
     INVITATION_REVOKED,
-    MEMBER_JOINED;
+    MEMBER_JOINED,
+    PROVIDER_LINKED;
 
     private static final Set<AuditEventType> ABOUT_A_BUSINESS = EnumSet.of(
             BUSINESS_CREATED,

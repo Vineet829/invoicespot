@@ -6,6 +6,7 @@ import com.invoicespot.business.Business;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
 import com.invoicespot.tax.SupplyType;
 import com.invoicespot.tax.TaxRegime;
 import com.invoicespot.upload.UploadService;
@@ -167,7 +168,12 @@ class PdfServiceTest {
         payment.setAdditionalInfo("Deposit & <thanks>");
 
         String html = service.receiptHtml(
-                document, payment, "2026-September-ABC123-P1", new BigDecimal("445.50"), seller("Ada Analytics"));
+                document,
+                payment,
+                "2026-September-ABC123-P1",
+                new BigDecimal("445.50"),
+                seller("Ada Analytics"),
+                PdfTemplate.CLASSIC);
 
         assertThat(html)
                 .contains("Payment receipt 2026-September-ABC123-P1")
@@ -210,7 +216,11 @@ class PdfServiceTest {
     @DisplayName("a statement lists each invoice and payment with the running balance and the amount due")
     void statementHtml() {
         String html = service.statementHtml(
-                seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "1000.00")));
+                seller("Ada Analytics"),
+                client(),
+                LocalDate.of(2026, 9, 30),
+                List.of(account("USD", "1000.00")),
+                PdfTemplate.CLASSIC);
 
         assertThat(html)
                 .contains("Statement for Beta &amp; &lt;Sons&gt;")
@@ -229,13 +239,19 @@ class PdfServiceTest {
     @DisplayName("a settled statement shows no overdue line, and several currencies are labelled")
     void statementCurrencies() {
         String settled = service.statementHtml(
-                seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(account("USD", "0")));
+                seller("Ada Analytics"),
+                client(),
+                LocalDate.of(2026, 9, 30),
+                List.of(account("USD", "0")),
+                PdfTemplate.CLASSIC);
         String mixed = service.statementHtml(
                 seller("Ada Analytics"),
                 client(),
                 LocalDate.of(2026, 9, 30),
-                List.of(account("USD", "0"), account("EUR", "0")));
-        String empty = service.statementHtml(seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of());
+                List.of(account("USD", "0"), account("EUR", "0")),
+                PdfTemplate.CLASSIC);
+        String empty = service.statementHtml(
+                seller("Ada Analytics"), client(), LocalDate.of(2026, 9, 30), List.of(), PdfTemplate.CLASSIC);
 
         assertThat(settled).doesNotContain("Overdue");
         assertThat(mixed).contains("<div class=\"label\">EUR</div>");
@@ -300,7 +316,8 @@ class PdfServiceTest {
         assertThat(service.html(document, seller("Borealis Studio"), SETTINGS))
                 .contains("Ada Analytics")
                 .doesNotContain("Borealis Studio");
-        assertThat(service.receiptHtml(document, payment, "INV-1-P1", BigDecimal.TEN, seller("Borealis Studio")))
+        assertThat(service.receiptHtml(
+                        document, payment, "INV-1-P1", BigDecimal.TEN, seller("Borealis Studio"), PdfTemplate.CLASSIC))
                 .contains("Ada Analytics")
                 .doesNotContain("Borealis Studio");
     }

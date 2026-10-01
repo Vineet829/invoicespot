@@ -782,7 +782,8 @@ public class DocumentService {
                         paidSoFar.stream()
                                 .map(paid -> paid.getAmountPaid().add(paid.getTdsAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add),
-                        document.getBusiness()),
+                        document.getBusiness(),
+                        settingsService.forBusiness(document.getBusiness().getPkid()).getPdfTemplate()),
                 receiptEnvelope(document, payment));
     }
 

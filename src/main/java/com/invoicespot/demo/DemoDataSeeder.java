@@ -121,7 +121,7 @@ public class DemoDataSeeder {
             settingsService.update(owner, new UpdateSettingsRequest(
                     "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS,
                     ZONE, "INV-", "QUO-", "REC-", 1001, 201, 301, null, null, null, null, null, null, null, null, null,
-                    null));
+                    null, null));
             for (EmailTemplateKind kind : EmailTemplateKind.values()) {
                 if (kind != EmailTemplateKind.REMINDER) {
                     emailTemplateService.save(owner, kind.name(), new EmailTemplateRequest(

@@ -1,10 +1,11 @@
 package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
-import com.invoicespot.business.Requires;
 import com.invoicespot.business.Permission;
+import com.invoicespot.business.Requires;
 import com.invoicespot.report.dto.GstReturnsResponse;
 import com.invoicespot.report.dto.OverviewResponse;
+import com.invoicespot.report.dto.ProfitReportResponse;
 import com.invoicespot.report.dto.ReportResponse;
 import com.invoicespot.report.dto.TaxReportResponse;
 import com.invoicespot.report.dto.TdsReportResponse;
@@ -24,18 +25,21 @@ public class ReportController {
     private final TaxReport taxReport;
     private final GstReturns gstReturns;
     private final Overview overview;
+    private final ProfitReport profitReport;
 
     public ReportController(
             ReportService reportService,
             TdsReport tdsReport,
             TaxReport taxReport,
             GstReturns gstReturns,
-            Overview overview) {
+            Overview overview,
+            ProfitReport profitReport) {
         this.reportService = reportService;
         this.tdsReport = tdsReport;
         this.taxReport = taxReport;
         this.gstReturns = gstReturns;
         this.overview = overview;
+        this.profitReport = profitReport;
     }
 
     @GetMapping("/overview")
@@ -56,6 +60,12 @@ public class ReportController {
     public TdsReportResponse tds(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @RequestParam(required = false) String period) {
         return tdsReport.report(access, period);
+    }
+
+    @GetMapping("/profit")
+    public ProfitReportResponse profit(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @RequestParam(required = false) String period) {
+        return profitReport.report(access, period);
     }
 
     @GetMapping("/tax")

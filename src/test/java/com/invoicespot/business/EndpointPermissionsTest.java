@@ -22,7 +22,7 @@ class EndpointPermissionsTest extends IntegrationTest {
 
     private static final Set<String> BUSINESS_PACKAGES = Set.of(
             "com.invoicespot.customer", "com.invoicespot.document", "com.invoicespot.item",
-            "com.invoicespot.report", "com.invoicespot.export", "com.invoicespot.settings",
+            "com.invoicespot.report", "com.invoicespot.export", "com.invoicespot.settings", "com.invoicespot.expense",
             "com.invoicespot.notification");
 
     // Writes that concern only the member themselves, such as marking a

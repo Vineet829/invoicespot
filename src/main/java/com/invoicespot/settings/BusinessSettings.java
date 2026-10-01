@@ -42,6 +42,11 @@ public class BusinessSettings extends BaseEntity {
     @Column(name = "lut_reference", length = 40)
     private String lutReference;
 
+    // How every PDF of the business looks.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pdf_template", nullable = false, length = 10)
+    private PdfTemplate pdfTemplate = PdfTemplate.CLASSIC;
+
     @Column(name = "payment_terms_days", nullable = false)
     private int paymentTermsDays = 7;
 

@@ -66,7 +66,8 @@ public class PasswordChangeService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
         demoAccountGuard.requireNotDemo(user, "changing the password");
         if (user.getPassword() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "This account signs in with Google, so it has no password");
+            throw new ApiException(
+                    HttpStatus.CONFLICT, "This account has no password yet. Use Forgot password to set one");
         }
         String attempts = "password:" + user.getPkid();
         rateLimiter.requireAvailable(RateLimit.WRONG_PASSWORD, attempts);

@@ -4,6 +4,7 @@ import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
+import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.EmailTemplateKind;
 import com.invoicespot.settings.SettingsService;
 import java.time.Clock;
@@ -53,14 +54,16 @@ public class StatementService {
 
     // A client's statement as of today in the business's time zone.
     DocumentPdf render(Customer customer) {
-        ZoneId zone = ZoneId.of(settingsService.forBusiness(customer.getBusiness().getPkid()).getTimeZone());
+        BusinessSettings settings = settingsService.forBusiness(customer.getBusiness().getPkid());
+        ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         List<Statements.Account> accounts = Statements.accounts(
                 documentRepository.findForStatement(customer.getPkid(), DocumentType.INVOICE),
                 today.atStartOfDay(zone).toInstant());
         return new DocumentPdf(
                 fileName(customer, today),
-                pdfService.renderStatement(customer.getBusiness(), customer, today, accounts),
+                pdfService.renderStatement(
+                        customer.getBusiness(), customer, today, accounts, settings.getPdfTemplate()),
                 envelope(customer));
     }
 

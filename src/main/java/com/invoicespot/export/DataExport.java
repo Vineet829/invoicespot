@@ -13,6 +13,8 @@ import com.invoicespot.document.DocumentExport;
 import com.invoicespot.document.DocumentSearch;
 import com.invoicespot.document.DocumentTotals;
 import com.invoicespot.document.dto.BillingItemResponse;
+import com.invoicespot.expense.ExpenseSearch;
+import com.invoicespot.expense.ExpenseService;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.EmailTemplateService;
 import com.invoicespot.settings.SettingsService;
@@ -57,6 +59,7 @@ public class DataExport {
             payments.csv     Every payment and refund recorded on a document.
             clients.csv      Your clients, and what each owes in every currency.
             items.csv        Your saved products and services.
+            expenses.csv     Every expense, with the tax paid on it.
             recurring.csv    The invoices that repeat, and how.
             settings.json    Your defaults for new documents, numbering and reminders.
             email-templates.json
@@ -71,6 +74,7 @@ public class DataExport {
 
     private final DocumentExport documentExport;
     private final CustomerService customerService;
+    private final ExpenseService expenseService;
     private final SettingsService settingsService;
     private final EmailTemplateService emailTemplates;
     private final BusinessService businessService;
@@ -82,6 +86,7 @@ public class DataExport {
     public DataExport(
             DocumentExport documentExport,
             CustomerService customerService,
+            ExpenseService expenseService,
             SettingsService settingsService,
             EmailTemplateService emailTemplates,
             BusinessService businessService,
@@ -91,6 +96,7 @@ public class DataExport {
             Clock clock) {
         this.documentExport = documentExport;
         this.customerService = customerService;
+        this.expenseService = expenseService;
         this.settingsService = settingsService;
         this.emailTemplates = emailTemplates;
         this.businessService = businessService;
@@ -118,6 +124,7 @@ public class DataExport {
                 "clients.csv",
                 customerService.csv(access, CustomerSearch.of(null, "name", "asc", 1, 1)).content());
         files.put("items.csv", items(businessPkid).content());
+        files.put("expenses.csv", expenseService.csv(access, ExpenseSearch.all()).content());
         files.put("recurring.csv", recurring(businessPkid).content());
         files.put("settings.json", json(SettingsResponse.from(settings)));
         files.put(

@@ -1,6 +1,7 @@
 package com.invoicespot;
 
 import com.invoicespot.auth.JwtService;
+import com.invoicespot.auth.oauth.OAuthStub;
 import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.business.ActiveBusinesses;
 import com.invoicespot.business.Business;
@@ -23,6 +24,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 
@@ -48,6 +51,20 @@ public abstract class IntegrationTest {
         PostgreSQLContainer<?> postgres() {
             return new PostgreSQLContainer<>("postgres:16");
         }
+    }
+
+    // Google sign-in, pointed at a stand-in, set up the same for every test
+    // so they all share one context.
+    @DynamicPropertySource
+    static void signInProviders(DynamicPropertyRegistry registry) {
+        OAuthStub stub = OAuthStub.get();
+        registry.add("app.oauth.google.client-id", () -> OAuthStub.GOOGLE_CLIENT_ID);
+        registry.add("app.oauth.google.client-secret", () -> OAuthStub.GOOGLE_CLIENT_SECRET);
+        registry.add("app.oauth.google.endpoints.authorization-uri", () -> stub.url() + "/google/authorize");
+        registry.add("app.oauth.google.endpoints.token-uri", () -> stub.url() + "/google/token");
+        registry.add("app.oauth.google.endpoints.user-info-uri", () -> stub.url() + "/google/userinfo");
+        registry.add("app.oauth.google.endpoints.jwk-set-uri", () -> stub.url() + "/google/jwks");
+        registry.add("app.oauth.google.endpoints.issuer-uri", stub::googleIssuer);
     }
 
     @Autowired

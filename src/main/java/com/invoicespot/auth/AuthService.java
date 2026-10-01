@@ -77,7 +77,7 @@ public class AuthService {
         }
 
         if (user.isTwoFactorEnabled()) {
-            return new LoginOutcome.TwoFactorChallenge(jwtService.issueTwoFactorChallenge(user));
+            return new LoginOutcome.TwoFactorChallenge(jwtService.issueTwoFactorChallenge(user, null));
         }
         return startSession(user, presentedRefreshToken, null);
     }
@@ -86,7 +86,8 @@ public class AuthService {
     // and a code from the app or a recovery code.
     @Transactional
     public TokenBundle completeTwoFactor(String challenge, String code, String presentedRefreshToken) {
-        User user = jwtService.readTwoFactorChallenge(challenge)
+        Optional<JwtService.Challenge> read = jwtService.readTwoFactorChallenge(challenge);
+        User user = read.map(JwtService.Challenge::user)
                 .flatMap(userRepository::findForUpdateByExternalId)
                 .filter(candidate -> candidate.isActive() && candidate.isTwoFactorEnabled())
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Your sign-in timed out. Log in again"));
@@ -95,10 +96,17 @@ public class AuthService {
             auditLog.signInFailed(user.getEmail(), user, "Wrong two-factor code");
             throw new ApiException(HttpStatus.BAD_REQUEST, "That code didn't work");
         }
-        return startSession(user, presentedRefreshToken, method.get().description());
+        return startSession(user, presentedRefreshToken, detail(read.get().via(), method.get().description()));
     }
 
-    private TokenBundle startSession(User user, String presentedRefreshToken, String detail) {
+    // How a sign-in was made, such as "With Google and a recovery code".
+    private static String detail(String via, String method) {
+        return via == null ? method : via + " and " + method.replaceFirst("^With ", "");
+    }
+
+    // A session for someone who has proven who they are; one the browser
+    // still had is ended. `detail` says how they signed in, for the log.
+    public TokenBundle startSession(User user, String presentedRefreshToken, String detail) {
         if (presentedRefreshToken != null && !presentedRefreshToken.isBlank()) {
             sessionService.end(presentedRefreshToken);
         }

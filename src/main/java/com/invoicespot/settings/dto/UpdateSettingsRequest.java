@@ -76,4 +76,5 @@ public record UpdateSettingsRequest(
                 @Max(value = 999_999_999, message = "The next number can be at most 999,999,999")
                 Integer nextCreditNoteNumber,
         String taxRegime,
-        @Size(max = 40, message = "The LUT reference can be at most 40 characters") String lutReference) {}
+        @Size(max = 40, message = "The LUT reference can be at most 40 characters") String lutReference,
+        String pdfTemplate) {}

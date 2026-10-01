@@ -72,8 +72,7 @@ public class UserService {
         if (request.email() != null
                 || request.isEmailVerified() != null
                 || request.provider() != null
-                || request.roles() != null
-                || request.googleId() != null) {
+                || request.roles() != null) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST, "You are not allowed to update that field on this route");
         }

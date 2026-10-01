@@ -1,6 +1,7 @@
 package com.invoicespot.settings.dto;
 
 import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
 import com.invoicespot.tax.TaxRegime;
 import java.math.BigDecimal;
 
@@ -28,6 +29,7 @@ public record SettingsResponse(
         int reminderMax,
         TaxRegime taxRegime,
         String lutReference,
+        PdfTemplate pdfTemplate,
         boolean saved) {
 
     public static SettingsResponse from(BusinessSettings settings) {
@@ -55,6 +57,7 @@ public record SettingsResponse(
                 settings.getReminderMax(),
                 settings.getTaxRegime(),
                 settings.getLutReference(),
+                settings.getPdfTemplate(),
                 settings.getPkid() != null);
     }
 }

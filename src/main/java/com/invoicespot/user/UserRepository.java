@@ -16,8 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByUsername(String username);
 
-    Optional<User> findByGoogleId(String googleId);
-
     @Query("select u from User u where u.id = :externalId")
     Optional<User> findByExternalId(@Param("externalId") UUID externalId);
 

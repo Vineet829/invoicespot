@@ -73,6 +73,7 @@
   .notes .block { margin-bottom: 16px; }
   .watermark { position: fixed; z-index: -1; top: 105mm; left: 0; right: 0; text-align: center; font-size: 96pt; font-weight: bold; letter-spacing: 12pt; color: #ecebf1; transform: rotate(-30deg); }
 </style>
+<th:block th:if="${theme != null}"><style th:replace="~{pdf/fragments/themes :: ${theme}}"></style></th:block>
 </head>
 <body>
   <div th:if="${pdf.watermark() != null}" class="watermark" th:text="${pdf.watermark()}">DRAFT</div>

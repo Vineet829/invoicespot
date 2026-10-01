@@ -3,6 +3,8 @@ package com.invoicespot.document;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.invoicespot.business.Business;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -136,7 +138,12 @@ class PdfGoldenTest {
         assertGolden(
                 "payment-receipt",
                 service.receiptHtml(
-                        invoice, invoice.getPayments().get(0), "INV-0042-P1", new BigDecimal("44550.00"), seller));
+                        invoice,
+                        invoice.getPayments().get(0),
+                        "INV-0042-P1",
+                        new BigDecimal("44550.00"),
+                        seller,
+                        PdfTemplate.CLASSIC));
     }
 
     @Test
@@ -144,6 +151,29 @@ class PdfGoldenTest {
     void statement() throws IOException {
         assertGolden(
                 "statement",
-                service.statementHtml(seller, PdfFixtures.customer(), LocalDate.of(2026, 10, 3), PdfFixtures.accounts()));
+                service.statementHtml(
+                        seller,
+                        PdfFixtures.customer(),
+                        LocalDate.of(2026, 10, 3),
+                        PdfFixtures.accounts(),
+                        PdfTemplate.CLASSIC));
+    }
+
+    @Test
+    @DisplayName("an invoice in the Modern template")
+    void modernInvoice() throws IOException {
+        assertGolden("modern-invoice", service.html(kept(PdfFixtures.invoice()), seller, in(PdfTemplate.MODERN)));
+    }
+
+    @Test
+    @DisplayName("an invoice in the Compact template")
+    void compactInvoice() throws IOException {
+        assertGolden("compact-invoice", service.html(kept(PdfFixtures.invoice()), seller, in(PdfTemplate.COMPACT)));
+    }
+
+    private static BusinessSettings in(PdfTemplate template) {
+        BusinessSettings settings = PdfFixtures.settings();
+        settings.setPdfTemplate(template);
+        return settings;
     }
 }
