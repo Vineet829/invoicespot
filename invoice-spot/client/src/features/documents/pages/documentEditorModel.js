@@ -105,7 +105,8 @@ export const customerSnapshot = (customer) =>
     ].map((key) => [key, String(customer[key] ?? "")]),
   );
 // The issue date is sent only when one is chosen; left empty, the server
-// dates the document the day it is issued, in the business's time zone.
+// dates the document the day it is issued, in the business's time zone. Only
+// an invoice says whether it shows how to pay.
 export const documentPayload = ({
   customer,
   documentType,
@@ -116,6 +117,7 @@ export const documentPayload = ({
   items,
   additionalInfo,
   termsConditions,
+  showPaymentDetails,
 }) => ({
   customerId: customer?._id || undefined,
   customer: customerSnapshot(customer),
@@ -124,6 +126,8 @@ export const documentPayload = ({
   dueDate,
   additionalInfo,
   termsConditions,
+  showPaymentDetails:
+    documentType === "Invoice" ? showPaymentDetails : undefined,
   currency,
   // Blank removes the rate the draft had.
   exchangeRate: exchangeRate === undefined ? undefined : exchangeRate.trim(),

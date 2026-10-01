@@ -14,6 +14,7 @@ import useListState from "../../../hooks/useListState";
 import useFileDownload from "../../../hooks/useFileDownload";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import DocumentsTabs from "../components/DocumentsTabs";
+import WaitingPayments from "../components/WaitingPayments";
 import { DocumentStatusBadge, documentName, isDraft } from "../documentState";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
@@ -248,6 +249,7 @@ const DocumentsPage = () => {
         }
       />
       <RefusalNote id="document-delete-refusal" reason={deleteRefusal} />
+      <WaitingPayments />
       {query.isLoading ? (
         <LoadingState />
       ) : (

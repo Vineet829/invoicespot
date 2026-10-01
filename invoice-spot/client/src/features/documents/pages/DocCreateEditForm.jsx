@@ -156,6 +156,9 @@ const DocumentFields = ({
   const [termsConditions, setTermsConditions] = useState(
     (doc ? doc.termsConditions : settings?.defaultTerms) || "",
   );
+  const [showPaymentDetails, setShowPaymentDetails] = useState(
+    doc?.showPaymentDetails ?? true,
+  );
   const taxLabel = settings?.taxLabel || "Tax";
   // India GST mode: where the supply goes, as the server works it out, and
   // how it is taxed. A credit note keeps its invoice's supply.
@@ -309,6 +312,7 @@ const DocumentFields = ({
             items,
             additionalInfo,
             termsConditions,
+            showPaymentDetails,
           });
           onSubmit(
             creditNote
@@ -913,6 +917,26 @@ const DocumentFields = ({
                   placeholder="Your payment terms or conditions"
                 />
               </div>
+              {documentType === "Invoice" && (
+                <label className="mt-5 flex items-start gap-3 text-[14px] text-spot-ink">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-[18px] shrink-0 accent-spot-violet"
+                    checked={showPaymentDetails}
+                    onChange={(event) =>
+                      setShowPaymentDetails(event.target.checked)
+                    }
+                    disabled={busy}
+                  />
+                  <span>
+                    Show how to pay
+                    <span className="block text-[12.5px] text-spot-muted">
+                      Your details from Settings → Getting paid, while the
+                      invoice is unpaid.
+                    </span>
+                  </span>
+                </label>
+              )}
             </Panel>
           </div>
           <aside className="flex min-w-0 flex-col gap-6 compact:gap-5 min-[1360px]:sticky min-[1360px]:top-[30px]">

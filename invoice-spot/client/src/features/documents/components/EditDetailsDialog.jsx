@@ -23,6 +23,10 @@ const DetailsForm = ({ document, onClose }) => {
   );
   const [notes, setNotes] = useState(document.additionalInfo || "");
   const [terms, setTerms] = useState(document.termsConditions || "");
+  const invoice = document.documentType === "Invoice";
+  const [showPaymentDetails, setShowPaymentDetails] = useState(
+    document.showPaymentDetails ?? true,
+  );
   const [update, { isLoading: saving }] = useUpdateDocMutation();
   const submit = async (event) => {
     event.preventDefault();
@@ -32,6 +36,7 @@ const DetailsForm = ({ document, onClose }) => {
         ...(!receipt && dueDate && { dueDate: dateInstant(dueDate) }),
         additionalInfo: notes,
         termsConditions: terms,
+        ...(invoice && { showPaymentDetails }),
       }).unwrap();
       toast.success(result.message || "The document was updated.");
       onClose();
@@ -75,6 +80,24 @@ const DetailsForm = ({ document, onClose }) => {
         onChange={(event) => setTerms(event.target.value)}
         disabled={saving}
       />
+      {invoice && (
+        <label className="flex items-start gap-3 text-[14px] text-spot-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-[18px] shrink-0 accent-spot-violet"
+            checked={showPaymentDetails}
+            onChange={(event) => setShowPaymentDetails(event.target.checked)}
+            disabled={saving}
+          />
+          <span>
+            Show how to pay
+            <span className="block text-[12.5px] text-spot-muted">
+              Your details from Settings → Getting paid, while the invoice is
+              unpaid.
+            </span>
+          </span>
+        </label>
+      )}
       <div className="mt-2 flex flex-wrap justify-end gap-2.5">
         <button
           type="button"
@@ -93,8 +116,8 @@ const DetailsForm = ({ document, onClose }) => {
   );
 };
 
-// What still changes on an issued document: when it is due, and its notes
-// and terms.
+// What still changes on an issued document: when it is due, its notes and
+// terms, and for an invoice whether it shows how to pay.
 const EditDetailsDialog = ({ document, open, onClose }) => (
   <Dialog
     open={open}

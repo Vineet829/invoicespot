@@ -5,6 +5,7 @@ import {
   FiEdit2,
   FiEye,
   FiFileText,
+  FiLink,
   FiMail,
   FiPlus,
 } from "react-icons/fi";
@@ -32,6 +33,7 @@ import {
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import EmailStatementDialog from "../components/EmailStatementDialog";
+import PortalDialog from "../components/PortalDialog";
 import {
   WorkspacePage,
   PageHeader,
@@ -105,6 +107,7 @@ const StatementActions = ({ customer, demo, refusal }) => {
   const [getStatement] = useGetStatementPdfMutation();
   const [downloading, setDownloading] = useState(false);
   const [emailing, setEmailing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const download = async () => {
     setDownloading(true);
     try {
@@ -144,6 +147,13 @@ const StatementActions = ({ customer, demo, refusal }) => {
       >
         <FiMail aria-hidden="true" /> Email statement
       </button>
+      <button
+        type="button"
+        className={secondaryButton}
+        onClick={() => setSharing(true)}
+      >
+        <FiLink aria-hidden="true" /> Client portal
+      </button>
       <RefusalNote id="statement-refusal" reason={refusal} />
       {demo && (
         <span id="statement-demo-note" className="sr-only">
@@ -154,6 +164,12 @@ const StatementActions = ({ customer, demo, refusal }) => {
         customerId={customer._id}
         open={emailing}
         onClose={() => setEmailing(false)}
+      />
+      <PortalDialog
+        customer={customer}
+        open={sharing}
+        onClose={() => setSharing(false)}
+        demoNote={demo ? DEMO_EMAIL_NOTE : undefined}
       />
     </div>
   );
