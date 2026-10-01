@@ -14,8 +14,9 @@ import { useChangePasswordMutation } from "../securityApiSlice";
 const EMPTY = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
 // A new password signs out every other device. This one stays signed in
-// with the access token the change sends back.
-const ChangePassword = ({ demo, provider }) => {
+// with the access token the change sends back. An account made by Google
+// sign-in has no current password to type, so it gets a note instead.
+const ChangePassword = ({ demo, hasPassword }) => {
   const [values, setValues] = useState(EMPTY);
   const [change, { isLoading }] = useChangePasswordMutation();
   const user = useSelector((state) => state.auth.user);
@@ -39,9 +40,10 @@ const ChangePassword = ({ demo, provider }) => {
       title="Password"
       description="Changing it signs out your other devices. This one stays signed in."
     >
-      {provider === "google" ? (
+      {!hasPassword ? (
         <p className={panelNote}>
-          You sign in with Google, so there’s no password to change here.
+          Your account has no password yet. To set one, use Forgot password on
+          the sign-in page.
         </p>
       ) : (
         <form className="flex flex-col gap-5" onSubmit={submit}>

@@ -5,6 +5,7 @@ import NotFound from "./components/NotFound";
 import HomePage from "./pages/HomePage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
 import VerifiedPage from "./features/auth/pages/VerifiedPage";
+import OAuthCallbackPage from "./features/auth/pages/OAuthCallbackPage";
 import LoginPage from "./features/auth/pages/LoginPage";
 import ResendEmailTokenPage from "./features/auth/pages/ResendEmailTokenPage";
 import PasswordResetRequestPage from "./features/auth/pages/PasswordResetRequestPage";
@@ -34,6 +35,7 @@ import TeamPage from "./features/settings/pages/TeamPage";
 import PaymentDetailsPage from "./features/settings/pages/PaymentDetailsPage";
 import EmailTemplatesPage from "./features/settings/pages/EmailTemplatesPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
+import ExpensesPage from "./features/expenses/pages/ExpensesPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
 import ClientPortalPage from "./features/portal/pages/ClientPortalPage";
 import PortalDocumentPage from "./features/portal/pages/PortalDocumentPage";
@@ -48,6 +50,7 @@ const App = () => {
           <Route index element={<HomePage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route path="auth/verify" element={<VerifiedPage />} />
+          <Route path="auth/callback" element={<OAuthCallbackPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="resend" element={<ResendEmailTokenPage />} />
           <Route
@@ -79,6 +82,7 @@ const App = () => {
               <Route path="settings/emails" element={<EmailTemplatesPage />} />
               <Route path="settings/team" element={<TeamPage />} />
               <Route path="items" element={<ItemsPage />} />
+              <Route path="expenses" element={<ExpensesPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="create-customer" element={<CustomerCreateForm />} />
               <Route

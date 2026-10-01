@@ -8,6 +8,7 @@ import useTitle from "../../../hooks/useTitle";
 import { useLoginUserMutation, useRegisterUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
 import AuthVisual from "../components/AuthVisual";
+import ProviderButtons from "../components/ProviderButtons";
 import {
   ArrowIcon,
   EyeIcon,
@@ -259,16 +260,23 @@ const RegisterPage = () => {
                       <div className={auth.dividerLine} />
                     </div>
 
-                    <button
-                      type="button"
-                      className={`${auth.ghost} ${rise}`}
+                    {/* Sign-in providers share Guest's row, in equal columns,
+                        tightened on narrow screens so labels stay on one line. */}
+                    <div
+                      className={`grid auto-cols-fr grid-flow-col gap-2.5 ${rise}`}
                       style={delay(0.66)}
-                      onClick={handleGuestLogin}
-                      disabled={busy}
                     >
-                      <GuestIcon />
-                      {loggingIn ? "Opening demo…" : "Guest"}
-                    </button>
+                      <ProviderButtons />
+                      <button
+                        type="button"
+                        className={`${auth.ghost} ${auth.tight}`}
+                        onClick={handleGuestLogin}
+                        disabled={busy}
+                      >
+                        <GuestIcon />
+                        {loggingIn ? "Opening demo…" : "Guest"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className={`${auth.foot} ${rise}`} style={delay(0.72)}>

@@ -7,6 +7,7 @@ describe("audit events", () => {
     expect(eventLabel("TWO_FACTOR_ENABLED")).toBe(
       "Two-factor sign-in turned on",
     );
+    expect(eventLabel("PROVIDER_LINKED")).toBe("Sign-in method added");
     expect(eventLabel("SOMETHING_NEW")).toBe("SOMETHING_NEW");
   });
 

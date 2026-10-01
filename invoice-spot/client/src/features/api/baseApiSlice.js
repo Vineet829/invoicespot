@@ -1,22 +1,14 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { logIn, logOut } from "../auth/authSlice";
 import { businessChanged } from "../business/businessSlice";
+import { API_BASE } from "./apiBase";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl:
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV
-      ? "/api/v1"
-      : "https://invoice.vineetpersonal.site/api/v1"),
+  baseUrl: API_BASE,
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.user?.accessToken;
-    const googleToken = getState().auth.googleToken;
-    if (token) {
-      headers.set("authorization", `Bearer ${token}`);
-    } else if (googleToken) {
-      headers.set("authorization", `Bearer ${googleToken}`);
-    }
+    if (token) headers.set("authorization", `Bearer ${token}`);
     const businessId = getState().business?.activeId;
     if (businessId) headers.set("x-business-id", businessId);
     return headers;
@@ -96,6 +88,7 @@ export const baseApiSlice = createApi({
     "Team",
     "Invitation",
     "Portal",
+    "Expense",
   ],
   endpoints: (builder) => ({}),
 });

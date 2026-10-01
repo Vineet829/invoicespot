@@ -17,6 +17,11 @@ export const reportsApiSlice = baseApiSlice.injectEndpoints({
         `/report/tax?${new URLSearchParams({ period, ...(view && { view }) })}`,
       providesTags: ["Document", "Customer"],
     }),
+    // Income less expenses; expenses change it too.
+    getProfitReport: builder.query({
+      query: (period) => `/report/profit?${new URLSearchParams({ period })}`,
+      providesTags: ["Document", "Expense"],
+    }),
     getTdsReport: builder.query({
       query: (period) => `/report/tds?${new URLSearchParams({ period })}`,
       providesTags: ["Document", "Customer"],
@@ -48,6 +53,7 @@ export const {
   useGetReportQuery,
   useGetTaxReportQuery,
   useGetTdsReportQuery,
+  useGetProfitReportQuery,
   useGetReportCsvMutation,
   useGetGstReturnsQuery,
   useGetGstCsvMutation,
