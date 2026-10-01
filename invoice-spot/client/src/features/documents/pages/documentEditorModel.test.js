@@ -26,7 +26,7 @@ const customer = {
 const input = {
   customer,
   documentType: "Invoice",
-  dueDate: "2026-10-01T06:30:00.000Z",
+  dueDate: "2026-10-01",
   currency: "USD",
   additionalInfo: "Project work",
   termsConditions: "Due in 14 days",

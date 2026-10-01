@@ -72,14 +72,14 @@ export const DueDate = ({ value, overdue = false }) =>
   ) : (
     dateLabel(value)
   );
+// The day a date field holds. A day sent as YYYY-MM-DD stays that day in any
+// time zone; a moment is its day where the browser is.
 export const dateInput = (value) => {
-  const date = value ? new Date(value) : new Date();
+  const date = value ? parseDate(value) : new Date();
   return Number.isFinite(date.getTime())
     ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
     : "";
 };
-export const dateInstant = (value) =>
-  value ? new Date(`${value}T12:00:00`).toISOString() : null;
 
 // Page sections rise one after another, like the overview's panels. On a
 // `fill` page, a `fill` panel reaches the bottom of wide windows.

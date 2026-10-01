@@ -5,7 +5,6 @@ import { Dialog } from "../../../components/workspace/Dialog";
 import {
   Field,
   dateInput,
-  dateInstant,
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
@@ -63,7 +62,7 @@ const IssueForm = ({
       const result = await issue({
         id: document._id,
         issueDate,
-        ...(dueDate && { dueDate: dateInstant(dueDate) }),
+        ...(dueDate && { dueDate }),
         ...(foreign && { exchangeRate: exchangeRate.trim() }),
       }).unwrap();
       toast.success(result.message || "The document was issued.");

@@ -22,6 +22,7 @@ import {
 } from "../../business/businessApiSlice";
 import { useUploadProfileLogoMutation } from "../../workspace/workspaceApiSlice";
 import SettingsTabs from "../components/SettingsTabs";
+import { printsOnPdfs } from "../logo";
 import { useBusiness } from "../../business/permissions";
 
 const KEYS = [
@@ -180,6 +181,11 @@ const BusinessFields = ({ business }) => {
               <Field
                 label="Logo URL"
                 maxLength={500}
+                hint={
+                  printsOnPdfs(values.logo)
+                    ? undefined
+                    : "Your PDFs leave this logo out. Upload it below as a PNG, JPEG or GIF to print it on them too."
+                }
                 className="col-span-full"
                 {...field("logo")}
               />
