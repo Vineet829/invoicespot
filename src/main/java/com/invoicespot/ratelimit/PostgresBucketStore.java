@@ -28,10 +28,13 @@ import org.springframework.boot.autoconfigure.jdbc.JdbcConnectionDetails;
 // transactions that already hold one of the app's connections, and with one
 // shared pool, busy requests could each wait for a second connection none can
 // get. Bucket4j commits on that connection itself, so what it records stays
-// even when the caller's transaction rolls back.
+// even when the caller's transaction rolls back. A request waits a moment at
+// most for one of its connections: past that the limiter is too busy, and the
+// request is refused rather than kept waiting.
 class PostgresBucketStore implements BucketStore, AutoCloseable {
 
-    private static final int POOL_SIZE = 4;
+    static final int POOL_SIZE = 4;
+    private static final Duration CONNECTION_WAIT = Duration.ofSeconds(2);
     // A row can be removed five minutes after its bucket is full again.
     private static final Duration KEEP_FULL = Duration.ofMinutes(5);
     private static final int CLEANUP_BATCH = 1_000;
@@ -48,8 +51,12 @@ class PostgresBucketStore implements BucketStore, AutoCloseable {
                 hmac(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC), ID_KEY_LABEL), HMAC);
         pool.setPoolName("rate-limits");
         pool.setMaximumPoolSize(POOL_SIZE);
-        pool.setDriverClassName(connection.getDriverClassName());
-        pool.setJdbcUrl(connection.getJdbcUrl());
+        pool.setConnectionTimeout(CONNECTION_WAIT.toMillis());
+        // Through a data source of its own, so the login timeout Hikari makes
+        // of that wait is set on this pool's connections: given a JDBC URL,
+        // Hikari would set it on DriverManager, for the whole JVM.
+        pool.setDataSourceClassName("org.postgresql.ds.PGSimpleDataSource");
+        pool.addDataSourceProperty("url", connection.getJdbcUrl());
         pool.setUsername(connection.getUsername());
         pool.setPassword(connection.getPassword());
         buckets = Bucket4jPostgreSQL.selectForUpdateBasedBuilder(pool)

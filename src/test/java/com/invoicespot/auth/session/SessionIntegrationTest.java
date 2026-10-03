@@ -108,6 +108,44 @@ class SessionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a token handed out a moment ago isn't swapped again, so a tab still sending the one before gets in")
+    void noSecondSwapWithinGrace() throws Exception {
+        User user = withPassword();
+        SignedIn first = signIn(user);
+        SignedIn rotated = read(refresh(first.refresh()).andExpect(status().isOk()).andReturn().getResponse());
+
+        // A tab that already has the new cookie refreshes a moment later.
+        refresh(rotated.refresh())
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        // A tab that sent the first cookie before either answer came back.
+        MockHttpServletResponse late = refresh(first.refresh())
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andReturn()
+                .getResponse();
+
+        profile(read(late).access()).andExpect(status().isOk());
+        assertThat(active(user)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("once that moment has passed, the token is swapped again")
+    void swapsAgainAfterGrace() throws Exception {
+        User user = withPassword();
+        SignedIn first = signIn(user);
+        SignedIn rotated = read(refresh(first.refresh()).andReturn().getResponse());
+        jdbcTemplate.update(
+                "update user_sessions set rotated_at = now() - interval '1 minute' where user_pkid = ?",
+                user.getPkid());
+
+        SignedIn next = read(refresh(rotated.refresh()).andExpect(status().isOk()).andReturn().getResponse());
+
+        assertThat(next.refresh()).isNotNull().isNotEqualTo(rotated.refresh());
+        refresh(next.refresh()).andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("an old token coming back after that signs out every session of the account")
     void reusedToken() throws Exception {
         User user = withPassword();
@@ -140,6 +178,22 @@ class SessionIntegrationTest extends IntegrationTest {
 
         profile(session.access()).andExpect(status().isForbidden());
         refresh(session.refresh()).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("signing out with the cookie a refresh has just replaced still ends the session")
+    void signOutWithReplacedCookie() throws Exception {
+        User user = withPassword();
+        SignedIn first = signIn(user);
+        SignedIn rotated = read(refresh(first.refresh()).andExpect(status().isOk()).andReturn().getResponse());
+
+        // The tab signing out sent its cookie before the refresh's answer came back.
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(new Cookie("jwt", first.refresh())))
+                .andExpect(status().isOk());
+
+        profile(rotated.access()).andExpect(status().isForbidden());
+        refresh(rotated.refresh()).andExpect(status().isForbidden());
+        assertThat(active(user)).isEmpty();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.invoicespot.upload;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -57,6 +58,19 @@ class UploadServingIntegrationTest extends IntegrationTest {
                 .andExpect(header().string("Content-Security-Policy", "sandbox"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"));
         mockMvc.perform(get("/uploads/{name}", page.getFileName().toString())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("an image is kept by browsers for a year, as an upload's name is never reused; a missing one isn't")
+    void imagesAreKept() throws Exception {
+        mockMvc.perform(get("/uploads/{name}", image.getFileName().toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "max-age=31536000, public, immutable"))
+                .andExpect(header().doesNotExist(HttpHeaders.PRAGMA))
+                .andExpect(header().doesNotExist(HttpHeaders.EXPIRES));
+        mockMvc.perform(get("/uploads/{name}", UUID.randomUUID() + ".png"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
     }
 
     @Test

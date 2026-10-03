@@ -15,6 +15,7 @@ import com.invoicespot.user.UserRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.Locale;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,30 +73,45 @@ public class OAuthAccounts {
                 .getPkid();
     }
 
+    // A refusal is logged as a wrong password is: for the account with the
+    // email, if there is one.
     private UserIdentity linkOrCreate(ProviderProfile profile, String via) {
-        if (profile.email() == null || !profile.emailVerified()) {
+        if (profile.email() == null) {
             throw new OAuthSignInException("unverified_email");
         }
         String email = profile.email().trim().toLowerCase(Locale.ROOT);
+        Optional<User> account = userRepository.findByEmailIgnoreCase(email);
+        if (!profile.emailVerified()) {
+            auditLog.signInFailed(
+                    email, account.orElse(null), via + ": email not verified by " + profile.provider().label());
+            throw new OAuthSignInException("unverified_email");
+        }
         if (demoAccountGuard.isDemoEmail(email)) {
+            auditLog.signInFailed(email, account.orElse(null), via + ": demo account");
             throw new OAuthSignInException("demo_account");
         }
-        return userRepository.findByEmailIgnoreCase(email)
-                .map(user -> link(user, profile, email, via))
-                .orElseGet(() -> create(profile, email));
+        return account.map(user -> link(user, profile, email, via)).orElseGet(() -> create(profile, email));
     }
 
-    // The account with the email the provider vouched for. One nobody ever
-    // verified may have been registered by someone else, with a password of
-    // their own: that password, its sessions and its email links stop
-    // working, and only the provider's account opens it from now on.
+    // The account with the email the provider vouched for, when the provider
+    // hosts that email. Any other address it checked only once, and it may
+    // belong to someone else by now: that account opens with its password.
+    // One nobody ever verified may have been registered by someone else, with
+    // a password of their own: that password, its sessions and its email links
+    // stop working, and only the provider's account opens it from now on.
     private UserIdentity link(User user, ProviderProfile profile, String email, String via) {
         if (!user.isActive()) {
             auditLog.signInFailed(email, user, via + ": account deactivated");
             throw new OAuthSignInException("deactivated");
         }
         if (identities.existsByUserAndProvider(user, profile.provider().id())) {
+            auditLog.signInFailed(
+                    email, user, via + ": linked to a different " + profile.provider().label() + " account");
             throw new OAuthSignInException("already_linked");
+        }
+        if (!profile.emailHosted()) {
+            auditLog.signInFailed(email, user, via + ": email not hosted by " + profile.provider().label());
+            throw new OAuthSignInException("email_not_hosted");
         }
         if (!user.isEmailVerified()) {
             user.setEmailVerified(true);

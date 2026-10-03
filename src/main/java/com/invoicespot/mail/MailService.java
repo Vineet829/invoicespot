@@ -40,14 +40,14 @@ public class MailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(to);
-        message.setSubject(subject);
+        message.setSubject(oneLine(subject));
         message.setText(body);
         try {
             mailSender.send(message);
             metrics.emailSent(ACCOUNT);
         } catch (MailException exception) {
             metrics.emailFailed(ACCOUNT);
-            LOGGER.error("Failed to send \"{}\" to {}", subject, to, exception);
+            LOGGER.error("Failed to send \"{}\" to {}", message.getSubject(), to, exception);
         }
     }
 
@@ -61,7 +61,7 @@ public class MailService {
         if (replyTo != null && !replyTo.isBlank()) {
             helper.setReplyTo(replyTo);
         }
-        helper.setSubject(subject);
+        helper.setSubject(oneLine(subject));
         helper.setText(body);
         deliver(BUSINESS, message);
     }
@@ -81,7 +81,7 @@ public class MailService {
         if (replyTo != null && !replyTo.isBlank()) {
             helper.setReplyTo(replyTo);
         }
-        helper.setSubject(subject);
+        helper.setSubject(oneLine(subject));
         helper.setText(body);
         helper.addAttachment(attachmentName, new ByteArrayResource(attachment));
         deliver(DOCUMENT, message);
@@ -96,5 +96,12 @@ public class MailService {
             throw exception;
         }
         metrics.emailSent(kind);
+    }
+
+    // A subject is one line. A line break in a name it carries, a business's
+    // or a person's, becomes a space, so it can't start a header of its own
+    // or a line in the log.
+    private static String oneLine(String subject) {
+        return subject == null ? null : subject.replaceAll("[\\r\\n]+", " ").trim();
     }
 }

@@ -33,7 +33,15 @@ public final class OAuthStub {
     public static final String GOOGLE_CLIENT_ID = "google-test-client";
     public static final String GOOGLE_CLIENT_SECRET = "google-test-secret";
 
-    public record GoogleUser(String sub, String email, boolean emailVerified, String givenName, String familyName) {}
+    // `hostedDomain` is the hd claim: the Google Workspace domain someone is
+    // at, or null for anyone else.
+    public record GoogleUser(
+            String sub, String email, boolean emailVerified, String givenName, String familyName, String hostedDomain) {
+
+        public GoogleUser(String sub, String email, boolean emailVerified, String givenName, String familyName) {
+            this(sub, email, emailVerified, givenName, familyName, null);
+        }
+    }
 
     private static final OAuthStub INSTANCE = new OAuthStub();
 
@@ -120,6 +128,9 @@ public final class OAuthStub {
         }
         if (user.familyName() != null) {
             claims.put("family_name", user.familyName());
+        }
+        if (user.hostedDomain() != null) {
+            claims.put("hd", user.hostedDomain());
         }
         return claims;
     }

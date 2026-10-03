@@ -198,6 +198,27 @@ class SharedRateLimiterIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("the daily cleanup keeps a bucket whose first write was cut short for a day, then removes it")
+    void removesCutShort() {
+        String id = id(RateLimit.SIGN_UP, address());
+        // Bucket4j inserts the id alone, then sets the state and expiry; the
+        // request ended in between.
+        jdbcTemplate.update("insert into rate_limit_buckets (id, state) values (?, null)", id);
+
+        rateLimiter.removeExpired();
+        assertThat(storedIds()).contains(id);
+
+        // As if it was written two days ago.
+        jdbcTemplate.update(
+                "update rate_limit_buckets set expires_at = expires_at - ? where id = ?",
+                Duration.ofDays(2).toMillis(),
+                id);
+
+        rateLimiter.removeExpired();
+        assertThat(storedIds()).doesNotContain(id);
+    }
+
+    @Test
     @DisplayName("with RATE_LIMIT_SHARED=false each server keeps its buckets in memory")
     void inMemory() {
         ApplicationContextRunner runner = new ApplicationContextRunner()

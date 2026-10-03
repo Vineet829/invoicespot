@@ -16,12 +16,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 // Signs in with a provider's account, by these rules in order. An account at
 // the provider already linked opens its account here, whatever its email is
 // now. Otherwise the provider has to vouch for the email: it links the
-// account with that email, or makes a new one (OAuthAccounts). The demo
-// account is never linked or made. Then it is a sign-in like any other: a
-// deactivated account is refused, and two-factor sign-in still asks for its
-// code. The account is found or made, and committed, before the sign-in's own
-// transaction opens, so a sign-in holds at most two connections at once: its
-// own and the log's.
+// account with that email if the provider hosts the email, or makes a new
+// one (OAuthAccounts). The demo account is never linked or made. Then it is
+// a sign-in like any other: a deactivated account is refused, and two-factor
+// sign-in still asks for its code. The account is found or made, and
+// committed, before the sign-in's own transaction opens, so a sign-in holds
+// at most two connections at once: its own and the log's.
 @Service
 public class OAuthSignIn {
 
@@ -64,6 +64,7 @@ public class OAuthSignIn {
                 throw new OAuthSignInException("deactivated");
             }
             if (demoAccountGuard.isDemo(user)) {
+                auditLog.signInFailed(user.getEmail(), user, via + ": demo account");
                 throw new OAuthSignInException("demo_account");
             }
             identity.setLastUsedAt(clock.instant());

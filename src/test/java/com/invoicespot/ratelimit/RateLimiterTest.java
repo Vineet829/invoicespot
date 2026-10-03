@@ -5,7 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.invoicespot.metrics.AppMetrics;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.BucketExceptions.BucketExecutionException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.sql.SQLException;
+import java.sql.SQLTransientConnectionException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +17,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 class RateLimiterTest {
 
@@ -85,5 +90,57 @@ class RateLimiterTest {
         assertThat(new RateLimitedException("Slow down", 1).getMessage()).isEqualTo("Slow down. Please try again in 1 second.");
         assertThat(new RateLimitedException("Slow down", 42).getMessage()).isEqualTo("Slow down. Please try again in 42 seconds.");
         assertThat(new RateLimitedException("Slow down", 61).getMessage()).isEqualTo("Slow down. Please try again in 2 minutes.");
+    }
+
+    // A store whose every call fails as the database store's does: bucket4j
+    // wraps what the connection pool or driver threw.
+    private static BucketStore failing(SQLException cause) {
+        return new BucketStore() {
+            @Override
+            public Bucket bucket(RateLimit limit, String key) {
+                throw new BucketExecutionException(cause);
+            }
+
+            @Override
+            public void reset(RateLimit limit, String key) {
+                throw new BucketExecutionException(cause);
+            }
+
+            @Override
+            public int removeExpired() {
+                return 0;
+            }
+        };
+    }
+
+    @Test
+    @DisplayName("when no connection to the limits frees up in time, every check is refused with a 503 to retry")
+    void busy() {
+        RateLimiter busy = new RateLimiter(
+                failing(new SQLTransientConnectionException("rate-limits - Connection is not available")),
+                new AppMetrics(registry));
+
+        for (Runnable check : new Runnable[] {
+                () -> busy.consume(RateLimit.SIGN_UP, "10.0.0.1"),
+                () -> busy.requireAvailable(RateLimit.FAILED_SIGN_IN, "ip|ada"),
+                () -> busy.recordFailure(RateLimit.FAILED_SIGN_IN, "ip|ada"),
+                () -> busy.reset(RateLimit.FAILED_SIGN_IN, "ip|ada")}) {
+            assertThatThrownBy(check::run)
+                    .isInstanceOfSatisfying(RateLimitedException.class, refusal -> {
+                        assertThat(refusal.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+                        assertThat(refusal.getRetryAfterSeconds()).isEqualTo(5L);
+                    })
+                    .hasMessage("Too many requests right now. Please try again in 5 seconds.");
+        }
+    }
+
+    @Test
+    @DisplayName("any other failure of the limits stays an error")
+    void broken() {
+        RateLimiter broken = new RateLimiter(
+                failing(new SQLException("relation \"rate_limit_buckets\" does not exist")), new AppMetrics(registry));
+
+        assertThatThrownBy(() -> broken.consume(RateLimit.SIGN_UP, "10.0.0.1"))
+                .isInstanceOf(BucketExecutionException.class);
     }
 }

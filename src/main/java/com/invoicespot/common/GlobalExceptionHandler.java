@@ -28,9 +28,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RateLimitedException.class)
     public ResponseEntity<ErrorResponse> handleRateLimited(RateLimitedException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        return ResponseEntity.status(ex.getStatus())
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
-                .body(ErrorResponse.of(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage()));
+                .body(ErrorResponse.of(ex.getStatus().value(), ex.getMessage()));
     }
 
     @ExceptionHandler(BusinessChangedException.class)

@@ -1,7 +1,9 @@
 package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +25,11 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -139,6 +146,40 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/v1/notification").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.unread").value(3))
                 .andExpect(jsonPath("$.notifications[0].type").value("REMINDER_SENT"));
+    }
+
+    @Test
+    @DisplayName("two runs at once send a due reminder once")
+    void twoRunsAtOnce() throws Exception {
+        User owner = createUser();
+        turnOnReminders(owner);
+        Invoice due = invoice(owner, today);
+        // A send to this client waits, a few seconds at most, for a second
+        // one, so two runs that both found the reminder due both send it.
+        CountDownLatch bothSending = new CountDownLatch(2);
+        doAnswer(invocation -> {
+                    MimeMessage message = invocation.getArgument(0);
+                    if (message.getAllRecipients()[0].toString().equals(due.email())) {
+                        bothSending.countDown();
+                        bothSending.await(4, TimeUnit.SECONDS);
+                    }
+                    return null;
+                })
+                .when(mailSender)
+                .send(any(MimeMessage.class));
+        Instant now = Instant.now();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> first = pool.submit(() -> reminders.send(now));
+            Future<Integer> second = pool.submit(() -> reminders.send(now));
+            first.get(60, TimeUnit.SECONDS);
+            second.get(60, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(recipients()).containsOnlyOnce(due.email());
+        assertThat(remindersSent(owner, due)).isEqualTo(1);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.invoicespot.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -110,6 +111,12 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
         return new OAuthStub.GoogleUser("google-" + UUID.randomUUID(), email, true, "Ada", "Lovelace");
     }
 
+    // Someone at a Google Workspace domain, the email's own: Google hosts it.
+    private static OAuthStub.GoogleUser workspace(String email) {
+        return new OAuthStub.GoogleUser(
+                "google-" + UUID.randomUUID(), email, true, "Ada", "Lovelace", email.substring(email.indexOf('@') + 1));
+    }
+
     private static String freshEmail() {
         return "ada-" + UUID.randomUUID().toString().substring(0, 8) + "@gmail.test";
     }
@@ -197,7 +204,7 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
         existing.setPassword(passwordEncoder.encode(PASSWORD));
         userRepository.save(existing);
 
-        MockHttpServletResponse done = signIn(google(existing.getEmail()));
+        MockHttpServletResponse done = signIn(workspace(existing.getEmail()));
 
         assertThat(done.getHeader(HttpHeaders.LOCATION)).isEqualTo(CLIENT + "/auth/callback");
         User linked = reloaded(existing);
@@ -227,7 +234,7 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
         userRepository.save(pending);
         String earlierSession = sessionService.start(pending).refreshToken();
 
-        signIn(google(pending.getEmail()));
+        signIn(workspace(pending.getEmail()));
 
         User owned = reloaded(pending);
         assertThat(owned.isEmailVerified()).isTrue();
@@ -235,6 +242,58 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
         assertThat(owned.getPasswordChangedAt()).isNotNull();
         mockMvc.perform(get("/api/v1/auth/new_access_token").cookie(new Cookie("jwt", earlierSession)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("an email Google doesn't host opens no existing account: Google checked it once, it may have moved")
+    void notHostedEmailOpensNoAccount() throws Exception {
+        User existing = createUser();
+        existing.setPassword(passwordEncoder.encode(PASSWORD));
+        userRepository.save(existing);
+
+        MockHttpServletResponse done = signIn(google(existing.getEmail()));
+
+        assertThat(done.getHeader(HttpHeaders.LOCATION)).isEqualTo(refused("email_not_hosted"));
+        assertThat(done.getCookie("jwt")).isNull();
+        assertThat(identities.findAll())
+                .noneMatch(identity -> identity.getUser().getPkid().equals(existing.getPkid()));
+        assertThat(eventsOf(existing)).extracting(AuditEvent::getType)
+                .doesNotContain(AuditEventType.PROVIDER_LINKED, AuditEventType.SIGN_IN);
+    }
+
+    @Test
+    @DisplayName("an email Google doesn't host takes no unverified account over: its password and sessions stay")
+    void notHostedEmailTakesNothingOver() throws Exception {
+        User pending = createUser();
+        pending.setEmailVerified(false);
+        pending.setPassword(passwordEncoder.encode(PASSWORD));
+        userRepository.save(pending);
+        String earlierSession = sessionService.start(pending).refreshToken();
+
+        MockHttpServletResponse done = signIn(google(pending.getEmail()));
+
+        assertThat(done.getHeader(HttpHeaders.LOCATION)).isEqualTo(refused("email_not_hosted"));
+        User unchanged = reloaded(pending);
+        assertThat(unchanged.isEmailVerified()).isFalse();
+        assertThat(unchanged.getPassword()).isEqualTo(pending.getPassword());
+        assertThat(identities.findAll())
+                .noneMatch(identity -> identity.getUser().getPkid().equals(pending.getPkid()));
+        mockMvc.perform(get("/api/v1/auth/new_access_token").cookie(new Cookie("jwt", earlierSession)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a Gmail address opens the account that has it, as a Workspace one does")
+    void linksGmailAccount() throws Exception {
+        User existing = createUser();
+        existing.setEmail(existing.getUsername() + "@gmail.com");
+        userRepository.save(existing);
+
+        MockHttpServletResponse done = signIn(google(existing.getEmail()));
+
+        assertThat(done.getHeader(HttpHeaders.LOCATION)).isEqualTo(CLIENT + "/auth/callback");
+        assertThat(eventsOf(existing)).extracting(AuditEvent::getType)
+                .containsSubsequence(AuditEventType.PROVIDER_LINKED, AuditEventType.SIGN_IN);
     }
 
     @Test
@@ -281,6 +340,51 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a refused Google sign-in is logged as a wrong password is, for the account with the email if any")
+    void refusalsLogged() throws Exception {
+        OAuthStub.GoogleUser first = google(freshEmail());
+        signIn(first);
+        User linked = userRepository.findByEmailIgnoreCase(first.email()).orElseThrow();
+        assertThat(signIn(google(first.email())).getHeader(HttpHeaders.LOCATION))
+                .isEqualTo(refused("already_linked"));
+        assertThat(lastEventOf(linked).getType()).isEqualTo(AuditEventType.SIGN_IN_FAILED);
+        assertThat(lastEventOf(linked).getDetail()).isEqualTo("With Google: linked to a different Google account");
+
+        User notHosted = createUser();
+        assertThat(signIn(google(notHosted.getEmail())).getHeader(HttpHeaders.LOCATION))
+                .isEqualTo(refused("email_not_hosted"));
+        assertThat(eventsOf(notHosted))
+                .extracting(AuditEvent::getType, AuditEvent::getDetail)
+                .containsExactly(tuple(AuditEventType.SIGN_IN_FAILED, "With Google: email not hosted by Google"));
+
+        User existing = createUser();
+        OAuthStub.GoogleUser unverified =
+                new OAuthStub.GoogleUser("google-" + UUID.randomUUID(), existing.getEmail(), false, "Ada", null);
+        assertThat(signIn(unverified).getHeader(HttpHeaders.LOCATION)).isEqualTo(refused("unverified_email"));
+        assertThat(eventsOf(existing))
+                .extracting(AuditEvent::getType, AuditEvent::getDetail)
+                .containsExactly(tuple(AuditEventType.SIGN_IN_FAILED, "With Google: email not verified by Google"));
+
+        String nobody = freshEmail();
+        signIn(new OAuthStub.GoogleUser("google-" + UUID.randomUUID(), nobody, false, "Ada", null));
+        assertThat(auditEvents.findAll())
+                .filteredOn(event -> nobody.equals(event.getEmail()))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getType()).isEqualTo(AuditEventType.SIGN_IN_FAILED);
+                    assertThat(event.getUser()).isNull();
+                });
+
+        // The demo account is shared by every test, so only its new entries.
+        User demo = demoUser();
+        int before = eventsOf(demo).size();
+        assertThat(signIn(google(DEMO_EMAIL)).getHeader(HttpHeaders.LOCATION)).isEqualTo(refused("demo_account"));
+        assertThat(eventsOf(demo).stream().skip(before))
+                .extracting(AuditEvent::getType, AuditEvent::getDetail)
+                .containsExactly(tuple(AuditEventType.SIGN_IN_FAILED, "With Google: demo account"));
+    }
+
+    @Test
     @DisplayName("with two-factor sign-in on, Google is only the first step, and the code still has to follow")
     void twoFactor() throws Exception {
         User user = createUser();
@@ -306,7 +410,7 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
                 .getContentAsString();
         List<String> recoveryCodes = JsonPath.read(enabled, "$.recoveryCodes");
 
-        MockHttpServletResponse done = signIn(google(user.getEmail()));
+        MockHttpServletResponse done = signIn(workspace(user.getEmail()));
         String location = done.getHeader(HttpHeaders.LOCATION);
 
         assertThat(location).startsWith(CLIENT + "/auth/callback#challenge=");
@@ -402,9 +506,13 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
         demoIdentity.setLinkedAt(Instant.now());
         identities.save(demoIdentity);
 
+        int before = eventsOf(demoUser()).size();
         assertThat(signIn(new OAuthStub.GoogleUser(demoIdentity.getSubject(), freshEmail(), true, "Ada", "Lovelace"))
                         .getHeader(HttpHeaders.LOCATION))
                 .isEqualTo(refused("demo_account"));
+        assertThat(eventsOf(demoUser()).stream().skip(before))
+                .extracting(AuditEvent::getType, AuditEvent::getDetail)
+                .containsExactly(tuple(AuditEventType.SIGN_IN_FAILED, "With Google: demo account"));
     }
 
     @Test

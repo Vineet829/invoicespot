@@ -23,10 +23,11 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 // Starts, continues and ends sessions. A refresh swaps the session's token
-// for a new one. The token it replaced still works for a few seconds, so a
-// second tab refreshing at the same moment gets an access token too; after
-// that, the old token coming back means it was copied, and every session of
-// that account is ended.
+// for a new one, at most once in a few seconds. The token it replaced still
+// works for those seconds and the new one isn't swapped again, so tabs that
+// refresh together all get an access token, whichever of the two cookies
+// each sent; after that, the old token coming back means it was copied, and
+// every session of that account is ended.
 @Service
 public class SessionService {
 
@@ -79,6 +80,11 @@ public class SessionService {
             if (!session.isActiveAt(now) || !session.getUser().isActive()) {
                 return Optional.empty();
             }
+            // Swapped a moment ago: another tab may still be sending the
+            // token before it, which a second swap would make unknown.
+            if (justRotated(session, now)) {
+                return Optional.of(new Continued(session, null));
+            }
             String next = SecretTokens.generate();
             session.setPreviousHash(hash);
             session.setTokenHash(SecretTokens.hash(next));
@@ -93,9 +99,7 @@ public class SessionService {
             return Optional.empty();
         }
         UserSession session = replaced.get();
-        if (session.isActiveAt(now)
-                && session.getUser().isActive()
-                && session.getRotatedAt().plus(GRACE).isAfter(now)) {
+        if (session.isActiveAt(now) && session.getUser().isActive() && justRotated(session, now)) {
             return Optional.of(new Continued(session, null));
         }
         if (session.isActiveAt(now)) {
@@ -111,10 +115,18 @@ public class SessionService {
         return Optional.empty();
     }
 
-    // Ends the session a refresh token opens, and says whose it was.
+    private static boolean justRotated(UserSession session, Instant now) {
+        return session.getRotatedAt() != null && session.getRotatedAt().plus(GRACE).isAfter(now);
+    }
+
+    // Ends the session a refresh token opens, and says whose it was. The token
+    // a refresh has just replaced still names it: a tab may sign out while
+    // another tab's refresh is on its way back.
     @Transactional
     public Optional<UserSession> end(String token) {
-        Optional<UserSession> session = repository.findByTokenHash(SecretTokens.hash(token))
+        String hash = SecretTokens.hash(token);
+        Optional<UserSession> session = repository.findByTokenHash(hash)
+                .or(() -> repository.findByPreviousHash(hash))
                 .filter(found -> found.getRevokedAt() == null);
         session.ifPresent(found -> found.setRevokedAt(clock.instant()));
         return session;

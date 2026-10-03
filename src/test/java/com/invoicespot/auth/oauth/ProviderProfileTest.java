@@ -45,7 +45,50 @@ class ProviderProfileTest {
         ProviderProfile profile = ProviderProfile.of("google", new DefaultOidcUser(List.of(), token));
 
         assertThat(profile).isEqualTo(new ProviderProfile(
-                SignInProvider.GOOGLE, "google-1", "ada.lovelace@gmail.test", true, "Ada", "Lovelace", "ada.lovelace"));
+                SignInProvider.GOOGLE,
+                "google-1",
+                "ada.lovelace@gmail.test",
+                true,
+                false,
+                "Ada",
+                "Lovelace",
+                "ada.lovelace"));
+    }
+
+    @Test
+    @DisplayName("Google hosts a Gmail address, and a Workspace account's, which carries the hd claim, and no other")
+    void emailHosted() {
+        assertThat(hosted("ada@gmail.com", null)).isTrue();
+        assertThat(hosted("Ada@GoogleMail.com", null)).isTrue();
+        assertThat(hosted("ada@example.test", "example.test")).isTrue();
+        // Google's rule is only that hd is set, whatever domain it names.
+        assertThat(hosted("ada@sales.example.test", "example.test")).isTrue();
+        assertThat(hosted("ada@example.test", null)).isFalse();
+        assertThat(hosted("ada@example.test", " ")).isFalse();
+        assertThat(hosted("ada@gmail.com.example.test", null)).isFalse();
+        assertThat(hosted("ada@notgmail.com", null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("the hd claim in Google's ID token says the email is hosted")
+    void hostedDomainFromIdToken() {
+        OidcIdToken token = OidcIdToken.withTokenValue("id-token")
+                .subject("google-1")
+                .claim("email", "ada@example.test")
+                .claim("email_verified", true)
+                .claim("hd", "example.test")
+                .build();
+
+        assertThat(ProviderProfile.of("google", new DefaultOidcUser(List.of(), token)).emailHosted()).isTrue();
+    }
+
+    private static boolean hosted(String email, String hostedDomain) {
+        Map<String, Object> claims = claims(true);
+        claims.put("email", email);
+        if (hostedDomain != null) {
+            claims.put("hd", hostedDomain);
+        }
+        return ProviderProfile.of("google", google(claims)).emailHosted();
     }
 
     @Test

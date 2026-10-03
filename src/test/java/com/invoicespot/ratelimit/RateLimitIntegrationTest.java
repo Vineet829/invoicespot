@@ -1,5 +1,6 @@
 package com.invoicespot.ratelimit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -8,12 +9,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -23,6 +32,18 @@ class RateLimitIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RateLimiter rateLimiter;
+
+    @Autowired
+    private PostgresBucketStore store;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static String address() {
         return "10." + (int) (Math.random() * 250) + "." + (int) (Math.random() * 250) + "." + (int) (Math.random() * 250);
@@ -114,6 +135,52 @@ class RateLimitIntegrationTest extends IntegrationTest {
                 result.andExpect(status().isTooManyRequests())
                         .andExpect(jsonPath("$.message").value(startsWith("Too many sign-ups from this network")));
             }
+        }
+    }
+
+    private int waitingOnBuckets() {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from pg_stat_activity where wait_event_type = 'Lock'"
+                        + " and query like 'SELECT state as state FROM rate_limit_buckets%'",
+                Integer.class);
+    }
+
+    @Test
+    @DisplayName("with every connection of the limiter busy, a sign-in is refused within seconds with a 503 to retry,"
+            + " not a 500 half a minute later")
+    void busyLimiter() throws Exception {
+        String flooding = address();
+        rateLimiter.consume(RateLimit.SIGN_UP, flooding);
+        ExecutorService waiting = Executors.newFixedThreadPool(PostgresBucketStore.POOL_SIZE);
+        try (Connection holder = dataSource.getConnection()) {
+            // A lock held on one bucket, as by a slow request: every call for
+            // that bucket waits on one of the limiter's connections.
+            holder.setAutoCommit(false);
+            try (PreparedStatement lock =
+                    holder.prepareStatement("select id from rate_limit_buckets where id = ? for update")) {
+                lock.setString(1, store.id(RateLimit.SIGN_UP, flooding));
+                lock.executeQuery().close();
+            }
+            for (int call = 0; call < PostgresBucketStore.POOL_SIZE; call++) {
+                waiting.submit(() -> rateLimiter.consume(RateLimit.SIGN_UP, flooding));
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (waitingOnBuckets() < PostgresBucketStore.POOL_SIZE && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            assertThat(waitingOnBuckets()).isEqualTo(PostgresBucketStore.POOL_SIZE);
+
+            long start = System.nanoTime();
+            login(address(), "nobody@example.test", "Wrong!password1")
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(header().string(HttpHeaders.RETRY_AFTER, "5"))
+                    .andExpect(jsonPath("$.message")
+                            .value("Too many requests right now. Please try again in 5 seconds."));
+            assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(10));
+            holder.rollback();
+        } finally {
+            waiting.shutdown();
+            assertThat(waiting.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
         }
     }
 }

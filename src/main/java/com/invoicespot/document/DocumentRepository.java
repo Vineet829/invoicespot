@@ -76,12 +76,16 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             @Param("to") LocalDate to);
 
     // Unpaid issued invoices due before a moment that nobody was yet told about.
-    @EntityGraph(attributePaths = {"business"})
+    // Locked, in a fixed order, so a run alongside another waits for it, then
+    // finds the invoices it alerted already alerted. Their businesses aren't
+    // fetched with them, which would lock those rows too.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select d from Document d
             where d.documentType = :invoice and d.issuedAt is not null and d.voidedAt is null
               and d.status <> :paid and d.total > 0
               and d.dueDate < :before and d.overdueAlertedAt is null
+            order by d.pkid
             """)
     List<Document> findUnalertedOverdue(
             @Param("invoice") DocumentType invoice,

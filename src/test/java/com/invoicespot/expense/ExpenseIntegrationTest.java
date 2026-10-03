@@ -21,17 +21,23 @@ import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 class ExpenseIntegrationTest extends IntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private User owner;
     private String session;
@@ -179,6 +185,26 @@ class ExpenseIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.expense.category").value("Office"));
         send(patch("/api/v1/expense/{id}", rail), "{\"category\": \"TRAVEL\"}")
                 .andExpect(jsonPath("$.expense.category").value("Travel"));
+    }
+
+    @Test
+    @DisplayName("a category two members saved at once in their own spellings takes the one used first from then on")
+    void categorySavedAtOnce() throws Exception {
+        for (List<String> spellings : List.of(List.of("Travel", "travel"), List.of("travel", "Travel"))) {
+            User someone = createUser();
+            Business business = businessOf(someone);
+            spellings.forEach(spelling -> jdbcTemplate.update(
+                    "insert into expenses (business_pkid, expense_date, category, amount, currency)"
+                            + " values (?, ?, ?, 5, 'USD')",
+                    business.getPkid(),
+                    TODAY,
+                    spelling));
+
+            send(post("/api/v1/expense"), bearer(someone), """
+                            {"date": "%s", "category": "TRAVEL", "amount": 5}
+                            """.formatted(TODAY))
+                    .andExpect(jsonPath("$.expense.category").value(spellings.get(0)));
+        }
     }
 
     @Test

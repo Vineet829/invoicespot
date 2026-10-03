@@ -37,6 +37,12 @@ spring:
           auth: false
           starttls:
             enable: false
+          # Milliseconds. Unset, they never run out: a mail server that stops
+          # answering would hold up a request, or the daily run with the invoice
+          # its reminder locks, forever.
+          connectiontimeout: 10000
+          timeout: 30000
+          writetimeout: 30000
 
   jackson:
     default-property-inclusion: always
