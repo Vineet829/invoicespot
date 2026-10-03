@@ -10,6 +10,7 @@ vi.mock("@reduxjs/toolkit/query/react", () => ({
 }));
 
 const request = fetchBaseQuery.mock.results[0].value;
+const pathOf = (args) => (typeof args === "string" ? args : args.url);
 let api;
 
 beforeEach(() => {
@@ -38,15 +39,30 @@ it.each([
 
   expect(result).toEqual({ data: { customers: [] } });
   expect(api.getState().auth.user.accessToken).toBe("renewed");
-  expect(request.mock.calls.map(([path]) => path)).toEqual([
+  expect(request.mock.calls.map(([args]) => pathOf(args))).toEqual([
     "/customer/all",
     "/auth/new_access_token",
     "/customer/all",
   ]);
 });
 
+it("sends the refresh with keepalive, so a reload half-way through still keeps the new cookie", async () => {
+  request
+    .mockResolvedValueOnce({ error: { status: 403 } })
+    .mockResolvedValueOnce({ data: { accessToken: "renewed" } })
+    .mockResolvedValueOnce({ data: { customers: [] } });
+
+  await baseApiSlice.baseQuery("/customer/all", api, {});
+
+  expect(request.mock.calls[1][0]).toEqual({
+    url: "/auth/new_access_token",
+    keepalive: true,
+  });
+});
+
 it("shares one cookie rotation between concurrent dashboard requests", async () => {
-  request.mockImplementation(async (path) => {
+  request.mockImplementation(async (args) => {
+    const path = pathOf(args);
     if (path === "/auth/new_access_token") {
       return { data: { accessToken: "renewed" } };
     }
@@ -65,7 +81,9 @@ it("shares one cookie rotation between concurrent dashboard requests", async () 
     { data: { resource: "/document/all" } },
   ]);
   expect(
-    request.mock.calls.filter(([path]) => path === "/auth/new_access_token"),
+    request.mock.calls.filter(
+      ([args]) => pathOf(args) === "/auth/new_access_token",
+    ),
   ).toHaveLength(1);
   expect(api.dispatch).toHaveBeenCalledTimes(1);
 });

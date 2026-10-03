@@ -522,18 +522,29 @@ const ReportsPage = () => {
           }}
         />
       ) : !shown ? (
-        <Panel>
-          <EmptyState
-            title="Nothing to report for this period."
-            text="Reports fill in as you issue invoices and receipts and record payments. Try a longer period, or create a document."
-            icon={FiBarChart2}
-            action={
-              <ActionLink to="/create-doc">
-                <FiPlus aria-hidden="true" /> Create document
-              </ActionLink>
-            }
-          />
-        </Panel>
+        <>
+          <Panel>
+            <EmptyState
+              title="Nothing to report for this period."
+              text="Reports fill in as you issue invoices and receipts and record payments. Try a longer period, or create a document."
+              icon={FiBarChart2}
+              action={
+                <ActionLink to="/create-doc">
+                  <FiPlus aria-hidden="true" /> Create document
+                </ActionLink>
+              }
+            />
+          </Panel>
+          {/* Profit and loss counts expenses too, so it can have figures when
+              the rest of the report has none. */}
+          {profitQuery.data?.currencies.length > 0 && (
+            <ProfitAndLoss
+              report={profitQuery.data}
+              periodName={periodName}
+              busy={profitQuery.isFetching}
+            />
+          )}
+        </>
       ) : (
         <>
           <section

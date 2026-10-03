@@ -1,4 +1,4 @@
-import { baseApiSlice } from "../api/baseApiSlice";
+import { baseApiSlice, refreshRequest } from "../api/baseApiSlice";
 import { logOut } from "./authSlice";
 
 export const authApiSlice = baseApiSlice.injectEndpoints({
@@ -68,7 +68,7 @@ export const authApiSlice = baseApiSlice.injectEndpoints({
     // Swaps the session's refresh cookie for an access token, as a reload
     // does; Google sign-in ends with a session and nothing else.
     refreshSession: builder.mutation({
-      query: () => "/auth/new_access_token",
+      query: () => refreshRequest,
     }),
   }),
 });

@@ -14,6 +14,8 @@ export const oauthErrorMessage = (code, providerName = "Google") => {
       return "This account has been deactivated. Please contact us.";
     case "already_linked":
       return `This account is already linked to a different ${providerName} account.`;
+    case "email_not_hosted":
+      return `An account already uses that email address, and ${providerName} can't confirm it's still yours. Please sign in with your password.`;
     // "failed", and any code this version of the app doesn't know yet.
     default:
       return `Signing in with ${providerName} didn't work. Please try again.`;
