@@ -12,9 +12,23 @@ const expired = token({ sub: "u1", roles: ["User"], exp: 1 });
 
 beforeEach(() => localStorage.clear());
 
-it("keeps a saved session whose token can be read, even an expired one, which a refresh renews", () => {
-  localStorage.setItem("user", JSON.stringify({ accessToken: expired }));
-  expect(readSavedUser(localStorage)).toEqual({ accessToken: expired });
+it("keeps who was signed in, but not a token an older version saved", () => {
+  localStorage.setItem(
+    "user",
+    JSON.stringify({
+      username: "asha",
+      firstName: "Asha",
+      accessToken: expired,
+    }),
+  );
+  expect(readSavedUser(localStorage)).toEqual({
+    username: "asha",
+    firstName: "Asha",
+  });
+  expect(JSON.parse(localStorage.getItem("user"))).toEqual({
+    username: "asha",
+    firstName: "Asha",
+  });
   expect(tokenRoles(expired)).toEqual(["User"]);
 });
 

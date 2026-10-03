@@ -25,6 +25,15 @@ const followBusiness = (response, api) => {
   return response;
 };
 
+// A refresh can swap the session's cookie. keepalive lets the new cookie
+// reach the browser even when the page reloads or closes before the answer
+// does; a browser left holding the cookie the server replaced would, on a
+// later refresh, sign out every device of the account.
+export const refreshRequest = {
+  url: "/auth/new_access_token",
+  keepalive: true,
+};
+
 let refreshInFlight;
 
 // The server answers an expired or revoked access token with an empty 403.
@@ -48,7 +57,7 @@ const refreshingQuery = async (args, api, extraOptions) => {
       return baseQuery(args, api, extraOptions);
     }
     if (!refreshInFlight) {
-      refreshInFlight = baseQuery("/auth/new_access_token", api, extraOptions)
+      refreshInFlight = baseQuery(refreshRequest, api, extraOptions)
         .then((result) => {
           if (result?.data) {
             api.dispatch(logIn({ ...result.data }));

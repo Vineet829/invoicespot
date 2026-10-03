@@ -1,13 +1,17 @@
 import { decodeToken } from "react-jwt";
 
-// The session saved in this browser, or none when it can't be read: a value
-// that isn't one, or whose token isn't a token, is dropped, so the app starts
-// signed out instead of failing to load.
+// Who was signed in on this browser, or no one when it can't be read. Only
+// who it was is kept, never the access token: a reload gets a new one through
+// the session's cookie. A token an older version saved here is dropped.
 export const readSavedUser = (storage) => {
   try {
     const user = JSON.parse(storage.getItem("user"));
-    if (user && typeof user === "object" && decodeToken(user.accessToken)) {
-      return user;
+    if (user && typeof user === "object" && typeof user.username === "string") {
+      const profile = withoutToken(user);
+      if ("accessToken" in user) {
+        storage.setItem("user", JSON.stringify(profile));
+      }
+      return profile;
     }
   } catch {
     // Dropped below, like any other value that isn't a session.
@@ -15,6 +19,12 @@ export const readSavedUser = (storage) => {
   storage.removeItem("user");
   return null;
 };
+
+// What a sign-in leaves in this browser: who it is, without the token.
+export const saveUser = (storage, user) =>
+  storage.setItem("user", JSON.stringify(withoutToken(user)));
+
+const withoutToken = ({ accessToken, ...profile }) => profile;
 
 // The roles an access token carries, or none when it can't be read.
 export const tokenRoles = (token) => {

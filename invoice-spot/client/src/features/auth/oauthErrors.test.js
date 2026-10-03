@@ -21,6 +21,9 @@ describe("oauthErrorMessage", () => {
     expect(oauthErrorMessage("already_linked")).toBe(
       "This account is already linked to a different Google account.",
     );
+    expect(oauthErrorMessage("email_not_hosted")).toBe(
+      "An account already uses that email address, and Google can't confirm it's still yours. Please sign in with your password.",
+    );
     expect(oauthErrorMessage("failed")).toBe(
       "Signing in with Google didn't work. Please try again.",
     );

@@ -1,3 +1,4 @@
+import { useSelector } from "react-redux";
 import { Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
@@ -43,6 +44,10 @@ import RecurringPage from "./features/recurring/pages/RecurringPage";
 import ReportsPage from "./features/reports/pages/ReportsPage";
 
 const App = () => {
+  // Nothing draws while a reload gets its access token back, so no page sees
+  // someone signed in without one.
+  const restoring = useSelector((state) => state.auth.restoring);
+  if (restoring) return null;
   return (
     <>
       <Routes>
