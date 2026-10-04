@@ -157,8 +157,11 @@ export const ActionLink = ({
     </Link>
   );
 };
+// An `id` lets a link from another page open this one at the panel, which
+// can then take focus.
 export const Panel = ({
   children,
+  id,
   title,
   description,
   aside,
@@ -166,7 +169,9 @@ export const Panel = ({
   className = "",
 }) => (
   <section
-    className={`${panel} ${fill ? "min-[1360px]:flex min-[1360px]:flex-1 min-[1360px]:flex-col" : ""} ${className}`}
+    id={id}
+    tabIndex={id ? -1 : undefined}
+    className={`${panel} ${id ? "scroll-mt-6" : ""} ${fill ? "min-[1360px]:flex min-[1360px]:flex-1 min-[1360px]:flex-col" : ""} ${className}`}
   >
     {title && (
       <header className="mb-5 flex items-start justify-between gap-4 compact:mb-4 max-[700px]:flex-wrap">

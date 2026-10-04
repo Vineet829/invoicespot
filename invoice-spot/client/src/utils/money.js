@@ -4,8 +4,19 @@
 const localeOf = (currency) =>
   String(currency || "").toUpperCase() === "INR" ? "en-IN" : "en";
 
+// Building a number format costs far more than using one, and charts format
+// many amounts at a time, so each locale and set of options gets one.
+const formats = new Map();
+const numberFormat = (locale, options) => {
+  const key = `${locale} ${JSON.stringify(options)}`;
+  if (!formats.has(key)) {
+    formats.set(key, new Intl.NumberFormat(locale, options));
+  }
+  return formats.get(key);
+};
+
 export const formatAmount = (value, currency) =>
-  new Intl.NumberFormat(localeOf(currency), {
+  numberFormat(localeOf(currency), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
@@ -13,7 +24,7 @@ export const formatAmount = (value, currency) =>
 // A short form for chart axes: 1.2L and 1.2Cr for rupees, 1.2K and 1.2M
 // otherwise.
 export const compactAmount = (value, currency) =>
-  new Intl.NumberFormat(localeOf(currency), {
+  numberFormat(localeOf(currency), {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(Number(value) || 0);

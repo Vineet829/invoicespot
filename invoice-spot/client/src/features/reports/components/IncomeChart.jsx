@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
+import useWidth from "../../../hooks/useWidth";
 import {
   HoverCard,
   useHoverCard,
@@ -11,25 +12,6 @@ const HEIGHT = 250;
 const AXIS = 52;
 const TOP = 10;
 const LABELS = 40;
-
-// The chart is drawn at the width it is given, so bars and text keep their
-// real size; before that is known it assumes a desktop width.
-const useWidth = (fallback) => {
-  const ref = useRef(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return undefined;
-    setWidth(Math.round(element.getBoundingClientRect().width));
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(([entry]) =>
-      setWidth(Math.round(entry.contentRect.width)),
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, width > 0 ? width : fallback];
-};
 
 export const SERIES = [
   {

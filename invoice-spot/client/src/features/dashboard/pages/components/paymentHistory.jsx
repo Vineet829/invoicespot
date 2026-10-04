@@ -87,8 +87,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments, currency }) => {
   // On desktop every row is a fifth of the table's height, so five rows fill
   // it at any page size: longer pages scroll inside the panel without
   // resizing the rows, and a short last page keeps the same row height.
-  const rowHeight =
-    "h-[46px] min-[1360px]:[height:max(40px,calc((100cqh_-_34px)_/_5))]";
+  const rowHeight = "min-[701px]:[height:max(40px,calc((100cqh_-_34px)_/_5))]";
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -102,18 +101,18 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments, currency }) => {
     >
       <header className={historyHeading}>
         <h2 id="payments-title" className={sectionTitle}>
-          Payment history
+          Latest payments
         </h2>
         <p className={panelNote}>Most recent first</p>
       </header>
       {rows.length ? (
         <div
-          className="relative min-h-[234px] flex-[1_1_0] overflow-y-auto [contain:size] [container-type:size] [scrollbar-color:#a996e0_#ffffff26] [scrollbar-width:thin] max-[700px]:h-[900px] max-[700px]:min-h-0 max-[700px]:flex-none"
+          className="relative min-h-[284px] flex-[1_1_0] overflow-y-auto [contain:size] [container-type:size] [scrollbar-color:#a996e0_#ffffff26] [scrollbar-width:thin] max-[700px]:h-[900px] max-[700px]:min-h-0 max-[700px]:flex-none"
           ref={scrollRef}
           onScroll={hide}
           tabIndex={0}
           role="region"
-          aria-label="Payment history rows"
+          aria-label="Latest payments rows"
         >
           <table className="w-full table-fixed border-separate border-spacing-0 text-left max-[700px]:block">
             <caption className="sr-only">Recorded payment history</caption>

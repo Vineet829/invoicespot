@@ -43,7 +43,7 @@ module.exports = {
           drawer: "#f0eef8",
           thead: "#f3f2f8",
         },
-        // The three financial summary cards.
+        // The financial cards, and the overview's tiles.
         card: {
           blue: {
             DEFAULT: "#cde3f4",
@@ -53,7 +53,6 @@ module.exports = {
             label: "#2b3a4d",
             icon: "#2e5b86",
             bar: "#3f79b0",
-            track: "#2337501f",
           },
           lilac: {
             DEFAULT: "#e5e1f8",
@@ -63,7 +62,6 @@ module.exports = {
             label: "#33294f",
             icon: "#5b47a0",
             bar: "#5b47a0",
-            track: "#3c2d6e1f",
           },
           peach: {
             DEFAULT: "#f9d9ca",
@@ -73,8 +71,35 @@ module.exports = {
             label: "#4d2d20",
             icon: "#a4502f",
             bar: "#c9643f",
-            track: "#783c231f",
           },
+          // The overview's profit tile. A loss is darker as well as
+          // warmer, so colour-blind readers can still tell it apart.
+          sage: {
+            DEFAULT: "#dcebd6",
+            ink: "#1f3320",
+            muted: "#3f5a3a",
+            decimal: "#4f6a4a",
+            label: "#233621",
+            bar: "#4f8a4a",
+            loss: "#8c3b1f",
+          },
+        },
+        // A figure's change against the period before. Each also has an
+        // arrow and words, so colour is never the only sign.
+        change: {
+          up: "#2f6b2c",
+          down: "#a4502f",
+        },
+        // Money owed, by whether it is due yet.
+        owed: {
+          due: "#a99fd6",
+          overdue: "#b5532f",
+        },
+        // The overview's cash flow: money in is spot violet, money out
+        // peach, and what was left the dark net line.
+        flow: {
+          out: "#d9774f",
+          net: "#2d3142",
         },
         // Initials avatars.
         avatar: {

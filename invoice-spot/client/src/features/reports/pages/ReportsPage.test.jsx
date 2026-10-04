@@ -1,10 +1,11 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { MemoryRouter } from "react-router-dom";
 import ReportsPage from "./ReportsPage";
 import {
   useGetProfitReportQuery,
+  useGetReportCsvMutation,
   useGetReportQuery,
   useGetTaxReportQuery,
   useGetTdsReportQuery,
@@ -54,11 +55,21 @@ beforeEach(() => {
   useGetTdsReportQuery.mockReturnValue(loaded({ currencies: [] }));
 });
 
-const render = () => {
-  const container = document.createElement("div");
+let root;
+let container;
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  delete Element.prototype.scrollIntoView;
+});
+
+// In the document, so a section can take focus.
+const render = (path = "/reports") => {
+  container = document.body.appendChild(document.createElement("div"));
+  root = createRoot(container);
   act(() => {
-    createRoot(container).render(
-      <MemoryRouter>
+    root.render(
+      <MemoryRouter initialEntries={[path]}>
         <ReportsPage />
       </MemoryRouter>,
     );
@@ -101,3 +112,97 @@ it("shows only that there is nothing to report when there are no expenses either
   );
   expect(headings(render())).toEqual(["Nothing to report for this period."]);
 });
+
+// A period with one invoice, part paid, in one currency.
+const withFigures = () => {
+  useGetReportCsvMutation.mockReturnValue([vi.fn(), { isLoading: false }]);
+  useGetReportQuery.mockReturnValue(
+    loaded({
+      period: "12m",
+      from: "2025-11-01",
+      to: "2026-10-02",
+      today: "2026-10-02",
+      years: [],
+      view: "currency",
+      baseCurrency: "USD",
+      notConverted: [],
+      currencies: [
+        {
+          currency: "USD",
+          billed: 1000,
+          received: 600,
+          outstanding: 400,
+          overdue: 0,
+          months: [{ month: "2026-09", billed: 1000, received: 600 }],
+          ageing: [
+            {
+              key: "notDue",
+              label: "Not due yet",
+              invoices: 1,
+              outstanding: 400,
+            },
+          ],
+          methods: [{ method: "Bank Transfer", payments: 1, amount: 600 }],
+          clients: [
+            {
+              customerId: "c1",
+              name: "Northwind",
+              documents: 1,
+              billed: 1000,
+              paid: 600,
+              outstanding: 400,
+            },
+          ],
+          otherClients: null,
+        },
+      ],
+    }),
+  );
+  useGetProfitReportQuery.mockReturnValue(
+    loaded({
+      period: "12m",
+      currencies: [
+        {
+          currency: "USD",
+          income: 900,
+          expenses: 0,
+          profit: 900,
+          months: [{ month: "2026-09", income: 900, expenses: 0, profit: 900 }],
+          categories: [],
+        },
+      ],
+    }),
+  );
+};
+
+it("opens at the section the overview links to, with focus there", () => {
+  withFigures();
+  const scrolled = [];
+  Element.prototype.scrollIntoView = vi.fn(function () {
+    scrolled.push(this.id);
+  });
+  const page = render("/reports#ageing");
+  expect(
+    ["income", "profit", "ageing", "clients"].map(
+      (id) => page.querySelector(`#${id}`)?.querySelector("h2").textContent,
+    ),
+  ).toEqual([
+    "Income by month",
+    "Profit and loss",
+    "Unpaid invoices by age",
+    "Top clients",
+  ]);
+  expect(scrolled).toEqual(["ageing"]);
+  expect(document.activeElement.id).toBe("ageing");
+});
+
+it.each(["/reports#%", "/reports#nowhere", "/reports"])(
+  "stays at the top for %s",
+  (path) => {
+    withFigures();
+    Element.prototype.scrollIntoView = vi.fn();
+    const page = render(path);
+    expect(page.querySelector("#income")).not.toBeNull();
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  },
+);

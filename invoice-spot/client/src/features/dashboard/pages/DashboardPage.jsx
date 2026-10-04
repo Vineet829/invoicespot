@@ -1,115 +1,160 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import {
-  FiAlertCircle,
-  FiArrowDownLeft,
-  FiClock,
-  FiTrendingUp,
-} from "react-icons/fi";
+import { Link, useSearchParams } from "react-router-dom";
+import { FiAlertCircle } from "react-icons/fi";
 import useTitle from "../../../hooks/useTitle";
 import { useGetOverviewQuery } from "../dashboardApiSlice";
 import {
-  formatMoney,
-  getFinanceBarRatios,
+  DEFAULT_PERIOD,
+  PERIODS,
+  findPeriod,
   paymentRows,
+  periodSubtitle,
 } from "../dashboardModel";
 import DashboardShell from "../components/DashboardShell";
 import {
   DashboardLoading,
   DocumentStatus,
-  FinancialCard,
-  OverviewTotals,
-  financeCards,
-  financePanel,
-  financePanelHeading,
-  mainColumn,
-  overviewLayout,
+  attentionPair,
+  chartPair,
 } from "../components/DashboardPanels";
+import OverviewTiles from "../components/OverviewTiles";
+import CashFlowPanel from "../components/CashFlowPanel";
+import OwedPanel from "../components/OwedPanel";
+import AttentionPanel from "../components/AttentionPanel";
 import {
   errorBanner,
   errorDetail,
   errorTitle,
-  pageSizeSelect,
   pageSubtitle,
   pageTitle,
-  panelNote,
   retryButton,
-  sectionTitle,
+  toolbarSelect,
 } from "../../../components/workspace/pastel";
 import PaymentHistory from "./components/paymentHistory";
 
 const NO_PAYMENTS = [];
+// What the overview draws from. An answer without these, as an older server
+// sends, can't be shown.
+const OVERVIEW_FIELDS = ["period", "totals", "owedNow", "trend"];
+
+const periodPill =
+  "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-[11px] px-3.5 text-[13px] transition-colors coarse:min-h-11 max-[700px]:flex-1 max-[700px]:px-2";
 
 const DashboardPage = () => {
   useTitle("Business overview — Invoice Spot");
   const [params, setParams] = useSearchParams();
+  const period = findPeriod(params.get("period")).key;
   const overviewQuery = useGetOverviewQuery(
-    params.get("currency") || undefined,
+    { currency: params.get("currency") || undefined, period },
     { refetchOnMountOrArgChange: 60 },
   );
-  const snapshot = overviewQuery.data;
+  const answer = overviewQuery.data;
+  const snapshot =
+    answer && OVERVIEW_FIELDS.every((key) => answer[key]) ? answer : undefined;
   const payments = useMemo(
     () => paymentRows(snapshot?.payments || NO_PAYMENTS),
     [snapshot],
   );
-  const documentCount = snapshot?.documents;
   const refreshing = overviewQuery.isFetching;
-  const hasError = overviewQuery.isError;
-  const bars = snapshot && getFinanceBarRatios(snapshot);
-  // Money is shown in one currency at a time; the switch appears only when
-  // there is more than one, and the default stays out of the address.
+  const hasError = overviewQuery.isError || (Boolean(answer) && !snapshot);
+  // Until the chosen period's or currency's figures arrive, or when they
+  // couldn't be loaded, the last ones stay on screen, dimmed.
+  const stale = Boolean(snapshot) && !overviewQuery.currentData;
+  const shownPeriod = snapshot && findPeriod(snapshot.period.key);
+  const failure = !snapshot
+    ? [
+        "We couldn’t load your overview.",
+        "Please try again to see your latest figures.",
+      ]
+    : stale && shownPeriod.key !== period
+      ? [
+          `We couldn’t load ${findPeriod(period).called}.`,
+          `Showing ${shownPeriod.called}.`,
+        ]
+      : stale
+        ? [
+            `We couldn’t load the figures in ${params.get("currency") || snapshot.currencies[0]}.`,
+            `Showing ${snapshot.currency}.`,
+          ]
+        : [
+            "Some workspace data couldn’t be refreshed.",
+            "Your last loaded figures are still shown. Try refreshing.",
+          ];
+  // Money is shown for one period and one currency at a time. The address
+  // keeps what was chosen; the default period, and the first currency,
+  // stay out of it. The currency switch appears only when there is more
+  // than one.
+  const search = (changes) => {
+    const chosen = { period, currency: params.get("currency"), ...changes };
+    const next = new URLSearchParams();
+    if (chosen.period !== DEFAULT_PERIOD) next.set("period", chosen.period);
+    if (chosen.currency && chosen.currency !== snapshot?.currencies[0]) {
+      next.set("currency", chosen.currency);
+    }
+    return next.toString() ? `?${next}` : "";
+  };
   const chooseCurrency = (currency) =>
-    setParams(currency === snapshot.currencies[0] ? {} : { currency }, {
-      replace: true,
-    });
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+    setParams(search({ currency }), { replace: true });
 
   const refresh = () => overviewQuery.refetch();
 
   return (
-    <DashboardShell fit>
-      <div
-        className={`flex min-h-0 min-w-0 flex-1 flex-col gap-[22px] compact:gap-4${hasError ? " has-error" : ""}`}
-      >
-        <header className="flex flex-[0_0_84px] animate-ov-rise items-end justify-between gap-8 compact:basis-[72px] max-[1359px]:items-start max-[1359px]:gap-5 max-[700px]:flex-wrap">
+    <DashboardShell>
+      <div className="flex min-w-0 flex-col gap-5">
+        <header className="flex animate-ov-rise flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="min-w-0">
             <h1 className={pageTitle}>
               Business overview<span>.</span>
             </h1>
+            {/* The words follow the figures shown, which can still be the
+                last period's while the chosen one loads. */}
             <p className={pageSubtitle}>
-              Your documents, payments, and customers at a glance{" "}
-              <span className="whitespace-nowrap max-[700px]:whitespace-normal">
-                · {today}
-              </span>
+              {snapshot
+                ? periodSubtitle(snapshot.period, snapshot.totals.hasPrevious)
+                : findPeriod(period).name}
             </p>
           </div>
-          <OverviewTotals
-            customerCount={snapshot?.clients}
-            documentCount={documentCount}
-            customersLoading={overviewQuery.isLoading}
-            documentsLoading={overviewQuery.isLoading}
-            customersError={hasError && !snapshot}
-          />
+          <div className="flex flex-wrap items-center gap-3 max-[700px]:w-full">
+            <nav
+              aria-label="Period"
+              className="inline-flex gap-1 rounded-[14px] border border-white/90 bg-white/55 p-1 max-[700px]:w-full"
+            >
+              {PERIODS.map(({ key, label }) => (
+                <Link
+                  key={key}
+                  to={{ search: search({ period: key }) }}
+                  replace
+                  aria-current={key === period ? "true" : undefined}
+                  className={`${periodPill} ${key === period ? "bg-white text-spot-ink shadow-key" : "text-spot-nav hover:bg-white/60 hover:text-spot-night"}`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            {snapshot?.currencies.length > 1 && (
+              <label className="flex items-center gap-2 text-[13px] text-spot-body">
+                Currency
+                <select
+                  className={toolbarSelect}
+                  value={snapshot.currency}
+                  onChange={(event) => chooseCurrency(event.target.value)}
+                >
+                  {snapshot.currencies.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         </header>
         {hasError && (
           <div className={errorBanner} role="alert">
             <FiAlertCircle aria-hidden="true" />
             <div className="flex-1">
-              <strong className={errorTitle}>
-                {!snapshot
-                  ? "We couldn’t load your overview."
-                  : "Some workspace data couldn’t be refreshed."}
-              </strong>
-              <span className={errorDetail}>
-                {snapshot
-                  ? "Your last loaded figures are still shown. Try refreshing."
-                  : "Please try again to see your latest figures."}
-              </span>
+              <strong className={errorTitle}>{failure[0]}</strong>
+              <span className={errorDetail}>{failure[1]}</span>
             </div>
             <button
               type="button"
@@ -125,89 +170,33 @@ const DashboardPage = () => {
           <DashboardLoading />
         ) : (
           snapshot && (
-            <div className={overviewLayout}>
-              <div className={mainColumn}>
-                <section
-                  className={financePanel}
-                  aria-labelledby="financial-summary-title"
-                >
-                  <header className={financePanelHeading}>
-                    <div className="flex min-w-0 items-center gap-3">
-                      <h2 id="financial-summary-title" className={sectionTitle}>
-                        Financial summary
-                      </h2>
-                      {snapshot.currencies.length > 1 && (
-                        <label className="flex items-center gap-2 text-[12.5px] text-spot-muted">
-                          <span className="sr-only">Currency</span>
-                          <select
-                            className={pageSizeSelect}
-                            value={snapshot.currency}
-                            onChange={(event) =>
-                              chooseCurrency(event.target.value)
-                            }
-                          >
-                            {snapshot.currencies.map((currency) => (
-                              <option key={currency} value={currency}>
-                                {currency}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                    </div>
-                    {bars && (
-                      <p className={panelNote}>
-                        Bars compare each amount with expected income
-                      </p>
-                    )}
-                  </header>
-                  <div className={financeCards}>
-                    <FinancialCard
-                      label="Expected income"
-                      value={formatMoney(
-                        snapshot.expectedIncome,
-                        snapshot.currency,
-                      )}
-                      detail="Invoices and receipts"
-                      icon={FiTrendingUp}
-                      tone="blue"
-                      fill={bars?.expected}
-                    />
-                    <FinancialCard
-                      label="Cash received"
-                      value={formatMoney(
-                        snapshot.cashReceived,
-                        snapshot.currency,
-                      )}
-                      detail="Total amount received"
-                      icon={FiArrowDownLeft}
-                      tone="lilac"
-                      fill={bars?.received}
-                    />
-                    <FinancialCard
-                      label="Cash pending"
-                      value={formatMoney(
-                        snapshot.cashPending,
-                        snapshot.currency,
-                      )}
-                      detail={
-                        Number(snapshot.taxWithheld) > 0
-                          ? "Expected income less cash received and tax withheld"
-                          : "Expected income less cash received"
-                      }
-                      icon={FiClock}
-                      tone="peach"
-                      fill={bars?.pending}
-                    />
-                  </div>
-                </section>
-                <PaymentHistory
-                  sortPaymentHistory={payments.rows}
-                  paymentDocuments={payments.documents}
-                  currency={snapshot.currency}
+            <div
+              className={`flex min-w-0 flex-col gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
+              aria-busy={stale || undefined}
+            >
+              <OverviewTiles
+                snapshot={snapshot}
+                currencyChosen={Boolean(params.get("currency"))}
+              />
+              <div className={chartPair}>
+                <CashFlowPanel snapshot={snapshot} />
+                <OwedPanel
+                  snapshot={snapshot}
+                  currencyChosen={Boolean(params.get("currency"))}
                 />
               </div>
-              <DocumentStatus snapshot={snapshot} total={documentCount} />
+              <div className={attentionPair}>
+                <AttentionPanel snapshot={snapshot} />
+                <DocumentStatus
+                  snapshot={snapshot}
+                  total={snapshot.documents}
+                />
+              </div>
+              <PaymentHistory
+                sortPaymentHistory={payments.rows}
+                paymentDocuments={payments.documents}
+                currency={snapshot.currency}
+              />
             </div>
           )
         )}

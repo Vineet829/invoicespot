@@ -20,6 +20,7 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
   const currencies = report?.currencies || [];
   return (
     <Panel
+      id="profit"
       title="Profit and loss"
       description={`${periodName}. Income is what you invoiced before tax, less credit notes, on the day each was issued. Expenses count on the day they were paid, with any tax you can’t claim back.`}
     >

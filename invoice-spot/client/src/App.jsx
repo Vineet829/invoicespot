@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
 import NotFound from "./components/NotFound";
+import ScrollToTop from "./components/ScrollToTop";
 import HomePage from "./pages/HomePage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
 import VerifiedPage from "./features/auth/pages/VerifiedPage";
@@ -50,6 +51,7 @@ const App = () => {
   if (restoring) return null;
   return (
     <>
+      <ScrollToTop />
       <Routes>
         <Route path="/">
           <Route index element={<HomePage />} />
