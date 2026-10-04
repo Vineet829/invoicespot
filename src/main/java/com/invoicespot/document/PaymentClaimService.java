@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Today;
 import com.invoicespot.document.dto.ConfirmClaimRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DismissClaimRequest;
@@ -99,7 +100,9 @@ public class PaymentClaimService {
                             + " still to pay");
         }
         LocalDate today = LocalDate.now(clock.withZone(zoneOf(document)));
-        if (request.paidOn().isAfter(today)) {
+        // The client may be a day ahead of the business, so a day is refused
+        // only once it is after today everywhere, as a recorded payment is.
+        if (request.paidOn().isAfter(Today.latest(clock))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "The day you paid can't be after today");
         }
         if (request.paidOn().isBefore(today.minusYears(1))) {

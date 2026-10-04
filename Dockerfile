@@ -1,6 +1,8 @@
 # The backend: Maven builds the jar, which is split into layers so a rebuild
-# that only changes our code reuses the dependency layers.
-FROM maven:3.9-eclipse-temurin-21 AS build
+# that only changes our code reuses the dependency layers. The jar runs on any
+# CPU, so it is built on the build machine's own platform even when the image
+# is for another one.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src

@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +18,7 @@ import com.invoicespot.business.BusinessRole;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +37,9 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
     private static final AtomicInteger NETWORKS = new AtomicInteger();
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    // UTC+14, the time zone furthest ahead: a day after its today is still to
+    // come everywhere.
+    private final LocalDate latest = LocalDate.now(ZoneId.of("Pacific/Kiritimati"));
     private User owner;
     private String network;
 
@@ -158,7 +163,7 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
         report(invoice, reported("250", today, "UPI", null))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("The amount can't be more than the USD 200.00 still to pay"));
-        report(invoice, reported("50", today.plusDays(1), "UPI", null))
+        report(invoice, reported("50", latest.plusDays(1), "UPI", null))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("The day you paid can't be after today"));
         report(invoice, reported("1.234", today, "UPI", null))
@@ -192,6 +197,26 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
         report(voided, reported("50", today, "UPI", null))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("This invoice has nothing left to pay"));
+    }
+
+    @Test
+    @DisplayName("a client a day ahead of the business can report a payment made on their own today")
+    void clientAheadOfBusiness() throws Exception {
+        // Pago Pago, UTC-11, is always at least a day behind UTC+14.
+        mockMvc.perform(put("/api/v1/settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0,
+                                 "taxLabel": "Tax", "timeZone": "Pacific/Pago_Pago"}
+                                """))
+                .andExpect(status().isOk());
+        Shared invoice = invoice();
+
+        report(invoice, reported("50", latest.plusDays(1), "UPI", null))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("The day you paid can't be after today"));
+        report(invoice, reported("50", latest, "UPI", null)).andExpect(status().isOk());
     }
 
     @Test

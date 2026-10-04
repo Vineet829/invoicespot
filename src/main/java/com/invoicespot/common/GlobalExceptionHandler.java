@@ -4,6 +4,7 @@ import com.invoicespot.business.BusinessChangedException;
 import com.invoicespot.ratelimit.RateLimitedException;
 import com.invoicespot.upload.UploadService;
 import java.sql.SQLException;
+import org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -87,8 +88,14 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "That conflicts with a record that already exists");
     }
 
+    // Spring reports a body sent in more parts than Tomcat takes as too large
+    // as well; that one is answered as an unreadable body, below, as the
+    // logo's size has nothing to do with it.
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ErrorResponse> handleTooLarge(MaxUploadSizeExceededException ex) {
+    public ResponseEntity<ErrorResponse> handleTooLarge(MaxUploadSizeExceededException ex, WebRequest request) {
+        if (ex.getMostSpecificCause() instanceof FileCountLimitExceededException) {
+            return handleUnreadableParts(ex, request);
+        }
         return build(HttpStatus.PAYLOAD_TOO_LARGE, UploadService.TOO_LARGE);
     }
 
