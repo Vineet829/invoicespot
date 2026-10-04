@@ -90,9 +90,10 @@ module.exports = {
           up: "#2f6b2c",
           down: "#a4502f",
         },
-        // Money owed, by whether it is due yet.
+        // Money owed, by whether it is due yet. The lavender is the one
+        // checked against the rust, on the overview and the money bar.
         owed: {
-          due: "#a99fd6",
+          due: "#9f91dc",
           overdue: "#b5532f",
         },
         // The overview's cash flow: money in is spot violet, money out

@@ -8,6 +8,15 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
       query: (params = {}) => `/document/all?${new URLSearchParams(params)}`,
       providesTags: ["Document"],
     }),
+    // What is outstanding now and what came in over the last 30 days, in a
+    // currency or the default one, and every currency the business bills
+    // in. Payments, refunds and confirmed claims change it too, and each of
+    // them refreshes documents.
+    getDocumentSummary: builder.query({
+      query: (currency) =>
+        `/document/summary${currency ? `?${new URLSearchParams({ currency })}` : ""}`,
+      providesTags: ["Document"],
+    }),
     // The rates and units the business uses, most used first, to suggest
     // on each line.
     getTaxRates: builder.query({
@@ -260,6 +269,7 @@ export const {
   useUpdateRefundMutation,
   useDeleteRefundMutation,
   useGetAllMyDocsQuery,
+  useGetDocumentSummaryQuery,
   useIssueDocMutation,
   useUpdateDocMutation,
   useVoidDocMutation,

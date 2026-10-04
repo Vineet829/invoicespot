@@ -25,6 +25,7 @@ import CustomersPage from "./features/customers/pages/CustomersPage";
 import SingleCustomerPage from "./features/customers/pages/SingleCustomerPage";
 import DocCreateEditForm from "./features/documents/pages/DocCreateEditForm";
 import DocumentsPage from "./features/documents/pages/DocumentsPage";
+import PaymentsPage from "./features/payments/pages/PaymentsPage";
 
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
 import SettingsPage from "./features/settings/pages/SettingsPage";
@@ -101,6 +102,7 @@ const App = () => {
                 element={<CustomerEditForm />}
               />
               <Route path="documents" element={<DocumentsPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
               <Route path="recurring" element={<RecurringPage />} />
               <Route path="create-doc" element={<DocCreateEditForm />} />
               <Route path="edit-doc/:id" element={<DocCreateEditForm />} />

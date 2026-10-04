@@ -86,10 +86,9 @@ const pill = (page, label) =>
 const content = (page) =>
   page.querySelector("[aria-busy], .transition-opacity");
 const tiles = (page) =>
-  [...page.querySelectorAll('a[href^="/reports"][aria-label]')].map((link) => [
-    link.getAttribute("href"),
-    link.getAttribute("aria-label"),
-  ]);
+  [...page.querySelectorAll('[aria-labelledby="figures-title"] a')].map(
+    (link) => [link.getAttribute("href"), link.getAttribute("aria-label")],
+  );
 const pills = (page) =>
   [...page.querySelectorAll('nav[aria-label="Period"] a')].map((link) => [
     link.textContent,
@@ -153,20 +152,20 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   ]);
   expect(tiles(page)).toEqual([
     [
-      "/reports#income",
-      "Billed in the last 90 days: USD 68,848.08, up 29.1% vs previous 90 days. View the income report",
+      "/documents?type=billed&period=90d",
+      "Billed in the last 90 days: USD 68,848.08, up 29.1% vs previous 90 days. View the invoices, receipts and credit notes",
     ],
     [
-      "/reports#income",
-      "Received in the last 90 days: USD 44,562.29, down 25.6% vs previous 90 days. View the income report",
+      "/payments?period=90d",
+      "Received in the last 90 days: USD 44,562.29, down 25.6% vs previous 90 days. View the payments",
     ],
     [
-      "/reports#profit",
+      "/reports?period=90d#profit",
       "Profit in the last 90 days: USD 64,194.00, up 29.1% vs previous 90 days. View the profit and loss report",
     ],
     [
-      "/reports#ageing",
-      "Outstanding now: USD 24,285.79 on 10 invoices, USD 6,326.03 of it overdue on 3 invoices. View unpaid invoices by age",
+      "/documents?status=outstanding&sort=dueDate&dir=asc",
+      "Outstanding now: USD 24,285.79 on 10 invoices, USD 6,326.03 of it overdue on 3 invoices. View the invoices owed, soonest due first",
     ],
   ]);
   for (const text of [
@@ -319,7 +318,7 @@ it("leaves every comparison out when nothing came before the period", async () =
   expect(page.textContent).not.toContain("vs previous");
   expect(page.textContent).not.toMatch(/\d%/);
   expect(tiles(page)[0][1]).toBe(
-    "Billed in the last 90 days: USD 68,848.08. View the income report",
+    "Billed in the last 90 days: USD 68,848.08. View the invoices, receipts and credit notes",
   );
 });
 
@@ -329,7 +328,7 @@ it("compares only figures that were not zero before", async () => {
     withTotals({ billed: { current: 68848.08, previous: 0 } }),
   );
   expect(tiles(page)[0][1]).toBe(
-    "Billed in the last 90 days: USD 68,848.08. View the income report",
+    "Billed in the last 90 days: USD 68,848.08. View the invoices, receipts and credit notes",
   );
   expect(tiles(page)[1][1]).toContain("down 25.6% vs previous 90 days");
   expect(page.textContent.match(/vs previous 90 days/g)).toHaveLength(2);
@@ -356,9 +355,11 @@ it("keeps the chosen period in the address and asks for it", async () => {
     "Last 12 months, Nov 1, 2025 – Oct 4, 2026 · compared with Nov 1, 2024 – Oct 31, 2025",
   );
   expect(tiles(page)[0]).toEqual([
-    "/reports#income",
+    "/documents?type=billed&period=12m",
     expect.stringContaining("Billed in the last 12 months: USD 68,848.08"),
   ]);
+  // The last 12 months is Reports' own default.
+  expect(tiles(page)[2][0]).toBe("/reports#profit");
   const months = page.querySelector('[aria-labelledby="cash-flow-title"]');
   expect(months.querySelector("caption").textContent).toBe(
     "Cash flow each month, USD",
@@ -525,7 +526,7 @@ it("keeps the period when the first currency is picked again", async () => {
   );
 });
 
-it("opens Reports at the same period and in the chosen currency", async () => {
+it("opens each figure's records for the same period and the chosen currency", async () => {
   const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
     ...overview,
     currencies: ["USD", "EUR"],
@@ -540,10 +541,46 @@ it("opens Reports at the same period and in the chosen currency", async () => {
     },
   }));
   expect(tiles(page).map(([href]) => href)).toEqual([
-    "/reports?period=ytd&currency=EUR#income",
-    "/reports?period=ytd&currency=EUR#income",
+    "/documents?type=billed&period=this-year&currency=EUR",
+    "/payments?period=this-year&currency=EUR",
     "/reports?period=ytd&currency=EUR#profit",
-    "/reports?period=ytd&currency=EUR#ageing",
+    "/documents?status=outstanding&currency=EUR&sort=dueDate&dir=asc",
+  ]);
+  const owed = page.querySelector('[aria-labelledby="owed-title"]');
+  expect(
+    [...owed.querySelectorAll("a")].map((link) => link.getAttribute("href")),
+  ).toEqual([
+    "/reports?currency=EUR#ageing",
+    "/documents?status=overdue&currency=EUR",
+    "/documents?status=outstanding&due=this-week&currency=EUR&sort=dueDate&dir=asc",
+    "/documents?status=outstanding&due=next-week&currency=EUR&sort=dueDate&dir=asc",
+    "/documents?status=outstanding&due=week-after&currency=EUR&sort=dueDate&dir=asc",
+  ]);
+  const attention = page.querySelector('[aria-labelledby="attention-title"]');
+  expect(attention.querySelector("a").getAttribute("href")).toBe(
+    "/documents?status=overdue&currency=EUR",
+  );
+  // The document status counts every currency, so it keeps to none.
+  const status = page.querySelector(
+    '[aria-labelledby="document-status-title"]',
+  );
+  expect(
+    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
+  ).toEqual([
+    "/documents?status=paid",
+    "/documents?status=partial",
+    "/documents?status=unpaid",
+    "/documents?status=overdue",
+  ]);
+});
+
+it("opens the last 30 days' records, and Reports at the same days", async () => {
+  const page = await open("/dashboard?period=30d", lastThirtyDays);
+  expect(tiles(page).map(([href]) => href)).toEqual([
+    "/documents?type=billed&period=30d",
+    "/payments?period=30d",
+    "/reports?period=30d#profit",
+    "/documents?status=outstanding&sort=dueDate&dir=asc",
   ]);
 });
 
@@ -562,15 +599,18 @@ it("shows what is owed by due date and what needs attention, each opening its li
       "/documents?status=overdue",
       "Overdue: 6,326.03 on 3 invoices. Open the overdue invoices",
     ],
-  ]);
-  expect(
-    [...owed.querySelectorAll('[role="img"]')].map((column) =>
-      column.getAttribute("aria-label"),
-    ),
-  ).toEqual([
-    "This week, due Oct 4–10: 2,664.09 on 1 invoice",
-    "Next week, due Oct 11–17: 13,353.37 on 4 invoices",
-    "Week after, due Oct 18–24: 1,942.30 on 2 invoices",
+    [
+      "/documents?status=outstanding&due=this-week&sort=dueDate&dir=asc",
+      "This week, due Oct 4–10: 2,664.09 on 1 invoice. Open these invoices",
+    ],
+    [
+      "/documents?status=outstanding&due=next-week&sort=dueDate&dir=asc",
+      "Next week, due Oct 11–17: 13,353.37 on 4 invoices. Open these invoices",
+    ],
+    [
+      "/documents?status=outstanding&due=week-after&sort=dueDate&dir=asc",
+      "Week after, due Oct 18–24: 1,942.30 on 2 invoices. Open these invoices",
+    ],
   ]);
   for (const text of [
     "6,326",
@@ -578,7 +618,7 @@ it("shows what is owed by due date and what needs attention, each opening its li
     "Oct 4–10 · 1",
     "Oct 11–17 · 4",
     "Oct 18–24 · 2",
-    "Grouped by due date. Overdue opens those invoices.",
+    "Grouped by due date. Each column opens its invoices.",
   ]) {
     expect(owed.textContent).toContain(text);
   }
@@ -617,6 +657,40 @@ it("shows what is owed by due date and what needs attention, each opening its li
   expect(attention.textContent).toContain(
     "No payment reports to confirm, drafts to issue or recurring invoices due this week.",
   );
+
+  const status = page.querySelector(
+    '[aria-labelledby="document-status-title"]',
+  );
+  expect(
+    [...status.querySelectorAll("a")].map((link) => [
+      link.getAttribute("href"),
+      link.getAttribute("aria-label"),
+    ]),
+  ).toEqual([
+    ["/documents?status=paid", "Paid: 32 documents. Open them"],
+    ["/documents?status=partial", "Partially paid: 6 documents. Open them"],
+    ["/documents?status=unpaid", "Unpaid: 10 documents. Open them"],
+    [
+      "/documents?status=overdue",
+      "Overdue: 3 unpaid invoices past their due date. Open them",
+    ],
+  ]);
+});
+
+it("opens a status only when it has documents", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    partial: 0,
+    overdue: 0,
+  });
+  const status = page.querySelector(
+    '[aria-labelledby="document-status-title"]',
+  );
+  expect(
+    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
+  ).toEqual(["/documents?status=paid", "/documents?status=unpaid"]);
+  expect(status.textContent).toContain("Partially paid");
+  expect(status.textContent).toContain("Unpaid invoices past their due date");
 });
 
 it("shows a later column when something is due then, and says when nothing needs attention", async () => {
@@ -639,11 +713,13 @@ it("shows a later column when something is due then, and says when nothing needs
   });
   const owed = page.querySelector('[aria-labelledby="owed-title"]');
   expect(owed.textContent).toContain("LaterFrom Oct 25 · 1");
-  expect(
-    [...owed.querySelectorAll('[role="img"]')]
-      .at(-1)
-      .getAttribute("aria-label"),
-  ).toBe("Later, due from Oct 25 or with no due date: 500.00 on 1 invoice");
+  const later = [...owed.querySelectorAll("a")].at(-1);
+  expect(later.getAttribute("href")).toBe(
+    "/documents?status=outstanding&due=later&sort=dueDate&dir=asc",
+  );
+  expect(later.getAttribute("aria-label")).toBe(
+    "Later, due from Oct 25 or with no due date: 500.00 on 1 invoice. Open these invoices",
+  );
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(attention.textContent).toBe(
     "Needs your attentionNothing needs your attention right now.",
@@ -672,7 +748,7 @@ it("says when nothing is owed", async () => {
   expect(owed.textContent).toContain("Nothing is owed to you right now.");
   expect(owed.querySelector('a[href^="/documents"]')).toBeNull();
   expect(tiles(page)[3][1]).toBe(
-    "Outstanding now: USD 0.00, no unpaid invoices. View unpaid invoices by age",
+    "Outstanding now: USD 0.00, no unpaid invoices. View the invoices owed, soonest due first",
   );
 });
 
@@ -702,7 +778,7 @@ it("names what the attention list leaves out", async () => {
   );
 });
 
-it("opens the ageing report from the owed panel at the same period and currency", async () => {
+it("opens the ageing report from the owed panel in the chosen currency, whatever the period", async () => {
   const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
     ...overview,
     currencies: ["USD", "EUR"],
@@ -711,6 +787,6 @@ it("opens the ageing report from the owed panel at the same period and currency"
   }));
   const owed = page.querySelector('[aria-labelledby="owed-title"]');
   expect(owed.querySelector("a").getAttribute("href")).toBe(
-    "/reports?period=ytd&currency=EUR#ageing",
+    "/reports?currency=EUR#ageing",
   );
 });

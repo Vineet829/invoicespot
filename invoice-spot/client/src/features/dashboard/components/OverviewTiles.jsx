@@ -6,12 +6,15 @@ import {
   FiMinus,
 } from "react-icons/fi";
 import { money } from "../../../components/workspace/Workspace";
+import { outstandingLink } from "../../documents/listLinks";
 import {
+  billedLink,
   changeFrom,
   findPeriod,
   formatMoney,
   invoiceCount,
   percentLabel,
+  receivedLink,
   reportLink,
   trendColumns,
   trendPoints,
@@ -183,7 +186,7 @@ const OwedSplit = ({ owed, currency }) => {
   );
 };
 
-// A tile is a link to the report behind its figure. Its name for assistive
+// A tile is a link to the records behind its figure. Its name for assistive
 // technology carries the figure, the change and where it leads; the
 // figure's size follows the tile's width, so long amounts still fit.
 const Tile = ({ to, label, title, value, tone, line, chart }) => {
@@ -220,19 +223,19 @@ const Tile = ({ to, label, title, value, tone, line, chart }) => {
 };
 
 // The period's billed, received and profit, each against the period before
-// when there was one, and what is owed today. Each opens its section of the
-// Reports page, in the same currency when one was chosen.
+// when there was one, and what is owed today. Each opens the records behind
+// it for the same period, profit the profit and loss report, in the same
+// currency when one was chosen.
 const OverviewTiles = ({ snapshot, currencyChosen }) => {
   const { currency, totals, owedNow, trend } = snapshot;
   const period = findPeriod(snapshot.period.key);
-  const report = (section) =>
-    reportLink(section, period.key, currencyChosen ? currency : undefined);
-  const figure = (key, title, report) => {
+  const chosen = currencyChosen ? currency : undefined;
+  const figure = (key, title, opens) => {
     const { current, previous } = totals[key];
     const change = totals.hasPrevious ? changeFrom(current, previous) : null;
     return {
       value: formatMoney(current, currency),
-      label: `${title} ${period.during}: ${money(current, currency)}${change ? `, ${changeWords(change)} ${period.compared}` : ""}. View ${report}`,
+      label: `${title} ${period.during}: ${money(current, currency)}${change ? `, ${changeWords(change)} ${period.compared}` : ""}. View ${opens}`,
       line: change && <Change change={change} compared={period.compared} />,
     };
   };
@@ -249,10 +252,14 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
       </h2>
       <div className={tileRow}>
         <Tile
-          to={report("income")}
+          to={billedLink(period.key, chosen)}
           title="Billed"
           tone="blue"
-          {...figure("billed", "Billed", "the income report")}
+          {...figure(
+            "billed",
+            "Billed",
+            "the invoices, receipts and credit notes",
+          )}
           chart={
             <Sparkline
               values={trend.map((bucket) => bucket.billed)}
@@ -261,10 +268,10 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
           }
         />
         <Tile
-          to={report("income")}
+          to={receivedLink(period.key, chosen)}
           title="Received"
           tone="lilac"
-          {...figure("received", "Received", "the income report")}
+          {...figure("received", "Received", "the payments")}
           chart={
             <Sparkline
               values={trend.map((bucket) => bucket.received)}
@@ -273,7 +280,7 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
           }
         />
         <Tile
-          to={report("profit")}
+          to={reportLink("profit", period.key, chosen)}
           title="Profit"
           tone="sage"
           {...figure("profit", "Profit", "the profit and loss report")}
@@ -286,11 +293,11 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
           }
         />
         <Tile
-          to={report("ageing")}
+          to={outstandingLink(chosen)}
           title="Outstanding now"
           tone="peach"
           value={formatMoney(owedNow.total, currency)}
-          label={`Outstanding now: ${owedLabel}. View unpaid invoices by age`}
+          label={`Outstanding now: ${owedLabel}. View the invoices owed, soonest due first`}
           line={<span className="text-[12.5px]">{owedLine}</span>}
           chart={<OwedSplit owed={owedNow} currency={currency} />}
         />

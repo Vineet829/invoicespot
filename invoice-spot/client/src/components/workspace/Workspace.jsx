@@ -521,8 +521,8 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
 
 // Tables copy the overview's payment table. Each column's `type` sets its
 // style. When the panel is too narrow for every column, each row becomes a
-// card: the main value, then labelled fields in as many columns as fit,
-// then the actions on a line of their own.
+// card: the main value first, whichever column it is, then labelled fields
+// in as many columns as fit, then the actions on a line of their own.
 const CARD_LABEL =
   "stacked:before:mb-1 stacked:before:block stacked:before:text-[11px] stacked:before:text-spot-muted stacked:before:content-[attr(data-label)]";
 const COLUMN_TYPES = {
@@ -532,7 +532,7 @@ const COLUMN_TYPES = {
   },
   main: {
     th: "pr-3.5 text-left",
-    td: "pr-3.5 text-[14.5px] font-medium text-spot-ink [overflow-wrap:anywhere] stacked:col-span-full stacked:pr-12",
+    td: "pr-3.5 text-[14.5px] font-medium text-spot-ink [overflow-wrap:anywhere] stacked:order-first stacked:col-span-full stacked:pr-12",
   },
   email: {
     th: "pr-3.5 text-left",

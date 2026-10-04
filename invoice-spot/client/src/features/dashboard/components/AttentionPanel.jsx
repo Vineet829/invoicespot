@@ -10,6 +10,7 @@ import {
 } from "react-icons/fi";
 import { Amount } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
+import { overdueLink } from "../../documents/listLinks";
 import { attentionFooter, attentionRow } from "../dashboardModel";
 import { overviewPanel, panelLink } from "./DashboardPanels";
 
@@ -34,8 +35,9 @@ const row =
 
 // The few things that need doing now, most urgent first, each opening its
 // document. The footer names what there is none of, and what the list
-// leaves out.
-const AttentionPanel = ({ snapshot }) => {
+// leaves out. Overdue invoices opens them all, in the same currency when
+// one was chosen.
+const AttentionPanel = ({ snapshot, currencyChosen }) => {
   const { attention, currency } = snapshot;
   const items = attention?.items || [];
   const footer = attentionFooter(attention?.counts, items);
@@ -49,7 +51,10 @@ const AttentionPanel = ({ snapshot }) => {
           Needs your attention
         </h2>
         {attention?.counts?.overdue > 0 && (
-          <Link to="/documents?status=overdue" className={panelLink}>
+          <Link
+            to={overdueLink(currencyChosen ? currency : undefined)}
+            className={panelLink}
+          >
             Overdue invoices
             <FiChevronRight aria-hidden="true" />
           </Link>

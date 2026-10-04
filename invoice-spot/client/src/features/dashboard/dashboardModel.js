@@ -1,5 +1,11 @@
-import { parseDate } from "../../utils/dates";
+import { dateSpan, dayMonth, dayMonthYear, parseDate } from "../../utils/dates";
 import { compactAmount, formatAmount } from "../../utils/money";
+import {
+  documentsLink,
+  outstandingLink,
+  overdueLink,
+  paymentsLink,
+} from "../documents/listLinks";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -27,7 +33,9 @@ export const formatDate = (value) => {
 };
 
 // The periods the overview can show, as its pills name them. The last 90
-// days is the default, so it stays out of the address.
+// days is the default, so it stays out of the address. Each names the same
+// period on the Reports page, where the last 12 months is the default, and
+// on the Documents and Payments lists.
 export const DEFAULT_PERIOD = "90d";
 export const PERIODS = [
   {
@@ -37,6 +45,8 @@ export const PERIODS = [
     called: "the last 30 days",
     during: "in the last 30 days",
     compared: "vs previous 30 days",
+    report: "30d",
+    list: "30d",
   },
   {
     key: "90d",
@@ -45,6 +55,8 @@ export const PERIODS = [
     called: "the last 90 days",
     during: "in the last 90 days",
     compared: "vs previous 90 days",
+    report: "90d",
+    list: "90d",
   },
   {
     key: "12m",
@@ -53,6 +65,7 @@ export const PERIODS = [
     called: "the last 12 months",
     during: "in the last 12 months",
     compared: "vs previous 12 months",
+    list: "12m",
   },
   {
     key: "ytd",
@@ -61,9 +74,8 @@ export const PERIODS = [
     called: "this year",
     during: "this year",
     compared: "vs same period last year",
-    // The same period on the Reports page; the last 12 months is its
-    // default, and it has no 30- or 90-day period.
     report: "ytd",
+    list: "this-year",
   },
 ];
 // A period from the address; anything else is the default.
@@ -71,39 +83,42 @@ export const findPeriod = (key) =>
   PERIODS.find((period) => period.key === key) ||
   PERIODS.find((period) => period.key === DEFAULT_PERIOD);
 
-const dayMonth = (date) =>
-  date.toLocaleDateString("en", { month: "short", day: "numeric" });
-const dayMonthYear = (date) =>
-  date.toLocaleDateString("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-// A section of the Reports page, for the period and currency shown here
-// when Reports has them. A currency is passed only when one was chosen.
+// A section of the Reports page, for the period shown here when one is
+// given and Reports has it, and in the currency when one was chosen.
 export const reportLink = (section, period, currency) => {
   const search = new URLSearchParams();
-  const report = findPeriod(period).report;
+  const report = period && findPeriod(period).report;
   if (report) search.set("period", report);
   if (currency) search.set("currency", currency);
   return `/reports${search.toString() ? `?${search}` : ""}#${section}`;
 };
 
-export const invoiceCount = (count) =>
-  `${count.toLocaleString("en")} ${count === 1 ? "invoice" : "invoices"}`;
-
-// From one day to another, as "Jul 7 – Oct 4, 2026": the year once at the
-// end when both days share it, or after each day when they don't.
-// `withYear` false leaves a shared year off.
-export const dateSpan = (from, to, withYear = true) => {
-  const start = parseDate(from);
-  const end = parseDate(to);
-  if (start.getFullYear() !== end.getFullYear()) {
-    return `${dayMonthYear(start)} – ${dayMonthYear(end)}`;
-  }
-  return `${dayMonth(start)} – ${withYear ? dayMonthYear(end) : dayMonth(end)}`;
+// The records behind the overview's figures, for the period shown and, when
+// one was chosen, the currency: what was billed, the payments received, and
+// the invoices owed in each week. Overdue opens the overdue invoices.
+export const billedLink = (period, currency) =>
+  documentsLink({ type: "billed", period: findPeriod(period).list, currency });
+export const receivedLink = (period, currency) =>
+  paymentsLink(findPeriod(period).list, currency);
+const DUE_WEEKS = {
+  thisWeek: "this-week",
+  nextWeek: "next-week",
+  weekAfter: "week-after",
+  later: "later",
 };
+export const owedWeekLink = (key, currency) =>
+  key === "overdue"
+    ? overdueLink(currency)
+    : outstandingLink(currency, DUE_WEEKS[key]);
+// The document status counts documents in every currency, so its links
+// keep to none.
+export const statusLink = (status) => documentsLink({ status });
+
+// Counts of invoices are worded as on the Documents list.
+export { invoiceCount } from "../../utils/counts";
+
+// Spans of days are named as on the Documents and Payments lists.
+export { dateSpan };
 
 // The line under the overview's title: the period and its days, then the
 // days it is compared with, when there were figures before it. Those keep

@@ -1,8 +1,11 @@
 export const DEFAULT_PERIOD = "12m";
 
-// The last few months, this year, then each earlier year since the first
-// invoice, as the server lists them.
+// The last 30 and 90 days, as the overview has them, the last few months,
+// this year, then each earlier year since the first invoice, as the server
+// lists them.
 export const periodOptions = (years = []) => [
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
   { value: "3m", label: "Last 3 months" },
   { value: "6m", label: "Last 6 months" },
   { value: "12m", label: "Last 12 months" },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   FiDownload,
@@ -7,22 +7,30 @@ import {
   FiPlus,
   FiSearch,
   FiTrash2,
+  FiX,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import useListState from "../../../hooks/useListState";
 import useFileDownload from "../../../hooks/useFileDownload";
+import useLastAnswer from "../../../hooks/useLastAnswer";
 import { PAGE_SIZES, nextSort } from "../../../utils/listState";
 import DocumentsTabs from "../components/DocumentsTabs";
+import CurrencyFilter from "../components/CurrencyFilter";
+import MoneyBar from "../components/MoneyBar";
+import { opensList } from "../listLinks";
+import ResultLine from "../components/ResultLine";
 import WaitingPayments from "../components/WaitingPayments";
 import { DocumentStatusBadge, documentName, isDraft } from "../documentState";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import {
   useDeleteDocMutation,
   useGetAllMyDocsQuery,
+  useGetDocumentSummaryQuery,
   useGetDocumentsCsvMutation,
 } from "../documentsApiSlice";
 import {
+  DUE_FILTERS,
   SORT_FIELDS,
   SORT_OPTIONS,
   STATUS_FILTERS,
@@ -30,6 +38,7 @@ import {
   PERIODS,
   documentFilterQuery,
   documentQuery,
+  documentResults,
   isFiltered,
   listSearch,
   readListState,
@@ -64,6 +73,13 @@ import {
 
 const NO_DOCUMENTS = [];
 
+// A filter a link set, with a button that removes it. Its focus ring is
+// white, to show on the dark chip.
+const removableChip =
+  "inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-full border border-spot-night bg-spot-night pl-3.5 pr-1 text-[13px] text-white coarse:h-11";
+const removeButton =
+  "grid size-7 place-items-center rounded-full bg-transparent p-0 text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-white focus-visible:outline-offset-0 coarse:size-9 [&>svg]:size-3.5 [&>svg]:stroke-[2]";
+
 const DocumentsPage = () => {
   useTitle("Documents — Invoice Spot");
   const [list, update] = useListState(readListState, listSearch);
@@ -72,6 +88,13 @@ const DocumentsPage = () => {
   const query = useGetAllMyDocsQuery(documentQuery(list), {
     refetchOnMountOrArgChange: 60,
   });
+  const summaryQuery = useGetDocumentSummaryQuery(list.currency || undefined, {
+    refetchOnMountOrArgChange: 60,
+  });
+  const summary = summaryQuery.data;
+  // What the result line says comes from the last answer and the filters
+  // it answered.
+  const answered = useLastAnswer(query.currentData, list);
   const rows = query.data?.myDocuments || NO_DOCUMENTS;
   const count = query.data?.totalDocuments ?? 0;
   const pagination = serverPagination({
@@ -102,10 +125,36 @@ const DocumentsPage = () => {
     }
   };
   const filtered = isFiltered(list);
-  const clearFilters = () =>
-    update({ q: "", status: "", type: "", period: "", page: 1 });
+  // A filter's control is gone once the filter is removed, so focus moves
+  // to the status chosen, as soon as the chips are shown.
+  const statusGroup = useRef(null);
+  const [refocus, setRefocus] = useState(false);
+  const clearFilters = () => {
+    update({
+      q: "",
+      status: "",
+      due: "",
+      type: "",
+      period: "",
+      currency: "",
+      page: 1,
+    });
+    setRefocus(true);
+  };
+  const removeDue = () => {
+    update({ due: "", page: 1 });
+    setRefocus(true);
+  };
+  const dueFilter = DUE_FILTERS.find((filter) => filter.value === list.due);
   // A new account has nothing to search or filter yet.
   const showTools = Boolean(query.data) && (count > 0 || filtered);
+  useEffect(() => {
+    const checked =
+      refocus && statusGroup.current?.querySelector("input:checked");
+    if (!checked) return;
+    checked.focus();
+    setRefocus(false);
+  }, [refocus, list.status, showTools]);
 
   const columns = [
     {
@@ -131,6 +180,17 @@ const DocumentsPage = () => {
       type: "amount",
       sortBy: "total",
       render: (row) => <Amount value={row.total} currency={row.currency} />,
+    },
+    // What is left to pay on an issued invoice; nothing is owed on the rest.
+    {
+      label: "Balance due",
+      type: "amount",
+      render: (row) =>
+        row.balanceDue == null ? (
+          <span className="text-[13px] text-spot-muted">—</span>
+        ) : (
+          <Amount value={row.balanceDue} currency={row.currency} />
+        ),
     },
     {
       label: "Due date",
@@ -183,6 +243,17 @@ const DocumentsPage = () => {
     <ErrorState error={query.error} retry={query.refetch} />
   ) : rows.length ? (
     <>
+      {filtered && isFiltered(answered.list) && answered.data && (
+        <ResultLine
+          parts={documentResults(
+            answered.list,
+            answered.data,
+            summary?.currencies,
+          )}
+          onClear={clearFilters}
+          busy={query.isFetching}
+        />
+      )}
       <DataTable
         columns={columns}
         rows={pagination.rows}
@@ -248,6 +319,10 @@ const DocumentsPage = () => {
           </>
         }
       />
+      <MoneyBar
+        query={summaryQuery}
+        shows={(link) => opensList(link, "/documents", readListState, list)}
+      />
       <RefusalNote id="document-delete-refusal" reason={deleteRefusal} />
       <WaitingPayments />
       {query.isLoading ? (
@@ -261,21 +336,46 @@ const DocumentsPage = () => {
             // The tools take the title's row, so the rows keep their room.
             <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 compact:mb-4">
               <h2 className="sr-only">Your documents</h2>
-              <fieldset className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
-                <legend className="sr-only">Status</legend>
-                {STATUS_FILTERS.map((filter) => (
-                  <label key={filter.value} className={filterChip}>
-                    <input
-                      type="radio"
-                      name="document-status"
-                      className="sr-only"
-                      checked={list.status === filter.value}
-                      onChange={() => update({ status: filter.value, page: 1 })}
-                    />
-                    {filter.label}
-                  </label>
-                ))}
-              </fieldset>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <fieldset
+                  ref={statusGroup}
+                  className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+                >
+                  <legend className="sr-only">Status</legend>
+                  {STATUS_FILTERS.map((filter) => (
+                    <label key={filter.value} className={filterChip}>
+                      {/* A week of due dates belongs to Outstanding. */}
+                      <input
+                        type="radio"
+                        name="document-status"
+                        className="sr-only"
+                        checked={list.status === filter.value}
+                        onChange={() =>
+                          update({
+                            status: filter.value,
+                            ...(filter.value !== "outstanding" && { due: "" }),
+                            page: 1,
+                          })
+                        }
+                      />
+                      {filter.label}
+                    </label>
+                  ))}
+                </fieldset>
+                {dueFilter && (
+                  <span className={removableChip}>
+                    {dueFilter.label}
+                    <button
+                      type="button"
+                      className={removeButton}
+                      onClick={removeDue}
+                      aria-label={`Remove ${dueFilter.label}`}
+                    >
+                      <FiX aria-hidden="true" />
+                    </button>
+                  </span>
+                )}
+              </div>
               <div className="flex min-w-0 flex-wrap items-center gap-2.5 max-[700px]:w-full">
                 <SearchField
                   value={list.q}
@@ -284,10 +384,13 @@ const DocumentsPage = () => {
                   placeholder="Number or customer"
                   className="w-[240px] max-[1439px]:w-[196px] max-[700px]:w-full"
                 />
-                <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
+                <label className="min-w-0 max-[700px]:flex-[1_1_100%]">
                   <span className="sr-only">Document type</span>
+                  {/* One option is much longer than the rest, so where the
+                      browser can, the menu is as wide as the type chosen,
+                      and on a phone it has a row of its own. */}
                   <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                    className={`${toolbarSelect} [field-sizing:content] max-[700px]:w-full`}
                     value={list.type}
                     onChange={(event) =>
                       update({ type: event.target.value, page: 1 })
@@ -316,6 +419,11 @@ const DocumentsPage = () => {
                     ))}
                   </select>
                 </label>
+                <CurrencyFilter
+                  value={list.currency}
+                  currencies={summary?.currencies}
+                  onChange={(currency) => update({ currency, page: 1 })}
+                />
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Sort documents</span>
                   <select
