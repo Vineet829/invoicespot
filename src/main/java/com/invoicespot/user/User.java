@@ -12,9 +12,14 @@ import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
+// Many unrelated flows change an account: its profile, its password, its
+// two-factor sign-in, an admin's deactivation. Each writes back only the
+// columns it changed, so one under way can't put back what another just did.
 @Entity
 @Table(name = "users")
+@DynamicUpdate
 @Getter
 @Setter
 public class User extends BaseEntity {

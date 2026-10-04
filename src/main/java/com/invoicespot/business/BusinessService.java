@@ -127,7 +127,10 @@ public class BusinessService {
 
     @Transactional
     public BusinessProfileResponse updateProfile(BusinessAccess access, UpdateBusinessRequest request) {
-        Business business = require(access);
+        // Locked, so a save that waits for another member's starts from what
+        // that one saved, instead of putting it back.
+        Business business = businessRepository.findForUpdate(access.businessPkid())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
         if (request.name() != null) {
             if (request.name().isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "A business needs a name");

@@ -134,6 +134,19 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             @Param("customerPkid") Long customerPkid,
             @Param("number") String number);
 
+    // The same, locked until the transaction ends, for a client's answer or
+    // report of a payment.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select d from Document d
+            where d.business.pkid = :businessPkid and d.customer.pkid = :customerPkid
+              and d.documentNumber = :number and d.issuedAt is not null
+            """)
+    Optional<Document> findForUpdateInPortal(
+            @Param("businessPkid") Long businessPkid,
+            @Param("customerPkid") Long customerPkid,
+            @Param("number") String number);
+
     // The business's latest issued documents of a type, newest first, to
     // preview its emails with.
     @Query("""

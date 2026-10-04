@@ -16,9 +16,12 @@ public interface RecurringScheduleRepository extends JpaRepository<RecurringSche
     @EntityGraph(attributePaths = {"template", "createdBy"})
     List<RecurringSchedule> findByBusinessPkidOrderByCreatedAtDescPkidDesc(Long businessPkid);
 
-    @EntityGraph(attributePaths = {"template", "createdBy"})
+    // Locked, as a run locks it, so a change waits for an invoice being made
+    // and keeps what making it did. Its template isn't fetched with it, which
+    // would lock that row too.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from RecurringSchedule s where s.id = :externalId")
-    Optional<RecurringSchedule> findByExternalId(@Param("externalId") UUID externalId);
+    Optional<RecurringSchedule> findForUpdateByExternalId(@Param("externalId") UUID externalId);
 
     @EntityGraph(attributePaths = {"template", "createdBy"})
     Optional<RecurringSchedule> findByTemplate(Document template);

@@ -256,10 +256,22 @@ class DocumentServiceTest {
     }
 
     @Test
-    @DisplayName("a percentage that isn't a number from 0 to 100 is refused")
+    @DisplayName("a percentage can have its point first or last, as a browser's number field may send it")
+    void readsPlainPercentages() {
+        ownsCustomer(1L);
+        service.create(access(1L), requestWith(".5", "7."));
+
+        ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
+        verify(documentRepository).save(captor.capture());
+        assertThat(captor.getValue().getBillingItems().get(0).getTaxRate()).isEqualByComparingTo("0.5");
+        assertThat(captor.getValue().getBillingItems().get(0).getDiscount()).isEqualByComparingTo("7");
+    }
+
+    @Test
+    @DisplayName("a percentage that isn't plain digits from 0 to 100 is refused, such as 1e2 or a long run of digits")
     void refusesBadPercentages() {
         ownsCustomer(1L);
-        for (String bad : new String[] {"abc", "-1", "100.5", "0.00001"}) {
+        for (String bad : new String[] {"abc", "-1", "100.5", "0.00001", "1e2", "5E1", "+5", "0".repeat(30) + "5"}) {
             assertThatThrownBy(() -> service.create(access(1L), requestWith(bad, "0")))
                     .isInstanceOf(ApiException.class)
                     .hasMessage("Tax rate must be a number from 0 to 100, with up to 4 decimals");

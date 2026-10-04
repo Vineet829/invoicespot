@@ -3,6 +3,7 @@ package com.invoicespot.common;
 import com.invoicespot.business.BusinessChangedException;
 import com.invoicespot.ratelimit.RateLimitedException;
 import com.invoicespot.upload.UploadService;
+import java.sql.SQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,6 +19,7 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -69,14 +71,36 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, message);
     }
 
+    // A value PostgreSQL can't store is the request's to fix, not a clash
+    // with a record already saved: a number too large for its column, such
+    // as a document total past 17 digits (SQLSTATE 22003), or text with a
+    // NUL character in it (22021).
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleConflict(DataIntegrityViolationException ex) {
+        String state = ex.getMostSpecificCause() instanceof SQLException sql ? sql.getSQLState() : null;
+        if ("22003".equals(state)) {
+            return build(HttpStatus.BAD_REQUEST, "An amount is too large to save");
+        }
+        if ("22021".equals(state)) {
+            return build(HttpStatus.BAD_REQUEST, "Text can't contain a NUL character");
+        }
         return build(HttpStatus.CONFLICT, "That conflicts with a record that already exists");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleTooLarge(MaxUploadSizeExceededException ex) {
         return build(HttpStatus.PAYLOAD_TOO_LARGE, UploadService.TOO_LARGE);
+    }
+
+    // Any other multipart body that can't be read is a 400. Most are the
+    // sender's to fix, such as one cut short or sent in more parts than
+    // Tomcat takes, but Tomcat failing on its own side lands here too, such
+    // as when it can't write a part to its temp folder, so each is logged in
+    // one warning line. One over the size limit is answered above.
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableParts(MultipartException ex, WebRequest request) {
+        LOGGER.warn("Unreadable multipart body on {}: {}", describe(request), ex.getMostSpecificCause().toString());
+        return build(HttpStatus.BAD_REQUEST, "Malformed request body");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

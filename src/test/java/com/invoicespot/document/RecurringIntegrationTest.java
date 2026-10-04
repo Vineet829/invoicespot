@@ -20,6 +20,8 @@ import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +30,12 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +53,9 @@ class RecurringIntegrationTest extends IntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private DataSource dataSource;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private User owner;
@@ -111,6 +122,47 @@ class RecurringIntegrationTest extends IntegrationTest {
 
     private Instant daysFromNow(int days) {
         return Instant.now().plus(Duration.ofDays(days));
+    }
+
+    // Makes the invoices due while the business's settings are held, as by
+    // another document taking its number: the run locks its schedule, then
+    // waits to number the invoice. The request arrives then, and the settings
+    // are let go once it waits too. Gives the request's status.
+    private int whileMaking(Instant now, Callable<ResultActions> request) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (PreparedStatement lock =
+                    holder.prepareStatement("select pkid from business_settings where business_pkid = ? for update")) {
+                lock.setLong(1, businessOf(owner).getPkid());
+                lock.executeQuery().close();
+            }
+            Future<Integer> making = pool.submit(() -> recurring.makeDue(now));
+            awaitWaitingForLocks(1);
+            Future<Integer> status = pool.submit(() -> request.call().andReturn().getResponse().getStatus());
+            awaitWaitingForLocks(2);
+            holder.rollback();
+            making.get(30, TimeUnit.SECONDS);
+            return status.get(30, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    // Waits until that many connections to the test's database wait for a
+    // lock, or gives up after half a minute.
+    private void awaitWaitingForLocks(int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (waitingForLocks() < count && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
+    }
+
+    private int waitingForLocks() {
+        return jdbc.queryForObject(
+                "select count(*) from pg_stat_activity"
+                        + " where datname = current_database() and wait_event_type = 'Lock'",
+                Integer.class);
     }
 
     @Test
@@ -312,5 +364,79 @@ class RecurringIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
         list().andExpect(jsonPath("$.schedules").isEmpty());
         verify(mailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    @DisplayName("a schedule paused while it makes an invoice counts that invoice, and makes the next once resumed")
+    void pauseWhileMaking() throws Exception {
+        String id = scheduleId(
+                document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(today));
+        String session = bearer(owner);
+
+        int status = whileMaking(Instant.now(), () -> mockMvc.perform(
+                post("/api/v1/recurring/{id}/pause", id).header(HttpHeaders.AUTHORIZATION, session)));
+
+        assertThat(status).isEqualTo(200);
+        list()
+                .andExpect(jsonPath("$.schedules[0].paused").value(true))
+                .andExpect(jsonPath("$.schedules[0].runsDone").value(1))
+                .andExpect(jsonPath("$.schedules[0].nextRun").value(today.plusMonths(1).toString()));
+        mockMvc.perform(post("/api/v1/recurring/{id}/resume", id).header(HttpHeaders.AUTHORIZATION, session))
+                .andExpect(status().isOk());
+        recurring.makeDue(daysFromNow(40));
+        assertThat(documents()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("a schedule changed while it makes an invoice counts that invoice toward the most allowed")
+    void editWhileMaking() throws Exception {
+        String id = scheduleId(
+                document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(today));
+        String session = bearer(owner);
+
+        int status = whileMaking(Instant.now(), () -> mockMvc.perform(patch("/api/v1/recurring/{id}", id)
+                .header(HttpHeaders.AUTHORIZATION, session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"frequency\": \"monthly\", \"startDate\": \"%s\", \"maxRuns\": 2}"
+                        .formatted(today.plusDays(10)))));
+
+        assertThat(status).isEqualTo(200);
+        recurring.makeDue(daysFromNow(80));
+        assertThat(documents()).isEqualTo(3);
+        list()
+                .andExpect(jsonPath("$.schedules[0].runsDone").value(2))
+                .andExpect(jsonPath("$.schedules[0].finished").value(true));
+    }
+
+    @Test
+    @DisplayName("changing a schedule but not its next date keeps it on the day it started, past a short month")
+    void editKeepsMonthEnds() throws Exception {
+        // The next 31st of a month followed by a shorter one: Jan, Mar, May, Aug or Oct.
+        LocalDate month = today.withDayOfMonth(1);
+        while (month.lengthOfMonth() < 31
+                || month.plusMonths(1).lengthOfMonth() == 31
+                || month.withDayOfMonth(31).isBefore(today)) {
+            month = month.plusMonths(1);
+        }
+        LocalDate start = month.withDayOfMonth(31);
+        String id = scheduleId(
+                document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(start));
+        recurring.makeDue(start.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC));
+        LocalDate next = start.plusMonths(1);
+        list().andExpect(jsonPath("$.schedules[0].nextRun").value(next.toString()));
+
+        // Its dialog sends the next date as it shows it, here with at most 12 invoices.
+        mockMvc.perform(patch("/api/v1/recurring/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"frequency\": \"MONTHLY\", \"startDate\": \"%s\", \"maxRuns\": 12}"
+                                .formatted(next)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schedule.nextRun").value(next.toString()));
+        recurring.makeDue(next.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC));
+
+        list()
+                .andExpect(jsonPath("$.schedules[0].runsDone").value(2))
+                .andExpect(jsonPath("$.schedules[0].nextRun").value(start.plusMonths(2).toString()));
     }
 }

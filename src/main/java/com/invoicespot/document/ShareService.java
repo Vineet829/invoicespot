@@ -69,10 +69,11 @@ public class ShareService {
 
     // The token's hash finds the link; the token is also kept sealed with the
     // app's key, when there is one, so the link can be shown again. A new link
-    // replaces the document's current one. A draft isn't shared.
+    // replaces the document's current one. A draft isn't shared. The document
+    // is locked, as when a link is sent, so links made at once take turns.
     @Transactional
     public ShareLinkResponse create(BusinessAccess access, String id) {
-        Document document = requireInBusiness(access, id);
+        Document document = requireInBusiness(access, id, true);
         DocumentService.requireIssued(document, "Issue this draft before sharing it");
         DocumentService.requireNotVoid(document, "A void document can't be shared");
         return newLink(document, access.user(), null);
@@ -253,12 +254,12 @@ public class ShareService {
 
     @Transactional
     public PublicDocumentResponse accept(String token) {
-        return publicDocuments.accept(requireLink(token).getDocument());
+        return publicDocuments.accept(lockedDocument(token));
     }
 
     @Transactional
     public PublicDocumentResponse decline(String token, String reason) {
-        return publicDocuments.decline(requireLink(token).getDocument(), reason);
+        return publicDocuments.decline(lockedDocument(token), reason);
     }
 
     @Transactional
@@ -267,18 +268,31 @@ public class ShareService {
     }
 
     private Document requireInBusiness(BusinessAccess access, String id) {
+        return requireInBusiness(access, id, false);
+    }
+
+    private Document requireInBusiness(BusinessAccess access, String id, boolean lock) {
         UUID externalId;
         try {
             externalId = UUID.fromString(id);
         } catch (IllegalArgumentException exception) {
             throw new ApiException(HttpStatus.NOT_FOUND, "That document does not exist");
         }
-        Document document = documentRepository.findByExternalId(externalId)
+        Document document = (lock
+                        ? documentRepository.findForUpdateByExternalId(externalId)
+                        : documentRepository.findByExternalId(externalId))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
         if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only share your own documents");
         }
         return document;
+    }
+
+    // The link's document, locked as it is first read, so a client's answer
+    // and any other change to it take turns.
+    private Document lockedDocument(String token) {
+        return documentRepository.findForUpdateByPkid(requireLink(token).getDocument().getPkid())
+                .orElseThrow(ShareService::linkGone);
     }
 
     private ShareLink requireLink(String token) {

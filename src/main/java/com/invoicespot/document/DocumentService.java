@@ -623,7 +623,8 @@ public class DocumentService {
 
     // Only a draft is deleted: an issued document keeps its number, and is
     // voided instead. It is locked first, so a draft being issued meanwhile
-    // isn't deleted.
+    // isn't deleted. A draft a schedule copies stays until the schedule is
+    // stopped, or the schedule and its runs would go with it.
     @Transactional
     public void delete(BusinessAccess access, String id) {
         Document document = lockInBusiness(
@@ -635,6 +636,9 @@ public class DocumentService {
                     document.isVoid()
                             ? "A void document is kept with its number"
                             : "An issued document can't be deleted. Void it instead");
+        }
+        if (scheduleRepository.findByTemplate(document).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "This draft repeats. Stop its schedule before deleting it");
         }
         documentRepository.delete(document);
     }
@@ -856,9 +860,12 @@ public class DocumentService {
         return envelope(EmailTemplateKind.REMINDER, title, document, values);
     }
 
+    // Counted with the invoice locked, as any change to it is, so a reminder
+    // counted while the invoice is paid or voided adds to that change and
+    // undoes none of it.
     @Transactional
     public void recordReminder(BusinessAccess access, String id, String to, boolean automatic) {
-        Document document = requireReadable(access, id);
+        Document document = lockInBusiness(access, id);
         document.setRemindersSent(document.getRemindersSent() + 1);
         document.setLastRemindedAt(Instant.now(clock));
         activity.record(

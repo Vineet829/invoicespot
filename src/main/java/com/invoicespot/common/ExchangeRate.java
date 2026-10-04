@@ -17,9 +17,15 @@ public final class ExchangeRate {
         if (value == null || value.isBlank()) {
             return null;
         }
+        String text = value.trim();
+        // Only plain digits are read, with a decimal point: never 1e2, and
+        // never so many digits that reading them as a number takes seconds.
+        if (!text.matches("[0-9]{0,20}(\\.[0-9]{0,20})?")) {
+            throw error("Enter the exchange rate as a number greater than zero");
+        }
         BigDecimal rate;
         try {
-            rate = new BigDecimal(value.trim());
+            rate = new BigDecimal(text);
         } catch (NumberFormatException exception) {
             throw error("Enter the exchange rate as a number greater than zero");
         }

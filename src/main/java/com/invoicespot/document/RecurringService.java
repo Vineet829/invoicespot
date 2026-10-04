@@ -79,7 +79,7 @@ public class RecurringService {
 
     @Transactional
     public RecurringResponse create(BusinessAccess access, RecurringRequest request) {
-        Document invoice = requireDocumentInBusiness(access, request.documentId());
+        Document invoice = requireDocumentInBusiness(access, request.documentId(), true);
         if (invoice.getDocumentType() != DocumentType.INVOICE) {
             throw new ApiException(HttpStatus.CONFLICT, "Only an invoice can repeat");
         }
@@ -107,10 +107,12 @@ public class RecurringService {
 
     @Transactional(readOnly = true)
     public Optional<RecurringResponse> forDocument(BusinessAccess access, String documentId) {
-        return scheduleRepository.findByTemplate(requireDocumentInBusiness(access, documentId)).map(this::respond);
+        return scheduleRepository.findByTemplate(requireDocumentInBusiness(access, documentId, false))
+                .map(this::respond);
     }
 
-    // Changing a schedule counts its dates from the new first one; invoices
+    // A schedule given a new date or frequency counts its dates from the date
+    // given; one that keeps both keeps counting from its first. Invoices
     // already made still count toward the most allowed.
     @Transactional
     public RecurringResponse update(BusinessAccess access, String id, RecurringRequest request) {
@@ -237,8 +239,16 @@ public class RecurringService {
         if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "The end date must come after the first invoice");
         }
+        // A change that keeps the frequency and the next date, as its dialog
+        // sends it, keeps counting from the first date, so one from Jan 31
+        // still runs on Mar 31 after Feb 28.
+        boolean sameDates = frequency == schedule.getFrequency()
+                && request.startDate().equals(schedule.getNextRun());
         schedule.setFrequency(frequency);
-        schedule.setStartDate(request.startDate());
+        if (!sameDates) {
+            schedule.setStartDate(request.startDate());
+            schedule.setStartOffset(schedule.getRunsDone());
+        }
         schedule.setEndDate(request.endDate());
         schedule.setMaxRuns(request.maxRuns());
         boolean issue = !Boolean.FALSE.equals(request.issueAutomatically());
@@ -249,7 +259,6 @@ public class RecurringService {
         }
         schedule.setIssueAutomatically(issue);
         schedule.setEmailAutomatically(email);
-        schedule.setStartOffset(schedule.getRunsDone());
         schedule.setNextRun(nextRun(schedule));
     }
 
@@ -284,9 +293,12 @@ public class RecurringService {
         return LocalDate.now(clock.withZone(ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone())));
     }
 
-    private Document requireDocumentInBusiness(BusinessAccess access, String id) {
+    // The document, locked until the transaction ends when a schedule is made
+    // for it, as deleting a draft locks it: a delete that waits for the
+    // schedule then finds it, and keeps the draft instead of deleting both.
+    private Document requireDocumentInBusiness(BusinessAccess access, String id, boolean lock) {
         Document document = parse(id)
-                .flatMap(documentRepository::findByExternalId)
+                .flatMap(lock ? documentRepository::findForUpdateByExternalId : documentRepository::findByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That document does not exist"));
         if (!document.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only repeat your own invoices");
@@ -294,9 +306,11 @@ public class RecurringService {
         return document;
     }
 
+    // The schedule, locked until the transaction ends, so a change to it and
+    // a run making its invoice take turns.
     private RecurringSchedule requireInBusiness(BusinessAccess access, String id) {
         RecurringSchedule schedule = parse(id)
-                .flatMap(scheduleRepository::findByExternalId)
+                .flatMap(scheduleRepository::findForUpdateByExternalId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "That schedule does not exist"));
         if (!schedule.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can only change your own schedules");

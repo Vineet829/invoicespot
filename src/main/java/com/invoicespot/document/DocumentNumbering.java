@@ -2,6 +2,8 @@ package com.invoicespot.document;
 
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.BusinessSettingsRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +14,9 @@ public class DocumentNumbering {
     private final BusinessSettingsRepository settingsRepository;
     private final DocumentRepository documentRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public DocumentNumbering(BusinessSettingsRepository settingsRepository, DocumentRepository documentRepository) {
         this.settingsRepository = settingsRepository;
         this.documentRepository = documentRepository;
@@ -19,11 +24,13 @@ public class DocumentNumbering {
 
     // Each business numbers its own documents. Its settings row is locked
     // while a number is handed out, so members creating documents at once
-    // take turns.
+    // take turns. It is read again once locked: issuing read the settings
+    // before, and writing that copy back would undo settings saved since.
     @Transactional(propagation = Propagation.MANDATORY)
     public String next(Long businessPkid, DocumentType type) {
         settingsRepository.insertDefaultsIfMissing(businessPkid);
         BusinessSettings settings = settingsRepository.findForUpdateByBusinessPkid(businessPkid).orElseThrow();
+        entityManager.refresh(settings);
         String prefix = switch (type) {
             case INVOICE -> settings.getInvoicePrefix();
             case QUOTATION -> settings.getQuotationPrefix();

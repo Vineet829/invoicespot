@@ -129,8 +129,10 @@ public class SettingsService {
     }
 
     // The business's settings row, made with the defaults if it has none yet.
+    // It is locked, as numbering locks it, so a save that waits for another
+    // save or for a document's number starts from what that one wrote.
     private BusinessSettings saved(BusinessAccess access) {
-        return settingsRepository.findByBusinessPkid(access.businessPkid()).orElseGet(() -> {
+        return settingsRepository.findForUpdateByBusinessPkid(access.businessPkid()).orElseGet(() -> {
             BusinessSettings created = new BusinessSettings();
             created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
             return created;

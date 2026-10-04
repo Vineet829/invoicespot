@@ -96,6 +96,13 @@ class ExchangeRateIntegrationTest extends IntegrationTest {
         edit(draft, "{\"exchangeRate\": \"0\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Enter the exchange rate as a number greater than zero"));
+        // Only plain digits are read: not an exponent, and not so many digits
+        // that reading them as a number would take seconds.
+        for (String bad : new String[] {"1e2", "1e2147483647", "1".repeat(100_000)}) {
+            edit(draft, "{\"exchangeRate\": \"" + bad + "\"}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Enter the exchange rate as a number greater than zero"));
+        }
         edit(draft, "{\"exchangeRate\": \"83.12345678901\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("The exchange rate can have at most 10 decimals"));

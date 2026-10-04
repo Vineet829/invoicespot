@@ -1,8 +1,11 @@
 package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -94,5 +97,41 @@ class DocumentLinesIntegrationTest extends IntegrationTest {
         create("{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": 1, \"unit\": \"%s\"}".formatted("u".repeat(21)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Units can be at most 20 characters"));
+    }
+
+    // Each line's price and quantity are within their limits, but a document
+    // can store amounts of at most 99,999,999,999,999,999.99.
+    @Test
+    @DisplayName("a total too large to save is a 400 that says so, and a draft edited past it keeps its total")
+    void totalTooLarge() throws Exception {
+        create("{\"itemName\": \"Work\", \"unitPrice\": 999999999999999.9999, \"quantity\": 1000000}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("An amount is too large to save"));
+        create("{\"itemName\": \"Work\", \"unitPrice\": 999999999999999.9999, \"quantity\": 100}")
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"total\":99999999999999999.99")));
+
+        String draft = JsonPath.read(
+                body(send(post("/api/v1/document/create"), """
+                        {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "draft": true,
+                         "billingItems": [{"itemName": "Work", "unitPrice": 5, "quantity": 1}]}
+                        """.formatted(client))
+                        .andExpect(status().isOk())),
+                "$.newDocument._id");
+        send(patch("/api/v1/document/{id}", draft), """
+                {"billingItems": [{"itemName": "Work", "unitPrice": 600000000000000, "quantity": 100},
+                                  {"itemName": "More work", "unitPrice": 600000000000000, "quantity": 100}]}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("An amount is too large to save"));
+        send(get("/api/v1/document/{id}", draft), "").andExpect(jsonPath("$.document.total").value(5.0));
+    }
+
+    @Test
+    @DisplayName("a line whose name has a NUL character in it is a 400 that says so")
+    void nulCharacter() throws Exception {
+        create("{\"itemName\": \"Work\\u0000\", \"unitPrice\": 1, \"quantity\": 1}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Text can't contain a NUL character"));
     }
 }

@@ -27,7 +27,9 @@ import org.springframework.stereotype.Service;
 // A document as its client sees it, whichever link they came by: what it
 // says, its PDF, and what they may do with it, answering a quotation or
 // reporting a payment. Callers find the document from their link and hold
-// the transaction.
+// the transaction. The document is locked as it is first read for an answer
+// or a report: by the caller, or, for a share-link report, by
+// PaymentClaimService.report.
 @Service
 public class PublicDocuments {
 

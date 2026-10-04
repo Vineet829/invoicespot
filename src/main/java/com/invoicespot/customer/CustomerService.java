@@ -171,7 +171,7 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerSummaryResponse summary(BusinessAccess access, String id) {
-        Customer customer = requireInBusiness(access, id, "Customer not found",
+        Customer customer = requireInBusiness(access, id, false, "Customer not found",
                 "You are not authorized to view this customer's information. He/She is not your"
                         + " customer");
         ZoneId zone = ZoneId.of(settingsService.forBusiness(access.businessPkid()).getTimeZone());
@@ -181,14 +181,14 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerResponse getOne(BusinessAccess access, String id) {
-        return CustomerResponse.from(requireInBusiness(access, id, "Customer not found",
+        return CustomerResponse.from(requireInBusiness(access, id, false, "Customer not found",
                 "You are not authorized to view this customer's information. He/She is not your"
                         + " customer"));
     }
 
     @Transactional
     public CustomerResponse update(BusinessAccess access, String id, UpdateCustomerRequest request) {
-        Customer customer = requireInBusiness(access, id, "That Customer does not exist",
+        Customer customer = requireInBusiness(access, id, true, "That Customer does not exist",
                 "You are not authorized to update this customer's information. He/She is not your"
                         + " customer");
         if (request.name() != null) {
@@ -239,16 +239,20 @@ public class CustomerService {
 
     @Transactional
     public void delete(BusinessAccess access, String id) {
-        Customer customer = requireInBusiness(access, id, "That customer does not exist!",
+        Customer customer = requireInBusiness(access, id, true, "That customer does not exist!",
                 "You are not authorized to delete this customer's information. He/She is not your"
                         + " customer!");
         customerRepository.delete(customer);
     }
 
+    // Locked for an edit or a delete, so one that waits for another sees what
+    // that one did: the other's changes, or that the client is gone.
     private Customer requireInBusiness(
-            BusinessAccess access, String id, String notFoundMessage, String forbiddenMessage) {
+            BusinessAccess access, String id, boolean lock, String notFoundMessage, String forbiddenMessage) {
         Customer customer = externalId(id)
-                .flatMap(customerRepository::findByExternalId)
+                .flatMap(uuid -> lock
+                        ? customerRepository.findForUpdateByExternalId(uuid)
+                        : customerRepository.findByExternalId(uuid))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, notFoundMessage));
         if (!customer.getBusiness().getPkid().equals(access.businessPkid())) {
             throw new ApiException(HttpStatus.FORBIDDEN, forbiddenMessage);

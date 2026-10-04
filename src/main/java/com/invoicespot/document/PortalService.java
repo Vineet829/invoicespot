@@ -90,10 +90,11 @@ public class PortalService {
                 .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0, null));
     }
 
-    // A new link replaces the client's current one.
+    // A new link replaces the client's current one. The client is locked, as
+    // when a link is sent, so links made at once take turns.
     @Transactional
     public ShareLinkResponse create(BusinessAccess access, String customerId) {
-        return newLink(requireInBusiness(access, customerId), access);
+        return newLink(requireInBusiness(access, customerId, true), access);
     }
 
     private ShareLinkResponse newLink(Customer customer, BusinessAccess access) {
@@ -267,17 +268,17 @@ public class PortalService {
 
     @Transactional
     public PublicDocumentResponse accept(String token, String number) {
-        return publicDocuments.accept(requireDocument(token, number));
+        return publicDocuments.accept(requireDocument(token, number, true));
     }
 
     @Transactional
     public PublicDocumentResponse decline(String token, String number, String reason) {
-        return publicDocuments.decline(requireDocument(token, number), reason);
+        return publicDocuments.decline(requireDocument(token, number, true), reason);
     }
 
     @Transactional
     public PublicDocumentResponse reportPayment(String token, String number, ReportPaymentRequest request) {
-        return publicDocuments.reportPayment(requireDocument(token, number), request);
+        return publicDocuments.reportPayment(requireDocument(token, number, true), request);
     }
 
     @Transactional(readOnly = true)
@@ -286,8 +287,17 @@ public class PortalService {
     }
 
     private Document requireDocument(String token, String number) {
+        return requireDocument(token, number, false);
+    }
+
+    // Locked as it is first read when the client answers it or reports a
+    // payment, so that and any other change to it take turns.
+    private Document requireDocument(String token, String number, boolean lock) {
         Customer customer = requireLink(token).getCustomer();
-        return documentRepository.findInPortal(customer.getBusiness().getPkid(), customer.getPkid(), number)
+        Long business = customer.getBusiness().getPkid();
+        return (lock
+                        ? documentRepository.findForUpdateInPortal(business, customer.getPkid(), number)
+                        : documentRepository.findInPortal(business, customer.getPkid(), number))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "There is no such document in this portal"));
     }
 

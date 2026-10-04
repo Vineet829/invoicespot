@@ -16,8 +16,14 @@ public final class Percentage {
         if (value == null || value.isBlank()) {
             return null;
         }
+        String text = value.trim();
+        // Only plain digits are read, with a decimal point: never 1e2, and
+        // never so many digits that reading them as a number takes seconds.
+        if (!text.matches("[0-9]{0,20}(\\.[0-9]{0,20})?")) {
+            throw error(label);
+        }
         try {
-            BigDecimal number = new BigDecimal(value.trim());
+            BigDecimal number = new BigDecimal(text);
             if (number.signum() >= 0
                     && number.compareTo(ONE_HUNDRED) <= 0
                     && number.stripTrailingZeros().scale() <= 4) {

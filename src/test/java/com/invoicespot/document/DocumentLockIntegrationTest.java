@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.invoicespot.IntegrationTest;
 import com.jayway.jsonpath.JsonPath;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +27,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 // An issued document keeps what it went out with: its client, lines,
 // currency, tax, issue date and amounts. Its due date, notes and terms still
-// change, and only a draft is deleted.
+// change, and only a draft is deleted, unless a schedule repeats it.
 class DocumentLockIntegrationTest extends IntegrationTest {
 
     private static final String LOCKED =
@@ -158,7 +160,8 @@ class DocumentLockIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("only a draft is deleted: an issued document is voided instead, and a void one is kept")
+    @DisplayName("only a draft is deleted, and not while it repeats: an issued document is voided instead, and a void"
+            + " one is kept")
     void deleting() throws Exception {
         String issued = document("Invoice", false);
         send(delete("/api/v1/document/{id}", issued), "")
@@ -172,6 +175,25 @@ class DocumentLockIntegrationTest extends IntegrationTest {
         String draft = document("Invoice", true);
         send(delete("/api/v1/document/{id}", draft), "").andExpect(status().isOk());
         send(get("/api/v1/document/{id}", draft), "").andExpect(status().isNotFound());
+
+        String repeating = document("Invoice", true);
+        String schedule = JsonPath.read(
+                body(send(post("/api/v1/recurring"), """
+                                {"documentId": "%s", "frequency": "monthly", "startDate": "%s"}
+                                """.formatted(repeating, LocalDate.now(ZoneOffset.UTC).plusDays(1)))
+                        .andExpect(status().isCreated())),
+                "$.schedule._id");
+        send(delete("/api/v1/document/{id}", repeating), "")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This draft repeats. Stop its schedule before deleting it"));
+        // A paused schedule still copies it.
+        send(post("/api/v1/recurring/{id}/pause", schedule), "").andExpect(status().isOk());
+        send(delete("/api/v1/document/{id}", repeating), "").andExpect(status().isConflict());
+        send(get("/api/v1/document/{id}/recurring", repeating), "")
+                .andExpect(jsonPath("$.schedule._id").value(schedule));
+
+        send(delete("/api/v1/recurring/{id}", schedule), "").andExpect(status().isOk());
+        send(delete("/api/v1/document/{id}", repeating), "").andExpect(status().isOk());
     }
 
     @Test
