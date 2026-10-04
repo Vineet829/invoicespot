@@ -33,13 +33,35 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 
+// The business the session works in, as its owner, and as a viewer, who
+// sees the records and exports lists but changes nothing.
+const business = (role, permissions) => ({
+  businesses: [
+    { _id: "b-1", name: "Studio Demo", role, active: true, permissions },
+  ],
+});
+const owner = business("OWNER", [
+  "VIEW_RECORDS",
+  "EXPORT_LISTS",
+  "EDIT_RECORDS",
+  "DELETE_RECORDS",
+  "EXPORT_ARCHIVE",
+  "MANAGE_BUSINESS",
+  "MANAGE_TEAM",
+  "VIEW_TEAM_ACTIVITY",
+  "OWN_BUSINESS",
+]);
+const viewer = business("VIEWER", ["VIEW_RECORDS", "EXPORT_LISTS"]);
+
 // Answers every overview request with `answer`, or with what it gives for
-// the request's address: a body, a Response, or a promise of either.
-const serve = (answer) =>
+// the request's address: a body, a Response, or a promise of either. The
+// business the session works in is `session`'s.
+const serve = (answer, session) =>
   vi.stubGlobal(
     "fetch",
     vi.fn(async (request) => {
       const url = new URL(request.url);
+      if (url.pathname.endsWith("/businesses")) return json(session);
       requests.push(`${url.pathname}${url.search}`);
       const body = await (typeof answer === "function" ? answer(url) : answer);
       return body instanceof Response ? body : json(body);
@@ -51,8 +73,13 @@ const loaded = (page) =>
     expect(page.querySelector("#document-status-title")).not.toBeNull(),
   );
 
-const open = async (path, answer = overview, ready = loaded) => {
-  serve(answer);
+const open = async (
+  path,
+  answer = overview,
+  ready = loaded,
+  session = owner,
+) => {
+  serve(answer, session);
   const { Provider } = await import("react-redux");
   const { MemoryRouter } = await import("react-router-dom");
   const { store } = await import("../../../app/store");
@@ -194,6 +221,7 @@ it("draws the last 90 days from the server's figures, against the 90 days before
     "Needs your attention",
     "Document status",
     "Latest payments",
+    "Spending",
   ]);
 });
 
@@ -627,31 +655,56 @@ it("shows what is owed by due date and what needs attention, each opening its li
 
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(
+    [...attention.querySelectorAll("ol > li")].map((item) => item.textContent),
+  ).toEqual([
+    "OverdueINV-1026Sable Fitness54 days lateDue Aug 113,391.67",
+    "OverdueINV-1030Quill & Co. Publishing21 days lateDue Sep 131,969.11",
+    "OverdueINV-1031Verdant Farms10 days lateDue Sep 24965.25",
+    "Due soonINV-1032Bluefin AnalyticsDue in 2 daysDue Oct 62,664.09",
+    "QuotationQUO-0206Kestrel OutdoorAwaiting an answerValid until Oct 91,201.20",
+  ]);
+  expect(
     [...attention.querySelectorAll("a")].map((link) => [
       link.getAttribute("href"),
-      link.textContent,
+      link.getAttribute("aria-label") || link.textContent,
     ]),
   ).toEqual([
     ["/documents?status=overdue", "Overdue invoices"],
     [
       "/document/00000000-0000-0000-0000-000000001026",
-      "OverdueINV-1026Sable Fitness54 days lateDue Aug 113,391.67",
+      "Overdue INV-1026, Sable Fitness, 54 days late, Due Aug 11, 3,391.67",
+    ],
+    [
+      "/single-customer/00000000-0000-0000-0000-00000000c105",
+      "Sable Fitness. View the client",
     ],
     [
       "/document/00000000-0000-0000-0000-000000001030",
-      "OverdueINV-1030Quill & Co. Publishing21 days lateDue Sep 131,969.11",
+      "Overdue INV-1030, Quill & Co. Publishing, 21 days late, Due Sep 13, 1,969.11",
+    ],
+    [
+      "/single-customer/00000000-0000-0000-0000-00000000c107",
+      "Quill & Co. Publishing. View the client",
     ],
     [
       "/document/00000000-0000-0000-0000-000000001031",
-      "OverdueINV-1031Verdant Farms10 days lateDue Sep 24965.25",
+      "Overdue INV-1031, Verdant Farms, 10 days late, Due Sep 24, 965.25",
     ],
     [
       "/document/00000000-0000-0000-0000-000000001032",
-      "Due soonINV-1032Bluefin AnalyticsDue in 2 daysDue Oct 62,664.09",
+      "Due soon INV-1032, Bluefin Analytics, Due in 2 days, Due Oct 6, 2,664.09",
+    ],
+    [
+      "/single-customer/00000000-0000-0000-0000-00000000c103",
+      "Bluefin Analytics. View the client",
     ],
     [
       "/document/00000000-0000-0000-0000-000000000206",
-      "QuotationQUO-0206Kestrel OutdoorAwaiting an answerValid until Oct 91,201.20",
+      "Quotation QUO-0206, Kestrel Outdoor, Awaiting an answer, Valid until Oct 9, 1,201.20",
+    ],
+    [
+      "/single-customer/00000000-0000-0000-0000-00000000c109",
+      "Kestrel Outdoor. View the client",
     ],
   ]);
   expect(attention.textContent).toContain(
@@ -789,4 +842,402 @@ it("opens the ageing report from the owed panel in the chosen currency, whatever
   expect(owed.querySelector("a").getAttribute("href")).toBe(
     "/reports?currency=EUR#ageing",
   );
+});
+
+// What was spent in the last 90 days: the five largest categories, then
+// three more added up.
+const spent = {
+  total: 7610.15,
+  categories: [
+    { category: "Contractors", amount: 3600, expenses: 2 },
+    { category: "Software and subscriptions", amount: 1240, expenses: 4 },
+    { category: "Marketing", amount: 980, expenses: 2 },
+    { category: "Travel", amount: 865.4, expenses: 3 },
+    { category: "Office", amount: 412.75, expenses: 5 },
+  ],
+  others: { amount: 512, expenses: 6, categories: 3 },
+};
+const spendingPanel = (page) =>
+  page.querySelector('[aria-labelledby="spending-title"]');
+const links = (element) =>
+  [...element.querySelectorAll("a")].map((link) => [
+    link.getAttribute("href"),
+    link.getAttribute("aria-label") || link.textContent,
+  ]);
+
+it("lists what was spent in the period by category, each opening its expenses", async () => {
+  const page = await open("/dashboard", { ...overview, spending: spent });
+  const spending = spendingPanel(page);
+  expect(spending.querySelector("p").textContent).toBe(
+    "7,610.15spent in these 90 days",
+  );
+  expect(links(spending)).toEqual([
+    ["/expenses?period=90d&currency=USD", "All expenses"],
+    [
+      "/expenses?category=Contractors&period=90d&currency=USD",
+      "Contractors: 3,600.00 on 2 expenses, 47% of spending. Open these expenses",
+    ],
+    [
+      "/expenses?category=Software+and+subscriptions&period=90d&currency=USD",
+      "Software and subscriptions: 1,240.00 on 4 expenses, 16% of spending. Open these expenses",
+    ],
+    [
+      "/expenses?category=Marketing&period=90d&currency=USD",
+      "Marketing: 980.00 on 2 expenses, 13% of spending. Open these expenses",
+    ],
+    [
+      "/expenses?category=Travel&period=90d&currency=USD",
+      "Travel: 865.40 on 3 expenses, 11% of spending. Open these expenses",
+    ],
+    [
+      "/expenses?category=Office&period=90d&currency=USD",
+      "Office: 412.75 on 5 expenses, 5% of spending. Open these expenses",
+    ],
+  ]);
+  const rows = [...spending.querySelectorAll("ol > li")];
+  expect(rows.map((row) => row.textContent)).toEqual([
+    "Contractors · 23,600.0047%",
+    "Software and subscriptions · 41,240.0016%",
+    "Marketing · 2980.0013%",
+    "Travel · 3865.4011%",
+    "Office · 5412.755%",
+    "3 other categories · 6512.007%",
+  ]);
+  // Each bar is against the largest row.
+  expect(
+    rows.map((row) =>
+      Math.round(parseFloat(row.querySelector("[style]").style.width)),
+    ),
+  ).toEqual([100, 34, 27, 24, 11, 14]);
+  // The rest of the categories open nothing, and are read as one figure.
+  const others = rows[5].firstElementChild;
+  expect(others.tagName).toBe("DIV");
+  expect(others.getAttribute("role")).toBe("img");
+  expect(others.getAttribute("aria-label")).toBe(
+    "3 other categories: 512.00 on 6 expenses, 7% of spending",
+  );
+  expect(spending.lastElementChild.textContent).toBe(
+    "Each category opens its expenses for these 90 days.",
+  );
+});
+
+it("opens the expenses of the period shown, in the chosen currency", async () => {
+  const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
+    ...overview,
+    currencies: ["USD", "EUR"],
+    currency: url.searchParams.get("currency") || "USD",
+    period: {
+      key: "ytd",
+      from: "2026-01-01",
+      to: "2026-10-04",
+      previousFrom: "2025-01-01",
+      previousTo: "2025-10-04",
+      step: "month",
+    },
+    spending: spent,
+  }));
+  const spending = spendingPanel(page);
+  expect(links(spending).map(([href]) => href)).toEqual([
+    "/expenses?period=this-year&currency=EUR",
+    "/expenses?category=Contractors&period=this-year&currency=EUR",
+    "/expenses?category=Software+and+subscriptions&period=this-year&currency=EUR",
+    "/expenses?category=Marketing&period=this-year&currency=EUR",
+    "/expenses?category=Travel&period=this-year&currency=EUR",
+    "/expenses?category=Office&period=this-year&currency=EUR",
+  ]);
+  expect(spending.querySelector("p").textContent).toBe(
+    "7,610.15spent this year",
+  );
+  expect(spending.lastElementChild.textContent).toBe(
+    "Each category opens its expenses for this year.",
+  );
+});
+
+it.each([
+  ["30d", "in these 30 days", "30d"],
+  ["90d", "in these 90 days", "90d"],
+  ["12m", "in these 12 months", "12m"],
+  ["ytd", "this year", "this-year"],
+])(
+  "says when nothing was spent over %s, with a way to record an expense",
+  async (key, words, list) => {
+    const page = await open(`/dashboard?period=${key}`, {
+      ...overview,
+      period: { ...overview.period, key },
+    });
+    const spending = spendingPanel(page);
+    expect(spending.textContent).toBe(
+      `SpendingAll expenses0.00spent ${words}No expenses recorded ${words}.Record an expenseExpenses by category, each opening its expenses.`,
+    );
+    expect(links(spending)).toEqual([
+      [`/expenses?period=${list}&currency=USD`, "All expenses"],
+      ["/expenses?new=1&currency=USD", "Record an expense"],
+    ]);
+  },
+);
+
+it("shows a viewer the way to record an expense disabled, with the reason", async () => {
+  const page = await open("/dashboard", overview, loaded, viewer);
+  const spending = spendingPanel(page);
+  await act(() =>
+    vi.waitFor(() => expect(spending.querySelector("button")).not.toBeNull()),
+  );
+  const record = spending.querySelector("button");
+  expect(record.textContent).toBe("Record an expense");
+  expect(record.disabled).toBe(true);
+  expect(record.title).toBe("Viewers can't change anything in this business");
+  expect(
+    document.getElementById(record.getAttribute("aria-describedby"))
+      .textContent,
+  ).toBe("Viewers can't change anything in this business");
+  expect(links(spending)).toEqual([
+    ["/expenses?period=90d&currency=USD", "All expenses"],
+  ]);
+});
+
+it("keeps Spending's place beside the latest payments while the overview loads", async () => {
+  let respond;
+  const page = await open(
+    "/dashboard",
+    () => new Promise((resolve) => (respond = resolve)),
+    () => vi.waitFor(() => expect(respond).toBeDefined()),
+  );
+  const loading = page.querySelector(
+    '[aria-label="Loading your business overview"]',
+  );
+  // The last row holds the latest payments' placeholder and Spending's.
+  expect(loading.lastElementChild.children).toHaveLength(2);
+  expect(spendingPanel(page)).toBeNull();
+  await act(async () => respond({ ...overview, spending: spent }));
+  await act(() => loaded(page));
+  expect(
+    page.querySelector('[aria-label="Loading your business overview"]'),
+  ).toBeNull();
+  expect(spendingPanel(page).querySelector("p").textContent).toBe(
+    "7,610.15spent in these 90 days",
+  );
+});
+
+it("keeps the last period's spending, dimmed, when the chosen period's can't be loaded", async () => {
+  const page = await open("/dashboard", (url) =>
+    url.searchParams.get("period") === "30d"
+      ? json({ message: "Try later" }, 500)
+      : { ...overview, spending: spent },
+  );
+  await click(pill(page, "30 days"));
+  await act(() =>
+    vi.waitFor(() =>
+      expect(page.querySelector('[role="alert"]')).not.toBeNull(),
+    ),
+  );
+  expect(page.querySelector('[role="alert"]').textContent).toContain(
+    "We couldn’t load the last 30 days.Showing the last 90 days.",
+  );
+  const spending = spendingPanel(page);
+  expect(spending.closest("[aria-busy]").getAttribute("aria-busy")).toBe(
+    "true",
+  );
+  expect(spending.querySelector("p").textContent).toBe(
+    "7,610.15spent in these 90 days",
+  );
+  expect(links(spending)[1][0]).toBe(
+    "/expenses?category=Contractors&period=90d&currency=USD",
+  );
+});
+
+it("leaves the latest payments on their own when the server sends no spending", async () => {
+  const { spending, ...older } = overview;
+  const page = await open("/dashboard", older);
+  expect(spendingPanel(page)).toBeNull();
+  expect(page.querySelector("#payments-title").textContent).toBe(
+    "Latest payments",
+  );
+});
+
+it.each([
+  ["30d", "30d"],
+  ["90d", "90d"],
+  ["12m", "12m"],
+  ["ytd", "this-year"],
+])(
+  "keeps every Spending link over %s to the currency its figures count, though the address names none",
+  async (key, list) => {
+    const page = await open(`/dashboard?period=${key}`, {
+      ...overview,
+      period: { ...overview.period, key },
+      spending: spent,
+    });
+    expect(links(spendingPanel(page)).map(([href]) => href)).toEqual([
+      `/expenses?period=${list}&currency=USD`,
+      ...spent.categories.map(
+        ({ category }) =>
+          `/expenses?${new URLSearchParams({ category, period: list, currency: "USD" })}`,
+      ),
+    ]);
+    // The other figures keep to no currency while none was chosen.
+    expect(tiles(page)[1][0]).toBe(`/payments?period=${list}`);
+  },
+);
+
+it("keeps a category named others apart from the row that adds up the rest", async () => {
+  const warnings = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const page = await open("/dashboard", {
+      ...overview,
+      spending: {
+        ...spent,
+        categories: [
+          ...spent.categories.slice(0, 4),
+          { category: "others", amount: 412.75, expenses: 5 },
+        ],
+      },
+    });
+    expect(
+      [...spendingPanel(page).querySelectorAll("ol > li")]
+        .slice(-2)
+        .map((row) => row.textContent),
+    ).toEqual(["others · 5412.755%", "3 other categories · 6512.007%"]);
+    expect(warnings.mock.calls.flat().join(" ")).not.toContain("same key");
+  } finally {
+    warnings.mockRestore();
+  }
+});
+
+const shortcuts = (page) => page.querySelector('nav[aria-label="Shortcuts"]');
+const REFUSAL = "Viewers can't change anything in this business";
+
+it("offers shortcuts to a new invoice, expense or client under the subtitle", async () => {
+  const page = await open("/dashboard");
+  const nav = shortcuts(page);
+  expect(nav.previousElementSibling.textContent).toBe(
+    "Last 90 days, Jul 7 – Oct 4, 2026 · compared with Apr 8 – Jul 6",
+  );
+  expect(
+    [...nav.querySelectorAll("a")].map((link) => [
+      link.textContent,
+      link.getAttribute("href"),
+    ]),
+  ).toEqual([
+    ["New invoice", "/create-doc"],
+    ["Record an expense", "/expenses?new=1"],
+    ["Add a client", "/create-customer"],
+  ]);
+  expect(nav.querySelector("button")).toBeNull();
+});
+
+it("shows a viewer the shortcuts disabled, with the reason given once", async () => {
+  const page = await open("/dashboard", overview, loaded, viewer);
+  const nav = shortcuts(page);
+  await act(() =>
+    vi.waitFor(() => expect(nav.querySelectorAll("button")).toHaveLength(3)),
+  );
+  const keys = [...nav.querySelectorAll("button")];
+  expect(keys.map((key) => [key.textContent, key.disabled, key.title])).toEqual(
+    [
+      ["New invoice", true, REFUSAL],
+      ["Record an expense", true, REFUSAL],
+      ["Add a client", true, REFUSAL],
+    ],
+  );
+  // One note gives the reason, and each shortcut points to it.
+  const notes = new Set(
+    keys.map((key) => key.getAttribute("aria-describedby")),
+  );
+  expect(notes.size).toBe(1);
+  expect(document.getElementById([...notes][0]).textContent).toBe(REFUSAL);
+  expect(
+    [...page.querySelectorAll("header span")].filter(
+      (span) => span.textContent === REFUSAL,
+    ),
+  ).toHaveLength(1);
+  expect(nav.querySelector("a")).toBeNull();
+});
+
+it("opens a client from the attention list in a link of its own beside the document's", async () => {
+  const page = await open("/dashboard");
+  const rows = [
+    ...page.querySelectorAll('[aria-labelledby="attention-title"] ol > li'),
+  ];
+  // With a client: the document and the client, each its own link, neither
+  // inside the other, both reached with Tab in reading order.
+  const links = [...rows[0].querySelectorAll("a")];
+  expect(links.map((link) => link.getAttribute("href"))).toEqual([
+    "/document/00000000-0000-0000-0000-000000001026",
+    "/single-customer/00000000-0000-0000-0000-00000000c105",
+  ]);
+  expect(links[1].textContent).toBe("Sable Fitness");
+  for (const link of links) {
+    expect(link.querySelector("a")).toBeNull();
+    expect(link.parentElement.closest("a")).toBeNull();
+    expect(link.tabIndex).toBe(0);
+  }
+  expect(
+    links[0].compareDocumentPosition(links[1]) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  // Without one, the name is only words, and the row opens its document.
+  const unlinked = [...rows[2].querySelectorAll("a")];
+  expect(unlinked.map((link) => link.getAttribute("href"))).toEqual([
+    "/document/00000000-0000-0000-0000-000000001031",
+  ]);
+  expect(rows[2].querySelector('[class*="grid-area:client"]').tagName).toBe(
+    "SPAN",
+  );
+  expect(rows[2].textContent).toContain("Verdant Farms");
+  // Each row is read once: the document's link reads it whole, so the words
+  // beside it are hidden from screen readers.
+  for (const row of rows) {
+    const read = row.cloneNode(true);
+    read
+      .querySelectorAll('a, [aria-hidden="true"]')
+      .forEach((node) => node.remove());
+    expect(read.textContent).toBe("");
+  }
+  expect(
+    page.querySelector('[aria-labelledby="attention-title"]').lastElementChild
+      .textContent,
+  ).toBe(
+    "No payment reports to confirm, drafts to issue or recurring invoices due this week. A client’s name opens the client.",
+  );
+});
+
+it("says nothing of clients when no row in the attention list links one", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    attention: {
+      ...overview.attention,
+      items: overview.attention.items.map((item) => ({
+        ...item,
+        clientId: null,
+      })),
+    },
+  });
+  const attention = page.querySelector('[aria-labelledby="attention-title"]');
+  expect(
+    [...attention.querySelectorAll("ol a")].map((link) =>
+      link.getAttribute("href"),
+    ),
+  ).toEqual([
+    "/document/00000000-0000-0000-0000-000000001026",
+    "/document/00000000-0000-0000-0000-000000001030",
+    "/document/00000000-0000-0000-0000-000000001031",
+    "/document/00000000-0000-0000-0000-000000001032",
+    "/document/00000000-0000-0000-0000-000000000206",
+  ]);
+  expect(attention.lastElementChild.textContent).toBe(
+    "No payment reports to confirm, drafts to issue or recurring invoices due this week.",
+  );
+});
+
+it("hides the cash flow's table for screen readers inside a box that clips it", async () => {
+  const page = await open("/dashboard");
+  const table = page.querySelector('[aria-labelledby="cash-flow-title"] table');
+  // A table is never narrower than its widest row, so the box is hidden,
+  // not the table, which would still widen the page on a small phone.
+  expect(table.parentElement.className).toBe("sr-only");
+  expect(table.className).toBe("");
+  expect(table.querySelector("caption").textContent).toBe(
+    "Cash flow each week, USD",
+  );
+  expect(table.querySelectorAll("tbody tr")).toHaveLength(13);
 });

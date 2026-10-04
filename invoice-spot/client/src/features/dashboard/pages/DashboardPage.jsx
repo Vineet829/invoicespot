@@ -16,11 +16,14 @@ import {
   DocumentStatus,
   attentionPair,
   chartPair,
+  historyPair,
 } from "../components/DashboardPanels";
 import OverviewTiles from "../components/OverviewTiles";
 import CashFlowPanel from "../components/CashFlowPanel";
 import OwedPanel from "../components/OwedPanel";
 import AttentionPanel from "../components/AttentionPanel";
+import SpendingPanel from "../components/SpendingPanel";
+import Shortcuts from "../components/Shortcuts";
 import {
   errorBanner,
   errorDetail,
@@ -113,6 +116,7 @@ const DashboardPage = () => {
                 ? periodSubtitle(snapshot.period, snapshot.totals.hasPrevious)
                 : findPeriod(period).name}
             </p>
+            <Shortcuts />
           </div>
           <div className="flex flex-wrap items-center gap-3 max-[700px]:w-full">
             <nav
@@ -195,11 +199,16 @@ const DashboardPage = () => {
                   total={snapshot.documents}
                 />
               </div>
-              <PaymentHistory
-                sortPaymentHistory={payments.rows}
-                paymentDocuments={payments.documents}
-                currency={snapshot.currency}
-              />
+              {/* An answer without spending, as an older server sends,
+                  leaves the latest payments on their own. */}
+              <div className={snapshot.spending ? historyPair : "contents"}>
+                <PaymentHistory
+                  sortPaymentHistory={payments.rows}
+                  paymentDocuments={payments.documents}
+                  currency={snapshot.currency}
+                />
+                {snapshot.spending && <SpendingPanel snapshot={snapshot} />}
+              </div>
             </div>
           )
         )}

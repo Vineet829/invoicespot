@@ -21,8 +21,11 @@ import {
   percentLabel,
   periodSubtitle,
   receivedLink,
+  recordExpenseLink,
   reportLink,
   showsLabel,
+  spendingLink,
+  spendingRows,
   statusLink,
   trendColumns,
   trendPoints,
@@ -239,6 +242,94 @@ describe("links to the records behind each figure", () => {
       "/documents?status=unpaid",
       "/documents?status=overdue",
     ]);
+  });
+
+  it.each([
+    ["30d", "30d"],
+    ["90d", "90d"],
+    ["12m", "12m"],
+    ["ytd", "this-year"],
+  ])(
+    "opens the expenses spent over %s as the list's %s, all of them or a category's",
+    (period, list) => {
+      expect(spendingLink(period)).toBe(`/expenses?period=${list}`);
+      expect(spendingLink(period, "EUR")).toBe(
+        `/expenses?period=${list}&currency=EUR`,
+      );
+      expect(spendingLink(period, undefined, "Travel")).toBe(
+        `/expenses?category=Travel&period=${list}`,
+      );
+      expect(spendingLink(period, "EUR", "Software & tools")).toBe(
+        `/expenses?category=Software+%26+tools&period=${list}&currency=EUR`,
+      );
+    },
+  );
+});
+
+it("records an expense over the expenses in the overview's currency", () => {
+  expect(recordExpenseLink("USD")).toBe("/expenses?new=1&currency=USD");
+  expect(recordExpenseLink()).toBe("/expenses?new=1");
+});
+
+describe("spending by category", () => {
+  const spending = {
+    total: 7610.15,
+    categories: [
+      { category: "Contractors", amount: 3600, expenses: 2 },
+      { category: "Software and subscriptions", amount: 1240, expenses: 4 },
+      { category: "Marketing", amount: 980, expenses: 2 },
+      { category: "Travel", amount: 865.4, expenses: 3 },
+      { category: "Office", amount: 412.75, expenses: 5 },
+    ],
+    others: { amount: 512, expenses: 6, categories: 3 },
+  };
+
+  it("gives each category its share of the total and a bar against the largest, then the rest as one row", () => {
+    const rows = spendingRows(spending);
+    expect(rows.map((row) => [row.category, row.share, row.bar])).toEqual([
+      ["Contractors", "47%", 1],
+      ["Software and subscriptions", "16%", 1240 / 3600],
+      ["Marketing", "13%", 980 / 3600],
+      ["Travel", "11%", 865.4 / 3600],
+      ["Office", "5%", 412.75 / 3600],
+      [undefined, "7%", 512 / 3600],
+    ]);
+    expect(rows.at(-1)).toMatchObject({
+      others: true,
+      amount: 512,
+      expenses: 6,
+      categories: 3,
+    });
+  });
+
+  it("measures the bars against the rest when they add up to more than the largest category", () => {
+    const rows = spendingRows({
+      total: 1000,
+      categories: [{ category: "Rent", amount: 300, expenses: 1 }],
+      others: { amount: 700, expenses: 9, categories: 6 },
+    });
+    expect(rows.map((row) => [row.share, row.bar])).toEqual([
+      ["30%", 300 / 700],
+      ["70%", 1],
+    ]);
+  });
+
+  it("names a share too small to round to 1% as under it", () => {
+    const rows = spendingRows({
+      total: 1000,
+      categories: [
+        { category: "Rent", amount: 996, expenses: 1 },
+        { category: "Postage", amount: 4, expenses: 1 },
+      ],
+      others: null,
+    });
+    expect(rows.map((row) => row.share)).toEqual(["100%", "<1%"]);
+  });
+
+  it("has no rows when nothing was spent", () => {
+    expect(spendingRows({ total: 0, categories: [], others: null })).toEqual(
+      [],
+    );
   });
 });
 
@@ -561,6 +652,55 @@ describe("what needs attention", () => {
     );
     expect(attentionRow(item("recurring", 3, "2026-10-07")).to).toBe(
       "/recurring",
+    );
+  });
+
+  it("opens the client an item is linked to, and none without one", () => {
+    expect(
+      attentionRow(item("overdue", 3, "2026-10-01", { clientId: "c1" }))
+        .clientTo,
+    ).toBe("/single-customer/c1");
+    expect(
+      attentionRow(item("recurring", 3, "2026-10-07", { clientId: "c2" }))
+        .clientTo,
+    ).toBe("/single-customer/c2");
+    expect(
+      attentionRow(item("overdue", 3, "2026-10-01", { clientId: null }))
+        .clientTo,
+    ).toBeNull();
+    expect(attentionRow(item("draft", null, "2026-10-01")).clientTo).toBeNull();
+    // A client with no name has nothing to click.
+    expect(
+      attentionRow(
+        item("overdue", 3, "2026-10-01", { clientId: "c1", client: null }),
+      ).clientTo,
+    ).toBeNull();
+  });
+
+  it("adds that a client's name opens the client, when one does", () => {
+    const counts = {
+      paymentReports: 0,
+      overdue: 2,
+      dueSoon: 0,
+      quotations: 0,
+      recurring: 0,
+      drafts: 0,
+    };
+    const linked = item("overdue", 3, "2026-10-01", { clientId: "c1" });
+    const unlinked = item("overdue", 5, "2026-09-29", { clientId: null });
+    expect(attentionFooter(counts, [linked, unlinked])).toBe(
+      "No payment reports to confirm, invoices due this week, quotations expiring this week, drafts to issue or recurring invoices due this week. A client’s name opens the client.",
+    );
+    expect(attentionFooter(counts, [unlinked, unlinked])).toBe(
+      "No payment reports to confirm, invoices due this week, quotations expiring this week, drafts to issue or recurring invoices due this week.",
+    );
+    expect(
+      attentionFooter(
+        { ...counts, paymentReports: 1, dueSoon: 1, quotations: 1 },
+        [linked],
+      ),
+    ).toBe(
+      "No drafts to issue or recurring invoices due this week. Also 1 payment report, 1 more overdue invoice, 1 due this week and 1 quotation. A client’s name opens the client.",
     );
   });
 

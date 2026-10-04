@@ -28,29 +28,33 @@ const net = (bucket) =>
   (Number(bucket.moneyIn) || 0) - (Number(bucket.moneyOut) || 0);
 
 // The same figures as the chart, for screen readers. It doesn't change as
-// the pointer or focus moves over the chart.
+// the pointer or focus moves over the chart. It is hidden inside a box that
+// clips it: a table is never narrower than its widest row, so hidden itself
+// it would still widen the page on a small phone.
 const FiguresTable = memo(({ parts, part, partName, currency }) => (
-  <table className="sr-only">
-    <caption>{`Cash flow each ${partName}, ${currency}`}</caption>
-    <thead>
-      <tr>
-        <th scope="col">{part}</th>
-        <th scope="col">Money in</th>
-        <th scope="col">Money out</th>
-        <th scope="col">Net</th>
-      </tr>
-    </thead>
-    <tbody>
-      {parts.map((figures) => (
-        <tr key={figures.from}>
-          <th scope="row">{figures.range}</th>
-          <td>{figures.moneyIn}</td>
-          <td>{figures.moneyOut}</td>
-          <td>{figures.net}</td>
+  <div className="sr-only">
+    <table>
+      <caption>{`Cash flow each ${partName}, ${currency}`}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{part}</th>
+          <th scope="col">Money in</th>
+          <th scope="col">Money out</th>
+          <th scope="col">Net</th>
         </tr>
-      ))}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {parts.map((figures) => (
+          <tr key={figures.from}>
+            <th scope="row">{figures.range}</th>
+            <td>{figures.moneyIn}</td>
+            <td>{figures.moneyOut}</td>
+            <td>{figures.net}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
 ));
 
 // Money in and out of the business in each part of the period: money in
