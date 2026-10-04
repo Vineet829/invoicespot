@@ -1,6 +1,7 @@
 # The client: Vite builds it, and nginx serves it with the API on the same
-# origin.
-FROM node:24-alpine AS build
+# origin. The built files run on any CPU, so they are built on the build
+# machine's own platform even when the image is for another one.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
