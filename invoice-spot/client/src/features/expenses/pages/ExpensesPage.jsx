@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   FiCreditCard,
   FiDownload,
@@ -11,8 +12,13 @@ import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
 import useListState from "../../../hooks/useListState";
 import useFileDownload from "../../../hooks/useFileDownload";
+import useLastAnswer from "../../../hooks/useLastAnswer";
 import { PAGE_SIZES } from "../../../utils/listState";
+import CurrencyFilter from "../../documents/components/CurrencyFilter";
+import ResultLine from "../../documents/components/ResultLine";
 import { PERIODS } from "../../documents/documentFilters";
+import { useGetDocumentSummaryQuery } from "../../documents/documentsApiSlice";
+import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import {
   useDeleteExpenseMutation,
   useGetExpenseCategoriesQuery,
@@ -23,6 +29,7 @@ import {
   expenseFilterQuery,
   expenseListSearch,
   expenseQuery,
+  expenseResults,
   isFiltered,
   readExpenseList,
 } from "../expenseModel";
@@ -66,6 +73,13 @@ const ExpensesPage = () => {
   const query = useGetExpensesQuery(expenseQuery(list), {
     refetchOnMountOrArgChange: 60,
   });
+  // The currencies the business bills in, for the currency menu.
+  const currencies = useGetDocumentSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: 60,
+  }).data?.currencies;
+  // What the result line says comes from the last answer and the filters
+  // it answered.
+  const answered = useLastAnswer(query.currentData, list);
   const categories =
     useGetExpenseCategoriesQuery().data?.categories || NO_CATEGORIES;
   const rows = query.data?.expenses || NO_EXPENSES;
@@ -84,9 +98,49 @@ const ExpensesPage = () => {
     if (pages && list.page > pages) update({ page: pages });
   }, [pages, list.page, update]);
 
-  const editRefusal = useBusiness().reason("EDIT_RECORDS");
+  const { business, reason } = useBusiness();
+  const editRefusal = reason("EDIT_RECORDS");
   // `editing` is the expense being edited, or "new" for the add dialog.
   const [editing, setEditing] = useState(null);
+  // A link to record an expense, such as the overview's, opens the add
+  // dialog once with `new=1`, which then leaves the address in place, so a
+  // reload or the back button doesn't open it again. It waits for the
+  // business, since a role that can't add expenses gets the list instead,
+  // and for the settings the form starts from, so the dialog opens on its
+  // first field. The link that led here is gone, so once the dialog closes,
+  // focus moves to New expense.
+  const [params, setParams] = useSearchParams();
+  const adding = params.get("new") === "1";
+  const formReady = Boolean(useGetSettingsQuery().data?.settings);
+  const newButton = useRef(null);
+  const openedByLink = useRef(false);
+  const [focusNew, setFocusNew] = useState(false);
+  useEffect(() => {
+    if (!adding || !business || !formReady) return;
+    if (!editRefusal) {
+      openedByLink.current = true;
+      setEditing("new");
+    }
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("new");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [adding, business, formReady, editRefusal, setParams]);
+  const closeDialog = () => {
+    setEditing(null);
+    if (!openedByLink.current) return;
+    openedByLink.current = false;
+    setFocusNew(true);
+  };
+  useEffect(() => {
+    if (!focusNew) return;
+    newButton.current?.focus();
+    setFocusNew(false);
+  }, [focusNew]);
   const [removing, setRemoving] = useState(null);
   const [deleteExpense, { isLoading: deleting }] = useDeleteExpenseMutation();
   const remove = async () => {
@@ -99,10 +153,22 @@ const ExpensesPage = () => {
     }
   };
   const filtered = isFiltered(list);
-  const clearFilters = () =>
-    update({ q: "", category: "", period: "", page: 1 });
+  // Clear filters is gone once they are cleared, so focus moves to the
+  // search box, as soon as the tools are shown.
+  const tools = useRef(null);
+  const [refocus, setRefocus] = useState(false);
+  const clearFilters = () => {
+    update({ q: "", category: "", period: "", currency: "", page: 1 });
+    setRefocus(true);
+  };
   // A new business has nothing to search or filter yet.
   const showTools = Boolean(query.data) && (count > 0 || filtered);
+  useEffect(() => {
+    const box = refocus && tools.current?.querySelector('input[type="search"]');
+    if (!box) return;
+    box.focus();
+    setRefocus(false);
+  }, [refocus, showTools]);
   // A category from an old link stays chosen after its last expense is gone.
   const categoryOptions =
     list.category && !categories.includes(list.category)
@@ -184,6 +250,13 @@ const ExpensesPage = () => {
     <ErrorState error={query.error} retry={query.refetch} />
   ) : rows.length ? (
     <>
+      {filtered && isFiltered(answered.list) && answered.data && (
+        <ResultLine
+          parts={expenseResults(answered.data, currencies)}
+          onClear={clearFilters}
+          busy={query.isFetching}
+        />
+      )}
       <DataTable
         columns={shown}
         rows={pagination.rows}
@@ -239,6 +312,7 @@ const ExpensesPage = () => {
               <FiDownload aria-hidden="true" />
             </button>
             <button
+              ref={newButton}
               type="button"
               className={primaryButton}
               onClick={() => setEditing("new")}
@@ -262,7 +336,10 @@ const ExpensesPage = () => {
           fill={rows.length > 0 && !query.isError}
           aside={
             showTools && (
-              <div className="flex min-w-0 flex-wrap items-center gap-2.5 max-[700px]:w-full">
+              <div
+                ref={tools}
+                className="flex min-w-0 flex-wrap items-center gap-2.5 max-[700px]:w-full"
+              >
                 <SearchField
                   value={list.q}
                   onSearch={search}
@@ -303,6 +380,11 @@ const ExpensesPage = () => {
                     ))}
                   </select>
                 </label>
+                <CurrencyFilter
+                  value={list.currency}
+                  currencies={currencies}
+                  onChange={(currency) => update({ currency, page: 1 })}
+                />
               </div>
             )
           }
@@ -313,7 +395,7 @@ const ExpensesPage = () => {
       <ExpenseDialog
         open={Boolean(editing)}
         expense={editing === "new" ? null : editing}
-        onClose={() => setEditing(null)}
+        onClose={closeDialog}
       />
       <ConfirmDialog
         open={Boolean(removing)}

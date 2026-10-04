@@ -123,16 +123,17 @@ export const PageHeader = ({ title, description, actions, back }) => {
 };
 
 // A link styled as a button. With a `reason`, it can't be followed, and the
-// reason is shown on hover and read out with it.
+// reason is shown on hover and read out with it. A custom className replaces
+// the button's look, its disabled state included.
 export const ActionLink = ({
   children,
   to,
   secondary = false,
   reason,
+  className = secondary ? secondaryButton : primaryButton,
   ...props
 }) => {
   const noteId = useId();
-  const className = secondary ? secondaryButton : primaryButton;
   if (reason) {
     return (
       <>

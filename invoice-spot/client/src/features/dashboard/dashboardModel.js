@@ -2,10 +2,12 @@ import { dateSpan, dayMonth, dayMonthYear, parseDate } from "../../utils/dates";
 import { compactAmount, formatAmount } from "../../utils/money";
 import {
   documentsLink,
+  expensesLink,
   outstandingLink,
   overdueLink,
   paymentsLink,
 } from "../documents/listLinks";
+import { share } from "../reports/reportModel";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -35,7 +37,8 @@ export const formatDate = (value) => {
 // The periods the overview can show, as its pills name them. The last 90
 // days is the default, so it stays out of the address. Each names the same
 // period on the Reports page, where the last 12 months is the default, and
-// on the Documents and Payments lists.
+// on the Documents, Payments and Expenses lists. `these` refers back to the
+// period the subtitle names.
 export const DEFAULT_PERIOD = "90d";
 export const PERIODS = [
   {
@@ -44,6 +47,8 @@ export const PERIODS = [
     name: "Last 30 days",
     called: "the last 30 days",
     during: "in the last 30 days",
+    these: "these 30 days",
+    inThese: "in these 30 days",
     compared: "vs previous 30 days",
     report: "30d",
     list: "30d",
@@ -54,6 +59,8 @@ export const PERIODS = [
     name: "Last 90 days",
     called: "the last 90 days",
     during: "in the last 90 days",
+    these: "these 90 days",
+    inThese: "in these 90 days",
     compared: "vs previous 90 days",
     report: "90d",
     list: "90d",
@@ -64,6 +71,8 @@ export const PERIODS = [
     name: "Last 12 months",
     called: "the last 12 months",
     during: "in the last 12 months",
+    these: "these 12 months",
+    inThese: "in these 12 months",
     compared: "vs previous 12 months",
     list: "12m",
   },
@@ -73,6 +82,8 @@ export const PERIODS = [
     name: "This year",
     called: "this year",
     during: "this year",
+    these: "this year",
+    inThese: "this year",
     compared: "vs same period last year",
     report: "ytd",
     list: "this-year",
@@ -113,6 +124,34 @@ export const owedWeekLink = (key, currency) =>
 // The document status counts documents in every currency, so its links
 // keep to none.
 export const statusLink = (status) => documentsLink({ status });
+// The expenses behind Spending, for the period shown, in the currency its
+// figures count: a category's, or every one without a category. Recording
+// an expense from it opens the add dialog over that currency's expenses.
+export const spendingLink = (period, currency, category) =>
+  expensesLink({ category, period: findPeriod(period).list, currency });
+export const recordExpenseLink = (currency) =>
+  expensesLink({ new: "1", currency });
+
+// Spending by category as the panel lists it: the largest categories, as
+// the server sends them, then the rest as one row when there are more.
+// Each row has its share of the total, with a share too small to round to
+// 1% shown as under it, and a bar against the largest row.
+const shareOfTotal = (amount, total) => {
+  const percent = total > 0 && amount > 0 ? (amount / total) * 100 : 0;
+  return percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
+};
+export const spendingRows = (spending) => {
+  const rows = [
+    ...(spending?.categories || []),
+    ...(spending?.others ? [{ ...spending.others, others: true }] : []),
+  ];
+  const largest = Math.max(0, ...rows.map((row) => asAmount(row.amount)));
+  return rows.map((row) => ({
+    ...row,
+    share: shareOfTotal(asAmount(row.amount), asAmount(spending.total)),
+    bar: share(row.amount, largest),
+  }));
+};
 
 // Counts of invoices are worded as on the Documents list.
 export { invoiceCount } from "../../utils/counts";
@@ -379,7 +418,8 @@ const listed = (phrases, last) =>
 
 // One item's row: its label, its state, the day that matters, and where it
 // leads. Without a number of days, only the day is given. A recurring
-// schedule opens the recurring list; the rest open their document.
+// schedule opens the recurring list; the rest open their document. The
+// client's name opens the client when the item is linked to one.
 export const attentionRow = (item) => {
   const date = item.date ? dayMonth(parseDate(item.date)) : "";
   const days = item.days == null ? NaN : Number(item.days);
@@ -408,11 +448,14 @@ export const attentionRow = (item) => {
     when,
     to:
       item.kind === "recurring" ? "/recurring" : `/document/${item.documentId}`,
+    clientTo:
+      item.clientId && item.client ? `/single-customer/${item.clientId}` : null,
   };
 };
 
 // The list's footer: the kinds there is none of, then what the list leaves
-// out, since it shows only the most urgent few.
+// out, since it shows only the most urgent few, and that a client's name
+// opens the client, when one does.
 export const attentionFooter = (counts = {}, items = []) => {
   const none = NONE_ORDER.filter((kind) => !counts[ATTENTION[kind].count]).map(
     (kind) => ATTENTION[kind].none,
@@ -433,6 +476,8 @@ export const attentionFooter = (counts = {}, items = []) => {
   const sentences = [
     none.length && `No ${listed(none, "or")}.`,
     more.length && `Also ${listed(more, "and")}.`,
+    items.some((item) => attentionRow(item).clientTo) &&
+      "A client’s name opens the client.",
   ].filter(Boolean);
   return sentences.length ? sentences.join(" ") : null;
 };

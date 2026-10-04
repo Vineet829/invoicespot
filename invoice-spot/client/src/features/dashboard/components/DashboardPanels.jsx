@@ -408,12 +408,16 @@ export const panelLink =
   "inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12.5px] text-spot-night underline-offset-4 transition-colors hover:text-spot-violet hover:underline coarse:min-h-11 [&>svg]:size-[13px] [&>svg]:stroke-[1.5]";
 
 // The overview's rows below the tiles: the cash flow beside what is owed
-// from 1360px wide, and what needs attention beside the document status
-// from 1200px.
+// from 1360px wide, what needs attention beside the document status from
+// 1200px, and the latest payments beside spending from 1440px. Narrower,
+// the payments' columns would break names and headings inside words.
+// Spending is as wide as the status above it.
 export const chartPair =
   "grid min-w-0 gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_clamp(400px,36%,560px)]";
 export const attentionPair =
   "grid min-w-0 gap-5 min-[1200px]:grid-cols-[minmax(0,1fr)_480px]";
+export const historyPair =
+  "grid min-w-0 gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_480px]";
 
 // The overview's tiles: four across a wide window, two below 1200px and one
 // on phones.
@@ -484,23 +488,38 @@ export const DashboardLoading = () => (
         </div>
       </div>
     </div>
-    <div className={historyPanel} aria-hidden="true">
-      <div className={historyHeading}>
-        <Skeleton className="h-6 w-[185px] rounded-md" />
+    <div className={historyPair} aria-hidden="true">
+      <div className={historyPanel}>
+        <div className={historyHeading}>
+          <Skeleton className="h-6 w-[185px] rounded-md" />
+        </div>
+        <div className="grid min-h-[284px] flex-1 grid-rows-[repeat(5,minmax(44px,1fr))]">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div
+              className="flex items-center gap-3 border-t border-[#23273512]"
+              key={index}
+            >
+              <Skeleton className="size-8 rounded-[11px]" />
+              <Skeleton className="h-3 w-1/4 rounded-md" />
+              <Skeleton className="ml-auto h-3 w-[15%] rounded-md" />
+            </div>
+          ))}
+        </div>
+        <Skeleton className="mt-2.5 h-[22px] w-[116px] rounded-md" />
       </div>
-      <div className="grid min-h-[284px] flex-1 grid-rows-[repeat(5,minmax(44px,1fr))]">
+      <div className={`${overviewPanel} [--rise-delay:320ms]`}>
+        <Skeleton className="h-6 w-[120px] rounded-md" />
+        <Skeleton className="h-[30px] w-[45%] rounded-md" />
         {Array.from({ length: 5 }, (_, index) => (
-          <div
-            className="flex items-center gap-3 border-t border-[#23273512]"
-            key={index}
-          >
-            <Skeleton className="size-8 rounded-[11px]" />
-            <Skeleton className="h-3 w-1/4 rounded-md" />
-            <Skeleton className="ml-auto h-3 w-[15%] rounded-md" />
+          <div className="flex items-center gap-2.5 py-[7px]" key={index}>
+            <span className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-3 w-2/5 rounded-md" />
+              <Skeleton className="h-1.5 w-full rounded-full" />
+            </span>
+            <Skeleton className="h-3 w-[72px] rounded-md" />
           </div>
         ))}
       </div>
-      <Skeleton className="mt-2.5 h-[22px] w-[116px] rounded-md" />
     </div>
   </div>
 );

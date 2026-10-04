@@ -243,6 +243,7 @@
         "documentId": "00000000-0000-0000-0000-000000001026",
         "documentNumber": "INV-1026",
         "client": "Sable Fitness",
+        "clientId": "00000000-0000-0000-0000-00000000c105",
         "amount": 3391.67,
         "date": "2026-08-11",
         "days": 54
@@ -252,6 +253,7 @@
         "documentId": "00000000-0000-0000-0000-000000001030",
         "documentNumber": "INV-1030",
         "client": "Quill & Co. Publishing",
+        "clientId": "00000000-0000-0000-0000-00000000c107",
         "amount": 1969.11,
         "date": "2026-09-13",
         "days": 21
@@ -261,6 +263,7 @@
         "documentId": "00000000-0000-0000-0000-000000001031",
         "documentNumber": "INV-1031",
         "client": "Verdant Farms",
+        "clientId": null,
         "amount": 965.25,
         "date": "2026-09-24",
         "days": 10
@@ -270,6 +273,7 @@
         "documentId": "00000000-0000-0000-0000-000000001032",
         "documentNumber": "INV-1032",
         "client": "Bluefin Analytics",
+        "clientId": "00000000-0000-0000-0000-00000000c103",
         "amount": 2664.09,
         "date": "2026-10-06",
         "days": 2
@@ -279,6 +283,7 @@
         "documentId": "00000000-0000-0000-0000-000000000206",
         "documentNumber": "QUO-0206",
         "client": "Kestrel Outdoor",
+        "clientId": "00000000-0000-0000-0000-00000000c109",
         "amount": 1201.2,
         "date": "2026-10-09",
         "days": 5
@@ -292,5 +297,6 @@
       "recurring": 0,
       "drafts": 0
     }
-  }
+  },
+  "spending": { "total": 0.0, "categories": [], "others": null }
 }

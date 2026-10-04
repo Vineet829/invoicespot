@@ -11,7 +11,7 @@ import {
 import { Amount } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
 import { overdueLink } from "../../documents/listLinks";
-import { attentionFooter, attentionRow } from "../dashboardModel";
+import { attentionFooter, attentionRow, formatMoney } from "../dashboardModel";
 import { overviewPanel, panelLink } from "./DashboardPanels";
 
 // Each kind's icon and tint; the words beside them carry the meaning.
@@ -31,12 +31,22 @@ const KINDS = {
 // stylesheet is not fixed, and without a gap, since a container can be a
 // fraction of a pixel wide.
 const row =
-  "-mx-2 grid items-center gap-x-3.5 gap-y-0.5 rounded-xl px-2 py-[9px] text-spot-ink transition-colors [grid-template-areas:'icon_kind_client_state_amount'] [grid-template-columns:34px_120px_minmax(0,1fr)_minmax(150px,0.6fr)_minmax(84px,auto)] hover:bg-white/50 [@container_attention_(340px<=width<600px)]:[grid-template-areas:'icon_kind_client_amount'_'icon_state_state_amount'] [@container_attention_(340px<=width<600px)]:[grid-template-columns:34px_auto_minmax(0,1fr)_auto] [@container_attention_(width<340px)]:[grid-template-areas:'icon_kind_amount'_'icon_client_client'_'icon_state_state'] [@container_attention_(width<340px)]:[grid-template-columns:34px_minmax(0,1fr)_auto]";
+  "relative -mx-2 grid items-center gap-x-3.5 gap-y-0.5 rounded-xl px-2 py-[9px] text-spot-ink transition-colors [grid-template-areas:'icon_kind_client_state_amount'] [grid-template-columns:34px_120px_minmax(0,1fr)_minmax(150px,0.6fr)_minmax(84px,auto)] hover:bg-white/50 [@container_attention_(340px<=width<600px)]:[grid-template-areas:'icon_kind_client_amount'_'icon_state_state_amount'] [@container_attention_(340px<=width<600px)]:[grid-template-columns:34px_auto_minmax(0,1fr)_auto] [@container_attention_(width<340px)]:[grid-template-areas:'icon_kind_amount'_'icon_client_client'_'icon_state_state'] [@container_attention_(width<340px)]:[grid-template-columns:34px_minmax(0,1fr)_auto]";
+// The row's own link, to its document, covers the whole row and shows its
+// focus around it. Its name reads the whole row, so the words beside it are
+// hidden from screen readers rather than read twice. The client's link sits
+// above it, as tall on a touch screen as the overview's other small links.
+const documentLink =
+  "flex min-w-0 flex-col [grid-area:kind] after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[#5b47a0]";
+const clientLink =
+  "group relative z-[1] flex min-w-0 max-w-full items-center justify-self-start text-[14px] text-spot-night transition-colors [grid-area:client] hover:text-spot-violet coarse:min-h-11";
+const clientName =
+  "truncate underline decoration-spot-night/30 underline-offset-[3px] group-hover:decoration-current";
 
 // The few things that need doing now, most urgent first, each opening its
-// document. The footer names what there is none of, and what the list
-// leaves out. Overdue invoices opens them all, in the same currency when
-// one was chosen.
+// document, and its client's name the client. The footer names what there
+// is none of, and what the list leaves out. Overdue invoices opens them all,
+// in the same currency when one was chosen.
 const AttentionPanel = ({ snapshot, currencyChosen }) => {
   const { attention, currency } = snapshot;
   const items = attention?.items || [];
@@ -64,32 +74,62 @@ const AttentionPanel = ({ snapshot, currencyChosen }) => {
         <>
           <ol className="m-0 list-none p-0 [container-name:attention] [container-type:inline-size]">
             {items.map((item, index) => {
-              const { label, state, when, to } = attentionRow(item);
+              const { label, state, when, to, clientTo } = attentionRow(item);
               const [Icon, tint] = KINDS[item.kind] || KINDS.draft;
+              const number = item.documentNumber || "No number yet";
+              const client = item.client || "No client";
               return (
                 <li
                   className={index ? "border-t border-[#23273512]" : ""}
                   key={`${item.kind}-${item.documentId}-${index}`}
                 >
-                  <Link to={to} className={row}>
+                  <div className={row}>
                     <span
                       className={`grid size-[34px] place-items-center rounded-xl [grid-area:icon] [&>svg]:size-4 [&>svg]:stroke-[1.6] ${tint}`}
                       aria-hidden="true"
                     >
                       <Icon />
                     </span>
-                    <span className="flex min-w-0 flex-col [grid-area:kind]">
+                    <Link
+                      to={to}
+                      className={documentLink}
+                      aria-label={[
+                        `${label} ${number}`.trim(),
+                        client,
+                        state,
+                        when,
+                        formatMoney(item.amount, currency),
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    >
                       <span className="text-[12px] text-spot-muted [@container_attention_(width<600px)]:sr-only">
                         {label}
                       </span>
                       <span className="truncate text-[14px] font-medium">
-                        {item.documentNumber || "No number yet"}
+                        {number}
                       </span>
-                    </span>
-                    <span className="min-w-0 truncate text-[14px] [grid-area:client]">
-                      {item.client || "No client"}
-                    </span>
-                    <span className="flex min-w-0 flex-col [grid-area:state] [@container_attention_(width<600px)]:flex-row [@container_attention_(width<600px)]:flex-wrap [@container_attention_(width<600px)]:items-baseline [@container_attention_(width<600px)]:gap-x-2">
+                    </Link>
+                    {clientTo ? (
+                      <Link
+                        to={clientTo}
+                        className={clientLink}
+                        aria-label={`${item.client}. View the client`}
+                      >
+                        <span className={clientName}>{item.client}</span>
+                      </Link>
+                    ) : (
+                      <span
+                        className="min-w-0 truncate text-[14px] [grid-area:client]"
+                        aria-hidden="true"
+                      >
+                        {client}
+                      </span>
+                    )}
+                    <span
+                      className="flex min-w-0 flex-col [grid-area:state] [@container_attention_(width<600px)]:flex-row [@container_attention_(width<600px)]:flex-wrap [@container_attention_(width<600px)]:items-baseline [@container_attention_(width<600px)]:gap-x-2"
+                      aria-hidden="true"
+                    >
                       {state && <span className="text-[13px]">{state}</span>}
                       {when && (
                         <span className="text-[12px] text-spot-muted">
@@ -97,13 +137,18 @@ const AttentionPanel = ({ snapshot, currencyChosen }) => {
                         </span>
                       )}
                     </span>
-                    <Amount
-                      value={item.amount}
-                      currency={currency}
-                      hideCode
-                      className="justify-self-end text-[17px] font-light tracking-[-0.03em] [grid-area:amount]"
-                    />
-                  </Link>
+                    <span
+                      className="justify-self-end [grid-area:amount]"
+                      aria-hidden="true"
+                    >
+                      <Amount
+                        value={item.amount}
+                        currency={currency}
+                        hideCode
+                        className="text-[17px] font-light tracking-[-0.03em]"
+                      />
+                    </span>
+                  </div>
                 </li>
               );
             })}
