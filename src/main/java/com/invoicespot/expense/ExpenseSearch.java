@@ -1,27 +1,44 @@
 package com.invoicespot.expense;
 
-import com.invoicespot.common.SearchText;
-import jakarta.persistence.criteria.Predicate;
+import com.invoicespot.common.ApiException;
+import com.invoicespot.common.RecentPeriod;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 
 // The Expenses list's search and filters: text in the vendor, category,
-// reference or notes, one category, and the days paid between two dates.
-public record ExpenseSearch(String query, String category, LocalDate from, LocalDate to, int page, int size) {
+// reference or notes, one category, one currency, and the days paid between
+// two dates or in one of the overview's periods.
+public record ExpenseSearch(
+        String query,
+        String category,
+        String currency,
+        String period,
+        LocalDate from,
+        LocalDate to,
+        int page,
+        int size) {
 
     private static final int MAX_PAGE_SIZE = 100;
 
-    // Newest first, and the last recorded first within a day.
-    static final Sort ORDER = Sort.by(Sort.Order.desc("expenseDate"), Sort.Order.desc("pkid"));
-
-    public static ExpenseSearch of(String query, String category, LocalDate from, LocalDate to, int page, int size) {
+    public static ExpenseSearch of(
+            String query,
+            String category,
+            String currency,
+            String period,
+            LocalDate from,
+            LocalDate to,
+            int page,
+            int size) {
+        // One of the overview's periods takes the place of dates.
+        boolean periodic = period != null && !period.isBlank();
+        if (periodic && (from != null || to != null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Choose a period or dates, not both");
+        }
         return new ExpenseSearch(
                 query,
                 category == null || category.isBlank() ? null : category.trim(),
+                currency == null || currency.isBlank() ? null : currency.trim(),
+                periodic ? period : null,
                 from,
                 to,
                 Math.max(page, 1),
@@ -30,31 +47,16 @@ public record ExpenseSearch(String query, String category, LocalDate from, Local
 
     // Every expense of a business.
     public static ExpenseSearch all() {
-        return of(null, null, null, null, 1, 1);
+        return of(null, null, null, null, null, null, 1, 1);
     }
 
-    Specification<Expense> matching(Long businessPkid) {
-        return (root, criteria, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("business").get("pkid"), businessPkid));
-            if (query() != null && !query().isBlank()) {
-                String like = SearchText.containing(query());
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("vendor")), like, SearchText.ESCAPE),
-                        cb.like(cb.lower(root.get("category")), like, SearchText.ESCAPE),
-                        cb.like(cb.lower(root.get("reference")), like, SearchText.ESCAPE),
-                        cb.like(cb.lower(root.get("notes")), like, SearchText.ESCAPE)));
-            }
-            if (category != null) {
-                predicates.add(cb.equal(cb.lower(root.get("category")), category.toLowerCase(Locale.ROOT)));
-            }
-            if (from != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("expenseDate"), from));
-            }
-            if (to != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("expenseDate"), to));
-            }
-            return cb.and(predicates.toArray(Predicate[]::new));
-        };
+    // The same search with its period, if it has one, as the dates that
+    // period covers today: the dates the expenses are then read between.
+    ExpenseSearch on(LocalDate today) {
+        if (period == null) {
+            return this;
+        }
+        RecentPeriod days = RecentPeriod.of(period, today);
+        return new ExpenseSearch(query, category, currency, null, days.from(), days.to(), page, size);
     }
 }

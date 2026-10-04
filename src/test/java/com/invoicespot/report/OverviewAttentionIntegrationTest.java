@@ -1,9 +1,15 @@
 package com.invoicespot.report;
 
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -200,6 +206,7 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.items[0].documentId").value(reported.id()))
                 .andExpect(jsonPath("$.attention.items[0].documentNumber").value(reported.number()))
                 .andExpect(jsonPath("$.attention.items[0].client").value("Acme"))
+                .andExpect(jsonPath("$.attention.items[0].clientId").value(acme))
                 .andExpect(jsonPath("$.attention.items[0].amount").value(120.0))
                 .andExpect(jsonPath("$.attention.items[0].date").value(today.minusDays(1).toString()))
                 .andExpect(jsonPath("$.attention.items[0].days").value(nullValue()))
@@ -207,11 +214,13 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.items[1].documentId").value(overdue.id()))
                 .andExpect(jsonPath("$.attention.items[1].documentNumber").value(overdue.number()))
                 .andExpect(jsonPath("$.attention.items[1].client").value("Birch Studio"))
+                .andExpect(jsonPath("$.attention.items[1].clientId").value(birch))
                 .andExpect(jsonPath("$.attention.items[1].amount").value(200.0))
                 .andExpect(jsonPath("$.attention.items[1].date").value(today.minusDays(4).toString()))
                 .andExpect(jsonPath("$.attention.items[1].days").value(4))
                 .andExpect(jsonPath("$.attention.items[2].kind").value("dueSoon"))
                 .andExpect(jsonPath("$.attention.items[2].documentId").value(dueSoon.id()))
+                .andExpect(jsonPath("$.attention.items[2].clientId").value(acme))
                 .andExpect(jsonPath("$.attention.items[2].amount").value(150.0))
                 .andExpect(jsonPath("$.attention.items[2].date").value(today.plusDays(3).toString()))
                 .andExpect(jsonPath("$.attention.items[2].days").value(3))
@@ -219,12 +228,14 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.items[3].documentId").value(quotation.id()))
                 .andExpect(jsonPath("$.attention.items[3].documentNumber").value(quotation.number()))
                 .andExpect(jsonPath("$.attention.items[3].client").value("Acme"))
+                .andExpect(jsonPath("$.attention.items[3].clientId").value(acme))
                 .andExpect(jsonPath("$.attention.items[3].amount").value(900.0))
                 .andExpect(jsonPath("$.attention.items[3].date").value(today.plusDays(6).toString()))
                 .andExpect(jsonPath("$.attention.items[3].days").value(6))
                 .andExpect(jsonPath("$.attention.items[4].kind").value("recurring"))
                 .andExpect(jsonPath("$.attention.items[4].documentId").value(repeating.id()))
                 .andExpect(jsonPath("$.attention.items[4].documentNumber").value(repeating.number()))
+                .andExpect(jsonPath("$.attention.items[4].clientId").value(acme))
                 .andExpect(jsonPath("$.attention.items[4].amount").value(400.0))
                 .andExpect(jsonPath("$.attention.items[4].date").value(today.plusDays(5).toString()))
                 .andExpect(jsonPath("$.attention.items[4].days").value(5))
@@ -232,6 +243,7 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.items[5].documentId").value(draft.id()))
                 .andExpect(jsonPath("$.attention.items[5].documentNumber").value(nullValue()))
                 .andExpect(jsonPath("$.attention.items[5].client").value("Birch Studio"))
+                .andExpect(jsonPath("$.attention.items[5].clientId").value(birch))
                 .andExpect(jsonPath("$.attention.items[5].amount").value(250.0))
                 .andExpect(jsonPath("$.attention.items[5].date").value(today.toString()))
                 .andExpect(jsonPath("$.attention.items[5].days").value(nullValue()))
@@ -325,6 +337,29 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.counts.quotations").value(2))
                 .andExpect(jsonPath("$.attention.counts.recurring").value(2))
                 .andExpect(jsonPath("$.attention.counts.drafts").value(2));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("once a client is deleted, each kind still names it as its document does, with no client id")
+    void deletedClient(ZoneId zone) throws Exception {
+        inZone(zone);
+        String cedar = client("Cedar Works");
+        report(invoice(cedar, "500", today.plusDays(30)), "120", today.minusDays(1));
+        invoice(cedar, "300", today.minusDays(4));
+        invoice(cedar, "150", today.plusDays(3));
+        create("Quotation", cedar, "USD", "900", today.plusDays(6), false);
+        repeat(invoice(cedar, "400", today.plusDays(40)), today.plusDays(5));
+        create("Invoice", cedar, "USD", "250", today.minusDays(10), true);
+        send(delete("/api/v1/customer/{id}", cedar), "").andExpect(status().isOk());
+
+        overview()
+                .andExpect(jsonPath(
+                        "$.attention.items[*].kind",
+                        contains("paymentReport", "overdue", "dueSoon", "quotation", "recurring", "draft")))
+                .andExpect(jsonPath("$.attention.items[*].client", everyItem(is("Cedar Works"))))
+                .andExpect(jsonPath("$.attention.items[*].clientId", everyItem(nullValue())))
+                .andExpect(content().string(containsString("\"client\":\"Cedar Works\",\"clientId\":null,")));
     }
 
     @Test

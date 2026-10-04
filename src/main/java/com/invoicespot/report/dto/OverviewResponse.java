@@ -23,4 +23,5 @@ public record OverviewResponse(
         OverviewOwed owedNow,
         List<TrendBucket> trend,
         List<OwedWeek> owedByWeek,
-        OverviewAttention attention) {}
+        OverviewAttention attention,
+        OverviewSpending spending) {}

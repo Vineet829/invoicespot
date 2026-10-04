@@ -34,18 +34,23 @@ public class ExpenseController {
         this.expenseService = expenseService;
     }
 
+    // A period is the last 30 or 90 days or 12 months, as the overview has
+    // them, in place of dates; a currency is a code such as USD, as written.
     @GetMapping
     public ExpenseListResponse list(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "currency", required = false) String currency,
+            @RequestParam(name = "period", required = false) String period,
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate to,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size) {
-        return expenseService.list(access, ExpenseSearch.of(query, category, from, to, page, size));
+        return expenseService.list(
+                access, ExpenseSearch.of(query, category, currency, period, from, to, page, size));
     }
 
     // The categories the business has used, for picking one again.
@@ -59,11 +64,15 @@ public class ExpenseController {
             @Requires(Permission.EXPORT_LISTS) BusinessAccess access,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "currency", required = false) String currency,
+            @RequestParam(name = "period", required = false) String period,
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate to) {
-        return expenseService.csv(access, ExpenseSearch.of(query, category, from, to, 1, 1)).download();
+        return expenseService
+                .csv(access, ExpenseSearch.of(query, category, currency, period, from, to, 1, 1))
+                .download();
     }
 
     @PostMapping

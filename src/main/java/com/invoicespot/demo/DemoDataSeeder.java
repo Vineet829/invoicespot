@@ -13,6 +13,10 @@ import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.PaymentRecordDto;
+import com.invoicespot.expense.ExpenseRepository;
+import com.invoicespot.expense.ExpenseService;
+import com.invoicespot.expense.dto.ExpenseRequest;
+import com.invoicespot.expense.dto.ExpenseResponse;
 import com.invoicespot.item.CatalogItemService;
 import com.invoicespot.item.dto.CreateItemRequest;
 import com.invoicespot.settings.BusinessSettingsRepository;
@@ -21,7 +25,6 @@ import com.invoicespot.settings.EmailTemplateService;
 import com.invoicespot.settings.SettingsService;
 import com.invoicespot.settings.dto.EmailTemplateRequest;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
-import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -62,6 +65,8 @@ public class DemoDataSeeder {
     private final CatalogItemService itemService;
     private final CustomerService customerService;
     private final DocumentService documentService;
+    private final ExpenseService expenseService;
+    private final ExpenseRepository expenseRepository;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
@@ -79,6 +84,8 @@ public class DemoDataSeeder {
             CatalogItemService itemService,
             CustomerService customerService,
             DocumentService documentService,
+            ExpenseService expenseService,
+            ExpenseRepository expenseRepository,
             JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate,
             Clock clock) {
@@ -91,6 +98,8 @@ public class DemoDataSeeder {
         this.itemService = itemService;
         this.customerService = customerService;
         this.documentService = documentService;
+        this.expenseService = expenseService;
+        this.expenseRepository = expenseRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
@@ -103,16 +112,52 @@ public class DemoDataSeeder {
         }
     }
 
-    public Result seed(String demoEmail) {
-        Optional<User> demo = userRepository.findByEmailIgnoreCase(demoEmail == null ? "" : demoEmail.trim());
-        if (demo.isEmpty()) {
-            return Result.skipped("the demo account " + demoEmail + " does not exist");
+    // How many sample expenses were added, or why none were.
+    public record ExpenseResult(boolean seeded, String reason, int expenses) {
+
+        static ExpenseResult skipped(String reason) {
+            return new ExpenseResult(false, reason, 0);
         }
-        BusinessAccess owner = businessService.ownerAccess(businessService.ownedBy(demo.get().getPkid()).getPkid());
-        if (customerRepository.existsByBusinessPkidAndEmailIgnoreCase(owner.businessPkid(), DemoData.MARKER_EMAIL)) {
+    }
+
+    public Result seed(String demoEmail) {
+        Optional<BusinessAccess> owner = owner(demoEmail);
+        if (owner.isEmpty()) {
+            return Result.skipped(missing(demoEmail));
+        }
+        if (customerRepository.existsByBusinessPkidAndEmailIgnoreCase(
+                owner.get().businessPkid(), DemoData.MARKER_EMAIL)) {
             return Result.skipped("the demo account already has the sample data");
         }
-        return transactionTemplate.execute(status -> seed(owner));
+        return transactionTemplate.execute(status -> seed(owner.get()));
+    }
+
+    // The sample expenses, for an account without any expenses: neither the
+    // sample ones nor its own. They came after the rest of the sample data,
+    // so they are added on their own, to an account that has the rest too.
+    public ExpenseResult seedExpenses(String demoEmail) {
+        Optional<BusinessAccess> owner = owner(demoEmail);
+        if (owner.isEmpty()) {
+            return ExpenseResult.skipped(missing(demoEmail));
+        }
+        Long businessPkid = owner.get().businessPkid();
+        if (expenseRepository.existsByBusinessPkidAndVendorIn(businessPkid, DemoData.EXPENSE_VENDORS)) {
+            return ExpenseResult.skipped("the demo account already has the sample expenses");
+        }
+        if (expenseRepository.existsByBusinessPkid(businessPkid)) {
+            return ExpenseResult.skipped("the demo account already has expenses of its own");
+        }
+        return transactionTemplate.execute(status -> new ExpenseResult(true, null, expenses(owner.get())));
+    }
+
+    // The demo account's own business, as its owner, if the account exists.
+    private Optional<BusinessAccess> owner(String demoEmail) {
+        return userRepository.findByEmailIgnoreCase(demoEmail == null ? "" : demoEmail.trim())
+                .map(demo -> businessService.ownerAccess(businessService.ownedBy(demo.getPkid()).getPkid()));
+    }
+
+    private static String missing(String demoEmail) {
+        return "the demo account " + demoEmail + " does not exist";
     }
 
     private Result seed(BusinessAccess owner) {
@@ -147,6 +192,32 @@ public class DemoDataSeeder {
             payments += create(owner, plan, clients.get(plan.client()), today, zone, random);
         }
         return new Result(true, null, clients.size(), DemoData.ITEMS.size(), plans.size(), payments);
+    }
+
+    // The sample expenses, in dollars as the sample documents are, each paid
+    // the given number of days before today and recorded on the day it was
+    // paid.
+    private int expenses(BusinessAccess owner) {
+        ZoneId zone = ZoneId.of(ZONE);
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        List<ExpenseResponse> recorded = new ArrayList<>();
+        for (DemoData.SampleExpense expense : DemoData.EXPENSES) {
+            recorded.add(expenseService.create(owner, new ExpenseRequest(
+                    today.minusDays(expense.daysAgo()),
+                    expense.vendor(),
+                    expense.category(),
+                    expense.amount(),
+                    expense.tax(),
+                    expense.taxReclaimable(),
+                    "USD",
+                    null,
+                    expense.method().getValue(),
+                    null,
+                    null)));
+        }
+        entityManager.flush();
+        recorded.forEach(expense -> backdate("expenses", expense.id(), expense.date(), zone));
+        return recorded.size();
     }
 
     private record Plan(LocalDate issued, DocumentType type, int client) {}

@@ -6,6 +6,7 @@ import com.invoicespot.report.dto.DocumentSummaryResponse;
 import com.invoicespot.report.dto.OverviewOwed;
 import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
+import com.invoicespot.report.dto.OverviewSpending;
 import com.invoicespot.report.dto.OverviewTotals;
 import com.invoicespot.report.dto.OwedWeek;
 import com.invoicespot.report.dto.TrendBucket;
@@ -33,12 +34,14 @@ import org.springframework.transaction.annotation.Transactional;
 // receipts; a quotation is an offer, not income. Status counts and totals
 // cover every issued document. Payments are the currency's, most recent first.
 // A period's totals, and those of the period before it, count money as the
-// reports do; what is owed is as of today.
+// reports do; what is owed is as of today. Spending is what the currency's
+// expenses paid in the period cost, by category, as its profit counts them.
 @Service
 public class Overview {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
     private static final List<String> WEEKS = List.of("overdue", "thisWeek", "nextWeek", "weekAfter", "later");
+    private static final int TOP_CATEGORIES = 5;
 
     private record Money(BigDecimal expected, BigDecimal received, BigDecimal withheld) {}
 
@@ -106,7 +109,8 @@ public class Overview {
                 owedNow(owed, startOfToday),
                 trend(byDay, window),
                 owedByWeek(owed, zone, today),
-                needsAttention.list(businessPkid, currency, zone, today));
+                needsAttention.list(businessPkid, currency, zone, today),
+                spending(businessPkid, currency, window, byDay));
     }
 
     // The money bar over the documents list, in a currency chosen as above:
@@ -260,6 +264,32 @@ public class Overview {
                             sums.moneyOut());
                 })
                 .toList();
+    }
+
+    // What the period's expenses cost, as its profit and its trend count
+    // them, with the five categories that cost most, told apart and ordered
+    // as the profit report's are, and the rest added up together.
+    private OverviewSpending spending(Long businessPkid, String currency, OverviewWindow window, MoneyByDay money) {
+        List<ReportQueries.CategorySpent> categories =
+                queries.spentByCategory(businessPkid, window.from(), window.to()).stream()
+                        .filter(category -> category.currency().equals(currency))
+                        .sorted(ProfitReport.largestFirst(
+                                ReportQueries.CategorySpent::amount, ReportQueries.CategorySpent::category))
+                        .toList();
+        List<ReportQueries.CategorySpent> rest = categories.stream().skip(TOP_CATEGORIES).toList();
+        return new OverviewSpending(
+                money.between(window.from(), window.to()).expenses(),
+                categories.stream()
+                        .limit(TOP_CATEGORIES)
+                        .map(category -> new OverviewSpending.Category(
+                                category.category(), category.amount(), category.expenses()))
+                        .toList(),
+                rest.isEmpty()
+                        ? null
+                        : new OverviewSpending.Others(
+                                rest.stream().map(ReportQueries.CategorySpent::amount).reduce(ZERO, BigDecimal::add),
+                                rest.stream().mapToLong(ReportQueries.CategorySpent::expenses).sum(),
+                                rest.size()));
     }
 
     // Whether the currency had money dated before the period: an invoice or

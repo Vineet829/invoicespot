@@ -1,5 +1,6 @@
 package com.invoicespot.demo;
 
+import com.invoicespot.document.PaymentMethod;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -8,6 +9,17 @@ final class DemoData {
     record Item(String name, String description, BigDecimal price, boolean countable) {}
 
     record Client(String name, String email, String phone, String address, String city) {}
+
+    // Paid the given number of days before the sample data is added: what it
+    // cost before tax, and the tax paid on it, which can be claimed back or not.
+    record SampleExpense(
+            int daysAgo,
+            String vendor,
+            String category,
+            BigDecimal amount,
+            BigDecimal tax,
+            boolean taxReclaimable,
+            PaymentMethod method) {}
 
     static final String MARKER_EMAIL = "accounts@harborandpine.example";
 
@@ -48,6 +60,29 @@ final class DemoData {
             new Client("Verdant Farms", "office@verdantfarms.example", "+1 503 555 0110", "88 NW Hoyt Street",
                     "Portland"));
 
+    private static final String SOFTWARE = "Software and subscriptions";
+
+    // A year of what the studio spent, in dollars, as its documents are.
+    static final List<SampleExpense> EXPENSES = List.of(
+            expense(3, "Mission Street Office Supply", "Office", "86.25", "6.25", false, PaymentMethod.CASH),
+            expense(9, "Canvasly", SOFTWARE, "599.88", "43.49", true, PaymentMethod.CREDIT_CARD),
+            expense(15, "Harborview Hotel", "Travel", "412.00", "49.44", false, PaymentMethod.CREDIT_CARD),
+            expense(16, "Pacific Coast Air", "Travel", "386.40", "0", false, PaymentMethod.CREDIT_CARD),
+            expense(24, "Rivera Front-End Studio", "Contractors", "2400.00", "0", false, PaymentMethod.BANK_TRANSFER),
+            expense(38, "Bayline Print Co.", "Marketing", "420.00", "30.45", false, PaymentMethod.CREDIT_CARD),
+            expense(52, "Framewise", SOFTWARE, "144.00", "0", false, PaymentMethod.CREDIT_CARD),
+            expense(67, "Mae Lin Illustration", "Contractors", "1200.00", "0", false, PaymentMethod.BANK_TRANSFER),
+            expense(81, "Brightdesk Coworking", "Office", "180.00", "0", false, PaymentMethod.BANK_TRANSFER),
+            expense(121, "Brightreach Ads", "Marketing", "560.00", "0", false, PaymentMethod.CREDIT_CARD),
+            expense(148, "Cloudcrate Hosting", SOFTWARE, "240.00", "0", false, PaymentMethod.CREDIT_CARD),
+            expense(184, "Metro Rideshare", "Travel", "67.00", "0", false, PaymentMethod.CREDIT_CARD),
+            expense(205, "Typeforge Fonts", SOFTWARE, "129.00", "9.35", false, PaymentMethod.CREDIT_CARD),
+            expense(310, "Ergoworks Furniture", "Office", "489.00", "35.45", false, PaymentMethod.CREDIT_CARD));
+
+    // Who the sample expenses were paid to, which tells them from the
+    // account's own.
+    static final List<String> EXPENSE_VENDORS = EXPENSES.stream().map(SampleExpense::vendor).toList();
+
     static final String NOTES = "Thank you for working with us. It's a pleasure to be part of your project.";
     static final String TERMS =
             "Payment is due within 14 days of the issue date. Bank transfer details are on request.";
@@ -56,6 +91,18 @@ final class DemoData {
 
     private static Item item(String name, String description, String price, boolean countable) {
         return new Item(name, description, new BigDecimal(price), countable);
+    }
+
+    private static SampleExpense expense(
+            int daysAgo,
+            String vendor,
+            String category,
+            String amount,
+            String tax,
+            boolean taxReclaimable,
+            PaymentMethod method) {
+        return new SampleExpense(
+                daysAgo, vendor, category, new BigDecimal(amount), new BigDecimal(tax), taxReclaimable, method);
     }
 
     private DemoData() {}

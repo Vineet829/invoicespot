@@ -1,17 +1,21 @@
 package com.invoicespot.expense;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpecificationExecutor<Expense> {
+public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("select e from Expense e where e.id = :externalId")
     Optional<Expense> findByExternalId(@Param("externalId") UUID externalId);
+
+    boolean existsByBusinessPkid(Long businessPkid);
+
+    boolean existsByBusinessPkidAndVendorIn(Long businessPkid, Collection<String> vendors);
 
     // The categories a business has used, in alphabetical order.
     @Query("""

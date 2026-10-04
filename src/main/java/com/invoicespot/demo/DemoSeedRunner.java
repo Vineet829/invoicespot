@@ -36,5 +36,16 @@ public class DemoSeedRunner implements ApplicationRunner {
         } catch (RuntimeException exception) {
             LOGGER.error("Adding sample data to the demo account failed", exception);
         }
+        // Sample expenses came later, so they are added on their own.
+        try {
+            DemoDataSeeder.ExpenseResult result = seeder.seedExpenses(properties.email());
+            if (result.seeded()) {
+                LOGGER.info("Added sample expenses to the demo account: {} expenses", result.expenses());
+            } else {
+                LOGGER.info("No sample expenses added: {}", result.reason());
+            }
+        } catch (RuntimeException exception) {
+            LOGGER.error("Adding sample expenses to the demo account failed", exception);
+        }
     }
 }

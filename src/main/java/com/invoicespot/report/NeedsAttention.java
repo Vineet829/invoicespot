@@ -20,7 +20,8 @@ import org.springframework.stereotype.Repository;
 // reported that wait to be confirmed, overdue invoices, invoices due within
 // the week, unanswered quotations whose last day is within it, invoices a
 // running schedule makes within it, and drafts. Each kind is counted in full;
-// six things at most are listed.
+// six things at most are listed. Each names its client as its document does,
+// with the id of the client the document is linked to while it is linked.
 @Repository
 class NeedsAttention {
 
@@ -72,9 +73,11 @@ class NeedsAttention {
     private Group paymentReports(Map<String, Object> params) {
         return group(
                 """
-                select d.id, d.document_number, d.customer_name, c.amount, c.paid_on, count(*) over () as kind_count
+                select d.id, d.document_number, d.customer_name, client.id as client_id, c.amount, c.paid_on,
+                       count(*) over () as kind_count
                 from payment_claims c
                 join documents d on d.pkid = c.document_pkid
+                left join customers client on client.pkid = d.customer_pkid
                 where c.business_pkid = :business and c.status = 'PENDING' and %s and d.document_type = 'Invoice'
                   and coalesce(d.currency, '') = :currency
                 order by c.created_at desc, c.pkid desc
@@ -90,9 +93,10 @@ class NeedsAttention {
     private Group owed(String kind, String due, Map<String, Object> params, ZoneId zone, LocalDate today) {
         return group(
                 """
-                select d.id, d.document_number, d.customer_name, %1$s as amount, d.due_date,
+                select d.id, d.document_number, d.customer_name, client.id as client_id, %1$s as amount, d.due_date,
                        count(*) over () as kind_count
                 from documents d
+                left join customers client on client.pkid = d.customer_pkid
                 where d.business_pkid = :business and %2$s and d.document_type = 'Invoice'
                   and coalesce(d.currency, '') = :currency and %1$s > 0 and %3$s
                 order by d.due_date, d.pkid
@@ -110,9 +114,10 @@ class NeedsAttention {
     private Group quotations(Map<String, Object> params, ZoneId zone, LocalDate today) {
         return group(
                 """
-                select d.id, d.document_number, d.customer_name, d.total as amount, d.due_date,
-                       count(*) over () as kind_count
+                select d.id, d.document_number, d.customer_name, client.id as client_id, d.total as amount,
+                       d.due_date, count(*) over () as kind_count
                 from documents d
+                left join customers client on client.pkid = d.customer_pkid
                 where d.business_pkid = :business and %s and d.document_type = 'Quotation'
                   and coalesce(d.currency, '') = :currency and d.accepted_at is null and d.declined_at is null
                   and d.due_date >= :startOfToday and d.due_date < :startOfNextWeek
@@ -131,10 +136,11 @@ class NeedsAttention {
     private Group recurring(Map<String, Object> params, LocalDate today) {
         return group(
                 """
-                select d.id, d.document_number, d.customer_name, d.total as amount, s.next_run,
-                       count(*) over () as kind_count
+                select d.id, d.document_number, d.customer_name, client.id as client_id, d.total as amount,
+                       s.next_run, count(*) over () as kind_count
                 from recurring_schedules s
                 join documents d on d.pkid = s.template_pkid
+                left join customers client on client.pkid = d.customer_pkid
                 where s.business_pkid = :business and not s.paused and s.next_run between :today and :lastDay
                   and coalesce(d.currency, '') = :currency
                 order by s.next_run, s.pkid
@@ -152,9 +158,10 @@ class NeedsAttention {
     private Group drafts(Map<String, Object> params, ZoneId zone) {
         return group(
                 """
-                select d.id, null as document_number, d.customer_name, d.total as amount, d.created_at,
-                       count(*) over () as kind_count
+                select d.id, null as document_number, d.customer_name, client.id as client_id, d.total as amount,
+                       d.created_at, count(*) over () as kind_count
                 from documents d
+                left join customers client on client.pkid = d.customer_pkid
                 where d.business_pkid = :business and d.issued_at is null and coalesce(d.currency, '') = :currency
                 order by d.created_at desc, d.pkid desc
                 limit :most
@@ -179,6 +186,7 @@ class NeedsAttention {
                 result.getObject("id", UUID.class),
                 result.getString("document_number"),
                 result.getString("customer_name"),
+                result.getObject("client_id", UUID.class),
                 result.getBigDecimal("amount"),
                 date,
                 days);

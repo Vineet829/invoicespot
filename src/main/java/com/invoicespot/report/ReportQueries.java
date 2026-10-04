@@ -1,6 +1,7 @@
 package com.invoicespot.report;
 
 import com.invoicespot.document.DocumentLedger;
+import com.invoicespot.expense.ExpenseLedger;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -68,16 +69,19 @@ class ReportQueries {
 
     record Earned(String currency, LocalDate month, BigDecimal income) {}
 
-    record Spent(String currency, LocalDate month, String category, BigDecimal cost) {}
+    record Spent(String currency, LocalDate month, BigDecimal cost) {}
 
     record DocumentDay(LocalDate day, BigDecimal billed, BigDecimal receipts, BigDecimal earned) {}
 
     record Daily(LocalDate day, BigDecimal amount) {}
 
-    // Income and costs, as profit and loss counts them by month or by day.
+    record CategorySpent(String currency, String category, BigDecimal amount, long expenses) {}
+
+    // Income and costs, as profit and loss counts them by month or by day;
+    // the expenses list adds up costs the same way.
     private static final String EARNED =
             "(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)";
-    private static final String SPENT = "(e.amount + case when e.tax_reclaimable then 0 else e.tax_amount end)";
+    private static final String SPENT = ExpenseLedger.SPENT;
 
     // A document in the reporting currency, or with a rate typed in against it.
     private static final String CONVERTIBLE = "(coalesce(d.currency, '') = :base"
@@ -265,15 +269,15 @@ class ReportQueries {
                 .list();
     }
 
-    // What expenses cost, by the month each was paid and its category: the
-    // amount, and the tax on it unless that can be claimed back.
+    // What expenses cost, by the month each was paid: the amount, and the tax
+    // on it unless that can be claimed back.
     List<Spent> spent(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
-                        select e.currency, cast(date_trunc('month', e.expense_date) as date) as month, e.category,
+                        select e.currency, cast(date_trunc('month', e.expense_date) as date) as month,
                                sum(%s) as cost
                         from expenses e
                         where e.business_pkid = :business and e.expense_date between :from and :to
-                        group by 1, 2, 3
+                        group by 1, 2
                         """.formatted(SPENT))
                 .param("business", businessPkid)
                 .param("from", from)
@@ -281,8 +285,30 @@ class ReportQueries {
                 .query((result, rowNumber) -> new Spent(
                         result.getString("currency"),
                         result.getObject("month", LocalDate.class),
-                        result.getString("category"),
                         result.getBigDecimal("cost")))
+                .list();
+    }
+
+    // What expenses paid between the days cost in each currency and
+    // category, and how many there were. A category is the same in any
+    // letter case, as the expenses list finds it, and goes by the spelling
+    // used first, as a new expense takes it.
+    List<CategorySpent> spentByCategory(long businessPkid, LocalDate from, LocalDate to) {
+        return jdbc.sql("""
+                        select e.currency, (array_agg(e.category order by e.pkid))[1] as category,
+                               sum(%s) as amount, count(*) as expenses
+                        from expenses e
+                        where e.business_pkid = :business and e.expense_date between :from and :to
+                        group by e.currency, lower(e.category)
+                        """.formatted(SPENT))
+                .param("business", businessPkid)
+                .param("from", from)
+                .param("to", to)
+                .query((result, rowNumber) -> new CategorySpent(
+                        result.getString("currency"),
+                        result.getString("category"),
+                        result.getBigDecimal("amount"),
+                        result.getLong("expenses")))
                 .list();
     }
 

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -128,6 +129,73 @@ class ExpenseIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Expense deleted"));
         list("").andExpect(jsonPath("$.totalExpenses").value(2));
+    }
+
+    @Test
+    @DisplayName("expenses paid the same day come a page at a time, the last recorded first, however they are stored")
+    void sameDayPages() throws Exception {
+        // Three expenses paid on one day, recorded in the order of their keys
+        // but stored first, third and second, so that neither the order they
+        // are stored in nor its reverse is the order they were recorded in.
+        List<Long> keys = jdbcTemplate
+                .queryForList(
+                        "select nextval(pg_get_serial_sequence('expenses', 'pkid')) from generate_series(1, 3)",
+                        Long.class)
+                .stream()
+                .sorted()
+                .toList();
+        Long business = businessOf(owner).getPkid();
+        jdbcTemplate.update("""
+                insert into expenses (pkid, business_pkid, expense_date, category, amount, currency, vendor)
+                values (?, ?, ?, 'Office', 5, 'USD', 'First'),
+                       (?, ?, ?, 'Office', 5, 'USD', 'Third'),
+                       (?, ?, ?, 'Office', 5, 'USD', 'Second')
+                """,
+                keys.get(0), business, TODAY, keys.get(2), business, TODAY, keys.get(1), business, TODAY);
+
+        list("size=2&page=1")
+                .andExpect(jsonPath("$.numberOfPages").value(2))
+                .andExpect(jsonPath("$.expenses[*].vendor").value(contains("Third", "Second")));
+        list("size=2&page=2").andExpect(jsonPath("$.expenses[*].vendor").value(contains("First")));
+    }
+
+    @Test
+    @DisplayName("a category is found by its own spelling, whatever the letter case")
+    void categorySpelling() throws Exception {
+        expense(TODAY, "Yapi Market", "İnşaat", "120");
+        expense(TODAY, "Uber", "Travel", "8");
+
+        send(get("/api/v1/expense").param("category", "İnşaat"), "")
+                .andExpect(jsonPath("$.expenses[*].vendor").value(contains("Yapi Market")));
+        send(get("/api/v1/expense").param("category", "TRAVEL"), "")
+                .andExpect(jsonPath("$.expenses[*].vendor").value(contains("Uber")));
+    }
+
+    @Test
+    @DisplayName("search reads the vendor, category, reference and notes, and takes wildcards as typed")
+    void search() throws Exception {
+        record("""
+                {"date": "%s", "vendor": "50%% Off Signs", "category": "Marketing", "amount": 40,
+                 "reference": "PO_77", "notes": "Paid with code SAVE!NOW"}
+                """.formatted(TODAY))
+                .andExpect(status().isCreated());
+        record("""
+                {"date": "%s", "vendor": "500 Offices", "category": "Office", "amount": 30,
+                 "reference": "POX77", "notes": "Paid with code SAVENOW"}
+                """.formatted(TODAY))
+                .andExpect(status().isCreated());
+
+        search("market").andExpect(jsonPath("$.expenses[*].vendor").value(contains("50% Off Signs")));
+        search("pox7").andExpect(jsonPath("$.expenses[*].vendor").value(contains("500 Offices")));
+        search("OFF").andExpect(jsonPath("$.expenses[*].vendor").value(contains("500 Offices", "50% Off Signs")));
+        // Each of these would match both if it were read as a wildcard.
+        search("50%").andExpect(jsonPath("$.expenses[*].vendor").value(contains("50% Off Signs")));
+        search("po_7").andExpect(jsonPath("$.expenses[*].vendor").value(contains("50% Off Signs")));
+        search("e!n").andExpect(jsonPath("$.expenses[*].vendor").value(contains("50% Off Signs")));
+    }
+
+    private ResultActions search(String text) throws Exception {
+        return send(get("/api/v1/expense").param("q", text), "");
     }
 
     @Test
@@ -279,6 +347,35 @@ class ExpenseIntegrationTest extends IntegrationTest {
                         + "Payment method,Reference,Notes",
                 TODAY + ",'=cmd,Travel,EUR,8.00,1.44,No,9.44,,,Credit Card,R-1,Airport",
                 TODAY.minusDays(1) + ",IndiGo,Travel,USD,120.00,0.00,No,120.00,,,,,");
+    }
+
+    @Test
+    @DisplayName("a list longer than the CSV file reads at once comes out whole, in its order")
+    void longCsv() throws Exception {
+        // 1,200 expenses paid the same day, recorded in the order of their references.
+        jdbcTemplate.update("""
+                insert into expenses (business_pkid, expense_date, category, amount, currency, reference)
+                select ?, ?, 'Office', 5, 'USD', 'R-' || lpad(cast(n as text), 4, '0')
+                from generate_series(1, 1200) n
+                order by n
+                """, businessOf(owner).getPkid(), TODAY);
+
+        List<String> lines = mockMvc.perform(get("/api/v1/expense/csv").header(HttpHeaders.AUTHORIZATION, session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8)
+                .lines()
+                .toList();
+        assertThat(lines).hasSize(1201);
+        // The last recorded comes first within a day.
+        assertThat(lines.subList(1, 1201))
+                .extracting(line -> line.split(",")[11])
+                .startsWith("R-1200", "R-1199")
+                .contains("R-0701", "R-0700", "R-0201", "R-0200")
+                .endsWith("R-0002", "R-0001")
+                .doesNotHaveDuplicates()
+                .isSortedAccordingTo(Comparator.reverseOrder());
     }
 
     @Test

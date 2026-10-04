@@ -8,6 +8,7 @@ import com.invoicespot.common.ExchangeRate;
 import com.invoicespot.common.Today;
 import com.invoicespot.document.PaymentMethod;
 import com.invoicespot.expense.dto.ExpenseListResponse;
+import com.invoicespot.expense.dto.ExpenseListTotals;
 import com.invoicespot.expense.dto.ExpenseRequest;
 import com.invoicespot.expense.dto.ExpenseResponse;
 import com.invoicespot.settings.BusinessSettings;
@@ -21,16 +22,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
+    private final ExpenseDirectory expenseDirectory;
     private final BusinessRepository businessRepository;
     private final UserRepository userRepository;
     private final SettingsService settingsService;
@@ -38,27 +39,38 @@ public class ExpenseService {
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
+            ExpenseDirectory expenseDirectory,
             BusinessRepository businessRepository,
             UserRepository userRepository,
             SettingsService settingsService,
             Clock clock) {
         this.expenseRepository = expenseRepository;
+        this.expenseDirectory = expenseDirectory;
         this.businessRepository = businessRepository;
         this.userRepository = userRepository;
         this.settingsService = settingsService;
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
+    // A page of the expenses, and what all of them come to, read at one
+    // moment so the two agree; the totals count them. A period is read as the
+    // dates it covers today, by the business's calendar, which the list sends
+    // back with the dates it was asked for; without one, today isn't read.
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ExpenseListResponse list(BusinessAccess access, ExpenseSearch search) {
-        Page<Expense> expenses = expenseRepository.findAll(
-                search.matching(access.businessPkid()),
-                PageRequest.of(search.page() - 1, search.size(), ExpenseSearch.ORDER));
+        ExpenseSearch dated = search.period() == null ? search : search.on(today(access.businessPkid()));
+        List<ExpenseListTotals> totals = expenseDirectory.totals(access.businessPkid(), dated);
+        long found = totals.stream().mapToLong(ExpenseListTotals::expenses).sum();
         return new ExpenseListResponse(
                 true,
-                expenses.getTotalElements(),
-                expenses.getTotalPages(),
-                expenses.getContent().stream().map(ExpenseResponse::from).toList());
+                found,
+                (int) ((found + search.size() - 1) / search.size()),
+                dated.from(),
+                dated.to(),
+                expenseDirectory.page(access.businessPkid(), dated).stream()
+                        .map(ExpenseResponse::from)
+                        .toList(),
+                totals);
     }
 
     @Transactional(readOnly = true)
@@ -142,15 +154,16 @@ public class ExpenseService {
         expenseRepository.delete(requireInBusiness(access, id));
     }
 
-    // Every expense the list's search matches, in its order.
-    @Transactional(readOnly = true)
+    // Every expense the list's search matches, in its order, as they all
+    // stood when the file was begun. A period is read as the list reads it.
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CsvFile csv(BusinessAccess access, ExpenseSearch search) {
-        ZoneId zone = ZoneId.of(settingsService.forBusiness(access.businessPkid()).getTimeZone());
+        LocalDate today = today(access.businessPkid());
         return CsvFile.of(
-                "invoice-spot-expenses-" + LocalDate.now(clock.withZone(zone)) + ".csv",
+                "invoice-spot-expenses-" + today + ".csv",
                 List.of("Date", "Vendor", "Category", "Currency", "Amount", "Tax", "Tax reclaimable", "Total",
                         "Exchange rate", "Exchange rate to", "Payment method", "Reference", "Notes"),
-                expenseRepository.findAll(search.matching(access.businessPkid()), ExpenseSearch.ORDER).stream()
+                expenseDirectory.all(access.businessPkid(), search.on(today)).stream()
                         .map(expense -> Arrays.<Object>asList(
                                 expense.getExpenseDate(),
                                 expense.getVendor(),
@@ -166,6 +179,11 @@ public class ExpenseService {
                                 expense.getReference(),
                                 expense.getNotes()))
                         .toList());
+    }
+
+    // Today by the business's calendar.
+    private LocalDate today(Long businessPkid) {
+        return LocalDate.now(clock.withZone(ZoneId.of(settingsService.forBusiness(businessPkid).getTimeZone())));
     }
 
     // The day an expense was paid, which can't be a day still to come
