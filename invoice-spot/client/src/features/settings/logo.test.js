@@ -49,7 +49,7 @@ it("says a logo linked from another site shows nowhere, as pages load images onl
     NOWHERE,
   );
   expect(logoHint("//example.com/logo.png", page)).toBe(NOWHERE);
-  expect(logoHint("https://invoices.example.evil/logo.png", page)).toBe(
+  expect(logoHint("https://invoices.example.other/logo.png", page)).toBe(
     NOWHERE,
   );
   expect(logoHint("https://exa mple.com/logo.png", page)).toBe(NOWHERE);

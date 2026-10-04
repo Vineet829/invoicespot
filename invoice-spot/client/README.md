@@ -10,9 +10,10 @@ The Guest buttons on login and registration use the dedicated demo account in
 that backend's database. The account must be active and email verified.
 
 To use a different API, set `VITE_API_URL` (including `/api/v1`) in
-`.env.local` and restart the development server. Production builds retain the
-hosted API default unless this variable is supplied at build time.
+`.env.local` and restart the development server. Production builds call
+`/api/v1` on the app's own origin, as the Docker image's nginx serves it, unless
+this variable is supplied at build time.
 
 `npm run build` writes the production build to `dist/`, and `npm run preview`
-serves it on port 3001 with the same proxy (build with `VITE_API_URL=/api/v1`
-to use the local backend). `npm test` runs Vitest; `npm run lint` runs ESLint.
+serves it on port 3001 with the same proxy, so it uses the local backend.
+`npm test` runs Vitest; `npm run lint` runs ESLint.

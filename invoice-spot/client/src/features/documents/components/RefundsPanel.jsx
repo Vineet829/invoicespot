@@ -33,6 +33,7 @@ const RefundFields = ({ values, update, limit, currency, busy, columns }) => (
       label="Date refunded"
       type="date"
       required
+      max={dateInput()}
       value={values.dateRefunded}
       onChange={update("dateRefunded")}
       disabled={busy}

@@ -2,9 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Local API requests stay on the frontend's origin so browsers can send the
-// refresh cookie without CORS. The local backend sends SameSite=None without
-// Secure over HTTP, which browsers reject; the proxy is same-origin, so Lax
-// works. Production cookie settings are unaffected.
+// refresh cookie without CORS. A backend set up to send SameSite=None, or
+// Secure over HTTP, would have the cookie rejected; the proxy is same-origin,
+// so Lax works. Production cookie settings are unaffected.
 const apiProxy = {
   "/api/v1": {
     target: "http://127.0.0.1:8080",

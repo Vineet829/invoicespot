@@ -17,9 +17,10 @@ const DetailsForm = ({ document, onClose }) => {
   // A receipt and a credit note have no due date.
   const receipt = ["Receipt", "Credit Note"].includes(document.documentType);
   const quotation = document.documentType === "Quotation";
-  const [dueDate, setDueDate] = useState(
-    document.dueDate ? dateInput(document.dueDate) : "",
-  );
+  // A due date moves no earlier than the issue date. One an older document
+  // was saved with stays as it is, as the server allows.
+  const savedDue = document.dueDate ? dateInput(document.dueDate) : "";
+  const [dueDate, setDueDate] = useState(savedDue);
   const [notes, setNotes] = useState(document.additionalInfo || "");
   const [terms, setTerms] = useState(document.termsConditions || "");
   const invoice = document.documentType === "Invoice";
@@ -54,6 +55,7 @@ const DetailsForm = ({ document, onClose }) => {
           label={quotation ? "Valid until" : "Due date"}
           type="date"
           required={Boolean(document.dueDate)}
+          min={dueDate === savedDue ? undefined : document.issueDate}
           value={dueDate}
           onChange={(event) => setDueDate(event.target.value)}
           disabled={saving}

@@ -28,6 +28,7 @@ const IssueForm = ({
   document,
   terms,
   base,
+  gst,
   canEmail,
   emailNote,
   onClose,
@@ -47,8 +48,13 @@ const IssueForm = ({
         : "",
   );
   // A document in another currency than the reporting one can be issued
-  // with a rate to it, which is then fixed.
-  const foreign = Boolean(document.currency) && document.currency !== base;
+  // with a rate to it, which is then fixed; in GST mode only a quotation
+  // goes out without one. A credit note keeps its invoice's rate.
+  const foreign =
+    Boolean(document.currency) &&
+    document.currency !== base &&
+    document.documentType !== "Credit Note";
+  const rateNeeded = gst && !quotation;
   const [exchangeRate, setExchangeRate] = useState(
     document.exchangeRate && document.exchangeBase === base
       ? document.exchangeRate
@@ -105,11 +111,16 @@ const IssueForm = ({
             label={`Exchange rate (1 ${document.currency} in ${base})`}
             type="number"
             min="0.0000000001"
-            step="any"
+            step="0.0000000001"
+            required={rateNeeded}
             value={exchangeRate}
             onChange={(event) => setExchangeRate(event.target.value)}
             disabled={issuing}
-            hint={`Optional. Reports can then show it in ${base}.`}
+            hint={
+              rateNeeded
+                ? "Needed to issue it in GST mode. It is fixed once issued."
+                : `Optional. Reports can then show it in ${base}.`
+            }
           />
         )}
       </div>
@@ -190,6 +201,7 @@ const IssueDialog = ({
           document={document}
           terms={settings.data.settings.paymentTermsDays}
           base={settings.data.settings.baseCurrency}
+          gst={settings.data.settings.taxRegime === "GST_INDIA"}
           canEmail={canEmail}
           emailNote={emailNote}
           onClose={onClose}
