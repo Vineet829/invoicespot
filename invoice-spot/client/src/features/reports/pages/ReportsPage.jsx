@@ -1,4 +1,5 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   FiArrowDownLeft,
   FiBarChart2,
@@ -378,7 +379,23 @@ const ReportsPage = () => {
   const profitQuery = useGetProfitReportQuery(period);
   const gstMode =
     useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
+  const loading =
+    query.isLoading ||
+    tdsQuery.isLoading ||
+    taxQuery.isLoading ||
+    profitQuery.isLoading;
   const report = query.data;
+  // A link from the overview names a section, such as #ageing. Once the
+  // report is drawn, the page opens there and keyboard focus starts there.
+  // The sections' ids are plain words, so the hash is used as it is.
+  const drawn = !loading && Boolean(report);
+  const { hash } = useLocation();
+  useEffect(() => {
+    const section = drawn && hash && document.getElementById(hash.slice(1));
+    if (!section) return;
+    section.scrollIntoView();
+    section.focus({ preventScroll: true });
+  }, [drawn, hash]);
   const currencies = report?.currencies || [];
   const shown =
     currencies.find((entry) => entry.currency === params.get("currency")) ||
@@ -501,10 +518,7 @@ const ReportsPage = () => {
           . Add a rate to a draft before you issue it.
         </p>
       )}
-      {query.isLoading ||
-      tdsQuery.isLoading ||
-      taxQuery.isLoading ||
-      profitQuery.isLoading ? (
+      {loading ? (
         <LoadingState />
       ) : (query.isError && !query.isFetching) ||
         (tdsQuery.isError && !tdsQuery.isFetching) ||
@@ -575,6 +589,7 @@ const ReportsPage = () => {
             />
           </section>
           <Panel
+            id="income"
             title="Income by month"
             description={`${periodName}. Invoices and receipts count on the day they were issued, payments on the day they were paid.`}
             aside={
@@ -633,6 +648,7 @@ const ReportsPage = () => {
           />
           <div className="grid min-w-0 gap-6 compact:gap-5 min-[1100px]:grid-cols-2 max-[700px]:gap-5">
             <Panel
+              id="ageing"
               title="Unpaid invoices by age"
               description={`As of ${dateLabel(report.today)}, by days past the due date.`}
               aside={
@@ -720,6 +736,7 @@ const ReportsPage = () => {
             </Panel>
           </div>
           <Panel
+            id="clients"
             title="Top clients"
             description="By the amount billed in this period, with what they have paid on it so far. The CSV file lists every client."
             aside={

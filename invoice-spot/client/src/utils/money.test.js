@@ -20,6 +20,15 @@ describe("money", () => {
     expect(formatAmount("abc", "USD")).toBe("0.00");
   });
 
+  it("gives the same answers when formats are used again", () => {
+    expect([1, 2, 3].map((value) => formatAmount(value * 1000, "INR"))).toEqual(
+      ["1,000.00", "2,000.00", "3,000.00"],
+    );
+    expect(formatAmount(1000, "USD")).toBe("1,000.00");
+    expect(compactAmount(1500, "USD")).toBe("1.5K");
+    expect(compactAmount(150000, "INR")).toBe("1.5L");
+  });
+
   it("shortens axis amounts to lakhs and crores for rupees", () => {
     expect(compactAmount(120000, "INR")).toBe("1.2L");
     expect(compactAmount(12000000, "INR")).toBe("1.2Cr");

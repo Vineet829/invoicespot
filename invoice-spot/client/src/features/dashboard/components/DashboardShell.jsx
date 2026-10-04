@@ -38,8 +38,8 @@ const content =
 // top bar that opens it.
 const ui = {
   // dashboard-app scopes the workspace's reset in src/index.css. The
-  // sidebar widens with the window, from 260px to 360px, only as fast as
-  // the overview's middle column can spare the room.
+  // sidebar widens with the window, from 260px at 1415px wide to 360px
+  // from 1665px, so the pages keep most of the extra room.
   app: "dashboard-app grid min-h-dvh grid-cols-[var(--sidebar-width)_minmax(0,1fr)] bg-spot-canvas bg-canvas p-0 font-ui font-normal leading-[normal] tracking-normal text-spot-ink [--sidebar-width:clamp(260px,calc(40vw_-_306px),360px)] [color-scheme:light] max-[960px]:grid-cols-[minmax(0,1fr)]",
   skipLink:
     "dashboard-skip-link left-[calc(var(--sidebar-width)+16px)] bg-white text-spot-night max-[960px]:left-6 coarse:inline-flex coarse:min-h-11 coarse:items-center",
@@ -84,18 +84,9 @@ const ui = {
   // Fill pages (documents, clients) stretch their table to 28px above the
   // bottom of wide windows.
   contentFill: `${content} min-[1360px]:flex min-[1360px]:flex-col min-[1360px]:pb-7`,
-  // The overview fills one desktop screen; the minimum heights add up the
-  // smallest panel sizes in the default and compact layouts.
-  contentFit:
-    "flex h-dvh min-h-[888px] w-full px-8 pb-7 pt-[30px] outline-none has-[.has-error]:h-auto compact:min-h-[763px] compact:px-6 compact:py-5 max-[1359px]:h-auto max-[1359px]:min-h-dvh max-[1359px]:p-7 max-[960px]:min-h-[calc(100dvh_-_68px)] max-[960px]:p-6 max-[700px]:px-4 max-[700px]:pb-6 max-[700px]:pt-5",
 };
 
-const DashboardShell = ({
-  children,
-  section = "Overview",
-  fit = false,
-  fill = false,
-}) => {
+const DashboardShell = ({ children, section = "Overview", fill = false }) => {
   const { user } = useSelector((state) => state.auth);
   const { isAdmin } = useAuthUser();
   const business = useGetBusinessesQuery().data?.businesses?.find(
@@ -337,7 +328,7 @@ const DashboardShell = ({
           </div>
         </header>
         <main
-          className={fit ? ui.contentFit : fill ? ui.contentFill : ui.content}
+          className={fill ? ui.contentFill : ui.content}
           id="dashboard-content"
           tabIndex={-1}
         >

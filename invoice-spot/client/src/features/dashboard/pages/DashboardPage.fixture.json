@@ -1,0 +1,296 @@
+{
+  "success": true,
+  "currencies": ["USD"],
+  "currency": "USD",
+  "documents": 48,
+  "clients": 12,
+  "expectedIncome": 209842.18,
+  "cashReceived": 185556.39,
+  "taxWithheld": 0.0,
+  "cashPending": 24285.79,
+  "paid": 32,
+  "partial": 6,
+  "unpaid": 10,
+  "overdue": 3,
+  "payments": [
+    {
+      "_id": "4fe2bf84-9f7f-4c0d-94a7-01c371c5b8da",
+      "paidBy": "Harbor & Pine Architects",
+      "datePaid": "2026-10-04",
+      "paymentMethod": "Bank Transfer",
+      "additionalInfo": "Deposit",
+      "amountPaid": 262.76,
+      "document": {
+        "_id": "b8e30d46-18fd-4b4e-b035-dcc4ce1081cf",
+        "documentType": "Invoice",
+        "documentNumber": "INV-1038",
+        "total": 750.75,
+        "status": "Not Fully Paid",
+        "dueDate": "2026-10-18"
+      }
+    },
+    {
+      "_id": "5f39497b-40f6-4d51-80ed-8db7b750a700",
+      "paidBy": "Atlas Robotics",
+      "datePaid": "2026-09-30",
+      "paymentMethod": "Credit Card",
+      "additionalInfo": "Deposit",
+      "amountPaid": 1846.85,
+      "document": {
+        "_id": "cf9b556d-a176-4659-a843-d54e518d2820",
+        "documentType": "Invoice",
+        "documentNumber": "INV-1034",
+        "total": 4397.25,
+        "status": "Not Fully Paid",
+        "dueDate": "2026-10-12"
+      }
+    }
+  ],
+  "period": {
+    "key": "90d",
+    "from": "2026-07-07",
+    "to": "2026-10-04",
+    "previousFrom": "2026-04-08",
+    "previousTo": "2026-07-06",
+    "step": "week"
+  },
+  "totals": {
+    "billed": { "current": 68848.08, "previous": 53344.02 },
+    "received": { "current": 44562.29, "previous": 59864.82 },
+    "profit": { "current": 64194.0, "previous": 49738.0 },
+    "hasPrevious": true
+  },
+  "owedNow": {
+    "total": 24285.79,
+    "notDue": 17959.76,
+    "overdue": 6326.03,
+    "invoices": 10,
+    "overdueInvoices": 3
+  },
+  "trend": [
+    {
+      "from": "2026-07-07",
+      "to": "2026-07-13",
+      "billed": 0.0,
+      "received": 0.0,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-14",
+      "to": "2026-07-20",
+      "billed": 750.75,
+      "received": 300.3,
+      "income": 700.0,
+      "expenses": 0.0,
+      "moneyIn": 300.3,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-21",
+      "to": "2026-07-27",
+      "billed": 11218.35,
+      "received": 4332.9,
+      "income": 10460.0,
+      "expenses": 0.0,
+      "moneyIn": 4332.9,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-28",
+      "to": "2026-08-03",
+      "billed": 8172.45,
+      "received": 6002.14,
+      "income": 7620.0,
+      "expenses": 0.0,
+      "moneyIn": 6002.14,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-04",
+      "to": "2026-08-10",
+      "billed": 4268.55,
+      "received": 2120.98,
+      "income": 3980.0,
+      "expenses": 0.0,
+      "moneyIn": 2120.98,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-11",
+      "to": "2026-08-17",
+      "billed": 4395.11,
+      "received": 5743.67,
+      "income": 4098.0,
+      "expenses": 0.0,
+      "moneyIn": 5743.67,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-18",
+      "to": "2026-08-24",
+      "billed": 0.0,
+      "received": 1406.44,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 1406.44,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-25",
+      "to": "2026-08-31",
+      "billed": 3861.0,
+      "received": 0.0,
+      "income": 3600.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-01",
+      "to": "2026-09-07",
+      "billed": 0.0,
+      "received": 4410.33,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 4410.33,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-08",
+      "to": "2026-09-14",
+      "billed": 965.25,
+      "received": 2988.67,
+      "income": 900.0,
+      "expenses": 0.0,
+      "moneyIn": 2988.67,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-15",
+      "to": "2026-09-21",
+      "billed": 0.0,
+      "received": 0.0,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-22",
+      "to": "2026-09-28",
+      "billed": 16956.23,
+      "received": 0.0,
+      "income": 15810.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-29",
+      "to": "2026-10-04",
+      "billed": 18260.39,
+      "received": 17256.86,
+      "income": 17026.0,
+      "expenses": 0.0,
+      "moneyIn": 17256.86,
+      "moneyOut": 0.0
+    }
+  ],
+  "owedByWeek": [
+    {
+      "key": "overdue",
+      "from": null,
+      "to": "2026-10-03",
+      "amount": 6326.03,
+      "invoices": 3
+    },
+    {
+      "key": "thisWeek",
+      "from": "2026-10-04",
+      "to": "2026-10-10",
+      "amount": 2664.09,
+      "invoices": 1
+    },
+    {
+      "key": "nextWeek",
+      "from": "2026-10-11",
+      "to": "2026-10-17",
+      "amount": 13353.37,
+      "invoices": 4
+    },
+    {
+      "key": "weekAfter",
+      "from": "2026-10-18",
+      "to": "2026-10-24",
+      "amount": 1942.3,
+      "invoices": 2
+    },
+    {
+      "key": "later",
+      "from": "2026-10-25",
+      "to": null,
+      "amount": 0.0,
+      "invoices": 0
+    }
+  ],
+  "attention": {
+    "items": [
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001026",
+        "documentNumber": "INV-1026",
+        "client": "Sable Fitness",
+        "amount": 3391.67,
+        "date": "2026-08-11",
+        "days": 54
+      },
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001030",
+        "documentNumber": "INV-1030",
+        "client": "Quill & Co. Publishing",
+        "amount": 1969.11,
+        "date": "2026-09-13",
+        "days": 21
+      },
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001031",
+        "documentNumber": "INV-1031",
+        "client": "Verdant Farms",
+        "amount": 965.25,
+        "date": "2026-09-24",
+        "days": 10
+      },
+      {
+        "kind": "dueSoon",
+        "documentId": "00000000-0000-0000-0000-000000001032",
+        "documentNumber": "INV-1032",
+        "client": "Bluefin Analytics",
+        "amount": 2664.09,
+        "date": "2026-10-06",
+        "days": 2
+      },
+      {
+        "kind": "quotation",
+        "documentId": "00000000-0000-0000-0000-000000000206",
+        "documentNumber": "QUO-0206",
+        "client": "Kestrel Outdoor",
+        "amount": 1201.2,
+        "date": "2026-10-09",
+        "days": 5
+      }
+    ],
+    "counts": {
+      "paymentReports": 0,
+      "overdue": 3,
+      "dueSoon": 1,
+      "quotations": 1,
+      "recurring": 0,
+      "drafts": 0
+    }
+  }
+}
