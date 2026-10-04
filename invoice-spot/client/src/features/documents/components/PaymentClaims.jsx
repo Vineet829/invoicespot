@@ -6,6 +6,7 @@ import {
   Amount,
   Field,
   Panel,
+  dateInput,
   dateLabel,
   errorMessage,
 } from "../../../components/workspace/Workspace";
@@ -68,6 +69,7 @@ const ConfirmForm = ({ document, claim, onClose }) => {
           label="Date paid"
           type="date"
           required
+          max={dateInput()}
           value={form.datePaid}
           onChange={change("datePaid")}
           disabled={saving}

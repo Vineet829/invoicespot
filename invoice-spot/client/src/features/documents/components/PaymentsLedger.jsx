@@ -7,6 +7,7 @@ import {
   ConfirmDialog,
   DataTable,
   Field,
+  dateInput,
   dateLabel,
   errorMessage,
   money,
@@ -66,6 +67,7 @@ const EditPaymentForm = ({ document, payment, busy, onSave, onClose }) => {
           label="Date paid"
           type="date"
           required
+          max={dateInput()}
           value={values.datePaid}
           onChange={update("datePaid")}
           disabled={busy}
@@ -178,14 +180,14 @@ const DeletedPayment = ({ payment, document }) => {
 
 // The payments recorded on a document, each with its receipt, edit and
 // delete. The server recalculates the amount received and the status after
-// every change. Receipts are numbered by the payments' date order.
+// every change. Each receipt keeps the number its payment was given.
 const PaymentsLedger = ({ document, demo = false, refusal }) => {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [emailingReceipt, setEmailingReceipt] = useState(null);
   const [downloading, setDownloading] = useState(null);
   const [getReceipt] = useGetReceiptPdfMutation();
-  const downloadReceipt = async (payment, index) => {
+  const downloadReceipt = async (payment) => {
     setDownloading(payment._id);
     try {
       const url = await getReceipt({
@@ -194,7 +196,7 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
       }).unwrap();
       saveFile(
         url,
-        `Receipt-${document.documentNumber}-P${index + 1}.pdf`.replace(
+        `Receipt-${document.documentNumber}-P${payment.receiptNumber}.pdf`.replace(
           /[^A-Za-z0-9._-]/g,
           "-",
         ),
@@ -263,12 +265,12 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
     {
       label: "Receipt",
       type: "action",
-      render: (payment, index) => (
+      render: (payment) => (
         <span className="inline-flex gap-1.5">
           <button
             type="button"
             className={rowAction}
-            onClick={() => downloadReceipt(payment, index)}
+            onClick={() => downloadReceipt(payment)}
             disabled={downloading === payment._id}
             aria-busy={downloading === payment._id}
             aria-label={`Download the receipt for the payment of ${dateLabel(payment.datePaid)}`}

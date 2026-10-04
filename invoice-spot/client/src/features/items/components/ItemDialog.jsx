@@ -71,7 +71,7 @@ const ItemForm = ({ item, busy, onSave, onClose }) => {
           type="number"
           min="0"
           max="100"
-          step="any"
+          step="0.0001"
           value={values.taxRate}
           onChange={change("taxRate")}
           disabled={busy}

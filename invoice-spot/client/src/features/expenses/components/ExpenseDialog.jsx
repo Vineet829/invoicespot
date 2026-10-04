@@ -53,6 +53,7 @@ const ExpenseForm = ({ expense, settings, busy, onSave, onClose }) => {
           label="Date paid"
           type="date"
           required
+          max={dateInput()}
           value={values.date}
           onChange={change("date")}
           disabled={busy}
@@ -146,7 +147,7 @@ const ExpenseForm = ({ expense, settings, busy, onSave, onClose }) => {
             label={`Exchange rate (1 ${values.currency} in ${base})`}
             type="number"
             min="0.0000000001"
-            step="any"
+            step="0.0000000001"
             value={values.exchangeRate}
             onChange={change("exchangeRate")}
             disabled={busy}

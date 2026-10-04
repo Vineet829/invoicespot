@@ -142,6 +142,13 @@ const DocumentFields = ({
       doc?.dueDate || Date.now() + (settings?.paymentTermsDays ?? 7) * 86400000,
     ),
   );
+  // A due date comes no earlier than the issue date, today until one is
+  // chosen. A draft saved due earlier keeps it while neither date changes,
+  // as the server allows.
+  const earliestDue =
+    doc?.dueDate === dueDate && (doc?.issueDate || "") === issueDate
+      ? undefined
+      : issueDate || dateInput();
   // The rate new lines start at, which every line can be set to at once.
   const [everyRate, setEveryRate] = useState(
     doc?.rates ?? String(settings?.defaultTaxRate ?? "0"),
@@ -504,6 +511,7 @@ const DocumentFields = ({
                         }
                         type="date"
                         required={documentType === "Invoice"}
+                        min={earliestDue}
                         value={dueDate}
                         onChange={(event) => setDueDate(event.target.value)}
                         disabled={busy}
@@ -597,7 +605,7 @@ const DocumentFields = ({
                       max="1000000"
                       type="number"
                       min="0"
-                      step="any"
+                      step="0.0001"
                       value={item.quantity ?? ""}
                       onChange={(event) =>
                         changeItem(index, "quantity", event.target.value)
@@ -619,7 +627,7 @@ const DocumentFields = ({
                       label={lineLabel("Unit price", index)}
                       type="number"
                       min="0"
-                      step="any"
+                      step="0.0001"
                       value={item.unitPrice ?? ""}
                       onChange={(event) =>
                         changeItem(index, "unitPrice", event.target.value)
@@ -631,7 +639,7 @@ const DocumentFields = ({
                       type="number"
                       min="0"
                       max="100"
-                      step="any"
+                      step="0.0001"
                       value={item.discount ?? ""}
                       onChange={(event) =>
                         changeItem(index, "discount", event.target.value)
@@ -643,7 +651,7 @@ const DocumentFields = ({
                       type="number"
                       min="0"
                       max="100"
-                      step="any"
+                      step="0.0001"
                       list={ratesListId}
                       value={item.taxRate ?? ""}
                       onChange={(event) =>
@@ -739,7 +747,7 @@ const DocumentFields = ({
                     max="100"
                     type="number"
                     min="0"
-                    step="any"
+                    step="0.0001"
                     value={everyRate}
                     onChange={(event) => setEveryRate(event.target.value)}
                     hint="Each line keeps its own rate."
@@ -782,15 +790,15 @@ const DocumentFields = ({
                     label={`Exchange rate (1 ${currency} in ${base})`}
                     type="number"
                     min="0.0000000001"
-                    step="any"
+                    step="0.0000000001"
                     value={exchangeRate}
                     onChange={(event) => setExchangeRate(event.target.value)}
                     className="col-start-2 max-[700px]:col-start-auto"
                     hint={
-                      doc?.exchangeRate && doc.exchangeBase !== base
-                        ? `Optional. The rate saved was to ${doc.exchangeBase}, which you no longer report in.`
-                        : gstMode
-                          ? "Needed to issue an invoice in GST mode. It is fixed once issued."
+                      gstMode
+                        ? "Needed to issue an invoice in GST mode. It is fixed once issued."
+                        : doc?.exchangeRate && doc.exchangeBase !== base
+                          ? `Optional. The rate saved was to ${doc.exchangeBase}, which you no longer report in.`
                           : `Optional. Reports can then show this document in ${base}. It is fixed once issued.`
                     }
                     disabled={busy}

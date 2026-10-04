@@ -50,6 +50,7 @@ const PaymentForm = ({ document }) => {
           label="Date paid"
           type="date"
           required
+          max={dateInput()}
           value={datePaid}
           onChange={(event) => setDatePaid(event.target.value)}
           disabled={busy}
