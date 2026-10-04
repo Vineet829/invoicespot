@@ -202,7 +202,8 @@ class DraftIntegrationTest extends IntegrationTest {
     @DisplayName("drafts count for nothing: not in balances, reports, the overview, statements or alerts")
     void leftOut() throws Exception {
         String overdue = dueNoon(LocalDate.now(ZONE).minusDays(9));
-        String issued = invoice(false, "100", ", \"dueDate\": \"" + overdue + "\"");
+        String issued = invoice(false, "100", ", \"issueDate\": \"%s\", \"dueDate\": \"%s\""
+                .formatted(LocalDate.now(ZONE).minusDays(9), overdue));
         String draft = invoice(true, "500", ", \"dueDate\": \"" + overdue + "\"");
 
         send(get("/api/v1/document/all"), "")

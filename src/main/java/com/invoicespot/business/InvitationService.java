@@ -175,8 +175,15 @@ public class InvitationService {
         if (token == null || token.isBlank() || token.length() > 100) {
             throw invitationGone();
         }
+        String tokenHash = SecretTokens.hash(token);
+        // The business is locked before the invitation, as a resend, a
+        // withdrawal or a deletion locks them, so one of those at the same
+        // time takes turns with this instead of deadlocking.
+        Business business = invitationRepository.findBusinessPkidByTokenHash(tokenHash)
+                .flatMap(businessRepository::findForUpdate)
+                .orElseThrow(InvitationService::invitationGone);
         Invitation invitation = invitationRepository
-                .findForUpdateByTokenHash(SecretTokens.hash(token))
+                .findForUpdateByTokenHash(tokenHash)
                 .orElseThrow(InvitationService::invitationGone);
         Instant now = clock.instant();
         if (!invitation.isPending()) {
@@ -191,9 +198,6 @@ public class InvitationService {
                     HttpStatus.FORBIDDEN,
                     "This invitation is for " + invitation.getEmail() + ". Sign in with that email to accept it");
         }
-        Business business = businessRepository
-                .findForUpdate(invitation.getBusiness().getPkid())
-                .orElseThrow(InvitationService::invitationGone);
         if (memberRepository.findByBusinessPkidAndUserPkid(business.getPkid(), user.getPkid()).isEmpty()) {
             BusinessMember member = new BusinessMember();
             member.setBusiness(business);

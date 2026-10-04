@@ -1,6 +1,9 @@
 package com.invoicespot.business;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -28,11 +31,19 @@ import org.springframework.http.MediaType;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class TeamIntegrationTest extends IntegrationTest {
 
     @Autowired
     private AuditEventRepository auditEventRepository;
+
+    @Autowired
+    private TeamService teamService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private User founder;
     private Business business;
@@ -150,6 +161,25 @@ class TeamIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a hand-over that rolls back emails nobody, and the owner keeps the business")
+    void transferRolledBack() {
+        User admin = createMember(business, BusinessRole.ADMIN);
+        BusinessAccess access = new BusinessAccess(business.getPkid(), business.getId(), BusinessRole.OWNER, founder);
+
+        // As when saving it fails at the very end.
+        new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> {
+            teamService.transfer(access, admin.getId().toString());
+            transaction.setRollbackOnly();
+        });
+
+        verify(mailSender, after(1000).never()).send(any(SimpleMailMessage.class));
+        assertThat(businessMemberRepository.findByBusinessPkidAndUserPkid(business.getPkid(), founder.getPkid())
+                        .orElseThrow()
+                        .getRole())
+                .isEqualTo(BusinessRole.OWNER);
+    }
+
+    @Test
     @DisplayName("an inactive account can't take a business over")
     void transferNeedsAnActiveAccount() throws Exception {
         User admin = createMember(business, BusinessRole.ADMIN);
@@ -184,11 +214,15 @@ class TeamIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.business._id").value(businessOf(admin).getId().toString()));
         send(get("/api/v1/customer/" + client), adminSession, "").andExpect(status().isNotFound());
+        // Other tests delete businesses with the same name, so only the
+        // owner's own deletion counts.
         assertThat(auditEventRepository.findAll().stream()
                         .filter(event -> event.getType() == AuditEventType.BUSINESS_DELETED
-                                && business.getName().equals(event.getDetail()))
-                        .count())
-                .isEqualTo(1);
+                                && event.getActor() != null
+                                && event.getActor().getPkid().equals(founder.getPkid()))
+                        .map(event -> event.getDetail())
+                        .toList())
+                .containsExactly(business.getName());
     }
 
     @Test

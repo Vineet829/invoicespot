@@ -50,9 +50,15 @@ class DocumentExportIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "currency": "USD", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "currency": "USD",
+                                 "issueDate": "%s", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
-                                """.formatted(client, type, due.atTime(12, 0).toInstant(ZoneOffset.UTC), amount)))
+                                """.formatted(
+                                        client,
+                                        type,
+                                        due.isBefore(today) ? due : today,
+                                        due.atTime(12, 0).toInstant(ZoneOffset.UTC),
+                                        amount)))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -97,7 +103,7 @@ class DocumentExportIntegrationTest extends IntegrationTest {
                 "INV-0002,Invoice,Paid,Acme,%s,USD,50.00,0.00,50.00,50.00,0.00,%s,No,0.00,,,,0.00,0.00"
                         .formatted(email, dates),
                 "INV-0001,Invoice,Partially paid,Acme,%s,USD,100.00,0.00,100.00,40.00,60.00,%s,%s,Yes,0.00,,,,0.00,0.00"
-                        .formatted(email, today, today.minusDays(1)));
+                        .formatted(email, today.minusDays(1), today.minusDays(1)));
     }
 
     @Test

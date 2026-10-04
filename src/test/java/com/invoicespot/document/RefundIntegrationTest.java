@@ -12,7 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.invoicespot.IntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 // Money paid back when a credit note leaves an invoice or receipt overpaid:
 // never more than is due back, and counted wherever money received is.
 class RefundIntegrationTest extends IntegrationTest {
+
+    // UTC+14, the time zone furthest ahead: a day after its today is still to
+    // come everywhere.
+    private static final ZoneId FURTHEST_AHEAD = ZoneId.of("Pacific/Kiritimati");
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private String session;
@@ -85,6 +91,21 @@ class RefundIntegrationTest extends IntegrationTest {
 
     private ResultActions refund(String document, String json) throws Exception {
         return send(post("/api/v1/document/{id}/refund", document), json);
+    }
+
+    private void timeZone(ZoneId zone) throws Exception {
+        send(put("/api/v1/settings"), """
+                {"defaultCurrency": "USD", "paymentTermsDays": 15, "defaultTaxRate": 0,
+                 "taxLabel": "Tax", "timeZone": "%s"}
+                """.formatted(zone.getId())).andExpect(status().isOk());
+    }
+
+    // A time zone whose today isn't UTC's right now: fourteen hours ahead of
+    // UTC from 10:00 UTC, eleven hours behind it before then.
+    private static ZoneId awayFromUtc() {
+        return LocalDate.now(FURTHEST_AHEAD).equals(LocalDate.now(ZoneOffset.UTC))
+                ? ZoneId.of("Pacific/Pago_Pago")
+                : FURTHEST_AHEAD;
     }
 
     @Test
@@ -214,5 +235,56 @@ class RefundIntegrationTest extends IntegrationTest {
                 .getResponse()
                 .getContentAsByteArray())
                 .replaceAll("\\s+", " ");
+    }
+
+    @Test
+    @DisplayName("a refund is dated no later than today somewhere, and today where the business is if no day is given")
+    void notAfterToday() throws Exception {
+        ZoneId zone = awayFromUtc();
+        timeZone(zone);
+        LocalDate local = LocalDate.now(zone);
+        LocalDate tomorrowFurthestAhead = LocalDate.now(FURTHEST_AHEAD).plusDays(1);
+        String invoice = paidInvoice("1000");
+        credit(invoice, "300");
+
+        for (LocalDate future : List.of(local.plusDays(2), tomorrowFurthestAhead)) {
+            refund(invoice, "{\"amount\": 100, \"dateRefunded\": \"%s\"}".formatted(future))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("A refund can't be dated after today"));
+        }
+        String refundId = JsonPath.read(
+                body(refund(invoice, "{\"amount\": 100, \"dateRefunded\": \"%s\"}".formatted(local))
+                        .andExpect(status().isCreated())),
+                "$.document.refunds[0]._id");
+        send(patch("/api/v1/document/{id}/refund/{refund}", invoice, refundId),
+                        "{\"dateRefunded\": \"%s\"}".formatted(tomorrowFurthestAhead))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("A refund can't be dated after today"));
+        // Without a day, it is dated today where the business is.
+        refund(invoice, "{\"amount\": 50}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.document.refunds[1].dateRefunded").value(local.toString()));
+    }
+
+    @Test
+    @DisplayName("a refund dated today in UTC+14 is taken while it is still the day before where the business is")
+    void todayAheadOfTheBusiness() throws Exception {
+        // Ten hours behind UTC, so always a day behind UTC+14.
+        timeZone(ZoneId.of("Pacific/Honolulu"));
+        LocalDate latest = LocalDate.now(FURTHEST_AHEAD);
+        String invoice = paidInvoice("1000");
+        credit(invoice, "300");
+
+        String refundId = JsonPath.read(
+                body(refund(invoice, "{\"amount\": 100, \"dateRefunded\": \"%s\"}".formatted(latest.minusDays(1)))
+                        .andExpect(status().isCreated())),
+                "$.document.refunds[0]._id");
+        send(patch("/api/v1/document/{id}/refund/{refund}", invoice, refundId),
+                        "{\"dateRefunded\": \"%s\"}".formatted(latest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.document.refunds[0].dateRefunded").value(latest.toString()));
+        refund(invoice, "{\"amount\": 100, \"dateRefunded\": \"%s\"}".formatted(latest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.document.refunds[1].dateRefunded").value(latest.toString()));
     }
 }

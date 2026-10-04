@@ -153,7 +153,7 @@ class CatalogItemIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("names are required and prices can't be negative")
+    @DisplayName("names are required, and prices can't be negative or have too many digits")
     void validation() throws Exception {
         User owner = createUser();
 
@@ -163,6 +163,9 @@ class CatalogItemIntegrationTest extends IntegrationTest {
         create(owner, "{\"name\": \"Refund\", \"unitPrice\": -5}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Prices can't be negative"));
+        create(owner, "{\"name\": \"Hosting\", \"unitPrice\": 1000000000000000}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Prices can have at most 15 whole digits and 4 decimals"));
     }
 
     @Test

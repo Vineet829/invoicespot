@@ -5,6 +5,7 @@ import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.VerificationTokenService;
 import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.business.BusinessService;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
 import com.invoicespot.user.DemoAccountGuard;
@@ -125,14 +126,14 @@ public class OAuthAccounts {
         auditLog.record(AuditEventType.PROVIDER_LINKED, user, user, null, provider);
         // A new password wouldn't remove the link, and the app has no way to,
         // so the advice is to reply: the mail comes from the support address.
-        mailService.send(
-                user.getEmail(),
-                provider + " sign-in was added to your " + site.name() + " account",
-                "Hello " + user.getFirstName() + ",\n\n"
-                        + "Your " + site.name() + " account can now be signed in to with the " + provider
-                        + " account " + email + ". Whoever holds that " + provider
-                        + " account can sign in to yours.\n\n"
-                        + "If that wasn't you, reply to this email right away.");
+        String to = user.getEmail();
+        String subject = provider + " sign-in was added to your " + site.name() + " account";
+        String body = "Hello " + user.getFirstName() + ",\n\n"
+                + "Your " + site.name() + " account can now be signed in to with the " + provider
+                + " account " + email + ". Whoever holds that " + provider
+                + " account can sign in to yours.\n\n"
+                + "If that wasn't you, reply to this email right away.";
+        AfterCommit.run(() -> mailService.send(to, subject, body));
         return identity;
     }
 

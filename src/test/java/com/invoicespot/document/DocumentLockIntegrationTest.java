@@ -100,10 +100,10 @@ class DocumentLockIntegrationTest extends IntegrationTest {
         String id = document("Invoice", false);
 
         change(id, """
-                {"dueDate": "2026-12-01T12:00:00Z", "additionalInfo": "Thanks", "termsConditions": "Net 30"}
+                {"dueDate": "2099-12-01T12:00:00Z", "additionalInfo": "Thanks", "termsConditions": "Net 30"}
                 """)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-12-01"))
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2099-12-01"))
                 .andExpect(jsonPath("$.updatedDocument.additionalInfo").value("Thanks"))
                 .andExpect(jsonPath("$.updatedDocument.termsConditions").value("Net 30"))
                 .andExpect(jsonPath("$.updatedDocument.total").value(110.0));
@@ -135,7 +135,7 @@ class DocumentLockIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a receipt never takes a due date: not made, saved as a draft, turned into one, or issued")
+    @DisplayName("a receipt never takes a due date: not made, saved as a draft, turned into one, issued or copied")
     void receiptsHaveNoDueDate() throws Exception {
         String due = "\"dueDate\": \"2026-12-01T12:00:00Z\"";
         String made = JsonPath.read(
@@ -157,6 +157,10 @@ class DocumentLockIntegrationTest extends IntegrationTest {
         send(post("/api/v1/document/{id}/issue", draft), "{" + due + "}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.updatedDocument.dueDate").value(nullValue()));
+        send(post("/api/v1/document/{id}/duplicate", draft), "")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.newDocument.documentType").value("Receipt"))
+                .andExpect(jsonPath("$.newDocument.dueDate").value(nullValue()));
     }
 
     @Test

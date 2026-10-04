@@ -2,6 +2,11 @@ package com.invoicespot.auth.twofactor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -9,11 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.auth.twofactor.dto.TwoFactorSetupResponse;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -21,9 +28,11 @@ import java.util.concurrent.Future;
 import org.apache.commons.codec.binary.Base32;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -40,6 +49,9 @@ class TwoFactorIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private TwoFactorService twoFactorService;
 
     private User withPassword() {
         User user = createUser();
@@ -213,6 +225,28 @@ class TwoFactorIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         login(enabled.user()).andExpect(jsonPath("$.accessToken").exists()).andExpect(cookie().exists("jwt"));
+    }
+
+    @Test
+    @DisplayName("turning it on in a change that rolls back emails nobody; turned on, the owner is told")
+    void turnOnRolledBack() {
+        User user = withPassword();
+        UUID session = sessionService.start(user).session().getId();
+        TwoFactorSetupResponse setup = twoFactorService.setup(user, PASSWORD);
+        String code = Totp.code(new Base32().decode(setup.secret()), Totp.step(Instant.now()));
+
+        // As when saving it fails at the very end.
+        new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> {
+            twoFactorService.enable(user, session, code);
+            transaction.setRollbackOnly();
+        });
+        verify(mailSender, after(1000).never()).send(any(SimpleMailMessage.class));
+
+        twoFactorService.enable(user, session, code);
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, timeout(2000)).send(mail.capture());
+        assertThat(mail.getValue().getTo()).containsExactly(user.getEmail());
+        assertThat(mail.getValue().getSubject()).isEqualTo("Two-factor sign-in was turned on");
     }
 
     @Test

@@ -65,9 +65,10 @@ class QuotationAnswerIntegrationTest extends IntegrationTest {
     private String[] quotation(LocalDate validUntil) throws Exception {
         String id = JsonPath.read(
                 body(send(post("/api/v1/document/create"), """
-                        {"customerId": "%s", "documentType": "Quotation", "currency": "USD", "dueDate": "%s",
-                         "billingItems": [{"itemName": "Retainer", "unitPrice": 900, "quantity": 1}]}
-                        """.formatted(client, noon(validUntil))).andExpect(status().isOk())),
+                        {"customerId": "%s", "documentType": "Quotation", "currency": "USD", "issueDate": "%s",
+                         "dueDate": "%s", "billingItems": [{"itemName": "Retainer", "unitPrice": 900, "quantity": 1}]}
+                        """.formatted(client, LocalDate.now(ZONE).minusDays(30), noon(validUntil)))
+                        .andExpect(status().isOk())),
                 "$.newDocument._id");
         String url = JsonPath.read(body(send(post("/api/v1/document/{id}/share", id), "")), "$.url");
         return new String[] {id, url.substring(url.lastIndexOf('/') + 1)};

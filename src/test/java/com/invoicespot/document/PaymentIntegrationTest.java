@@ -6,12 +6,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 class PaymentIntegrationTest extends IntegrationTest {
+
+    // UTC+14, the time zone furthest ahead: a day after its today is still to
+    // come everywhere.
+    private static final ZoneId FURTHEST_AHEAD = ZoneId.of("Pacific/Kiritimati");
 
     private String createDocument(User owner, String type) throws Exception {
         String customer = mockMvc.perform(post("/api/v1/customer/create")
@@ -48,6 +57,25 @@ class PaymentIntegrationTest extends IntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json));
+    }
+
+    private void timeZone(User owner, ZoneId zone) throws Exception {
+        mockMvc.perform(put("/api/v1/settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"defaultCurrency": "USD", "paymentTermsDays": 7, "defaultTaxRate": 0,
+                                 "taxLabel": "Tax", "timeZone": "%s"}
+                                """.formatted(zone.getId())))
+                .andExpect(status().isOk());
+    }
+
+    // A time zone whose today isn't UTC's right now: fourteen hours ahead of
+    // UTC from 10:00 UTC, eleven hours behind it before then.
+    private static ZoneId awayFromUtc() {
+        return LocalDate.now(FURTHEST_AHEAD).equals(LocalDate.now(ZoneOffset.UTC))
+                ? ZoneId.of("Pacific/Pago_Pago")
+                : FURTHEST_AHEAD;
     }
 
     @Test
@@ -176,5 +204,68 @@ class PaymentIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("That payment does not exist"));
+    }
+
+    @Test
+    @DisplayName("a payment is dated no later than today somewhere, and today where the business is if no day is given")
+    void notAfterToday() throws Exception {
+        User owner = createUser();
+        ZoneId zone = awayFromUtc();
+        timeZone(owner, zone);
+        LocalDate local = LocalDate.now(zone);
+        LocalDate tomorrowFurthestAhead = LocalDate.now(FURTHEST_AHEAD).plusDays(1);
+        String documentId = createDocument(owner, "Invoice");
+        String cheque = "{\"datePaid\": \"%s\", \"amountPaid\": 40, \"paymentMethod\": \"Cheque\"}";
+
+        for (LocalDate future : List.of(local.plusDays(2), tomorrowFurthestAhead)) {
+            pay(owner, documentId, cheque.formatted(future))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("A payment can't be dated after today"));
+        }
+        String paymentId = JsonPath.read(
+                pay(owner, documentId, cheque.formatted(local))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.document.paymentRecords[0]._id");
+        mockMvc.perform(patch("/api/v1/document/{id}/payment/{paymentId}", documentId, paymentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"datePaid\": \"%s\"}".formatted(tomorrowFurthestAhead)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("A payment can't be dated after today"));
+        // Without a day, it is dated today where the business is.
+        pay(owner, documentId, "{\"amountPaid\": 10, \"paymentMethod\": \"Cash\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.document.paymentRecords[1].datePaid").value(local.toString()));
+    }
+
+    @Test
+    @DisplayName("a payment dated today in UTC+14 is taken while it is still the day before where the business is")
+    void todayAheadOfTheBusiness() throws Exception {
+        User owner = createUser();
+        // Ten hours behind UTC, so always a day behind UTC+14.
+        timeZone(owner, ZoneId.of("Pacific/Honolulu"));
+        LocalDate latest = LocalDate.now(FURTHEST_AHEAD);
+        String documentId = createDocument(owner, "Invoice");
+        String cheque = "{\"datePaid\": \"%s\", \"amountPaid\": 40, \"paymentMethod\": \"Cheque\"}";
+
+        String paymentId = JsonPath.read(
+                pay(owner, documentId, cheque.formatted(latest.minusDays(1)))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.document.paymentRecords[0]._id");
+        mockMvc.perform(patch("/api/v1/document/{id}/payment/{paymentId}", documentId, paymentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"datePaid\": \"%s\"}".formatted(latest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.document.paymentRecords[0].datePaid").value(latest.toString()));
+        pay(owner, documentId, cheque.formatted(latest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.document.paymentRecords[1].datePaid").value(latest.toString()));
     }
 }

@@ -39,7 +39,7 @@ class DocumentSearchIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "issueDate": "2026-01-15", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": %d, "quantity": 1}]}
                                 """.formatted(customerId, type, dueDate, price)))
                 .andReturn()

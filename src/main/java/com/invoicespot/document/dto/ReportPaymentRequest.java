@@ -12,7 +12,10 @@ import java.time.LocalDate;
 public record ReportPaymentRequest(
         @NotNull(message = "Enter the amount you paid")
                 @DecimalMin(value = "0.01", message = "Enter the amount you paid")
-                @Digits(integer = 15, fraction = 2, message = "Enter the amount with at most 2 decimals")
+                @Digits(
+                        integer = 15,
+                        fraction = 2,
+                        message = "Enter the amount with at most 15 whole digits and 2 decimals")
                 BigDecimal amount,
         @NotNull(message = "Enter the day you paid") LocalDate paidOn,
         @NotNull(message = "Choose how you paid") String method,

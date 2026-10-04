@@ -43,12 +43,14 @@ class OverviewIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "currency": "%s", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "currency": "%s",
+                                 "issueDate": "%s", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
                                 """.formatted(
                                         client,
                                         type,
                                         currency,
+                                        today.plusDays(Math.min(dueInDays, 0)),
                                         today.plusDays(dueInDays).atTime(12, 0).toInstant(ZoneOffset.UTC),
                                         amount)))
                 .andReturn()

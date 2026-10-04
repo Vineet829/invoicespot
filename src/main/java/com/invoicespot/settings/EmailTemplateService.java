@@ -54,6 +54,7 @@ public class EmailTemplateService {
     public EmailTemplateResponse save(BusinessAccess access, String kindName, EmailTemplateRequest request) {
         EmailTemplateKind kind = kind(kindName);
         EmailText text = checked(kind, request);
+        lock(access);
         EmailTemplate template = repository.findByBusinessPkidAndKind(access.businessPkid(), kind).orElseGet(() -> {
             EmailTemplate created = new EmailTemplate();
             created.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
@@ -72,8 +73,17 @@ public class EmailTemplateService {
     @Transactional
     public EmailTemplateResponse reset(BusinessAccess access, String kindName) {
         EmailTemplateKind kind = kind(kindName);
+        lock(access);
         repository.findByBusinessPkidAndKind(access.businessPkid(), kind).ifPresent(repository::delete);
         return EmailTemplateResponse.of(kind, null);
+    }
+
+    // Saves and resets of a business's emails take turns, so neither finds a
+    // template the other is adding or removing.
+    private void lock(BusinessAccess access) {
+        businessRepository
+                .findForUpdate(access.businessPkid())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
     }
 
     // What a business's emails of a kind say: its own words, or the standard

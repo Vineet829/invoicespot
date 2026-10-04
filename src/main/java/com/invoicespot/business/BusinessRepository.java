@@ -24,7 +24,7 @@ public interface BusinessRepository extends JpaRepository<Business, Long> {
             """)
     List<String> findSharedNamesOwnedBy(@Param("userPkid") Long userPkid);
 
-    // Locked, so changes to one business's team take turns.
+    // Locked, so changes to one business take turns.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from Business b where b.pkid = :pkid")
     Optional<Business> findForUpdate(@Param("pkid") Long pkid);

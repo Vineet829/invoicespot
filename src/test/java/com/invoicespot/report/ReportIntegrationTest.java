@@ -57,9 +57,16 @@ class ReportIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "currency": "%s", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "currency": "%s",
+                                 "issueDate": %s, "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
-                                """.formatted(client, type, currency, noon(due), amount)))
+                                """.formatted(
+                                        client,
+                                        type,
+                                        currency,
+                                        due.isBefore(today) ? "\"" + due + "\"" : "null",
+                                        noon(due),
+                                        amount)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

@@ -12,6 +12,8 @@ import com.invoicespot.IntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class DueDateIntegrationTest extends IntegrationTest {
 
     private static final String MALFORMED = "Enter the due date as YYYY-MM-DD";
+    private static final String BEFORE_ISSUE = "An invoice can't be due before its issue date";
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -199,5 +202,87 @@ class DueDateIntegrationTest extends IntegrationTest {
         send(post("/api/v1/document/{id}/issue", draft), "{\"dueDate\": \"2026-10-32\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(MALFORMED));
+    }
+
+    @Test
+    @DisplayName("an invoice is due, and a quotation valid, no earlier than its issue date, however they are set")
+    void notBeforeIssue() throws Exception {
+        business("Asia/Kolkata");
+
+        // Dated 15 January, made and issued at once, or saved as a draft.
+        invoice(false, "2026-01-14")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        invoice(true, "2026-01-14")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        // Left undated, as the editor leaves it, so dated today.
+        send(post("/api/v1/document/create"), """
+                {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "dueDate": "%s",
+                 "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
+                """.formatted(client, LocalDate.now(ZoneId.of("Asia/Kolkata")).minusDays(1)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        send(post("/api/v1/document/create"), """
+                {"customerId": "%s", "documentType": "Quotation", "currency": "USD", "issueDate": "2026-01-15",
+                 "dueDate": "2026-01-10", "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
+                """.formatted(client))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("A quotation can't expire before its issue date"));
+
+        // A draft dated, or issued, later than its due date, until it is due later.
+        String draft = made(true, "2026-01-20");
+        send(patch("/api/v1/document/{id}", draft), "{\"issueDate\": \"2026-01-21\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        send(post("/api/v1/document/{id}/issue", draft), "{\"issueDate\": \"2026-01-21\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        send(post("/api/v1/document/{id}/issue", draft), "{\"issueDate\": \"2026-01-21\", \"dueDate\": \"2026-01-21\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-01-21"));
+
+        // Issued, its due date still moves, but not before its issue date.
+        send(patch("/api/v1/document/{id}", draft), "{\"dueDate\": \"2026-01-20\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        send(patch("/api/v1/document/{id}", draft), "{\"dueDate\": \"2026-01-22\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-01-22"));
+    }
+
+    @Test
+    @DisplayName("a document saved due before its issue date keeps that due date through other changes")
+    void keptAsItWas() throws Exception {
+        business("Asia/Kolkata");
+        String issued = made(false, "2026-02-14");
+        String draft = made(true, "2026-02-14");
+        // Due on 10 January, as an older document could be saved.
+        jdbc.update(
+                "update documents set due_date = ? where id in (?, ?)",
+                Timestamp.from(Instant.parse("2026-01-10T06:30:00Z")),
+                UUID.fromString(issued),
+                UUID.fromString(draft));
+
+        // Edit details sends the due date back with the notes, and the editor
+        // sends both of a draft's dates back.
+        send(patch("/api/v1/document/{id}", issued), "{\"dueDate\": \"2026-01-10\", \"additionalInfo\": \"Thanks\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedDocument.dueDate").value("2026-01-10"))
+                .andExpect(jsonPath("$.updatedDocument.additionalInfo").value("Thanks"));
+        send(patch("/api/v1/document/{id}", draft), """
+                {"issueDate": "2026-01-15", "dueDate": "2026-01-10", "additionalInfo": "Thanks"}
+                """)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedDocument.additionalInfo").value("Thanks"));
+
+        // A due date that moves is checked, even when it moves later.
+        send(patch("/api/v1/document/{id}", issued), "{\"dueDate\": \"2026-01-12\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
+        // So is a draft as it is issued.
+        send(post("/api/v1/document/{id}/issue", draft), "")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(BEFORE_ISSUE));
     }
 }

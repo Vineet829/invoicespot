@@ -1,5 +1,6 @@
 package com.invoicespot.settings;
 
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -87,7 +88,7 @@ class SettingsIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("unknown time zones, bad currencies and tax rates over 100 are refused")
+    @DisplayName("unknown time zones, bad currencies and tax rates over 100 or past 4 decimals are refused")
     void validation() throws Exception {
         User user = createUser();
 
@@ -100,5 +101,12 @@ class SettingsIntegrationTest extends IntegrationTest {
         save(user, VALID.replace("\"defaultTaxRate\": 18", "\"defaultTaxRate\": 101"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("The tax rate must be from 0 to 100"));
+        // Past 3 whole digits two limits apply, and either may be the one named.
+        save(user, VALID.replace("\"defaultTaxRate\": 18", "\"defaultTaxRate\": 1000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(startsWith("The tax rate must be from 0 to 100")));
+        save(user, VALID.replace("\"defaultTaxRate\": 18", "\"defaultTaxRate\": 18.12345"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("The tax rate must be from 0 to 100, with up to 4 decimals"));
     }
 }

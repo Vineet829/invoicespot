@@ -76,8 +76,10 @@ class VoidIntegrationTest extends IntegrationTest {
         return JsonPath.read(
                 body(send(post("/api/v1/document/create"), """
                         {"customerId": "%s", "documentType": "%s", "currency": "USD", "draft": %s,
-                         "dueDate": "%s", "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
-                        """.formatted(client, type, draft, due, price)).andExpect(status().isOk())),
+                         "issueDate": "%s", "dueDate": "%s",
+                         "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
+                        """.formatted(client, type, draft, LocalDate.now(ZONE).minusDays(9), due, price))
+                        .andExpect(status().isOk())),
                 "$.newDocument._id");
     }
 

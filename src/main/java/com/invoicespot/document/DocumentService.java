@@ -5,6 +5,7 @@ import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.ExchangeRate;
 import com.invoicespot.common.Percentage;
+import com.invoicespot.common.Today;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.document.dto.ActivityEntry;
@@ -121,6 +122,7 @@ public class DocumentService {
         ZoneId zone = zoneOf(access.businessPkid());
         document.setIssueDate(issueDate(request.issueDate(), zone));
         document.setDueDate(takesDueDate(document) ? dueAt(request.dueDate(), zone) : null);
+        DocumentIssuer.requireDueFromIssue(document, zone);
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
         document.setShowPaymentDetails(!Boolean.FALSE.equals(request.showPaymentDetails()));
@@ -427,15 +429,23 @@ public class DocumentService {
         if (request.documentType() != null) {
             document.setDocumentType(documentType(request.documentType()));
         }
+        ZoneId zone = zoneOf(access.businessPkid());
+        // Only dates that change are checked, so a document saved due before
+        // its issue date still takes other changes.
+        LocalDate issuedOn = document.getIssueDate();
+        LocalDate dueOn = document.dueDay(zone);
         if (request.issueDate() != null) {
-            document.setIssueDate(issueDate(request.issueDate(), zoneOf(access.businessPkid())));
+            document.setIssueDate(issueDate(request.issueDate(), zone));
         }
-        Instant due = dueAt(request.dueDate(), zoneOf(access.businessPkid()));
+        Instant due = dueAt(request.dueDate(), zone);
         if (due != null) {
             document.setDueDate(due);
         }
         if (!takesDueDate(document)) {
             document.setDueDate(null);
+        }
+        if (!Objects.equals(document.getIssueDate(), issuedOn) || !Objects.equals(document.dueDay(zone), dueOn)) {
+            DocumentIssuer.requireDueFromIssue(document, zone);
         }
         if (request.additionalInfo() != null) {
             document.setAdditionalInfo(request.additionalInfo());
@@ -554,7 +564,8 @@ public class DocumentService {
     }
 
     // A new draft with the original's client and lines, due as the
-    // business's payment terms say from today. Payments stay behind.
+    // business's payment terms say from today, unless it is a receipt.
+    // Payments stay behind.
     private Document copyOf(Document original, DocumentType type, boolean linkSource, User author) {
         Long businessPkid = original.getBusiness().getPkid();
         BusinessSettings settings = settingsService.forBusiness(businessPkid);
@@ -568,8 +579,9 @@ public class DocumentService {
                 ? copyOf(original.getCustomerSnapshot())
                 : CustomerSnapshot.of(original.getCustomer()));
         copy.setDocumentType(type);
-        copy.setDueDate(Document.dueAt(
-                LocalDate.now(clock.withZone(zone)).plusDays(settings.getPaymentTermsDays()), zone));
+        copy.setDueDate(takesDueDate(copy)
+                ? Document.dueAt(LocalDate.now(clock.withZone(zone)).plusDays(settings.getPaymentTermsDays()), zone)
+                : null);
         copy.setAdditionalInfo(original.getAdditionalInfo());
         copy.setTermsConditions(original.getTermsConditions());
         copy.setShowPaymentDetails(original.isShowPaymentDetails());
@@ -670,7 +682,7 @@ public class DocumentService {
         payment.setReceiptNumber(document.getReceiptsNumbered());
         CustomerSnapshot customer = document.getCustomerSnapshot();
         payment.setPaidBy(customer == null ? null : customer.getName());
-        payment.setDatePaid(paymentDate(request.datePaid()));
+        payment.setDatePaid(paymentDate(request.datePaid(), document.getBusiness().getPkid()));
         Amounts amounts = paymentAmounts(request.amountPaid(), request.tdsAmount());
         payment.setAmountPaid(amounts.received());
         payment.setTdsAmount(amounts.withheld());
@@ -695,7 +707,7 @@ public class DocumentService {
         Document document = lockInBusiness(access, id);
         Payment payment = requirePayment(document, paymentId);
         if (request.datePaid() != null) {
-            payment.setDatePaid(paymentDate(request.datePaid()));
+            payment.setDatePaid(paymentDate(request.datePaid(), access.businessPkid()));
         }
         if (request.paymentMethod() != null) {
             payment.setPaymentMethod(paymentMethod(request.paymentMethod()));
@@ -986,17 +998,25 @@ public class DocumentService {
         return amount.setScale(2);
     }
 
-    private LocalDate paymentDate(String value) {
+    // The day a payment was made, today where the business is unless one is
+    // given. A day still to come everywhere is refused: money not received
+    // yet, such as a post-dated cheque, is recorded the day it comes in.
+    private LocalDate paymentDate(String value, Long businessPkid) {
         if (value == null || value.isBlank()) {
-            return LocalDate.now(clock);
+            return LocalDate.now(clock.withZone(zoneOf(businessPkid)));
         }
+        LocalDate day;
         try {
-            return value.length() == 10
+            day = value.length() == 10
                     ? LocalDate.parse(value)
                     : LocalDate.ofInstant(Instant.parse(value), ZoneOffset.UTC);
         } catch (DateTimeParseException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Enter the payment date as YYYY-MM-DD");
         }
+        if (day.isAfter(Today.latest(clock))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "A payment can't be dated after today");
+        }
+        return day;
     }
 
     // A due date comes as a day in the business's calendar, YYYY-MM-DD. A

@@ -58,10 +58,13 @@ class OverdueAlertsIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "Invoice", "currency": "USD",
+                                 "issueDate": "%s", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
                                 """.formatted(
-                                        (String) JsonPath.read(customer, "$.createdCustomer._id"), noon(due))))
+                                        (String) JsonPath.read(customer, "$.createdCustomer._id"),
+                                        today.minusDays(30),
+                                        noon(due))))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

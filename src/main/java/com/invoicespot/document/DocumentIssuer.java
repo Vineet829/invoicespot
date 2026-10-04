@@ -83,6 +83,7 @@ public class DocumentIssuer {
         if (document.getDocumentType() == DocumentType.INVOICE && document.getDueDate() == null) {
             document.setDueDate(Document.dueAt(issueDate.plusDays(settings.getPaymentTermsDays()), zone));
         }
+        requireDueFromIssue(document, zone);
         // A credit note keeps the supply of what it credits.
         boolean taxDocument = document.getDocumentType() != DocumentType.QUOTATION;
         if (document.getDocumentType() != DocumentType.CREDIT_NOTE) {
@@ -109,5 +110,18 @@ public class DocumentIssuer {
                 metrics.documentIssued(type);
             }
         });
+    }
+
+    // An invoice falls due, and a quotation stays valid, no earlier than the
+    // day it is dated. A draft not dated yet is checked as it is issued.
+    static void requireDueFromIssue(Document document, ZoneId zone) {
+        LocalDate due = document.dueDay(zone);
+        if (due != null && document.getIssueDate() != null && due.isBefore(document.getIssueDate())) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    document.getDocumentType() == DocumentType.QUOTATION
+                            ? "A quotation can't expire before its issue date"
+                            : "An invoice can't be due before its issue date");
+        }
     }
 }

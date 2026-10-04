@@ -22,7 +22,10 @@ public record UpdateSettingsRequest(
         @NotNull(message = "Enter a default tax rate")
                 @DecimalMin(value = "0", message = "The tax rate must be from 0 to 100")
                 @DecimalMax(value = "100", message = "The tax rate must be from 0 to 100")
-                @Digits(integer = 3, fraction = 4, message = "The tax rate can have at most 4 decimals")
+                @Digits(
+                        integer = 3,
+                        fraction = 4,
+                        message = "The tax rate must be from 0 to 100, with up to 4 decimals")
                 BigDecimal defaultTaxRate,
         @NotBlank(message = "Enter a name for your tax, such as VAT or GST")
                 @Size(max = 20, message = "The tax name can be at most 20 characters")

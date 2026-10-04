@@ -45,6 +45,14 @@ class CsvFileTest {
     }
 
     @Test
+    @DisplayName("text that starts with apostrophes ahead of a formula character gets one more, so it reads back")
+    void guardsApostrophes() {
+        CsvFile file = CsvFile.of("x.csv", List.of("A", "B", "C"), List.of(List.of("'+Acme", "''=x", "'90s")));
+
+        assertThat(text(file)).endsWith("''+Acme,'''=x,'90s\r\n");
+    }
+
+    @Test
     @DisplayName("downloads as an attachment that is never cached")
     void download() {
         ResponseEntity<byte[]> response = CsvFile.of("report.csv", List.of("A"), List.of()).download();

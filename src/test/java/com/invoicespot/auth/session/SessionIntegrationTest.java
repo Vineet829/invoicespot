@@ -209,6 +209,22 @@ class SessionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("the refresh cookie is Lax, so a form another site posts to sign someone out doesn't carry it")
+    void refreshCookieStaysOnSite() throws Exception {
+        User user = withPassword();
+
+        String cookie = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"%s\", \"password\": \"%s\"}".formatted(user.getEmail(), PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getHeader(HttpHeaders.SET_COOKIE);
+
+        assertThat(cookie).startsWith("jwt=").contains("SameSite=Lax");
+    }
+
+    @Test
     @DisplayName("a session that ran out can't be refreshed")
     void expired() throws Exception {
         User user = withPassword();

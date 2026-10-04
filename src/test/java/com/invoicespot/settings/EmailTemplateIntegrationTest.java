@@ -1,5 +1,6 @@
 package com.invoicespot.settings;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -11,20 +12,45 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRole;
+import com.invoicespot.settings.dto.EmailTemplateRequest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class EmailTemplateIntegrationTest extends IntegrationTest {
 
     private static final String TEMPLATES = "/api/v1/settings/email-templates";
+
+    @Autowired
+    private EmailTemplateService templateService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private EmailTemplateRepository templateRepository;
 
     private User owner;
 
@@ -185,5 +211,91 @@ class EmailTemplateIntegrationTest extends IntegrationTest {
                 .andExpect(status().isNotFound());
         preview(bearer(owner), "STATEMENT", "{\"subject\": \"{document}\", \"body\": \"{amount}\"}")
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("two first saves of a kind of email at once both save, the later one last")
+    void firstSavesTakeTurns() throws Exception {
+        BusinessAccess access = access();
+
+        whileHeld(
+                        () -> templateService.save(access, "INVOICE", new EmailTemplateRequest("Held", "A note")),
+                        () -> save(bearer(owner), "INVOICE", "{\"subject\": \"Mine\", \"body\": \"A note\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(invoiceSubjects(access)).containsExactly("Mine");
+    }
+
+    @Test
+    @DisplayName("a kind of email saved while it is reset is saved")
+    void saveWhileReset() throws Exception {
+        BusinessAccess access = access();
+        save(bearer(owner), "INVOICE", "{\"subject\": \"First\", \"body\": \"A note\"}")
+                .andExpect(status().isOk());
+
+        whileHeld(
+                        () -> {
+                            templateService.reset(access, "INVOICE");
+                            templateRepository.flush();
+                        },
+                        () -> save(bearer(owner), "INVOICE", "{\"subject\": \"Mine\", \"body\": \"A note\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(invoiceSubjects(access)).containsExactly("Mine");
+    }
+
+    private BusinessAccess access() {
+        Business business = businessOf(owner);
+        return new BusinessAccess(business.getPkid(), business.getId(), BusinessRole.OWNER, owner);
+    }
+
+    private List<String> invoiceSubjects(BusinessAccess access) {
+        return jdbc.queryForList(
+                "select subject from email_templates where business_pkid = ? and kind = 'INVOICE'",
+                String.class,
+                access.businessPkid());
+    }
+
+    // Sends the request while a transaction of the test's own does `holding`
+    // and stays open, and lets it commit once something waits for it.
+    private ResultActions whileHeld(Runnable holding, Callable<ResultActions> request) throws Exception {
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        try {
+            Future<?> holder = pool.submit(() -> transaction.executeWithoutResult(tx -> {
+                holding.run();
+                held.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            if (!held.await(30, TimeUnit.SECONDS)) {
+                holder.get(1, TimeUnit.SECONDS);
+                throw new AssertionError("Nothing was ever held");
+            }
+            Future<ResultActions> sent = pool.submit(request);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (!sent.isDone() && waitingForLocks() == 0 && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            release.countDown();
+            holder.get(30, TimeUnit.SECONDS);
+            return sent.get(30, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    // How many connections to the test's database wait for a lock.
+    private int waitingForLocks() {
+        return jdbc.queryForObject(
+                "select count(*) from pg_stat_activity"
+                        + " where datname = current_database() and wait_event_type = 'Lock'",
+                Integer.class);
     }
 }

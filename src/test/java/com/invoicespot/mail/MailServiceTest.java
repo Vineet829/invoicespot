@@ -97,10 +97,10 @@ class MailServiceTest {
     void failureLoggedOnOneLine(CapturedOutput output) {
         doThrow(new MailSendException("The mail server is down")).when(mailSender).send(any(SimpleMailMessage.class));
 
-        mailService.send("ada@example.test", "You now own Acme\nERROR c.i.auth.SignIn : forged", "Hello");
+        mailService.send("ada@example.test", "You now own Acme\nERROR c.i.auth.SignIn : made up", "Hello");
 
         assertThat(output.getOut() + output.getErr())
-                .contains("Failed to send \"You now own Acme ERROR c.i.auth.SignIn : forged\" to ada@example.test")
+                .contains("Failed to send \"You now own Acme ERROR c.i.auth.SignIn : made up\" to ada@example.test")
                 .doesNotContain("Acme\nERROR");
     }
 

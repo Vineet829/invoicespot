@@ -73,9 +73,9 @@ class UploadServiceTest {
     @DisplayName("a page sent as an image is refused, whatever its name and type say")
     void refusesDisguisedPages(@TempDir Path dir) {
         UploadService service = serviceFor(dir);
-        byte[] page = "<html><script>alert(document.cookie)</script></html>".getBytes();
+        byte[] page = "<html><p>Not an image</p></html>".getBytes();
 
-        for (String name : new String[] {"evil.html", "evil.png", "evil.svg"}) {
+        for (String name : new String[] {"page.html", "page.png", "page.svg"}) {
             assertThatThrownBy(() -> service.store(new MockMultipartFile("logo", name, "image/png", page)))
                     .isInstanceOf(ApiException.class)
                     .hasMessage("Logos can be PNG, JPEG or GIF images");
@@ -88,7 +88,7 @@ class UploadServiceTest {
     void namesByContent(@TempDir Path dir) {
         UploadService service = serviceFor(dir);
 
-        assertThat(service.store(new MockMultipartFile("logo", "evil.html", "text/html", PNG))).endsWith(".png");
+        assertThat(service.store(new MockMultipartFile("logo", "page.html", "text/html", PNG))).endsWith(".png");
         assertThat(service.store(new MockMultipartFile("logo", "photo", "image/png", JPEG))).endsWith(".jpg");
         assertThat(service.store(new MockMultipartFile("logo", "anim.png", "image/gif", GIF))).endsWith(".gif");
         assertThatThrownBy(() -> service.store(new MockMultipartFile("logo", "logo.webp", "image/webp", WEBP)))

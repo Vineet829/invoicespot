@@ -47,7 +47,8 @@ class CustomerAccountIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "currency": "%s", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "currency": "%s",
+                                 "issueDate": "2026-01-15", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": %d, "quantity": 1}]}
                                 """.formatted(customerId, type, currency, dueDate, price)))
                 .andReturn()

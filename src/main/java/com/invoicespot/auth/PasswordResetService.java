@@ -4,6 +4,7 @@ import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.dto.ResetPasswordRequest;
 import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -68,11 +69,10 @@ public class PasswordResetService {
     private void sendResetLink(User user) {
         String token = tokenService.issue(user);
         String link = site.clientUrl() + "/auth/reset_password?emailToken=" + token + "&userId=" + user.getId();
-        mailService.send(
-                user.getEmail(),
-                "Password Reset Request",
-                "Hello " + user.getFirstName() + ", use this link to reset your " + site.name() + " password: "
-                        + link);
+        String to = user.getEmail();
+        String body = "Hello " + user.getFirstName() + ", use this link to reset your " + site.name() + " password: "
+                + link;
+        AfterCommit.run(() -> mailService.send(to, "Password Reset Request", body));
     }
 
     @Transactional
@@ -105,14 +105,13 @@ public class PasswordResetService {
         tokenService.revokeAll(user);
         auditLog.record(AuditEventType.PASSWORD_RESET, user);
 
-        mailService.send(
-                user.getEmail(),
-                "Password Reset Success",
-                "Hello "
-                        + user.getFirstName()
-                        + ", your "
-                        + site.name()
-                        + " password was reset successfully.");
+        String to = user.getEmail();
+        String body = "Hello "
+                + user.getFirstName()
+                + ", your "
+                + site.name()
+                + " password was reset successfully.";
+        AfterCommit.run(() -> mailService.send(to, "Password Reset Success", body));
         return "Hey "
                 + user.getFirstName()
                 + ",Your password reset was successful. An email has been sent to confirm the same";

@@ -60,9 +60,10 @@ class TaxWithheldIntegrationTest extends IntegrationTest {
                 .toString();
         return JsonPath.read(
                 body(send(post("/api/v1/document/create"), """
-                        {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "dueDate": "%s",
-                         "billingItems": [{"itemName": "Work", "unitPrice": 1000, "quantity": 1}]}
-                        """.formatted(client, due)).andExpect(status().isOk())),
+                        {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "issueDate": "%s",
+                         "dueDate": "%s", "billingItems": [{"itemName": "Work", "unitPrice": 1000, "quantity": 1}]}
+                        """.formatted(client, LocalDate.now(ZoneOffset.UTC).minusDays(9), due))
+                        .andExpect(status().isOk())),
                 "$.newDocument._id");
     }
 

@@ -1,6 +1,7 @@
 package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -96,6 +97,17 @@ class PaymentReceiptIntegrationTest extends IntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getHeader(HttpHeaders.CONTENT_DISPOSITION);
+    }
+
+    @Test
+    @DisplayName("each payment says its receipt's number, which isn't its place among the payments by date")
+    void numberListed() throws Exception {
+        User owner = createUser();
+        Paid paid = paidInvoice(owner);
+
+        mockMvc.perform(get("/api/v1/document/{id}", paid.document()).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.document.paymentRecords[*].receiptNumber", contains(2, 1)));
+        assertThat(receiptName(owner, paid, paid.payments().get(0))).contains("Receipt-INV-0001-P2.pdf");
     }
 
     @Test

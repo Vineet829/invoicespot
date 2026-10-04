@@ -7,18 +7,40 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.business.Business;
+import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRole;
 import com.invoicespot.user.User;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class CustomerImportIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private CustomerImport customerImport;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private User owner;
     private String tag;
@@ -102,6 +124,12 @@ class CustomerImportIntegrationTest extends IntegrationTest {
     @DisplayName("a clients file exported from the app imports as it is")
     void roundTrip() throws Exception {
         send("import", owner, file()).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/customer/create")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"'+Acme\", \"email\": \"acme-%s@clients.test\", \"phoneNumber\": \"+1\"}"
+                                .formatted(tag)))
+                .andExpect(status().isOk());
         byte[] exported = mockMvc.perform(get("/api/v1/customer/csv").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andReturn()
                 .getResponse()
@@ -109,17 +137,32 @@ class CustomerImportIntegrationTest extends IntegrationTest {
 
         User other = createUser();
         send("import", other, exported)
-                .andExpect(jsonPath("$.message").value("3 clients added"));
+                .andExpect(jsonPath("$.message").value("4 clients added"));
         clients(other)
-                .andExpect(jsonPath("$.totalCustomers").value(3))
+                .andExpect(jsonPath("$.totalCustomers").value(4))
                 .andExpect(jsonPath("$.myCustomers[?(@.name == 'Oak Street, Ltd')].phoneNumber")
-                        .value("+44 20 7946 0958"));
+                        .value("+44 20 7946 0958"))
+                .andExpect(jsonPath("$.myCustomers[?(@.email == 'acme-%s@clients.test')].name", tag)
+                        .value("'+Acme"));
     }
 
     @Test
     @DisplayName("semicolon files are read; unreadable, empty, headless and oversized files are refused")
     void files() throws Exception {
         send("import/preview", owner, "Name;Email;Phone\nAcme;acme-%s@x.test;+1\n".formatted(tag).getBytes())
+                .andExpect(jsonPath("$.ready").value(1));
+        // A heading may hold the other separator, quoted or not.
+        send("import/preview", owner, "Name;Email;Phone;Tel, Fax, Mobile, Pager\nAcme;acme-%s@x.test;+1;\n"
+                        .formatted(tag)
+                        .getBytes())
+                .andExpect(jsonPath("$.ready").value(1));
+        send("import/preview", owner, "Name;Email;Phone;\"Notes (work, home, fax, other)\"\nAcme;acme-%s@x.test;+1;\n"
+                        .formatted(tag)
+                        .getBytes())
+                .andExpect(jsonPath("$.ready").value(1));
+        send("import/preview", owner, "Name,Email,Phone,\"Notes; misc; other; more; extra\"\nAcme,acme-%s@x.test,+1,\n"
+                        .formatted(tag)
+                        .getBytes())
                 .andExpect(jsonPath("$.ready").value(1));
         send("import/preview", owner, "Company,Mail\nAcme,acme@x.test\n".getBytes())
                 .andExpect(status().isBadRequest())
@@ -138,5 +181,72 @@ class CustomerImportIntegrationTest extends IntegrationTest {
         send("import/preview", owner, many.toString().getBytes())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Import at most 1,000 clients at a time"));
+    }
+
+    @Test
+    @DisplayName("an import sent while another is adding clients waits for it, then skips the clients it added")
+    void importsTakeTurns() throws Exception {
+        Business business = businessOf(owner);
+        BusinessAccess access = new BusinessAccess(business.getPkid(), business.getId(), BusinessRole.OWNER, owner);
+        String first = "first-" + tag + "@clients.test";
+        String second = "second-" + tag + "@clients.test";
+        String third = "third-" + tag + "@clients.test";
+
+        whileImporting(access, csvOf(first, second), () -> send("import", owner, csvOf(second, first, third)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("1 client added, 2 skipped"));
+    }
+
+    // A file with a client for each email.
+    private static byte[] csvOf(String... emails) {
+        StringBuilder text = new StringBuilder("Name,Email,Phone\r\n");
+        for (String email : emails) {
+            text.append(email, 0, email.indexOf('@')).append(',').append(email).append(",+1\r\n");
+        }
+        return text.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    // Sends the request while a transaction of the test's own imports `held`
+    // and stays open, and lets that import commit once something waits for it.
+    private ResultActions whileImporting(BusinessAccess access, byte[] held, Callable<ResultActions> request)
+            throws Exception {
+        CountDownLatch imported = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        try {
+            Future<?> holder = pool.submit(() -> transaction.executeWithoutResult(tx -> {
+                customerImport.importAll(access, new MockMultipartFile("file", "clients.csv", "text/csv", held));
+                imported.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            if (!imported.await(30, TimeUnit.SECONDS)) {
+                holder.get(1, TimeUnit.SECONDS);
+                throw new AssertionError("The held import never ran");
+            }
+            Future<ResultActions> sent = pool.submit(request);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (!sent.isDone() && waitingForLocks() == 0 && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            release.countDown();
+            holder.get(30, TimeUnit.SECONDS);
+            return sent.get(30, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    // How many connections to the test's database wait for a lock.
+    private int waitingForLocks() {
+        return jdbc.queryForObject(
+                "select count(*) from pg_stat_activity"
+                        + " where datname = current_database() and wait_event_type = 'Lock'",
+                Integer.class);
     }
 }

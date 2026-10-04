@@ -16,6 +16,8 @@ public record PaymentRecordDto(
         BigDecimal tdsAmount,
         PaymentMethod paymentMethod,
         String additionalInfo,
+        // The number its receipt carries, kept from when it was recorded.
+        int receiptNumber,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -28,6 +30,7 @@ public record PaymentRecordDto(
                 payment.getTdsAmount(),
                 payment.getPaymentMethod(),
                 payment.getAdditionalInfo(),
+                payment.getReceiptNumber(),
                 payment.getCreatedAt(),
                 payment.getUpdatedAt());
     }

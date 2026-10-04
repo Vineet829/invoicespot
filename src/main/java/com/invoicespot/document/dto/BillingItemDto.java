@@ -12,11 +12,17 @@ public record BillingItemDto(
                 @Size(max = 255, message = "Item names can be at most 255 characters")
                 String itemName,
         @DecimalMin(value = "0", message = "Unit prices can't be negative")
-                @Digits(integer = 15, fraction = 4, message = "Unit prices can have at most 4 decimals")
+                @Digits(
+                        integer = 15,
+                        fraction = 4,
+                        message = "Unit prices can have at most 15 whole digits and 4 decimals")
                 BigDecimal unitPrice,
         @DecimalMin(value = "0", message = "Quantities can't be negative")
                 @DecimalMax(value = "1000000", message = "Quantities can be at most 1,000,000")
-                @Digits(integer = 7, fraction = 4, message = "Quantities can have at most 4 decimals")
+                @Digits(
+                        integer = 7,
+                        fraction = 4,
+                        message = "Quantities can be at most 1,000,000, with up to 4 decimals")
                 BigDecimal quantity,
         String discount,
         @Size(max = 20, message = "Units can be at most 20 characters") String unit,

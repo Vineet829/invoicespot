@@ -2,6 +2,9 @@ package com.invoicespot.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,7 +46,10 @@ import org.springframework.http.MediaType;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 // Google sign-in end to end, against a stand-in for Google. The start sets a
 // signed cookie and sends the browser to Google with PKCE; the callback
@@ -65,6 +71,12 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private OAuthAccounts accounts;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private record Started(Cookie cookie, String setCookie, Map<String, String> query) {}
 
@@ -223,6 +235,33 @@ class OAuthGoogleSignInIntegrationTest extends IntegrationTest {
                             .contains("If that wasn't you, reply to this email right away.")
                             .doesNotContain("reset_password");
                 });
+    }
+
+    @Test
+    @DisplayName("a link that rolls back tells nobody; saved, the account's owner is told")
+    void linkRolledBack() {
+        User existing = createUser();
+        ProviderProfile profile = new ProviderProfile(
+                SignInProvider.GOOGLE, "google-" + UUID.randomUUID(), existing.getEmail(), true, true, "Ada",
+                "Lovelace", "ada");
+
+        // A link is saved in a transaction of its own, which the bean's proxy
+        // starts. The bean itself links inside the test's instead, which rolls
+        // back, as one does when saving it fails at the very end.
+        OAuthAccounts unproxied = AopTestUtils.getTargetObject(accounts);
+        new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> {
+            unproxied.identityFor(profile, "With Google");
+            transaction.setRollbackOnly();
+        });
+        verify(mailSender, after(1000).never()).send(any(SimpleMailMessage.class));
+        assertThat(identities.findAll())
+                .noneMatch(identity -> identity.getUser().getPkid().equals(existing.getPkid()));
+
+        accounts.identityFor(profile, "With Google");
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, timeout(2000)).send(mail.capture());
+        assertThat(mail.getValue().getTo()).containsExactly(existing.getEmail());
+        assertThat(mail.getValue().getSubject()).isEqualTo("Google sign-in was added to your Invoice Spot account");
     }
 
     @Test

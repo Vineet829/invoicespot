@@ -5,6 +5,7 @@ import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.CsvFile;
 import com.invoicespot.common.ExchangeRate;
+import com.invoicespot.common.Today;
 import com.invoicespot.document.PaymentMethod;
 import com.invoicespot.expense.dto.ExpenseListResponse;
 import com.invoicespot.expense.dto.ExpenseRequest;
@@ -77,7 +78,7 @@ public class ExpenseService {
         Expense expense = new Expense();
         expense.setBusiness(businessRepository.getReferenceById(access.businessPkid()));
         expense.setRecordedBy(userRepository.getReferenceById(access.userPkid()));
-        expense.setExpenseDate(request.date());
+        expense.setExpenseDate(paidOn(request.date()));
         expense.setVendor(blankToNull(request.vendor()));
         expense.setCategory(category(access.businessPkid(), request.category(), 0));
         expense.setAmount(request.amount().setScale(2));
@@ -98,7 +99,7 @@ public class ExpenseService {
     public ExpenseResponse update(BusinessAccess access, String id, ExpenseRequest request) {
         Expense expense = requireInBusiness(access, id);
         if (request.date() != null) {
-            expense.setExpenseDate(request.date());
+            expense.setExpenseDate(paidOn(request.date()));
         }
         if (request.vendor() != null) {
             expense.setVendor(blankToNull(request.vendor()));
@@ -165,6 +166,15 @@ public class ExpenseService {
                                 expense.getReference(),
                                 expense.getNotes()))
                         .toList());
+    }
+
+    // The day an expense was paid, which can't be a day still to come
+    // everywhere.
+    private LocalDate paidOn(LocalDate date) {
+        if (date.isAfter(Today.latest(clock))) {
+            throw badRequest("An expense can't be dated after today");
+        }
+        return date;
     }
 
     // A category typed in another letter case than the business's other

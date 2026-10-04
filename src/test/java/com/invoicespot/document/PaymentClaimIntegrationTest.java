@@ -150,7 +150,8 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a report that can't be right is refused: too much, after today, a reference twice, a fourth waiting")
+    @DisplayName("a report that can't be right is refused: too much, with too many decimals, after today, a reference"
+            + " twice, a fourth waiting")
     void refused() throws Exception {
         Shared invoice = invoice();
 
@@ -160,6 +161,9 @@ class PaymentClaimIntegrationTest extends IntegrationTest {
         report(invoice, reported("50", today.plusDays(1), "UPI", null))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("The day you paid can't be after today"));
+        report(invoice, reported("1.234", today, "UPI", null))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Enter the amount with at most 15 whole digits and 2 decimals"));
         report(invoice, reported("50", today, "CARD", null))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Choose how you paid"));

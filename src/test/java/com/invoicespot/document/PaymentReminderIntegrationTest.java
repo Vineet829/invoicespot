@@ -43,7 +43,8 @@ class PaymentReminderIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "%s", "currency": "USD", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "%s", "currency": "USD",
+                                 "issueDate": "2026-01-15", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
                                 """.formatted(
                                         (String) JsonPath.read(customer, "$.createdCustomer._id"), type, dueDate)))

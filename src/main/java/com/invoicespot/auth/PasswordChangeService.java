@@ -4,6 +4,7 @@ import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.dto.ChangePasswordRequest;
 import com.invoicespot.auth.session.SessionService;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -89,14 +90,14 @@ public class PasswordChangeService {
         user.setPasswordChangedAt(clock.instant());
         sessionService.endOthers(user, currentSession);
         auditLog.record(AuditEventType.PASSWORD_CHANGED, user);
-        mailService.send(
-                user.getEmail(),
-                "Your " + site.name() + " password was changed",
-                "Hello " + user.getFirstName() + ",\n\n"
-                        + "The password of your " + site.name() + " account was just changed, and every other"
-                        + " device signed in to it was signed out.\n\n"
-                        + "If you didn't change it, reset it now at " + site.clientUrl()
-                        + "/reset_password_request and check the devices signed in to your account.");
+        String to = user.getEmail();
+        String subject = "Your " + site.name() + " password was changed";
+        String body = "Hello " + user.getFirstName() + ",\n\n"
+                + "The password of your " + site.name() + " account was just changed, and every other"
+                + " device signed in to it was signed out.\n\n"
+                + "If you didn't change it, reset it now at " + site.clientUrl()
+                + "/reset_password_request and check the devices signed in to your account.";
+        AfterCommit.run(() -> mailService.send(to, subject, body));
         return jwtService.issueAccessToken(user, currentSession);
     }
 }

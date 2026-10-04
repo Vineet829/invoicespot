@@ -1,11 +1,14 @@
 package com.invoicespot.document;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Today;
 import com.invoicespot.document.dto.RefundRequest;
+import com.invoicespot.settings.SettingsService;
 import com.invoicespot.user.User;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,11 +25,17 @@ public class RefundService {
 
     private final DocumentRepository documentRepository;
     private final DocumentActivity activity;
+    private final SettingsService settingsService;
     private final Clock clock;
 
-    public RefundService(DocumentRepository documentRepository, DocumentActivity activity, Clock clock) {
+    public RefundService(
+            DocumentRepository documentRepository,
+            DocumentActivity activity,
+            SettingsService settingsService,
+            Clock clock) {
         this.documentRepository = documentRepository;
         this.activity = activity;
+        this.settingsService = settingsService;
         this.clock = clock;
     }
 
@@ -40,7 +49,7 @@ public class RefundService {
         requireDue(document, amount);
         Refund refund = new Refund();
         refund.setDocument(document);
-        refund.setDateRefunded(date(request.dateRefunded()));
+        refund.setDateRefunded(date(request.dateRefunded(), document));
         refund.setAmount(amount);
         refund.setPaymentMethod(method(request.paymentMethod()));
         refund.setReference(blankToNull(request.reference()));
@@ -59,7 +68,7 @@ public class RefundService {
             refund.setAmount(amount);
         }
         if (request.dateRefunded() != null) {
-            refund.setDateRefunded(date(request.dateRefunded()));
+            refund.setDateRefunded(date(request.dateRefunded(), document));
         }
         if (request.paymentMethod() != null) {
             refund.setPaymentMethod(method(request.paymentMethod()));
@@ -144,15 +153,23 @@ public class RefundService {
         return amount.setScale(2);
     }
 
-    private LocalDate date(String value) {
+    // The day money was paid back, today where the business is unless one is
+    // given, and never a day still to come everywhere.
+    private LocalDate date(String value, Document document) {
         if (value == null || value.isBlank()) {
-            return LocalDate.now(clock);
+            return LocalDate.now(clock.withZone(
+                    ZoneId.of(settingsService.forBusiness(document.getBusiness().getPkid()).getTimeZone())));
         }
+        LocalDate day;
         try {
-            return LocalDate.parse(value.length() > 10 ? value.substring(0, 10) : value);
+            day = LocalDate.parse(value.length() > 10 ? value.substring(0, 10) : value);
         } catch (DateTimeParseException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Enter the refund date as YYYY-MM-DD");
         }
+        if (day.isAfter(Today.latest(clock))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "A refund can't be dated after today");
+        }
+        return day;
     }
 
     private static PaymentMethod method(String value) {

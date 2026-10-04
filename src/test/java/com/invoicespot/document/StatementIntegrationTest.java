@@ -38,12 +38,14 @@ class StatementIntegrationTest extends IntegrationTest {
                 .getContentAsString();
         String id = JsonPath.read(body, "$.createdCustomer._id");
         mockMvc.perform(post("/api/v1/document/create")
-                .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"customerId": "%s", "documentType": "Invoice", "dueDate": "2026-01-15T12:00:00Z",
-                         "billingItems": [{"itemName": "Work", "unitPrice": 120, "quantity": 1}]}
-                        """.formatted(id)));
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"customerId": "%s", "documentType": "Invoice", "issueDate": "2026-01-15",
+                                 "dueDate": "2026-01-15T12:00:00Z",
+                                 "billingItems": [{"itemName": "Work", "unitPrice": 120, "quantity": 1}]}
+                                """.formatted(id)))
+                .andExpect(status().isOk());
         return id;
     }
 

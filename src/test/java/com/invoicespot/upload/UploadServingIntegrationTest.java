@@ -40,7 +40,7 @@ class UploadServingIntegrationTest extends IntegrationTest {
         Path dir = Path.of(properties.upload().dir());
         Files.createDirectories(dir);
         image = Files.write(dir.resolve(UUID.randomUUID() + ".png"), PNG);
-        page = Files.writeString(dir.resolve(UUID.randomUUID() + ".html"), "<script>alert(1)</script>");
+        page = Files.writeString(dir.resolve(UUID.randomUUID() + ".html"), "<p>Not an image</p>");
     }
 
     @AfterEach
@@ -77,7 +77,7 @@ class UploadServingIntegrationTest extends IntegrationTest {
     @DisplayName("an upload is refused when its bytes aren't a PNG, JPEG or GIF image")
     void refusesPagesSentAsImages() throws Exception {
         MockMultipartFile page = new MockMultipartFile(
-                "logo", "evil.html", "image/png", "<script>alert(1)</script>".getBytes());
+                "logo", "page.html", "image/png", "<p>Not an image</p>".getBytes());
         mockMvc.perform(multipart(HttpMethod.PATCH, "/api/v1/upload")
                         .file(page)
                         .header(HttpHeaders.AUTHORIZATION, bearer(createUser())))

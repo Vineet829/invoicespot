@@ -41,7 +41,7 @@ class DemoAccountIntegrationTest extends IntegrationTest {
         mockMvc.perform(patch("/api/v1/user/profile")
                         .header(HttpHeaders.AUTHORIZATION, bearer(demo))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firstName\": \"Hijacked\"}"))
+                        .content("{\"firstName\": \"Renamed\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message")
                         .value("This is a shared demo account, so changing its profile is turned off"));

@@ -78,10 +78,12 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "dueDate": "%s",
+                                {"customerId": "%s", "documentType": "Invoice", "currency": "USD",
+                                 "issueDate": "%s", "dueDate": "%s",
                                  "billingItems": [{"itemName": "Work", "unitPrice": 100, "quantity": 1}]}
                                 """.formatted(
                                         (String) JsonPath.read(customer, "$.createdCustomer._id"),
+                                        due.isBefore(today) ? due : today,
                                         due.atTime(12, 0).toInstant(ZoneOffset.UTC))))
                 .andReturn()
                 .getResponse()
@@ -118,7 +120,8 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
         Invoice soon = invoice(owner, today.plusDays(3));
         Invoice dueToday = invoice(owner, today);
         Invoice weekLate = invoice(owner, today.minusDays(7));
-        Invoice threeDaysLate = invoice(owner, today.minusDays(3));
+        // Issued today and due tomorrow, so its reminder three days before fell before it was issued.
+        Invoice issuedLate = invoice(owner, today.plusDays(1));
         Invoice paid = invoice(owner, today);
         mockMvc.perform(post("/api/v1/document/{id}/payment", paid.id())
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -132,11 +135,11 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
 
         assertThat(recipients())
                 .contains(soon.email(), dueToday.email(), weekLate.email())
-                .doesNotContain(threeDaysLate.email(), paid.email(), notTurnedOn.email());
+                .doesNotContain(issuedLate.email(), paid.email(), notTurnedOn.email());
         for (Invoice reminded : List.of(soon, dueToday, weekLate)) {
             assertThat(remindersSent(owner, reminded)).isEqualTo(1);
         }
-        assertThat(remindersSent(owner, threeDaysLate)).isZero();
+        assertThat(remindersSent(owner, issuedLate)).isZero();
         mockMvc.perform(get("/api/v1/document/{id}/activity", dueToday.id())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.events[0].type").value("REMINDED"))

@@ -49,7 +49,8 @@ class DocumentCopyIntegrationTest extends IntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"customerId": "%s", "documentType": "%s", "currency": "EUR", "rates": "10",
-                                 "additionalInfo": "Thanks", "dueDate": "2026-01-15T12:00:00Z", "draft": %s,
+                                 "additionalInfo": "Thanks", "issueDate": "2026-01-15",
+                                 "dueDate": "2026-01-15T12:00:00Z", "draft": %s,
                                  "billingItems": [{"itemName": "Design", "unitPrice": 200, "quantity": 2,
                                                    "discount": "5"}]}
                                 """.formatted(client, type, draft)))

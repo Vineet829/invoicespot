@@ -3,6 +3,7 @@ package com.invoicespot.customer;
 import static java.util.Map.entry;
 
 import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
 import com.invoicespot.customer.dto.ImportPreviewResponse;
@@ -20,10 +21,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -67,16 +70,21 @@ public class CustomerImport {
             entry("address", "address"),
             entry("city", "city"),
             entry("country", "country"));
-    private static final String FORMULA_STARTS = "=+-@\t\r";
+    private static final Pattern GUARD = Pattern.compile("'+[=+\\-@\t\r]");
 
     private final CustomerRepository customerRepository;
     private final CustomerService customerService;
+    private final BusinessRepository businessRepository;
     private final Validator validator;
 
     public CustomerImport(
-            CustomerRepository customerRepository, CustomerService customerService, Validator validator) {
+            CustomerRepository customerRepository,
+            CustomerService customerService,
+            BusinessRepository businessRepository,
+            Validator validator) {
         this.customerRepository = customerRepository;
         this.customerService = customerService;
+        this.businessRepository = businessRepository;
         this.validator = validator;
     }
 
@@ -87,9 +95,13 @@ public class CustomerImport {
     }
 
     // Adds every row that is ready and skips the rest; nothing is added when
-    // no row is ready.
+    // no row is ready. Imports into one business take turns, so two at once
+    // never each wait for a client the other is adding.
     @Transactional
     public ImportResultResponse importAll(BusinessAccess access, MultipartFile file) {
+        businessRepository
+                .findForUpdate(access.businessPkid())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
         List<ImportRow> rows = read(access.businessPkid(), file);
         List<ImportRow> ready = rows.stream().filter(ImportRow::ready).toList();
         if (ready.isEmpty()) {
@@ -122,7 +134,7 @@ public class CustomerImport {
             throw new ApiException(HttpStatus.BAD_REQUEST, "The file is empty");
         }
         Map<String, Integer> columns = columns(records.get(0));
-        if (!columns.containsKey("name") || !columns.containsKey("email")) {
+        if (!named(columns)) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST, "The first row must name the columns, with at least Name and Email");
         }
@@ -209,13 +221,14 @@ public class CustomerImport {
     }
 
     // A cell as typed: trimmed, empty as missing, and without the apostrophe
-    // an export puts before text a spreadsheet would read as a formula.
+    // an export puts before text a spreadsheet would read as a formula, and
+    // before text already starting with apostrophes ahead of such a character.
     private static String cell(CSVRecord record, int index) {
         if (index >= record.size()) {
             return null;
         }
         String value = record.get(index).trim();
-        if (value.length() > 1 && value.charAt(0) == '\'' && FORMULA_STARTS.indexOf(value.charAt(1)) >= 0) {
+        if (GUARD.matcher(value).lookingAt()) {
             value = value.substring(1);
         }
         return value.isEmpty() ? null : value;
@@ -225,13 +238,21 @@ public class CustomerImport {
         return record.stream().allMatch(String::isBlank);
     }
 
-    // Spreadsheets set to a comma for decimals save with semicolons.
+    // Spreadsheets set to a comma for decimals save with semicolons. A file is
+    // read with semicolons when its first row, split at them, names the
+    // columns; counting the characters can't tell, as a heading may hold either.
     private static char delimiter(String text) {
-        String header = text.lines().findFirst().orElse("");
-        return header.chars().filter(character -> character == ';').count()
-                        > header.chars().filter(character -> character == ',').count()
-                ? ';'
-                : ',';
+        try (CSVParser parser = CSVParser.parse(text, CSVFormat.RFC4180.builder().setDelimiter(';').get())) {
+            Iterator<CSVRecord> records = parser.iterator();
+            return records.hasNext() && named(columns(records.next())) ? ';' : ',';
+        } catch (IOException | UncheckedIOException | IllegalStateException exception) {
+            return ',';
+        }
+    }
+
+    // Whether a first row names at least the Name and Email columns.
+    private static boolean named(Map<String, Integer> columns) {
+        return columns.containsKey("name") && columns.containsKey("email");
     }
 
     private static String decode(MultipartFile file) {

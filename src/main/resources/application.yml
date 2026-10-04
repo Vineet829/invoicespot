@@ -80,10 +80,13 @@ app:
   # bytes, base64.
   encryption:
     key: ${APP_ENCRYPTION_KEY:}
+  # The client and the API share one origin (nginx, or the dev server's
+  # proxy), so the refresh cookie can stay Lax: a form another site posts,
+  # such as one signing someone out, doesn't carry it.
   cookie:
     refresh-name: jwt
     path: /
-    same-site: None
+    same-site: Lax
     secure: ${COOKIE_SECURE:true}
   site:
     name: ${SITE_NAME:Invoice Spot}

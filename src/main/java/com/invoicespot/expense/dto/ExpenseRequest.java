@@ -15,10 +15,13 @@ public record ExpenseRequest(
         @Size(max = 255, message = "Vendor names can be at most 255 characters") String vendor,
         @Size(max = 60, message = "Categories can be at most 60 characters") String category,
         @DecimalMin(value = "0", inclusive = false, message = "Enter an amount greater than zero")
-                @Digits(integer = 15, fraction = 2, message = "Amounts can have at most 2 decimals")
+                @Digits(integer = 15, fraction = 2, message = "Amounts can have at most 15 whole digits and 2 decimals")
                 BigDecimal amount,
         @DecimalMin(value = "0", message = "Tax paid can't be negative")
-                @Digits(integer = 15, fraction = 2, message = "Tax paid can have at most 2 decimals")
+                @Digits(
+                        integer = 15,
+                        fraction = 2,
+                        message = "Tax paid can have at most 15 whole digits and 2 decimals")
                 BigDecimal taxAmount,
         Boolean taxReclaimable,
         @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a three-letter code such as USD")

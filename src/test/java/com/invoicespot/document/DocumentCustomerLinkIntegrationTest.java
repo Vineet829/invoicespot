@@ -48,7 +48,7 @@ class DocumentCustomerLinkIntegrationTest extends IntegrationTest {
         String customerId = createCustomer(owner, "Northwind");
 
         createDocument(owner, """
-                        "customerId": "%s", "customer": {"name": "Someone Else", "email": "forged@x.test"}
+                        "customerId": "%s", "customer": {"name": "Someone Else", "email": "other@x.test"}
                         """.formatted(customerId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.newDocument.customerId").value(customerId))

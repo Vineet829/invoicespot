@@ -2,6 +2,7 @@ package com.invoicespot.auth;
 
 import com.invoicespot.auth.dto.RegisterRequest;
 import com.invoicespot.business.BusinessService;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
@@ -103,16 +104,15 @@ public class RegistrationService {
         userRepository.save(user);
         tokenService.consume(verificationToken);
 
-        mailService.send(
-                user.getEmail(),
-                "Welcome - Account Verified",
-                "Hello "
-                        + user.getFirstName()
-                        + ", your "
-                        + site.name()
-                        + " account is now verified. You can log in at "
-                        + site.clientUrl()
-                        + "/login");
+        String to = user.getEmail();
+        String body = "Hello "
+                + user.getFirstName()
+                + ", your "
+                + site.name()
+                + " account is now verified. You can log in at "
+                + site.clientUrl()
+                + "/login";
+        AfterCommit.run(() -> mailService.send(to, "Welcome - Account Verified", body));
     }
 
     // The same answer whether or not the email has an account, or one that is
@@ -132,15 +132,14 @@ public class RegistrationService {
     private void sendVerification(User user) {
         String token = tokenService.issue(user);
         String link = site.serverUrl() + "/api/v1/auth/verify/" + token + "/" + user.getId();
-        mailService.send(
-                user.getEmail(),
-                "Account Verification",
-                "Hello "
-                        + user.getFirstName()
-                        + ", welcome to "
-                        + site.name()
-                        + ". Please verify your account within 15 minutes using this link: "
-                        + link);
+        String to = user.getEmail();
+        String body = "Hello "
+                + user.getFirstName()
+                + ", welcome to "
+                + site.name()
+                + ". Please verify your account within 15 minutes using this link: "
+                + link;
+        AfterCommit.run(() -> mailService.send(to, "Account Verification", body));
     }
 
     private static Optional<UUID> parseId(String userId) {

@@ -35,6 +35,12 @@ public interface InvitationRepository extends JpaRepository<Invitation, Long> {
     @EntityGraph(attributePaths = {"business", "invitedBy"})
     Optional<Invitation> findByTokenHash(String tokenHash);
 
+    // The business an invitation is to, without loading or locking the
+    // invitation: accepting locks the business first, as inviting, resending,
+    // withdrawing and deleting the business do.
+    @Query("select i.business.pkid from Invitation i where i.tokenHash = :tokenHash")
+    Optional<Long> findBusinessPkidByTokenHash(@Param("tokenHash") String tokenHash);
+
     // Locked, so an invitation is accepted once.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Invitation i where i.tokenHash = :tokenHash")

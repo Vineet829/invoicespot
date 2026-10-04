@@ -5,6 +5,7 @@ import com.invoicespot.audit.AuditLog;
 import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.auth.twofactor.dto.TwoFactorSetupResponse;
 import com.invoicespot.auth.twofactor.dto.TwoFactorStatusResponse;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SecretBox;
 import com.invoicespot.common.SecretTokens;
@@ -292,13 +293,12 @@ public class TwoFactorService {
     }
 
     private void notifyOwner(User user, String subject, String change) {
-        mailService.send(
-                user.getEmail(),
-                subject,
-                "Hello " + user.getFirstName() + ",\n\n"
-                        + "Two-factor sign-in was just " + change + " for your " + site.name()
-                        + " account, and your other devices were signed out.\n\n"
-                        + "If this wasn't you, reset your password at " + site.clientUrl()
-                        + "/reset_password_request and check the devices signed in to your account.");
+        String to = user.getEmail();
+        String body = "Hello " + user.getFirstName() + ",\n\n"
+                + "Two-factor sign-in was just " + change + " for your " + site.name()
+                + " account, and your other devices were signed out.\n\n"
+                + "If this wasn't you, reset your password at " + site.clientUrl()
+                + "/reset_password_request and check the devices signed in to your account.";
+        AfterCommit.run(() -> mailService.send(to, subject, body));
     }
 }

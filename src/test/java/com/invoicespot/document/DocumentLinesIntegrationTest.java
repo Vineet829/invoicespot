@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -83,7 +84,8 @@ class DocumentLinesIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a quantity below 0, above 1,000,000 or with more than 4 decimals is refused, as is a long unit")
+    @DisplayName("a quantity below 0, above 1,000,000 or with more than 4 decimals is refused, as are a unit price"
+            + " past 15 whole digits and a long unit")
     void limits() throws Exception {
         create("{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": -1}")
                 .andExpect(status().isBadRequest())
@@ -93,7 +95,15 @@ class DocumentLinesIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.message").value("Quantities can be at most 1,000,000"));
         create("{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": 1.23456}")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Quantities can have at most 4 decimals"));
+                .andExpect(jsonPath("$.message").value("Quantities can be at most 1,000,000, with up to 4 decimals"));
+        // Past 7 whole digits two limits apply, and either may be the one named.
+        create("{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": 10000000}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(startsWith("Quantities can be at most 1,000,000")));
+        create("{\"itemName\": \"Work\", \"unitPrice\": 1000000000000000, \"quantity\": 1}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Unit prices can have at most 15 whole digits and 4 decimals"));
         create("{\"itemName\": \"Work\", \"unitPrice\": 1, \"quantity\": 1, \"unit\": \"%s\"}".formatted("u".repeat(21)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Units can be at most 20 characters"));

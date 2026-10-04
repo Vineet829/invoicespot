@@ -17,6 +17,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 // The people who work in a business. Every change locks the business first,
 // so two admins changing the team at once take turns, and the business always
@@ -147,12 +149,19 @@ public class TeamService {
         auditLog.recordForBusiness(
                 AuditEventType.OWNERSHIP_TRANSFERRED, access.businessPkid(), newOwner, access.user(),
                 fullName(access.user()) + " → " + fullName(newOwner));
-        mailService.send(
-                newOwner.getEmail(),
-                "You now own " + business.getName(),
-                "Hello " + newOwner.getFirstName() + ",\n\n" + fullName(access.user()) + " handed "
-                        + business.getName() + " over to you on " + site.name() + ". As its owner, you manage its"
-                        + " team and can hand it over or delete it.\n\n" + site.clientUrl() + "/settings/team");
+        String to = newOwner.getEmail();
+        String subject = "You now own " + business.getName();
+        String body = "Hello " + newOwner.getFirstName() + ",\n\n" + fullName(access.user()) + " handed "
+                + business.getName() + " over to you on " + site.name() + ". As its owner, you manage its"
+                + " team and can hand it over or delete it.\n\n" + site.clientUrl() + "/settings/team";
+        // Sent once the hand-over commits, so no email goes out for one that
+        // rolled back.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                mailService.send(to, subject, body);
+            }
+        });
         return MemberResponse.from(target, access.userPkid());
     }
 

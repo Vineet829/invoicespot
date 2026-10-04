@@ -20,6 +20,7 @@ import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ExpenseIntegrationTest extends IntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
+
+    // UTC+14, the time zone furthest ahead: a day after its today is still to
+    // come everywhere.
+    private static final ZoneId FURTHEST_AHEAD = ZoneId.of("Pacific/Kiritimati");
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -153,7 +158,11 @@ class ExpenseIntegrationTest extends IntegrationTest {
         refused("{\"category\": \"Office\", \"amount\": 5}", "Enter the day the expense was paid");
         refused("{%s}".formatted(valid), "Enter an amount greater than zero");
         refused("{%s, \"amount\": 0}".formatted(valid), "Enter an amount greater than zero");
-        refused("{%s, \"amount\": 1.234}".formatted(valid), "Amounts can have at most 2 decimals");
+        refused("{%s, \"amount\": 1.234}".formatted(valid), "Amounts can have at most 15 whole digits and 2 decimals");
+        refused("{%s, \"amount\": 1000000000000000}".formatted(valid),
+                "Amounts can have at most 15 whole digits and 2 decimals");
+        refused("{%s, \"amount\": 5, \"taxAmount\": 1.234}".formatted(valid),
+                "Tax paid can have at most 15 whole digits and 2 decimals");
         refused("{%s, \"amount\": 5, \"taxAmount\": -1}".formatted(valid), "Tax paid can't be negative");
         refused("{\"date\": \"%s\", \"category\": \" \", \"amount\": 5}".formatted(TODAY),
                 "An expense needs a category");
@@ -307,5 +316,39 @@ class ExpenseIntegrationTest extends IntegrationTest {
         send(post("/api/v1/expense"), member, json).andExpect(status().isCreated());
         send(patch("/api/v1/expense/{id}", id), member, "{\"amount\": 9}").andExpect(status().isOk());
         send(delete("/api/v1/expense/{id}", id), member, "").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("an expense is dated no later than today somewhere in the world, when recorded and when changed")
+    void notAfterToday() throws Exception {
+        LocalDate tomorrowFurthestAhead = LocalDate.now(FURTHEST_AHEAD).plusDays(1);
+
+        for (LocalDate future : List.of(TODAY.plusDays(2), tomorrowFurthestAhead)) {
+            record("{\"date\": \"%s\", \"category\": \"Office\", \"amount\": 5}".formatted(future))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("An expense can't be dated after today"));
+        }
+        String id = expense(TODAY, "Uber", "Travel", "8");
+        send(patch("/api/v1/expense/{id}", id), "{\"date\": \"%s\"}".formatted(tomorrowFurthestAhead))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("An expense can't be dated after today"));
+    }
+
+    @Test
+    @DisplayName("an expense dated today in UTC+14 is taken while it is still the day before where the business is")
+    void todayAheadOfTheBusiness() throws Exception {
+        // Ten hours behind UTC, so always a day behind UTC+14.
+        send(put("/api/v1/settings"), """
+                {"defaultCurrency": "USD", "paymentTermsDays": 15, "defaultTaxRate": 0,
+                 "taxLabel": "Tax", "timeZone": "Pacific/Honolulu"}
+                """)
+                .andExpect(status().isOk());
+        LocalDate latest = LocalDate.now(FURTHEST_AHEAD);
+
+        String id = expense(latest.minusDays(1), "Uber", "Travel", "8");
+        send(patch("/api/v1/expense/{id}", id), "{\"date\": \"%s\"}".formatted(latest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expense.date").value(latest.toString()));
+        expense(latest, "IRCTC", "Travel", "30");
     }
 }
