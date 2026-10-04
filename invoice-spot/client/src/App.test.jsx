@@ -38,6 +38,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Each test loads the whole app afresh, which can take longer than the
+// default 5 seconds while other test files run alongside.
+const LOADING_TIME = 30_000;
+
 // The app as index.jsx draws it, opened at `path`, with every path it shows.
 const mount = async (path) => {
   const { Provider } = await import("react-redux");
@@ -66,26 +70,34 @@ const mount = async (path) => {
   return { store, container, seen };
 };
 
-it("draws nothing and does not bounce to /login while restoring", async () => {
-  localStorage.setItem("user", JSON.stringify({ username: "asha" }));
-  const { store, container, seen } = await mount("/settings/security");
-  expect(store.getState().auth.restoring).toBe(true);
-  expect(container.innerHTML).toBe("");
-  expect(seen.at(-1)).toBe("/settings/security");
-  const { logIn } = await import("./features/auth/authSlice");
-  await act(async () => {
-    store.dispatch(logIn({ username: "asha", accessToken: token }));
-  });
-  expect(seen.at(-1)).toBe("/settings/security");
-  expect(container.innerHTML).not.toBe("");
-});
+it(
+  "draws nothing and does not bounce to /login while restoring",
+  async () => {
+    localStorage.setItem("user", JSON.stringify({ username: "asha" }));
+    const { store, container, seen } = await mount("/settings/security");
+    expect(store.getState().auth.restoring).toBe(true);
+    expect(container.innerHTML).toBe("");
+    expect(seen.at(-1)).toBe("/settings/security");
+    const { logIn } = await import("./features/auth/authSlice");
+    await act(async () => {
+      store.dispatch(logIn({ username: "asha", accessToken: token }));
+    });
+    expect(seen.at(-1)).toBe("/settings/security");
+    expect(container.innerHTML).not.toBe("");
+  },
+  LOADING_TIME,
+);
 
-it("sends a failed restore to /login, as a signed-out visitor", async () => {
-  localStorage.setItem("user", JSON.stringify({ username: "asha" }));
-  const { store, seen } = await mount("/settings/security");
-  const { restoreFailed } = await import("./features/auth/authSlice");
-  await act(async () => {
-    store.dispatch(restoreFailed());
-  });
-  expect(seen.at(-1)).toBe("/login");
-});
+it(
+  "sends a failed restore to /login, as a signed-out visitor",
+  async () => {
+    localStorage.setItem("user", JSON.stringify({ username: "asha" }));
+    const { store, seen } = await mount("/settings/security");
+    const { restoreFailed } = await import("./features/auth/authSlice");
+    await act(async () => {
+      store.dispatch(restoreFailed());
+    });
+    await vi.waitFor(() => expect(seen.at(-1)).toBe("/login"));
+  },
+  LOADING_TIME,
+);
