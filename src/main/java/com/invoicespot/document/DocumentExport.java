@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 // Documents and payments as CSV files, with dates on the owner's calendar
@@ -25,30 +26,30 @@ public class DocumentExport {
             DocumentStatus.NOT_FULLY_PAID, "Partially paid",
             DocumentStatus.NOT_PAID, "Unpaid");
 
-    private final DocumentRepository documentRepository;
+    private final DocumentDirectory documentDirectory;
     private final SettingsService settingsService;
     private final JdbcClient jdbc;
     private final Clock clock;
 
     public DocumentExport(
-            DocumentRepository documentRepository, SettingsService settingsService, JdbcClient jdbc, Clock clock) {
-        this.documentRepository = documentRepository;
+            DocumentDirectory documentDirectory, SettingsService settingsService, JdbcClient jdbc, Clock clock) {
+        this.documentDirectory = documentDirectory;
         this.settingsService = settingsService;
         this.jdbc = jdbc;
         this.clock = clock;
     }
 
-    // Every document the list's filters match, in the list's order. A
-    // quotation is an offer, a draft isn't billed yet, a void document no
-    // longer is and a credit note is money taken off another document, so
-    // nothing is paid or owed on them. A credit note names what it credits.
-    @Transactional(readOnly = true)
+    // Every document the list's filters match, in the list's order, as they
+    // all stood when the file was begun. A quotation is an offer, a draft
+    // isn't billed yet, a void document no longer is and a credit note is
+    // money taken off another document, so nothing is paid or owed on them.
+    // A credit note names what it credits.
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CsvFile documents(BusinessAccess access, DocumentSearch search) {
         ZoneId zone = zoneOf(access.businessPkid());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Instant startOfToday = today.atStartOfDay(zone).toInstant();
-        List<Document> documents = documentRepository.findAll(
-                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday), search.sort());
+        List<Document> documents = documentDirectory.all(access.businessPkid(), search.on(today), today, zone);
         return CsvFile.of(
                 "invoice-spot-documents-" + today + ".csv",
                 List.of("Number", "Type", "Status", "Client", "Client email", "Currency", "Subtotal", "Tax", "Total",

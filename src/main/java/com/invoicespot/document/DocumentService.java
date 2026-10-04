@@ -15,6 +15,7 @@ import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentCustomerDto;
 import com.invoicespot.document.dto.DocumentListResponse;
+import com.invoicespot.document.dto.DocumentListTotals;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.IssueDocumentRequest;
 import com.invoicespot.document.dto.RefundRequest;
@@ -45,11 +46,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -59,6 +60,7 @@ public class DocumentService {
             + " Void it and duplicate it to change them";
 
     private final DocumentRepository documentRepository;
+    private final DocumentDirectory documentDirectory;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
     private final PdfService pdfService;
@@ -76,6 +78,7 @@ public class DocumentService {
 
     public DocumentService(
             DocumentRepository documentRepository,
+            DocumentDirectory documentDirectory,
             CustomerRepository customerRepository,
             UserRepository userRepository,
             PdfService pdfService,
@@ -91,6 +94,7 @@ public class DocumentService {
             NotificationService notificationService,
             Clock clock) {
         this.documentRepository = documentRepository;
+        this.documentDirectory = documentDirectory;
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
         this.pdfService = pdfService;
@@ -195,22 +199,30 @@ public class DocumentService {
         return respond(document);
     }
 
-    @Transactional(readOnly = true)
+    // A page of the documents, and what all of them come to, read at one
+    // moment so the two agree; the totals count them. A period is read as the
+    // dates it covers today, which the list sends back with the dates it was
+    // asked for.
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public DocumentListResponse listMine(BusinessAccess access, DocumentSearch search) {
         ZoneId zone = zoneOf(access.businessPkid());
-        Instant startOfToday = startOfToday(zone);
-        Page<Document> result = documentRepository.findAll(
-                DocumentSpecifications.matching(access.businessPkid(), search, startOfToday),
-                PageRequest.of(search.page() - 1, search.size(), search.sort()));
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        Instant startOfToday = today.atStartOfDay(zone).toInstant();
+        DocumentSearch dated = search.on(today);
+        List<DocumentListTotals> totals = documentDirectory.totals(access.businessPkid(), dated, today, zone);
+        long found = totals.stream().mapToLong(DocumentListTotals::documents).sum();
         return new DocumentListResponse(
                 true,
-                result.getTotalElements(),
-                result.getTotalPages(),
+                found,
+                (int) ((found + search.size() - 1) / search.size()),
                 search.page(),
                 search.size(),
-                result.getContent().stream()
+                dated.issuedFrom(),
+                dated.issuedTo(),
+                documentDirectory.page(access.businessPkid(), dated, today, zone).stream()
                         .map(document -> DocumentResponse.from(document, startOfToday, zone))
-                        .toList());
+                        .toList(),
+                totals);
     }
 
     private User actor(BusinessAccess access) {

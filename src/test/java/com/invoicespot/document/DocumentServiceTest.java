@@ -46,6 +46,7 @@ import org.springframework.http.HttpStatus;
 class DocumentServiceTest {
 
     @Mock private DocumentRepository documentRepository;
+    @Mock private DocumentDirectory documentDirectory;
     @Mock private CustomerRepository customerRepository;
     @Mock private UserRepository userRepository;
     @Mock private PdfService pdfService;
@@ -65,6 +66,7 @@ class DocumentServiceTest {
     void setUp() {
         service = new DocumentService(
                 documentRepository,
+                documentDirectory,
                 customerRepository,
                 userRepository,
                 pdfService,

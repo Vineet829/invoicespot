@@ -27,6 +27,26 @@ class ReportPeriodTest {
     }
 
     @Test
+    @DisplayName("the last 30 or 90 days are the overview's, over every month they touch")
+    void lastDays() {
+        LocalDate today = LocalDate.of(2026, 10, 4);
+        assertThat(ReportPeriod.of("30d", today))
+                .isEqualTo(new ReportPeriod("30d", LocalDate.of(2026, 9, 5), today));
+        assertThat(ReportPeriod.of("90D", today))
+                .isEqualTo(new ReportPeriod("90d", LocalDate.of(2026, 7, 7), today));
+        assertThat(ReportPeriod.of("30d", today).months()).containsExactly(YearMonth.of(2026, 9), YearMonth.of(2026, 10));
+        assertThat(ReportPeriod.of("90d", today).months()).containsExactly(
+                YearMonth.of(2026, 7), YearMonth.of(2026, 8), YearMonth.of(2026, 9), YearMonth.of(2026, 10));
+        assertThat(ReportPeriod.of("30d", TODAY).months()).containsExactly(YearMonth.of(2026, 9));
+        for (String key : new String[] {"30d", "90d"}) {
+            for (LocalDate day : new LocalDate[] {today, TODAY, LocalDate.of(2028, 2, 29), LocalDate.of(2027, 1, 1)}) {
+                OverviewWindow window = OverviewWindow.of(key, day);
+                assertThat(ReportPeriod.of(key, day)).isEqualTo(new ReportPeriod(key, window.from(), window.to()));
+            }
+        }
+    }
+
+    @Test
     @DisplayName("this year runs to today, and an earlier year covers all of it")
     void years() {
         assertThat(ReportPeriod.of("ytd", TODAY)).isEqualTo(new ReportPeriod("ytd", LocalDate.of(2026, 1, 1), TODAY));
@@ -36,7 +56,7 @@ class ReportPeriodTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"2026", "2027", "1999", "+2025", "30d", "all"})
+    @ValueSource(strings = {"2026", "2027", "1999", "+2025", "7d", "60d", "all"})
     @DisplayName("any other period is refused")
     void unknown(String key) {
         assertThatThrownBy(() -> ReportPeriod.of(key, TODAY))

@@ -17,5 +17,13 @@ public final class DocumentLedger {
     // What each invoice or receipt billed; a credit note takes its total off.
     public static final String BILLED = "(case when d.document_type = 'Credit Note' then -d.total else d.total end)";
 
+    // The documents what was billed adds up: invoices and receipts, and the
+    // credit notes that take money off them.
+    public static final String BILLED_DOCUMENT =
+            COUNTED + " and d.document_type in ('Invoice', 'Receipt', 'Credit Note')";
+
+    // The invoices with money still owed on them, overdue or not.
+    public static final String OWED_INVOICE = COUNTED + " and d.document_type = 'Invoice' and " + OWED + " > 0";
+
     private DocumentLedger() {}
 }

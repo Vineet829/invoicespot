@@ -15,10 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.audit.AuditEvent;
 import com.invoicespot.audit.AuditEventRepository;
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,9 +64,12 @@ class TeamIntegrationTest extends IntegrationTest {
                 .content(json));
     }
 
+    // In the order they were recorded: without an order, the database may
+    // return rows in any order once other tests have deleted some.
     private List<AuditEventType> businessEvents() {
         return auditEventRepository.findAll().stream()
                 .filter(event -> event.getBusiness() != null && event.getBusiness().getPkid().equals(business.getPkid()))
+                .sorted(Comparator.comparing(AuditEvent::getPkid))
                 .map(event -> event.getType())
                 .toList();
     }

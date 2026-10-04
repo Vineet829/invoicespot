@@ -62,6 +62,8 @@ public class DocumentController {
         return new CreatedDocumentResponse(true, documentService.create(access, request));
     }
 
+    // A period is the last 30 or 90 days or 12 months, as the overview has
+    // them; due is a week what is owed falls due in, as the overview groups it.
     @GetMapping("/all")
     public DocumentListResponse listMine(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
@@ -72,7 +74,12 @@ public class DocumentController {
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "overdue", required = false) Boolean overdue,
+            @RequestParam(name = "outstanding", required = false) Boolean outstanding,
+            @RequestParam(name = "billed", required = false) Boolean billed,
+            @RequestParam(name = "due", required = false) String due,
             @RequestParam(name = "customerId", required = false) String customerId,
+            @RequestParam(name = "currency", required = false) String currency,
+            @RequestParam(name = "period", required = false) String period,
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -82,7 +89,8 @@ public class DocumentController {
         return documentService.listMine(
                 access,
                 DocumentSearch.of(
-                        query, state, status, type, overdue, customerId, from, to, sort, direction, page, size));
+                        query, state, status, type, overdue, outstanding, billed, due, customerId, currency, period,
+                        from, to, sort, direction, page, size));
     }
 
     @GetMapping("/csv")
@@ -93,7 +101,12 @@ public class DocumentController {
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "overdue", required = false) Boolean overdue,
+            @RequestParam(name = "outstanding", required = false) Boolean outstanding,
+            @RequestParam(name = "billed", required = false) Boolean billed,
+            @RequestParam(name = "due", required = false) String due,
             @RequestParam(name = "customerId", required = false) String customerId,
+            @RequestParam(name = "currency", required = false) String currency,
+            @RequestParam(name = "period", required = false) String period,
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -104,7 +117,8 @@ public class DocumentController {
                 .documents(
                         access,
                         DocumentSearch.of(
-                                query, state, status, type, overdue, customerId, from, to, sort, direction, 1, 1))
+                                query, state, status, type, overdue, outstanding, billed, due, customerId, currency,
+                                period, from, to, sort, direction, 1, 1))
                 .download();
     }
 

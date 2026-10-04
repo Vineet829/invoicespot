@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 // day, and one far behind UTC, where today is UTC's yesterday until late
 // morning UTC. Each is used only while its next midnight is at least an hour
 // away, so a test's today doesn't change while it runs.
-class AwayFromUtc implements ArgumentsProvider {
+public class AwayFromUtc implements ArgumentsProvider {
 
     @Override
     public Stream<Arguments> provideArguments(ExtensionContext context) {

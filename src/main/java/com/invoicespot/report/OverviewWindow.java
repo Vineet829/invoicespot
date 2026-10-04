@@ -1,8 +1,10 @@
 package com.invoicespot.report;
 
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.RecentPeriod;
 import com.invoicespot.report.dto.OverviewPeriod;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -11,7 +13,8 @@ import org.springframework.http.HttpStatus;
 // The days the overview covers, ending today, and the days just before them
 // to compare with: the last 30 or 90 days and as many before them, the last
 // 12 months from the first of a month and the 12 before them, or this year to
-// date and last year up to the same day.
+// date and last year up to the same day. The first three are RecentPeriod's,
+// which the lists the overview opens read too.
 record OverviewWindow(
         String key, LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo, Step step) {
 
@@ -27,10 +30,10 @@ record OverviewWindow(
     static OverviewWindow of(String key, LocalDate today) {
         String value = key == null || key.isBlank() ? DEFAULT : key.trim().toLowerCase(Locale.ROOT);
         return switch (value) {
-            case "30d" -> lastDays(value, 30, Step.DAY, today);
-            case "90d" -> lastDays(value, 90, Step.WEEK, today);
+            case "30d" -> lastDays(RecentPeriod.of(value, today), Step.DAY);
+            case "90d" -> lastDays(RecentPeriod.of(value, today), Step.WEEK);
             case "12m" -> {
-                LocalDate from = today.withDayOfMonth(1).minusMonths(11);
+                LocalDate from = RecentPeriod.of(value, today).from();
                 yield new OverviewWindow(value, from, today, from.minusMonths(12), from.minusDays(1), Step.MONTH);
             }
             // Compared with last year up to the same day, or to 28 February from the 29th.
@@ -43,9 +46,11 @@ record OverviewWindow(
         };
     }
 
-    private static OverviewWindow lastDays(String key, int days, Step step, LocalDate today) {
-        LocalDate from = today.minusDays(days - 1);
-        return new OverviewWindow(key, from, today, from.minusDays(days), from.minusDays(1), step);
+    // As many days just before them to compare with.
+    private static OverviewWindow lastDays(RecentPeriod period, Step step) {
+        LocalDate from = period.from();
+        long days = ChronoUnit.DAYS.between(from, period.to()) + 1;
+        return new OverviewWindow(period.key(), from, period.to(), from.minusDays(days), from.minusDays(1), step);
     }
 
     // A stretch of the period's trend, from one day to another.

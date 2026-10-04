@@ -123,12 +123,11 @@ class ReportQueries {
                         select %s as currency, d.document_type, d.issue_date, %s as total
                         from documents d
                         where d.business_pkid = :business and %s and %s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         """.formatted(
                                 view.currency(),
                                 view.amount(DocumentLedger.BILLED),
-                                DocumentLedger.COUNTED,
+                                DocumentLedger.BILLED_DOCUMENT,
                                 view.convertible()))
                 .param("business", businessPkid)
                 .param("from", from)
@@ -219,7 +218,6 @@ class ReportQueries {
                         from documents d
                         left join customers c on c.pkid = d.customer_pkid
                         where d.business_pkid = :business and %s and %s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         group by 1, 2, 3
                         order by billed desc, lower(coalesce(c.name, d.customer_name))
@@ -228,7 +226,7 @@ class ReportQueries {
                                 view.amount(DocumentLedger.BILLED),
                                 view.amount("(d.total_amount_received - d.total_refunded)"),
                                 view.amount("d.total_tds"),
-                                DocumentLedger.COUNTED,
+                                DocumentLedger.BILLED_DOCUMENT,
                                 view.convertible()))
                 .param("business", businessPkid)
                 .param("from", from)
@@ -254,10 +252,9 @@ class ReportQueries {
                                sum(%s) as income
                         from documents d
                         where d.business_pkid = :business and %s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         group by 1, 2
-                        """.formatted(EARNED, DocumentLedger.COUNTED))
+                        """.formatted(EARNED, DocumentLedger.BILLED_DOCUMENT))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
@@ -299,11 +296,13 @@ class ReportQueries {
                                sum(%2$s) as earned
                         from documents d
                         where d.business_pkid = :business and %3$s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and coalesce(d.currency, '') = :currency and %4$s
                         group by 1
                         """.formatted(
-                                DocumentLedger.BILLED, EARNED, DocumentLedger.COUNTED, inOverview("d.issue_date")))
+                                DocumentLedger.BILLED,
+                                EARNED,
+                                DocumentLedger.BILLED_DOCUMENT,
+                                inOverview("d.issue_date")))
                 .params(overview(businessPkid, currency, window))
                 .query((result, rowNumber) -> new DocumentDay(
                         result.getObject("day", LocalDate.class),
@@ -421,7 +420,6 @@ class ReportQueries {
                         from document_tax_summaries s
                         join documents d on d.pkid = s.document_pkid
                         where d.business_pkid = :business and %s and %s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         order by d.issue_date, d.pkid, s.rate
                         """.formatted(
@@ -431,7 +429,7 @@ class ReportQueries {
                                 view.amount("s.cgst"),
                                 view.amount("s.sgst"),
                                 view.amount("s.igst"),
-                                DocumentLedger.COUNTED,
+                                DocumentLedger.BILLED_DOCUMENT,
                                 view.convertible()))
                 .param("business", businessPkid)
                 .param("from", from)
@@ -460,11 +458,10 @@ class ReportQueries {
                         select coalesce(d.currency, '') as currency, count(*) as documents, sum(%s) as amount
                         from documents d
                         where d.business_pkid = :business and %s and not %s
-                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         group by 1
                         order by 1
-                        """.formatted(DocumentLedger.BILLED, DocumentLedger.COUNTED, CONVERTIBLE))
+                        """.formatted(DocumentLedger.BILLED, DocumentLedger.BILLED_DOCUMENT, CONVERTIBLE))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
@@ -482,8 +479,7 @@ class ReportQueries {
                         select coalesce(d.currency, '') as currency, count(*) as documents, sum(%s) as amount
                         from documents d
                         where d.business_pkid = :business and %s and not %s
-                          and ((d.document_type in ('Invoice', 'Receipt', 'Credit Note')
-                                and d.issue_date between :from and :to)
+                          and ((%s and d.issue_date between :from and :to)
                             or (d.document_type = 'Invoice' and d.status <> 'Paid')
                             or (d.document_type = 'Invoice' and exists (
                                 select 1 from payments p
@@ -493,7 +489,11 @@ class ReportQueries {
                                 where r.document_pkid = d.pkid and r.date_refunded between :from and :to))
                         group by 1
                         order by 1
-                        """.formatted(DocumentLedger.BILLED, DocumentLedger.COUNTED, CONVERTIBLE))
+                        """.formatted(
+                                DocumentLedger.BILLED,
+                                DocumentLedger.COUNTED,
+                                CONVERTIBLE,
+                                DocumentLedger.BILLED_DOCUMENT))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)

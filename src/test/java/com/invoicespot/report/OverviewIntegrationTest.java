@@ -16,6 +16,7 @@ import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -600,5 +601,73 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.owedByWeek[1].invoices").value(1))
                 .andExpect(jsonPath("$.owedByWeek[4].amount").value(0.0))
                 .andExpect(jsonPath("$.owedByWeek[4].invoices").value(0));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the reports' last 30 and 90 days are the overview's, and bill, receive and earn as it does")
+    void reportPeriods(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // On the first day of each period and the day before it: invoices
+        // paid, one with tax withheld and one credited and paid back, a
+        // receipt, and expenses.
+        pay(issue("Invoice", "USD", "1000", day.minusDays(29), day.plusDays(10)), "300", "20", day.minusDays(29));
+        pay(issue("Invoice", "USD", "500", day.minusDays(30), day.plusDays(10)), "500", "0", day.minusDays(30));
+        String credited = issue("Invoice", "USD", "800", day.minusDays(89), day.plusDays(10));
+        pay(credited, "800", "0", day.minusDays(89));
+        credit(credited, "100", day.minusDays(1));
+        refund(credited, "100", day);
+        issue("Invoice", "USD", "700", day.minusDays(90), day.plusDays(10));
+        create("Receipt", "USD", "60", "0", day, null, false);
+        expense("USD", "40", "0", false, day.minusDays(29));
+        expense("USD", "30", "0", false, day.minusDays(90));
+        // Never counted with dollars: euros, a quotation and a draft.
+        pay(issue("Invoice", "EUR", "900", day, day.plusDays(5)), "900", "0", day);
+        issue("Quotation", "USD", "5000", day, day.plusDays(5));
+        create("Invoice", "USD", "6000", "0", day, null, true);
+
+        List<String> periods = List.of("30d", "90d");
+        List<List<String>> figures = List.of(List.of("960", "260", "920"), List.of("2260", "1560", "2220"));
+        for (int index = 0; index < periods.size(); index++) {
+            String period = periods.get(index);
+            String overview = overview("USD", period).andReturn().getResponse().getContentAsString();
+            String report = send(get("/api/v1/report").param("period", period), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.period").value(period))
+                    .andExpect(jsonPath("$.from").value(JsonPath.<String>read(overview, "$.period.from")))
+                    .andExpect(jsonPath("$.to").value(JsonPath.<String>read(overview, "$.period.to")))
+                    .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            String profit = send(get("/api/v1/report/profit").param("period", period), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            assertThat(amount(report, "$.currencies[0].billed"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.billed.current"))
+                    .isEqualByComparingTo(figures.get(index).get(0));
+            assertThat(amount(report, "$.currencies[0].received"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.received.current"))
+                    .isEqualByComparingTo(figures.get(index).get(1));
+            assertThat(amount(profit, "$.currencies[0].profit"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.profit.current"))
+                    .isEqualByComparingTo(figures.get(index).get(2));
+        }
+        // The other reports read the same days.
+        for (String report : List.of("/api/v1/report/tax", "/api/v1/report/tds")) {
+            send(get(report).param("period", "30d"), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.from").value(day.minusDays(29).toString()))
+                    .andExpect(jsonPath("$.to").value(day.toString()));
+        }
+        send(get("/api/v1/report/csv/income").param("period", "90d"), "")
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("USD," + YearMonth.from(day) + ",")));
     }
 }

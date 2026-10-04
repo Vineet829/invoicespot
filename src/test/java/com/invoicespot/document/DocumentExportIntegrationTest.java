@@ -17,10 +17,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class DocumentExportIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private User owner;
@@ -117,6 +122,34 @@ class DocumentExportIntegrationTest extends IntegrationTest {
         assertThat(csv(owner, "/api/v1/document/csv", "type", "Invoice", "sort", "total", "dir", "asc"))
                 .extracting(line -> line.substring(0, line.indexOf(',')))
                 .containsExactly("﻿Number", "INV-0002", "INV-0001");
+    }
+
+    @Test
+    @DisplayName("a list longer than the export reads at once comes out whole, in its order")
+    void longList() throws Exception {
+        // 1,200 copies of the receipt, each with a number of its own.
+        String columns = String.join(", ", jdbcTemplate.queryForList("""
+                select column_name from information_schema.columns
+                where table_schema = current_schema() and table_name = 'documents'
+                  and column_name not in ('pkid', 'id', 'document_number')
+                order by ordinal_position
+                """, String.class));
+        jdbcTemplate.update("""
+                insert into documents (id, document_number, %1$s)
+                select gen_random_uuid(), 'COPY-' || lpad(cast(n as text), 4, '0'), %1$s
+                from documents cross join generate_series(1, 1200) n
+                where business_pkid = ? and document_number = 'REC-0001'
+                """.formatted(columns), businessOf(owner).getPkid());
+
+        List<String> lines = csv(owner, "/api/v1/document/csv", "type", "Receipt", "sort", "number", "dir", "asc");
+        assertThat(lines).hasSize(1202);
+        assertThat(lines.subList(1, 1202))
+                .extracting(line -> line.substring(0, line.indexOf(',')))
+                .startsWith("COPY-0001", "COPY-0002")
+                .contains("COPY-0500", "COPY-0501", "COPY-1000", "COPY-1001")
+                .endsWith("COPY-1200", "REC-0001")
+                .doesNotHaveDuplicates()
+                .isSorted();
     }
 
     @Test

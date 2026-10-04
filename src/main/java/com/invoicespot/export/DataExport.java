@@ -114,9 +114,7 @@ public class DataExport {
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put("README.txt", README.formatted(today, zone.getId()).getBytes(StandardCharsets.UTF_8));
-        files.put("documents.csv", documentExport
-                .documents(access, DocumentSearch.of(null, null, null, null, false, null, null, null, null, null, 1, 1))
-                .content());
+        files.put("documents.csv", documentExport.documents(access, DocumentSearch.all()).content());
         files.put("line-items.csv", lineItems(businessPkid).content());
         files.put("document-tax.csv", documentTax(businessPkid).content());
         files.put("payments.csv", documentExport.payments(access).content());

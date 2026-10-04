@@ -45,6 +45,9 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) String exchangeBase,
         @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst,
         BigDecimal totalAmountReceived,
+        // What a list shows as owed: there only on an issued invoice. The
+        // ledger's balanceDue is worked out for every document.
+        BigDecimal balanceDue,
         LedgerResponse ledger,
         List<BillingItemResponse> billingItems,
         List<PaymentRecordDto> paymentRecords,
@@ -128,6 +131,7 @@ public record DocumentResponse(
                 document.getExchangeBase(),
                 GstResponse.from(document),
                 document.getTotalAmountReceived(),
+                balanceDue(document),
                 LedgerResponse.from(document),
                 billingItems,
                 paymentRecords,
@@ -148,6 +152,15 @@ public record DocumentResponse(
                 document.getRemindersSent(),
                 document.getLastRemindedAt(),
                 document.isShowPaymentDetails());
+    }
+
+    // What is still owed on an issued invoice, as the overview counts it. A
+    // quotation, receipt or credit note has no balance due, and neither does
+    // a draft or a void invoice.
+    private static BigDecimal balanceDue(Document document) {
+        return document.getDocumentType() == DocumentType.INVOICE && document.state() == DocumentState.ISSUED
+                ? DocumentTotals.balanceDue(document).setScale(2)
+                : null;
     }
 
     // Invoices and receipts are the documents credit notes credit.

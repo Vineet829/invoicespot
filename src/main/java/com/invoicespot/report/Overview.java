@@ -2,6 +2,7 @@ package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.document.DocumentLedger;
+import com.invoicespot.report.dto.DocumentSummaryResponse;
 import com.invoicespot.report.dto.OverviewOwed;
 import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
@@ -48,6 +49,7 @@ public class Overview {
 
     private final JdbcClient jdbc;
     private final ReportQueries queries;
+    private final PaymentQueries paymentQueries;
     private final NeedsAttention needsAttention;
     private final SettingsService settingsService;
     private final Clock clock;
@@ -55,11 +57,13 @@ public class Overview {
     public Overview(
             JdbcClient jdbc,
             ReportQueries queries,
+            PaymentQueries paymentQueries,
             NeedsAttention needsAttention,
             SettingsService settingsService,
             Clock clock) {
         this.jdbc = jdbc;
         this.queries = queries;
+        this.paymentQueries = paymentQueries;
         this.needsAttention = needsAttention;
         this.settingsService = settingsService;
         this.clock = clock;
@@ -73,9 +77,7 @@ public class Overview {
         LocalDate today = LocalDate.now(clock.withZone(zone));
         OverviewWindow window = OverviewWindow.of(periodKey, today);
         List<String> currencies = currencies(businessPkid, settings.getDefaultCurrency());
-        String currency = currencies.contains(requested)
-                ? requested
-                : currencies.isEmpty() ? settings.getDefaultCurrency() : currencies.get(0);
+        String currency = chosen(currencies, requested, settings.getDefaultCurrency());
         Money money = money(businessPkid, currency);
         ZonedDateTime startOfToday = today.atStartOfDay(zone);
         Counts counts = counts(businessPkid, startOfToday);
@@ -105,6 +107,38 @@ public class Overview {
                 trend(byDay, window),
                 owedByWeek(owed, zone, today),
                 needsAttention.list(businessPkid, currency, zone, today));
+    }
+
+    // The money bar over the documents list, in a currency chosen as above:
+    // what is owed now, as here, and the Received of the last 30 days, with
+    // how many payments, receipts and refunds it came from. Documents without
+    // a currency are left out of its choice, as a list's address can't tell
+    // them from all currencies.
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public DocumentSummaryResponse documentSummary(BusinessAccess access, String requested) {
+        Long businessPkid = access.businessPkid();
+        BusinessSettings settings = settingsService.forBusiness(businessPkid);
+        ZoneId zone = ZoneId.of(settings.getTimeZone());
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        List<String> currencies = currencies(businessPkid, settings.getDefaultCurrency()).stream()
+                .filter(currency -> !currency.isEmpty())
+                .toList();
+        String currency = chosen(currencies, requested, settings.getDefaultCurrency());
+        OverviewWindow month = OverviewWindow.of("30d", today);
+        return new DocumentSummaryResponse(
+                true,
+                currency,
+                currencies,
+                owedNow(owed(businessPkid, currency), today.atStartOfDay(zone)),
+                paymentQueries.received(businessPkid, currency, month.from(), month.to()));
+    }
+
+    // The currency asked for when the business has money in it; else the
+    // first it has money in, its default one coming first; else the default.
+    private static String chosen(List<String> currencies, String requested, String defaultCurrency) {
+        return currencies.contains(requested)
+                ? requested
+                : currencies.isEmpty() ? defaultCurrency : currencies.get(0);
     }
 
     // The currencies of the business's invoices and receipts, its default first.
@@ -257,11 +291,10 @@ public class Overview {
     // The currency's issued invoices with money still owed on them.
     private List<Owed> owed(Long businessPkid, String currency) {
         return jdbc.sql("""
-                        select d.due_date, %1$s as owed
+                        select d.due_date, %s as owed
                         from documents d
-                        where d.business_pkid = :business and %2$s and d.document_type = 'Invoice'
-                          and coalesce(d.currency, '') = :currency and %1$s > 0
-                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED))
+                        where d.business_pkid = :business and %s and coalesce(d.currency, '') = :currency
+                        """.formatted(DocumentLedger.OWED, DocumentLedger.OWED_INVOICE))
                 .param("business", businessPkid)
                 .param("currency", currency)
                 .query((result, rowNumber) -> {
