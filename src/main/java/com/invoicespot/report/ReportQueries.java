@@ -2,10 +2,13 @@ package com.invoicespot.report;
 
 import com.invoicespot.document.DocumentLedger;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -66,6 +69,15 @@ class ReportQueries {
     record Earned(String currency, LocalDate month, BigDecimal income) {}
 
     record Spent(String currency, LocalDate month, String category, BigDecimal cost) {}
+
+    record DocumentDay(LocalDate day, BigDecimal billed, BigDecimal receipts, BigDecimal earned) {}
+
+    record Daily(LocalDate day, BigDecimal amount) {}
+
+    // Income and costs, as profit and loss counts them by month or by day.
+    private static final String EARNED =
+            "(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)";
+    private static final String SPENT = "(e.amount + case when e.tax_reclaimable then 0 else e.tax_amount end)";
 
     // A document in the reporting currency, or with a rate typed in against it.
     private static final String CONVERTIBLE = "(coalesce(d.currency, '') = :base"
@@ -239,14 +251,13 @@ class ReportQueries {
         return jdbc.sql("""
                         select coalesce(d.currency, '') as currency,
                                cast(date_trunc('month', d.issue_date) as date) as month,
-                               sum(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)
-                                   as income
+                               sum(%s) as income
                         from documents d
                         where d.business_pkid = :business and %s
                           and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
                           and d.issue_date between :from and :to
                         group by 1, 2
-                        """.formatted(DocumentLedger.COUNTED))
+                        """.formatted(EARNED, DocumentLedger.COUNTED))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
@@ -262,11 +273,11 @@ class ReportQueries {
     List<Spent> spent(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
                         select e.currency, cast(date_trunc('month', e.expense_date) as date) as month, e.category,
-                               sum(e.amount + case when e.tax_reclaimable then 0 else e.tax_amount end) as cost
+                               sum(%s) as cost
                         from expenses e
                         where e.business_pkid = :business and e.expense_date between :from and :to
                         group by 1, 2, 3
-                        """)
+                        """.formatted(SPENT))
                 .param("business", businessPkid)
                 .param("from", from)
                 .param("to", to)
@@ -276,6 +287,95 @@ class ReportQueries {
                         result.getString("category"),
                         result.getBigDecimal("cost")))
                 .list();
+    }
+
+    // The overview's money in one currency, a day at a time over its period
+    // and the period before it: what documents billed and earned, by the day
+    // each is dated, and what the receipts among them took in.
+    List<DocumentDay> documentsByDay(long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select d.issue_date as day, sum(%1$s) as billed,
+                               coalesce(sum(%1$s) filter (where d.document_type = 'Receipt'), 0) as receipts,
+                               sum(%2$s) as earned
+                        from documents d
+                        where d.business_pkid = :business and %3$s
+                          and d.document_type in ('Invoice', 'Receipt', 'Credit Note')
+                          and coalesce(d.currency, '') = :currency and %4$s
+                        group by 1
+                        """.formatted(
+                                DocumentLedger.BILLED, EARNED, DocumentLedger.COUNTED, inOverview("d.issue_date")))
+                .params(overview(businessPkid, currency, window))
+                .query((result, rowNumber) -> new DocumentDay(
+                        result.getObject("day", LocalDate.class),
+                        result.getBigDecimal("billed"),
+                        result.getBigDecimal("receipts"),
+                        result.getBigDecimal("earned")))
+                .list();
+    }
+
+    // What was paid on the currency's invoices, by the day it was paid.
+    List<Daily> paidByDay(long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select p.date_paid as day, sum(p.amount_paid) as amount
+                        from payments p
+                        join documents d on d.pkid = p.document_pkid
+                        where d.business_pkid = :business and %s and d.document_type = 'Invoice'
+                          and coalesce(d.currency, '') = :currency and %s
+                        group by 1
+                        """.formatted(DocumentLedger.COUNTED, inOverview("p.date_paid")))
+                .params(overview(businessPkid, currency, window))
+                .query(ReportQueries::daily)
+                .list();
+    }
+
+    // What was paid back on its invoices and receipts, by the day it went.
+    List<Daily> refundedByDay(long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select r.date_refunded as day, sum(r.amount) as amount
+                        from refunds r
+                        join documents d on d.pkid = r.document_pkid
+                        where d.business_pkid = :business and %s
+                          and coalesce(d.currency, '') = :currency and %s
+                        group by 1
+                        """.formatted(DocumentLedger.COUNTED, inOverview("r.date_refunded")))
+                .params(overview(businessPkid, currency, window))
+                .query(ReportQueries::daily)
+                .list();
+    }
+
+    // What its expenses cost, by the day each was paid.
+    List<Daily> spentByDay(long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select e.expense_date as day, sum(%s) as amount
+                        from expenses e
+                        where e.business_pkid = :business and e.currency = :currency and %s
+                        group by 1
+                        """.formatted(SPENT, inOverview("e.expense_date")))
+                .params(overview(businessPkid, currency, window))
+                .query(ReportQueries::daily)
+                .list();
+    }
+
+    // The business, the currency, and the overview's period and the period
+    // before it.
+    private static Map<String, Object> overview(long businessPkid, String currency, OverviewWindow window) {
+        return Map.of(
+                "business", businessPkid,
+                "currency", currency,
+                "previousFrom", window.previousFrom(),
+                "previousTo", window.previousTo(),
+                "from", window.from(),
+                "to", window.to());
+    }
+
+    // A day in the overview's period or in the period before it. The two
+    // meet, except that this year to date is compared with last year's.
+    private static String inOverview(String day) {
+        return "(%1$s between :previousFrom and :previousTo or %1$s between :from and :to)".formatted(day);
+    }
+
+    private static Daily daily(ResultSet result, int rowNumber) throws SQLException {
+        return new Daily(result.getObject("day", LocalDate.class), result.getBigDecimal("amount"));
     }
 
     // The payments a client withheld tax from, by the date paid. A client that

@@ -17,4 +17,10 @@ public record OverviewResponse(
         long partial,
         long unpaid,
         long overdue,
-        List<OverviewPayment> payments) {}
+        List<OverviewPayment> payments,
+        OverviewPeriod period,
+        OverviewTotals totals,
+        OverviewOwed owedNow,
+        List<TrendBucket> trend,
+        List<OwedWeek> owedByWeek,
+        OverviewAttention attention) {}

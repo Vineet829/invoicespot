@@ -42,10 +42,13 @@ public class ReportController {
         this.profitReport = profitReport;
     }
 
+    // The last 30 or 90 days, 12 months or this year: 90 days when none is given.
     @GetMapping("/overview")
     public OverviewResponse overview(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @RequestParam(required = false) String currency) {
-        return overview.summary(access, currency);
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @RequestParam(required = false) String currency,
+            @RequestParam(required = false) String period) {
+        return overview.summary(access, currency, period);
     }
 
     @GetMapping
