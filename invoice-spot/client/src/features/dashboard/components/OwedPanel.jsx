@@ -7,21 +7,20 @@ import {
   formatMoney,
   invoiceCount,
   owedColumns,
+  owedWeekLink,
   reportLink,
   wholeAmount,
 } from "../dashboardModel";
 import { overviewPanel, panelLink } from "./DashboardPanels";
 
 // What clients owe now, by when it is due: overdue first, then this week,
-// the two after it and later. The overdue column opens those invoices;
-// the report, in the same currency when one was chosen, has the ageing in
-// full.
+// the two after it and later. Each column opens its invoices, and the
+// report has the ageing in full, both in the same currency when one was
+// chosen. The ageing is as of today, so the report's period is its own.
 const OwedPanel = ({ snapshot, currencyChosen }) => {
   const { owedNow, currency } = snapshot;
+  const chosen = currencyChosen ? currency : undefined;
   const columns = owedColumns(snapshot.owedByWeek);
-  const overdue = columns.some(
-    (column) => column.key === "overdue" && column.invoices > 0,
-  );
   const grid = {
     gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
   };
@@ -34,14 +33,7 @@ const OwedPanel = ({ snapshot, currencyChosen }) => {
         <h2 id="owed-title" className={sectionTitle}>
           Invoices owed to you
         </h2>
-        <Link
-          to={reportLink(
-            "ageing",
-            snapshot.period.key,
-            currencyChosen ? currency : undefined,
-          )}
-          className={panelLink}
-        >
+        <Link to={reportLink("ageing", null, chosen)} className={panelLink}>
           View report
           <FiChevronRight aria-hidden="true" />
         </Link>
@@ -94,12 +86,12 @@ const OwedPanel = ({ snapshot, currencyChosen }) => {
                   />
                 </>
               );
-              return column.key === "overdue" && overdue ? (
+              return column.invoices > 0 ? (
                 <Link
                   key={column.key}
-                  to="/documents?status=overdue"
+                  to={owedWeekLink(column.key, chosen)}
                   className={`${box} rounded-t-xl transition-colors hover:bg-white/60`}
-                  aria-label={`${label}. Open the overdue invoices`}
+                  aria-label={`${label}. Open ${column.key === "overdue" ? "the overdue invoices" : "these invoices"}`}
                 >
                   {content}
                 </Link>
@@ -129,8 +121,7 @@ const OwedPanel = ({ snapshot, currencyChosen }) => {
             ))}
           </div>
           <p className="mt-auto border-t border-[#23273512] pt-2.5 text-[12px] text-spot-muted">
-            Grouped by due date.
-            {overdue && " Overdue opens those invoices."}
+            Grouped by due date. Each column opens its invoices.
           </p>
         </>
       ) : (

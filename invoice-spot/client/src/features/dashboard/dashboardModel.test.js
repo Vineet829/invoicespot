@@ -3,6 +3,7 @@ import {
   attentionFooter,
   attentionRow,
   axisLabel,
+  billedLink,
   bucketLabel,
   bucketRange,
   cashFlowScale,
@@ -15,11 +16,14 @@ import {
   invoiceCount,
   labelStep,
   owedColumns,
+  owedWeekLink,
   paymentRows,
   percentLabel,
   periodSubtitle,
+  receivedLink,
   reportLink,
   showsLabel,
+  statusLink,
   trendColumns,
   trendPoints,
   wholeAmount,
@@ -158,19 +162,83 @@ describe("periods", () => {
 });
 
 describe("links to the Reports page", () => {
-  it("carries this year, and a chosen currency, which Reports also has", () => {
+  it("carries the period, and a chosen currency, which Reports also has", () => {
     expect(reportLink("income", "ytd", "EUR")).toBe(
       "/reports?period=ytd&currency=EUR#income",
     );
     expect(reportLink("profit", "ytd")).toBe("/reports?period=ytd#profit");
+    expect(reportLink("profit", "30d")).toBe("/reports?period=30d#profit");
+    expect(reportLink("profit", "90d", "INR")).toBe(
+      "/reports?period=90d&currency=INR#profit",
+    );
   });
 
-  it("leaves out its default 12 months, and periods it doesn't have", () => {
-    expect(reportLink("ageing", "12m")).toBe("/reports#ageing");
-    expect(reportLink("ageing", "30d")).toBe("/reports#ageing");
-    expect(reportLink("income", "90d", "INR")).toBe(
-      "/reports?currency=INR#income",
+  it("names no period for a section that is as of today", () => {
+    expect(reportLink("ageing", null)).toBe("/reports#ageing");
+    expect(reportLink("ageing", null, "EUR")).toBe(
+      "/reports?currency=EUR#ageing",
     );
+  });
+
+  it("leaves out its default 12 months", () => {
+    expect(reportLink("ageing", "12m")).toBe("/reports#ageing");
+    expect(reportLink("profit", "12m", "EUR")).toBe(
+      "/reports?currency=EUR#profit",
+    );
+  });
+});
+
+describe("links to the records behind each figure", () => {
+  it.each([
+    ["30d", "30d"],
+    ["90d", "90d"],
+    ["12m", "12m"],
+    ["ytd", "this-year"],
+  ])(
+    "opens what was billed and received over %s as the lists' %s",
+    (period, list) => {
+      expect(billedLink(period)).toBe(`/documents?type=billed&period=${list}`);
+      expect(billedLink(period, "EUR")).toBe(
+        `/documents?type=billed&period=${list}&currency=EUR`,
+      );
+      expect(receivedLink(period)).toBe(`/payments?period=${list}`);
+      expect(receivedLink(period, "EUR")).toBe(
+        `/payments?period=${list}&currency=EUR`,
+      );
+    },
+  );
+
+  it("opens the invoices owed in each week, soonest due first, and the overdue ones", () => {
+    expect(
+      ["overdue", "thisWeek", "nextWeek", "weekAfter", "later"].map((key) =>
+        owedWeekLink(key),
+      ),
+    ).toEqual([
+      "/documents?status=overdue",
+      "/documents?status=outstanding&due=this-week&sort=dueDate&dir=asc",
+      "/documents?status=outstanding&due=next-week&sort=dueDate&dir=asc",
+      "/documents?status=outstanding&due=week-after&sort=dueDate&dir=asc",
+      "/documents?status=outstanding&due=later&sort=dueDate&dir=asc",
+    ]);
+    expect(owedWeekLink("overdue", "EUR")).toBe(
+      "/documents?status=overdue&currency=EUR",
+    );
+    expect(owedWeekLink("nextWeek", "EUR")).toBe(
+      "/documents?status=outstanding&due=next-week&currency=EUR&sort=dueDate&dir=asc",
+    );
+  });
+
+  it("opens each payment status, which counts every currency", () => {
+    expect(
+      ["paid", "partial", "unpaid", "overdue"].map((status) =>
+        statusLink(status),
+      ),
+    ).toEqual([
+      "/documents?status=paid",
+      "/documents?status=partial",
+      "/documents?status=unpaid",
+      "/documents?status=overdue",
+    ]);
   });
 });
 

@@ -186,7 +186,10 @@ const DashboardPage = () => {
                 />
               </div>
               <div className={attentionPair}>
-                <AttentionPanel snapshot={snapshot} />
+                <AttentionPanel
+                  snapshot={snapshot}
+                  currencyChosen={Boolean(params.get("currency"))}
+                />
                 <DocumentStatus
                   snapshot={snapshot}
                   total={snapshot.documents}

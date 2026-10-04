@@ -206,3 +206,25 @@ it.each(["/reports#%", "/reports#nowhere", "/reports"])(
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   },
 );
+
+it("reports on the overview's last 90 days when its profit opens the page", () => {
+  withFigures();
+  const scrolled = [];
+  Element.prototype.scrollIntoView = vi.fn(function () {
+    scrolled.push(this.id);
+  });
+  const page = render("/reports?period=90d#profit");
+  expect(useGetReportQuery).toHaveBeenLastCalledWith({
+    period: "90d",
+    view: undefined,
+  });
+  expect(useGetProfitReportQuery).toHaveBeenLastCalledWith("90d");
+  const period = [...page.querySelectorAll("label")]
+    .find((label) => label.textContent.startsWith("Period"))
+    .querySelector("select");
+  expect(period.value).toBe("90d");
+  expect(
+    [...period.options].slice(0, 3).map((option) => option.textContent),
+  ).toEqual(["Last 30 days", "Last 90 days", "Last 3 months"]);
+  expect(scrolled).toEqual(["profit"]);
+});

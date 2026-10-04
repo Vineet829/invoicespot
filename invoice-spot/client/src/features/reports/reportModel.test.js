@@ -12,8 +12,10 @@ import {
 } from "./reportModel";
 
 describe("reportModel", () => {
-  it("offers the recent periods, then each earlier year", () => {
+  it("offers the last 30 and 90 days first, then the recent months and each earlier year", () => {
     expect(periodOptions([2025, 2024]).map((option) => option.value)).toEqual([
+      "30d",
+      "90d",
       "3m",
       "6m",
       "12m",
@@ -25,6 +27,10 @@ describe("reportModel", () => {
       value: "ytd",
       label: "This year",
     });
+    expect(periodOptions().slice(0, 2)).toEqual([
+      { value: "30d", label: "Last 30 days" },
+      { value: "90d", label: "Last 90 days" },
+    ]);
   });
 
   it("rounds the axis up to four even steps", () => {

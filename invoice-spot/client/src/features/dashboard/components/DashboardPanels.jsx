@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { FiAlertCircle } from "react-icons/fi";
-import { getStatusRingRatio } from "../dashboardModel";
+import { getStatusRingRatio, statusLink } from "../dashboardModel";
 import {
   hoverLabel,
   hoverValue,
@@ -242,17 +243,39 @@ export const statusCard =
   "relative grid min-w-0 flex-1 grid-cols-[260px_minmax(0,1fr)] grid-rows-[auto_1fr_auto] items-center gap-x-8 gap-y-5 rounded-3xl border border-white/95 bg-white/[.72] px-[26px] py-6 min-[1200px]:grid-cols-[170px_minmax(0,1fr)] min-[1200px]:gap-x-6 min-[1200px]:gap-y-3 min-[1200px]:px-5 min-[1200px]:py-[18px] max-[700px]:flex max-[700px]:flex-col max-[700px]:gap-7 max-[700px]:rounded-[20px] max-[700px]:px-5 max-[700px]:py-[22px] max-[700px]:[&>:not(svg)]:w-full";
 export const statusLegend = "col-start-2 row-start-2";
 const statusRow = (index) =>
-  `flex items-center justify-between gap-4 py-3 transition-opacity duration-200 min-[1200px]:py-2 ${index > 0 ? "border-t border-[#23273514]" : ""}`;
+  `relative flex items-center justify-between gap-4 py-3 transition-opacity duration-200 min-[1200px]:py-2 ${index > 0 ? "border-t border-[#23273514]" : ""}`;
+// A status with documents opens them: its name is a link that covers the
+// whole row, above the rolling digits, and the row shows the link's focus.
+const statusLinkClass =
+  "after:absolute after:inset-0 after:z-[1] after:content-[''] hover:underline hover:underline-offset-4 focus-visible:outline-none";
+const statusFocus =
+  "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#5b47a0]";
 const overdueBar =
   "flex min-h-[82px] items-center gap-4 rounded-[22px] border border-white/90 bg-overdue/85 px-5 py-[18px] min-[1200px]:min-h-0 min-[1200px]:px-4 min-[1200px]:py-3 max-[700px]:gap-3 max-[700px]:p-4";
 
+// The overdue box opens the overdue invoices, when there are any.
+const OverdueBox = ({ count, children }) =>
+  count > 0 ? (
+    <Link
+      to={statusLink("overdue")}
+      className={`${overdueBar} transition-colors hover:bg-overdue`}
+      aria-label={`Overdue: ${count.toLocaleString("en")} unpaid ${count === 1 ? "invoice" : "invoices"} past their due date. Open them`}
+    >
+      {children}
+    </Link>
+  ) : (
+    <div className={overdueBar}>{children}</div>
+  );
+
+// The documents with each payment status, and the overdue invoices, open the
+// Documents list with that filter. The counts take in every currency.
 export const DocumentStatus = ({ snapshot, total }) => {
   const [active, setActive] = useState(null);
   const { containerRef, card, show, hide } = useHoverCard();
   const statuses = [
-    ["Paid", "Settled in full", snapshot.paid],
-    ["Partially paid", "Part received", snapshot.partial],
-    ["Unpaid", "Nothing received yet", snapshot.unpaid],
+    ["Paid", "Settled in full", snapshot.paid, "paid"],
+    ["Partially paid", "Part received", snapshot.partial, "partial"],
+    ["Unpaid", "Nothing received yet", snapshot.unpaid, "unpaid"],
   ];
   const hoverRing = (index, event) => {
     const [label, detail, value] = statuses[index];
@@ -310,9 +333,9 @@ export const DocumentStatus = ({ snapshot, total }) => {
           onLeave={leaveRing}
         />
         <dl className={statusLegend}>
-          {statuses.map(([label, detail, value], index) => (
+          {statuses.map(([label, detail, value, status], index) => (
             <div
-              className={`${statusRow(index)} ${active != null && active !== index ? "opacity-[.45]" : ""}`}
+              className={`${statusRow(index)} ${value > 0 ? statusFocus : ""} ${active != null && active !== index ? "opacity-[.45]" : ""}`}
               key={label}
               onMouseEnter={() => setActive(index)}
               onMouseLeave={() => setActive(null)}
@@ -323,7 +346,17 @@ export const DocumentStatus = ({ snapshot, total }) => {
                   aria-hidden="true"
                 />
                 <span>
-                  <span>{label}</span>
+                  {value > 0 ? (
+                    <Link
+                      to={statusLink(status)}
+                      className={statusLinkClass}
+                      aria-label={`${label}: ${value.toLocaleString("en")} ${value === 1 ? "document" : "documents"}. Open them`}
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    <span>{label}</span>
+                  )}
                   <small className="mt-0.5 block text-[13px] text-spot-muted">
                     {detail}
                   </small>
@@ -340,7 +373,7 @@ export const DocumentStatus = ({ snapshot, total }) => {
         </p>
         <HoverCard card={card} />
       </div>
-      <div className={overdueBar}>
+      <OverdueBox count={snapshot.overdue}>
         <span
           className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-white/75 text-overdue-icon min-[1200px]:size-[38px] min-[1200px]:rounded-[13px] max-[700px]:size-9 max-[700px]:rounded-xl [&>svg]:size-[19px] [&>svg]:stroke-[1.6]"
           aria-hidden="true"
@@ -358,7 +391,7 @@ export const DocumentStatus = ({ snapshot, total }) => {
             <DashboardNumber value={snapshot.overdue.toLocaleString("en")} />
           </dd>
         </dl>
-      </div>
+      </OverdueBox>
     </section>
   );
 };
