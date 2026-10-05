@@ -4,21 +4,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.config.DemoProperties;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -90,6 +98,7 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
                 where d.created_by_pkid = ? and e.type = 'PAYMENT_RECORDED'
                 """, owner)).isEqualTo(result.payments());
         assertThat(count("select count(*) from expenses where recorded_by_pkid = ?", owner)).isZero();
+        assertThat(count("select count(*) from recurring_schedules where created_by_pkid = ?", owner)).isZero();
 
         DemoDataSeeder.Result again = seeder.seed(demo.getEmail());
         assertThat(again.seeded()).isFalse();
@@ -249,11 +258,138 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("an account with the rest of the sample data gets three sample invoices repeating from the coming"
+            + " weeks, once")
+    void recurringOnce() throws Exception {
+        User demo = createUser();
+        Long business = businessOf(demo).getPkid();
+        seeder.seed(demo.getEmail());
+
+        DemoDataSeeder.RecurringResult result = seeder.seedRecurring(demo.getEmail());
+
+        assertThat(result.seeded()).isTrue();
+        assertThat(result.schedules()).isEqualTo(3);
+        LocalDate today = LocalDate.now(ZONE);
+        List<Map<String, Object>> schedules = jdbcTemplate.queryForList("""
+                select s.frequency, s.next_run,
+                       (select string_agg(i.item_name, ', ') from document_billing_items i
+                        where i.document_pkid = s.template_pkid) as items
+                from recurring_schedules s
+                where s.business_pkid = ?
+                order by s.pkid
+                """, business);
+        assertThat(schedules)
+                .extracting(schedule -> schedule.get("frequency"))
+                .containsExactly("MONTHLY", "MONTHLY", "QUARTERLY");
+        assertThat(schedules)
+                .extracting(schedule -> ((Date) schedule.get("next_run")).toLocalDate())
+                .containsExactly(today.plusDays(5), today.plusDays(12), today.plusDays(26));
+        assertThat(schedules)
+                .extracting(schedule -> (String) schedule.get("items"))
+                .satisfiesExactly(
+                        items -> assertThat(items).contains("Hosting and maintenance (monthly)"),
+                        items -> assertThat(items).contains("Consulting (hourly)"),
+                        items -> assertThat(items).contains("Brand strategy workshop"));
+        // Each repeats a sample invoice of its own in dollars, made by the
+        // account, and issues each new one as it is made, without emailing it.
+        assertThat(count("""
+                select count(distinct s.template_pkid) from recurring_schedules s
+                join documents d on d.pkid = s.template_pkid
+                where s.business_pkid = ? and s.created_by_pkid = ? and d.document_type = 'Invoice'
+                  and d.currency = 'USD' and d.issued_at is not null and d.voided_at is null
+                  and s.issue_automatically and not s.email_automatically and not s.paused
+                """, business, demo.getPkid())).isEqualTo(3);
+        read(bearer(demo), get("/api/v1/report/overview"))
+                .andExpect(jsonPath("$.comingUp.recurring.active").value(3))
+                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[0].date").value(today.plusDays(5).toString()));
+
+        DemoDataSeeder.RecurringResult again = seeder.seedRecurring(demo.getEmail());
+        assertThat(again.seeded()).isFalse();
+        assertThat(again.reason()).isEqualTo("the demo account already has recurring invoices");
+        assertThat(count("select count(*) from recurring_schedules where business_pkid = ?", business)).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("an account with a schedule of its own gets no sample ones, and one without sample invoices gets none")
+    void ownSchedules() throws Exception {
+        User demo = createUser();
+        Long business = businessOf(demo).getPkid();
+        seeder.seed(demo.getEmail());
+        UUID invoice = jdbcTemplate.queryForObject(
+                "select id from documents where business_pkid = ? and document_type = 'Invoice' order by pkid limit 1",
+                UUID.class,
+                business);
+        mockMvc.perform(post("/api/v1/recurring")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(demo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"documentId\": \"%s\", \"frequency\": \"YEARLY\", \"startDate\": \"%s\"}"
+                                .formatted(invoice, LocalDate.now(ZONE).plusDays(1))))
+                .andExpect(status().isCreated());
+
+        DemoDataSeeder.RecurringResult result = seeder.seedRecurring(demo.getEmail());
+        assertThat(result.seeded()).isFalse();
+        assertThat(result.reason()).isEqualTo("the demo account already has recurring invoices");
+        assertThat(count("select count(*) from recurring_schedules where business_pkid = ?", business)).isEqualTo(1);
+
+        User bare = createUser();
+        DemoDataSeeder.RecurringResult none = seeder.seedRecurring(bare.getEmail());
+        assertThat(none.seeded()).isFalse();
+        assertThat(none.reason()).isEqualTo("the demo account has no sample invoices to repeat");
+    }
+
+    @Test
+    @DisplayName("the sample invoices to repeat are found however their items were spelled when they were added")
+    void spelledDifferently() {
+        User demo = createUser();
+        Long business = businessOf(demo).getPkid();
+        seeder.seed(demo.getEmail());
+        jdbcTemplate.update("""
+                update document_billing_items i set item_name = ' ' || upper(i.item_name) || ' '
+                from documents d where d.pkid = i.document_pkid and d.business_pkid = ?
+                """, business);
+
+        DemoDataSeeder.RecurringResult result = seeder.seedRecurring(demo.getEmail());
+
+        assertThat(result.seeded()).isTrue();
+        assertThat(result.schedules()).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForList("""
+                select i.item_name from recurring_schedules s
+                join document_billing_items i on i.document_pkid = s.template_pkid
+                where s.business_pkid = ?
+                """, String.class, business))
+                .contains(
+                        " HOSTING AND MAINTENANCE (MONTHLY) ", " CONSULTING (HOURLY) ", " BRAND STRATEGY WORKSHOP ");
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    @DisplayName("starting up adds each kind of sample data on its own and says so, then says why it adds none again")
+    void startup(CapturedOutput output) {
+        User demo = createUser();
+        DemoSeedRunner runner = new DemoSeedRunner(seeder, new DemoProperties(demo.getEmail()));
+
+        runner.run(null);
+        assertThat(output)
+                .contains("Added sample data to the demo account: 12 clients, 10 items, 48 documents")
+                .contains("Added sample expenses to the demo account: 14 expenses")
+                .contains("Added sample recurring invoices to the demo account: 3 schedules");
+
+        runner.run(null);
+        assertThat(output)
+                .contains("No sample data added: the demo account already has the sample data")
+                .contains("No sample expenses added: the demo account already has the sample expenses")
+                .contains("No sample recurring invoices added: the demo account already has recurring invoices");
+    }
+
+    @Test
     @DisplayName("an account that doesn't exist is left alone")
     void missingAccount() {
         assertThat(seeder.seed("nobody@invoicespot.test").seeded()).isFalse();
         DemoDataSeeder.ExpenseResult expenses = seeder.seedExpenses("nobody@invoicespot.test");
         assertThat(expenses.seeded()).isFalse();
         assertThat(expenses.reason()).isEqualTo("the demo account nobody@invoicespot.test does not exist");
+        DemoDataSeeder.RecurringResult recurring = seeder.seedRecurring("nobody@invoicespot.test");
+        assertThat(recurring.seeded()).isFalse();
+        assertThat(recurring.reason()).isEqualTo("the demo account nobody@invoicespot.test does not exist");
     }
 }

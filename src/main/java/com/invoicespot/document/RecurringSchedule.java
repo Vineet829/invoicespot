@@ -66,4 +66,16 @@ public class RecurringSchedule extends BaseEntity {
 
     @Column(name = "paused", nullable = false)
     private boolean paused;
+
+    // The date of the run after the given number of runs, counted from its
+    // start date, less the runs made before that date was set; none once the
+    // most runs allowed are made, or when the run would fall after its end
+    // date.
+    public LocalDate runAfter(int runs) {
+        if (maxRuns != null && runs >= maxRuns) {
+            return null;
+        }
+        LocalDate run = frequency.run(startDate, runs - startOffset);
+        return endDate != null && run.isAfter(endDate) ? null : run;
+    }
 }

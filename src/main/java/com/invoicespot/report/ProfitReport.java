@@ -103,13 +103,14 @@ public class ProfitReport {
                         .toList());
     }
 
-    // Categories that cost most first, and by name, whatever its case, when
-    // two cost the same, then by spelling, so that none comes in whatever
-    // order the database read it: as they are listed here and on the overview.
-    static <T> Comparator<T> largestFirst(Function<T, BigDecimal> cost, Function<T, String> category) {
-        return Comparator.comparing(cost, Comparator.<BigDecimal>reverseOrder())
-                .thenComparing(row -> category.apply(row).toLowerCase(Locale.ROOT))
-                .thenComparing(category);
+    // The largest amounts first, and by name, whatever its case, when two are
+    // the same, then by spelling, so that none comes in whatever order the
+    // database read it: categories as they are listed here and on the
+    // overview, and the clients and items the overview lists.
+    static <T> Comparator<T> largestFirst(Function<T, BigDecimal> amount, Function<T, String> name) {
+        return Comparator.comparing(amount, Comparator.<BigDecimal>reverseOrder())
+                .thenComparing(row -> name.apply(row).toLowerCase(Locale.ROOT))
+                .thenComparing(name);
     }
 
     private static <T> BigDecimal sum(List<T> rows, Function<T, BigDecimal> amount) {

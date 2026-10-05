@@ -5,14 +5,18 @@ import com.invoicespot.business.BusinessService;
 import com.invoicespot.customer.CustomerRepository;
 import com.invoicespot.customer.CustomerService;
 import com.invoicespot.customer.dto.CreateCustomerRequest;
+import com.invoicespot.document.DocumentLedger;
 import com.invoicespot.document.DocumentService;
 import com.invoicespot.document.DocumentType;
 import com.invoicespot.document.PaymentMethod;
+import com.invoicespot.document.RecurringScheduleRepository;
+import com.invoicespot.document.RecurringService;
 import com.invoicespot.document.dto.BillingItemDto;
 import com.invoicespot.document.dto.CreateDocumentRequest;
 import com.invoicespot.document.dto.CreatePaymentRequest;
 import com.invoicespot.document.dto.DocumentResponse;
 import com.invoicespot.document.dto.PaymentRecordDto;
+import com.invoicespot.document.dto.RecurringRequest;
 import com.invoicespot.expense.ExpenseRepository;
 import com.invoicespot.expense.ExpenseService;
 import com.invoicespot.expense.dto.ExpenseRequest;
@@ -38,6 +42,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -67,6 +72,8 @@ public class DemoDataSeeder {
     private final DocumentService documentService;
     private final ExpenseService expenseService;
     private final ExpenseRepository expenseRepository;
+    private final RecurringService recurringService;
+    private final RecurringScheduleRepository scheduleRepository;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
@@ -86,6 +93,8 @@ public class DemoDataSeeder {
             DocumentService documentService,
             ExpenseService expenseService,
             ExpenseRepository expenseRepository,
+            RecurringService recurringService,
+            RecurringScheduleRepository scheduleRepository,
             JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate,
             Clock clock) {
@@ -100,6 +109,8 @@ public class DemoDataSeeder {
         this.documentService = documentService;
         this.expenseService = expenseService;
         this.expenseRepository = expenseRepository;
+        this.recurringService = recurringService;
+        this.scheduleRepository = scheduleRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
@@ -117,6 +128,14 @@ public class DemoDataSeeder {
 
         static ExpenseResult skipped(String reason) {
             return new ExpenseResult(false, reason, 0);
+        }
+    }
+
+    // How many sample recurring invoices were added, or why none were.
+    public record RecurringResult(boolean seeded, String reason, int schedules) {
+
+        static RecurringResult skipped(String reason) {
+            return new RecurringResult(false, reason, 0);
         }
     }
 
@@ -148,6 +167,24 @@ public class DemoDataSeeder {
             return ExpenseResult.skipped("the demo account already has expenses of its own");
         }
         return transactionTemplate.execute(status -> new ExpenseResult(true, null, expenses(owner.get())));
+    }
+
+    // Sample recurring invoices, for an account without any schedules, each
+    // repeating one of its sample invoices. They came after the rest of the
+    // sample data, so they are added on their own, to an account that has
+    // the rest too.
+    public RecurringResult seedRecurring(String demoEmail) {
+        Optional<BusinessAccess> owner = owner(demoEmail);
+        if (owner.isEmpty()) {
+            return RecurringResult.skipped(missing(demoEmail));
+        }
+        if (scheduleRepository.existsByBusinessPkid(owner.get().businessPkid())) {
+            return RecurringResult.skipped("the demo account already has recurring invoices");
+        }
+        int schedules = transactionTemplate.execute(status -> schedules(owner.get()));
+        return schedules == 0
+                ? RecurringResult.skipped("the demo account has no sample invoices to repeat")
+                : new RecurringResult(true, null, schedules);
     }
 
     // The demo account's own business, as its owner, if the account exists.
@@ -218,6 +255,48 @@ public class DemoDataSeeder {
         entityManager.flush();
         recorded.forEach(expense -> backdate("expenses", expense.id(), expense.date(), zone));
         return recorded.size();
+    }
+
+    // Each sample schedule repeats an issued invoice in dollars that bills its
+    // item: the one with the fewest lines, the latest of those, that no other
+    // sample schedule repeats. The item is matched by name whatever its letter
+    // case and the spaces around it, so an account seeded when it was spelled
+    // another way still has it. Its next invoice is made the given number of
+    // days after today, issued as it is made and not emailed. A schedule whose
+    // item no invoice bills is left out.
+    private int schedules(BusinessAccess owner) {
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of(ZONE)));
+        List<UUID> repeated = new ArrayList<>();
+        for (DemoData.SampleSchedule schedule : DemoData.SCHEDULES) {
+            Optional<UUID> invoice = jdbcTemplate
+                    .queryForList(
+                            """
+                            select d.id from documents d
+                            where d.business_pkid = ? and %s and d.document_type = 'Invoice' and d.currency = 'USD'
+                              and exists (select 1 from document_billing_items i
+                                          where i.document_pkid = d.pkid and lower(btrim(i.item_name)) = ?)
+                            order by (select count(*) from document_billing_items i where i.document_pkid = d.pkid),
+                                     d.issue_date desc, d.pkid desc
+                            """.formatted(DocumentLedger.COUNTED),
+                            UUID.class,
+                            owner.businessPkid(),
+                            schedule.item().toLowerCase(Locale.ROOT))
+                    .stream()
+                    .filter(id -> !repeated.contains(id))
+                    .findFirst();
+            if (invoice.isPresent()) {
+                recurringService.create(owner, new RecurringRequest(
+                        invoice.get().toString(),
+                        schedule.frequency().name(),
+                        today.plusDays(schedule.daysAhead()),
+                        null,
+                        null,
+                        false,
+                        true));
+                repeated.add(invoice.get());
+            }
+        }
+        return repeated.size();
     }
 
     private record Plan(LocalDate issued, DocumentType type, int client) {}

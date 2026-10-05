@@ -1,6 +1,7 @@
 package com.invoicespot.demo;
 
 import com.invoicespot.document.PaymentMethod;
+import com.invoicespot.document.RecurringFrequency;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -20,6 +21,11 @@ final class DemoData {
             BigDecimal tax,
             boolean taxReclaimable,
             PaymentMethod method) {}
+
+    // A sample invoice repeated on a schedule: the item it bills, how often it
+    // repeats, and how many days after the sample data is added the next one
+    // is made.
+    record SampleSchedule(String item, RecurringFrequency frequency, int daysAhead) {}
 
     static final String MARKER_EMAIL = "accounts@harborandpine.example";
 
@@ -82,6 +88,13 @@ final class DemoData {
     // Who the sample expenses were paid to, which tells them from the
     // account's own.
     static final List<String> EXPENSE_VENDORS = EXPENSES.stream().map(SampleExpense::vendor).toList();
+
+    // Hosting billed every month, a monthly retainer of consulting hours, and
+    // a strategy workshop every quarter, each next made in the coming weeks.
+    static final List<SampleSchedule> SCHEDULES = List.of(
+            new SampleSchedule("Hosting and maintenance (monthly)", RecurringFrequency.MONTHLY, 5),
+            new SampleSchedule("Consulting (hourly)", RecurringFrequency.MONTHLY, 12),
+            new SampleSchedule("Brand strategy workshop", RecurringFrequency.QUARTERLY, 26));
 
     static final String NOTES = "Thank you for working with us. It's a pleasure to be part of your project.";
     static final String TERMS =

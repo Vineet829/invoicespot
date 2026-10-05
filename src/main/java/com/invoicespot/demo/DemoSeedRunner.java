@@ -47,5 +47,17 @@ public class DemoSeedRunner implements ApplicationRunner {
         } catch (RuntimeException exception) {
             LOGGER.error("Adding sample expenses to the demo account failed", exception);
         }
+        // Sample recurring invoices came later still, so they are added on
+        // their own too.
+        try {
+            DemoDataSeeder.RecurringResult result = seeder.seedRecurring(properties.email());
+            if (result.seeded()) {
+                LOGGER.info("Added sample recurring invoices to the demo account: {} schedules", result.schedules());
+            } else {
+                LOGGER.info("No sample recurring invoices added: {}", result.reason());
+            }
+        } catch (RuntimeException exception) {
+            LOGGER.error("Adding sample recurring invoices to the demo account failed", exception);
+        }
     }
 }

@@ -24,4 +24,9 @@ public record OverviewResponse(
         List<TrendBucket> trend,
         List<OwedWeek> owedByWeek,
         OverviewAttention attention,
-        OverviewSpending spending) {}
+        OverviewSpending spending,
+        List<OverviewClient> topClients,
+        List<OverviewItem> topItems,
+        BigDecimal itemsTotal,
+        OverviewComingUp comingUp,
+        OverviewSetup setup) {}

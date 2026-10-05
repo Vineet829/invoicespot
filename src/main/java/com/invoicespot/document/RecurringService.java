@@ -218,12 +218,7 @@ public class RecurringService {
 
     // The run after the ones done, or none once the count or end date is met.
     private static LocalDate nextRun(RecurringSchedule schedule) {
-        if (schedule.getMaxRuns() != null && schedule.getRunsDone() >= schedule.getMaxRuns()) {
-            return null;
-        }
-        LocalDate next = schedule.getFrequency()
-                .run(schedule.getStartDate(), schedule.getRunsDone() - schedule.getStartOffset());
-        return schedule.getEndDate() != null && next.isAfter(schedule.getEndDate()) ? null : next;
+        return schedule.runAfter(schedule.getRunsDone());
     }
 
     private static void apply(RecurringSchedule schedule, RecurringRequest request, LocalDate today) {

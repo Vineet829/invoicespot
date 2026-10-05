@@ -1,11 +1,16 @@
 package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Permission;
 import com.invoicespot.document.DocumentLedger;
+import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.report.dto.DocumentSummaryResponse;
+import com.invoicespot.report.dto.OverviewClient;
+import com.invoicespot.report.dto.OverviewItem;
 import com.invoicespot.report.dto.OverviewOwed;
 import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
+import com.invoicespot.report.dto.OverviewSetup;
 import com.invoicespot.report.dto.OverviewSpending;
 import com.invoicespot.report.dto.OverviewTotals;
 import com.invoicespot.report.dto.OwedWeek;
@@ -23,6 +28,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -36,12 +42,35 @@ import org.springframework.transaction.annotation.Transactional;
 // A period's totals, and those of the period before it, count money as the
 // reports do; what is owed is as of today. Spending is what the currency's
 // expenses paid in the period cost, by category, as its profit counts them.
+// The top clients are those the period billed most, as its billed total
+// counts them, and the top items those its lines sold most of before tax,
+// which all add up to its income. What is coming up is the currency's, from
+// today: the invoices schedules will make and the quotations still open.
+// Those who may change the business's details and settings also see what is
+// left to set up.
 @Service
 public class Overview {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
     private static final List<String> WEEKS = List.of("overdue", "thisWeek", "nextWeek", "weekAfter", "later");
     private static final int TOP_CATEGORIES = 5;
+    private static final int TOP_CLIENTS = 5;
+    private static final int TOP_ITEMS = 5;
+    private static final String OTHER_LINES = "Other lines";
+
+    // The name a document linked to no client was saved with, for SQL over
+    // documents aliased d; none for a document linked to one.
+    private static final String SAVED_NAME = "(case when d.customer_pkid is null then d.customer_name end)";
+
+    // What a line comes to before tax, as DocumentTotals works it out: its
+    // quantity at its unit price, less its discount as a percentage, rounded
+    // half up to the cent, for SQL over billing items aliased i. Only the
+    // discount is divided, so that nothing is rounded before the cent.
+    private static final String LINE_NET =
+            "round(i.quantity * coalesce(i.unit_price, 0) * (1 - i.discount / 100), 2)";
+
+    // A credit note's lines take theirs off, for SQL over documents aliased d.
+    private static final String SIGN = "(case when d.document_type = 'Credit Note' then -1 else 1 end)";
 
     private record Money(BigDecimal expected, BigDecimal received, BigDecimal withheld) {}
 
@@ -54,6 +83,7 @@ public class Overview {
     private final ReportQueries queries;
     private final PaymentQueries paymentQueries;
     private final NeedsAttention needsAttention;
+    private final ComingUp comingUp;
     private final SettingsService settingsService;
     private final Clock clock;
 
@@ -62,12 +92,14 @@ public class Overview {
             ReportQueries queries,
             PaymentQueries paymentQueries,
             NeedsAttention needsAttention,
+            ComingUp comingUp,
             SettingsService settingsService,
             Clock clock) {
         this.jdbc = jdbc;
         this.queries = queries;
         this.paymentQueries = paymentQueries;
         this.needsAttention = needsAttention;
+        this.comingUp = comingUp;
         this.settingsService = settingsService;
         this.clock = clock;
     }
@@ -86,6 +118,7 @@ public class Overview {
         Counts counts = counts(businessPkid, startOfToday);
         MoneyByDay byDay = MoneyByDay.read(queries, businessPkid, currency, window);
         List<Owed> owed = owed(businessPkid, currency);
+        List<OverviewItem> items = itemsSold(businessPkid, currency, window);
         return new OverviewResponse(
                 true,
                 currencies,
@@ -110,7 +143,12 @@ public class Overview {
                 trend(byDay, window),
                 owedByWeek(owed, zone, today),
                 needsAttention.list(businessPkid, currency, zone, today),
-                spending(businessPkid, currency, window, byDay));
+                spending(businessPkid, currency, window, byDay),
+                topClients(businessPkid, currency, window),
+                items.stream().limit(TOP_ITEMS).toList(),
+                items.stream().map(OverviewItem::amount).reduce(ZERO, BigDecimal::add),
+                comingUp.read(businessPkid, currency, zone, today),
+                access.can(Permission.MANAGE_BUSINESS) ? setup(businessPkid, settings) : null);
     }
 
     // The money bar over the documents list, in a currency chosen as above:
@@ -290,6 +328,118 @@ public class Overview {
                                 rest.stream().map(ReportQueries.CategorySpent::amount).reduce(ZERO, BigDecimal::add),
                                 rest.stream().mapToLong(ReportQueries.CategorySpent::expenses).sum(),
                                 rest.size()));
+    }
+
+    // The five clients the period billed most, as its billed total counts
+    // them, largest first and by name when two were billed the same, each
+    // with how many documents billed it and what it owes now on invoices of
+    // any date. A client is the one documents are linked to, named as it is
+    // now, or, for documents linked to none, the name they were saved with.
+    // Clients named alike stay in the order they were added.
+    private List<OverviewClient> topClients(Long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        with billed as (
+                            select d.customer_pkid, %1$s as saved_name, sum(%2$s) as billed, count(*) as documents
+                            from documents d
+                            where d.business_pkid = :business and %3$s and coalesce(d.currency, '') = :currency
+                              and d.issue_date between :from and :to
+                            group by 1, 2
+                        ),
+                        owed as (
+                            select d.customer_pkid, %1$s as saved_name, sum(%4$s) as owed
+                            from documents d
+                            where d.business_pkid = :business and %5$s and coalesce(d.currency, '') = :currency
+                            group by 1, 2
+                        )
+                        select c.id as client_id, coalesce(c.name, b.saved_name) as client, b.billed,
+                               coalesce(o.owed, 0) as owed, b.documents
+                        from billed b
+                        left join customers c on c.pkid = b.customer_pkid
+                        left join owed o on o.customer_pkid is not distinct from b.customer_pkid
+                            and o.saved_name is not distinct from b.saved_name
+                        order by b.customer_pkid, b.saved_name
+                        """.formatted(
+                                SAVED_NAME,
+                                DocumentLedger.BILLED,
+                                DocumentLedger.BILLED_DOCUMENT,
+                                DocumentLedger.OWED,
+                                DocumentLedger.OWED_INVOICE))
+                .param("business", businessPkid)
+                .param("currency", currency)
+                .param("from", window.from())
+                .param("to", window.to())
+                .query((result, rowNumber) -> new OverviewClient(
+                        result.getObject("client_id", UUID.class),
+                        result.getString("client"),
+                        result.getBigDecimal("billed"),
+                        result.getBigDecimal("owed").setScale(2),
+                        result.getLong("documents")))
+                .list()
+                .stream()
+                .sorted(ProfitReport.largestFirst(
+                        OverviewClient::billed, client -> Objects.requireNonNullElse(client.client(), "")))
+                .limit(TOP_CLIENTS)
+                .toList();
+    }
+
+    // Every item the lines of the period's invoices and receipts sold, less
+    // what the lines of its credit notes took off, largest first and by name
+    // when two came to the same. An item is its name, whatever its letter case
+    // and the spaces around it, spelled as it was first used, and lines
+    // without a name are one item. As each document's lines add up to it
+    // before tax, they all add up to the period's income.
+    private List<OverviewItem> itemsSold(Long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select (array_agg(btrim(i.item_name) order by d.pkid, i.position))[1] as item,
+                               sum(%1$s * i.quantity) as quantity, sum(%1$s * %2$s) as amount,
+                               count(distinct d.pkid) as documents
+                        from documents d
+                        join document_billing_items i on i.document_pkid = d.pkid
+                        where d.business_pkid = :business and %3$s and coalesce(d.currency, '') = :currency
+                          and d.issue_date between :from and :to
+                        group by lower(nullif(btrim(i.item_name), ''))
+                        """.formatted(SIGN, LINE_NET, DocumentLedger.BILLED_DOCUMENT))
+                .param("business", businessPkid)
+                .param("currency", currency)
+                .param("from", window.from())
+                .param("to", window.to())
+                .query((result, rowNumber) -> {
+                    String item = result.getString("item");
+                    return new OverviewItem(
+                            item == null || item.isEmpty() ? OTHER_LINES : item,
+                            BillingItemResponse.plain(result.getBigDecimal("quantity")),
+                            result.getBigDecimal("amount"),
+                            result.getLong("documents"));
+                })
+                .list()
+                .stream()
+                .sorted(ProfitReport.largestFirst(OverviewItem::amount, OverviewItem::item))
+                .toList();
+    }
+
+    // What is left to set up, step by step: an address and a tax ID, a logo,
+    // a way for clients to pay, a first invoice issued and not void, and
+    // someone else in the team. A detail of nothing but spaces isn't set.
+    private OverviewSetup setup(Long businessPkid, BusinessSettings settings) {
+        return jdbc.sql("""
+                        select nullif(btrim(b.address), '') is not null and nullif(btrim(b.tax_id), '') is not null
+                                   as business_details,
+                               nullif(btrim(b.logo), '') is not null as logo,
+                               exists (select 1 from documents d
+                                       where d.business_pkid = b.pkid and %s and d.document_type = 'Invoice')
+                                   as first_invoice,
+                               (select count(*) from business_members m where m.business_pkid = b.pkid) > 1 as team
+                        from businesses b
+                        where b.pkid = :business
+                        """.formatted(DocumentLedger.COUNTED))
+                .param("business", businessPkid)
+                .query((result, rowNumber) -> new OverviewSetup(List.of(
+                        new OverviewSetup.Step("businessDetails", result.getBoolean("business_details")),
+                        new OverviewSetup.Step("logo", result.getBoolean("logo")),
+                        new OverviewSetup.Step("paymentDetails", settings.getPaymentDetails().hasWayToPay()),
+                        new OverviewSetup.Step("firstInvoice", result.getBoolean("first_invoice")),
+                        new OverviewSetup.Step("team", result.getBoolean("team")))))
+                .single();
     }
 
     // Whether the currency had money dated before the period: an invoice or
