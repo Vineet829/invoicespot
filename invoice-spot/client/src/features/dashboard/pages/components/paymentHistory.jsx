@@ -16,11 +16,11 @@ import {
 import {
   hoverLabel,
   hoverValue,
-  pageSizeSelect,
   pagerButton,
   panelNote,
   sectionTitle,
 } from "../../../../components/workspace/pastel";
+import { Select } from "../../../../components/workspace/Select";
 
 const AVATAR_TONES = [
   "bg-avatar-lilac text-avatar-lilac-ink",
@@ -251,11 +251,11 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments, currency }) => {
       <div className="flex flex-[0_0_36px] items-center justify-between gap-3 border-t border-[#23273512] pt-1 max-[700px]:flex-wrap max-[700px]:pt-3 coarse:basis-[50px]">
         <label className="flex items-center gap-2 text-[12.5px] text-spot-muted">
           Rows per page
-          <select
-            className={pageSizeSelect}
+          <Select
+            size="mini"
             value={rowsPerPage}
-            onChange={(event) => {
-              setRowsPerPage(Number(event.target.value));
+            onChange={(value) => {
+              setRowsPerPage(Number(value));
               setPage(0);
             }}
           >
@@ -264,7 +264,7 @@ const PaymentHistory = ({ sortPaymentHistory, paymentDocuments, currency }) => {
                 {count === -1 ? "All" : count}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <div className="flex items-center gap-1.5 max-[700px]:ml-auto max-[700px]:flex-wrap">
           <span

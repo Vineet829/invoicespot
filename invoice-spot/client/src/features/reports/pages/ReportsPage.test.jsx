@@ -207,7 +207,7 @@ it.each(["/reports#%", "/reports#nowhere", "/reports"])(
   },
 );
 
-it("reports on the overview's last 90 days when its profit opens the page", () => {
+it("reports on the overview's last 90 days when its profit opens the page", async () => {
   withFigures();
   const scrolled = [];
   Element.prototype.scrollIntoView = vi.fn(function () {
@@ -219,12 +219,17 @@ it("reports on the overview's last 90 days when its profit opens the page", () =
     view: undefined,
   });
   expect(useGetProfitReportQuery).toHaveBeenLastCalledWith("90d");
+  expect(scrolled).toEqual(["profit"]);
   const period = [...page.querySelectorAll("label")]
     .find((label) => label.textContent.startsWith("Period"))
-    .querySelector("select");
+    .querySelector('[role="combobox"]');
   expect(period.value).toBe("90d");
+  // The menu offers the periods, opened to look and closed again.
+  await act(async () => period.click());
   expect(
-    [...period.options].slice(0, 3).map((option) => option.textContent),
+    [...document.querySelectorAll('[role="option"]')]
+      .slice(0, 3)
+      .map((option) => option.textContent),
   ).toEqual(["Last 30 days", "Last 90 days", "Last 3 months"]);
-  expect(scrolled).toEqual(["profit"]);
+  await act(async () => period.click());
 });

@@ -455,16 +455,12 @@ it("switches currency when there is more than one, keeping the period", async ()
     currency: url.searchParams.get("currency") || "USD",
     period: { ...overview.period, key: url.searchParams.get("period") },
   }));
-  const select = page.querySelector("label select");
+  const select = page.querySelector('label [role="combobox"]');
   expect(select.closest("label").textContent).toContain("Currency");
-  expect([...select.options].map((option) => option.value)).toEqual([
-    "USD",
-    "EUR",
-  ]);
-  await act(async () => {
-    select.value = "EUR";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await act(async () => select.click());
+  const offered = [...document.querySelectorAll('[role="option"]')];
+  expect(offered.map((option) => option.dataset.value)).toEqual(["USD", "EUR"]);
+  await act(async () => offered[1].click());
   await act(() => vi.waitFor(() => expect(select.value).toBe("EUR")));
   expect(requests).toEqual([
     "/api/v1/report/overview?period=30d",
@@ -553,12 +549,12 @@ it("keeps the period when the first currency is picked again", async () => {
     currencies: ["USD", "EUR"],
     currency: url.searchParams.get("currency") || "USD",
   }));
-  const select = page.querySelector("label select");
+  const select = page.querySelector('label [role="combobox"]');
   expect(select.value).toBe("EUR");
-  await act(async () => {
-    select.value = "USD";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await act(async () => select.click());
+  await act(async () =>
+    document.querySelector('[role="option"][data-value="USD"]').click(),
+  );
   await act(() => vi.waitFor(() => expect(select.value).toBe("USD")));
   expect(requests).toEqual([
     "/api/v1/report/overview?currency=EUR&period=30d",

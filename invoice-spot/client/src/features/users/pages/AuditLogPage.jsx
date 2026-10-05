@@ -13,7 +13,8 @@ import {
   WorkspacePage,
   serverPagination,
 } from "../../../components/workspace/Workspace";
-import { panelNote, toolbarSelect } from "../../../components/workspace/pastel";
+import { panelNote } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import {
   EVENT_LABELS,
   WARNING_EVENTS,
@@ -68,11 +69,12 @@ const AuditLogPage = () => {
           />
           <label className="min-w-0 max-[700px]:w-full">
             <span className="sr-only">Kind of event</span>
-            <select
-              className={`${toolbarSelect} max-[700px]:w-full`}
+            <Select
+              size="toolbar"
+              className="max-[700px]:w-full"
               value={type}
-              onChange={(event) => {
-                setType(event.target.value);
+              onChange={(kind) => {
+                setType(kind);
                 setPage(0);
               }}
             >
@@ -82,7 +84,7 @@ const AuditLogPage = () => {
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         {query.isLoading ? (

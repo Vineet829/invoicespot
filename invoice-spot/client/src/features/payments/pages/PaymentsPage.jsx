@@ -46,8 +46,8 @@ import {
   rowAction,
   secondaryButton,
   textLink,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 
 const NO_PAYMENTS = [];
 const DESCRIPTION =
@@ -245,12 +245,11 @@ const PaymentsPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Payment method</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={list.method}
-                    onChange={(event) =>
-                      update({ method: event.target.value, page: 1 })
-                    }
+                    onChange={(method) => update({ method, page: 1 })}
                   >
                     {methodOptions(query.data?.methods, list.method).map(
                       (option) => (
@@ -259,23 +258,22 @@ const PaymentsPage = () => {
                         </option>
                       ),
                     )}
-                  </select>
+                  </Select>
                 </label>
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Date paid</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={list.period}
-                    onChange={(event) =>
-                      update({ period: event.target.value, page: 1 })
-                    }
+                    onChange={(period) => update({ period, page: 1 })}
                   >
                     {PERIODS.map((period) => (
                       <option key={period.value} value={period.value}>
                         {period.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <CurrencyFilter
                   value={list.currency}
@@ -284,11 +282,12 @@ const PaymentsPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Sort payments</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={`${list.sort}:${list.dir}`}
-                    onChange={(event) => {
-                      const [sort, dir] = event.target.value.split(":");
+                    onChange={(value) => {
+                      const [sort, dir] = value.split(":");
                       update({ sort, dir, page: 1 });
                     }}
                   >
@@ -297,7 +296,7 @@ const PaymentsPage = () => {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </div>
             </div>

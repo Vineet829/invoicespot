@@ -14,6 +14,7 @@ import {
 } from "react-icons/fi";
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
 import { Dialog } from "./Dialog";
+import { Select } from "./Select";
 import { parseDate } from "../../utils/dates";
 import { formatAmount } from "../../utils/money";
 import { STATUS_LABELS } from "../../features/dashboard/dashboardModel";
@@ -25,7 +26,6 @@ import {
   fieldLabel,
   fileControl,
   inputControl,
-  pageSizeSelect,
   pageSubtitle,
   pageTitle,
   pagerButton,
@@ -268,6 +268,9 @@ export const Amount = ({
   );
 };
 
+// A labelled control with its hint or error below. `as="select"` draws the
+// styled dropdown, which reports its choice as a change event, so a form
+// reads it as it would a native select.
 export const Field = ({
   label,
   error,
@@ -287,6 +290,7 @@ export const Field = ({
       : props.type === "file"
         ? fileControl
         : inputControl;
+  const describedBy = error || hint ? `${id}-hint` : undefined;
   return (
     <div className={`flex min-w-0 flex-col gap-2 ${className}`}>
       <label htmlFor={id} className={fieldLabel}>
@@ -297,15 +301,30 @@ export const Field = ({
           </span>
         )}
       </label>
-      <Control
-        id={id}
-        className={controlClass}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error || hint ? `${id}-hint` : undefined}
-        {...props}
-      >
-        {children}
-      </Control>
+      {as === "select" ? (
+        <Select
+          id={id}
+          label={label}
+          invalid={Boolean(error)}
+          aria-describedby={describedBy}
+          {...props}
+          onChange={(value) =>
+            props.onChange?.({ target: { value, name: props.name } })
+          }
+        >
+          {children}
+        </Select>
+      ) : (
+        <Control
+          id={id}
+          className={controlClass}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          {...props}
+        >
+          {children}
+        </Control>
+      )}
       {(error || hint) && (
         <p
           id={`${id}-hint`}
@@ -458,17 +477,17 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
     <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#23273512] pt-3 max-[700px]:flex-wrap">
       <label className="flex items-center gap-2 text-[12.5px] text-spot-muted">
         Rows per page
-        <select
-          className={pageSizeSelect}
+        <Select
+          size="mini"
           value={size}
-          onChange={(event) => setSize(Number(event.target.value))}
+          onChange={(value) => setSize(Number(value))}
         >
           {sizes.map((n) => (
             <option key={n} value={n}>
               {n === -1 ? "All" : n}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <div className="flex items-center gap-1.5 max-[700px]:ml-auto max-[700px]:flex-wrap">
         <span

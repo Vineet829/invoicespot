@@ -36,8 +36,8 @@ import {
   pageSubtitle,
   pageTitle,
   retryButton,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import PaymentHistory from "./components/paymentHistory";
 
 const NO_PAYMENTS = [];
@@ -143,17 +143,17 @@ const DashboardPage = () => {
             {snapshot?.currencies.length > 1 && (
               <label className="flex items-center gap-2 text-[13px] text-spot-body">
                 Currency
-                <select
-                  className={toolbarSelect}
+                <Select
+                  size="toolbar"
                   value={snapshot.currency}
-                  onChange={(event) => chooseCurrency(event.target.value)}
+                  onChange={chooseCurrency}
                 >
                   {snapshot.currencies.map((currency) => (
                     <option key={currency} value={currency}>
                       {currency}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             )}
           </div>

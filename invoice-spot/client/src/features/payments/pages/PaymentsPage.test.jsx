@@ -176,10 +176,32 @@ const rows = (page) =>
   [...page.querySelectorAll("tbody tr")].map((row) =>
     [...row.children].map((cell) => cell.textContent),
   );
+// The styled dropdown with this label: its trigger, which carries the value
+// chosen.
 const select = (page, label) =>
   [...page.querySelectorAll("label")]
     .find((element) => element.textContent.startsWith(label))
-    ?.querySelector("select");
+    ?.querySelector('[role="combobox"]');
+// What the dropdown offers, opening it to look and closing it again.
+const options = async (combobox) => {
+  await act(async () => combobox.click());
+  const words = [...document.querySelectorAll('[role="option"]')].map(
+    (option) => option.firstChild.textContent,
+  );
+  await act(async () =>
+    combobox.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  return words;
+};
+// Opens the dropdown and picks the option with this value.
+const choose = async (combobox, value) => {
+  await act(async () => combobox.click());
+  await act(async () =>
+    document.querySelector(`[role="option"][data-value="${value}"]`).click(),
+  );
+};
 
 it("lists payments, receipts and refunds as the Received figure opens them", async () => {
   const page = await open("/payments?period=90d");
@@ -241,11 +263,6 @@ const line = (page) =>
   [...page.querySelectorAll("button")]
     .find((button) => button.textContent === "Clear filters")
     ?.parentElement.querySelector("p").textContent;
-const choose = (element, value) =>
-  act(async () => {
-    element.value = value;
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  });
 
 it("says how many payments the filters found and what came in, with receipts counted apart", async () => {
   const page = await open("/payments?period=90d");
@@ -297,11 +314,7 @@ it("says only what the next method's answer counts", async () => {
 
 it("filters by method, date, and sorts as the menus offer", async () => {
   const page = await open("/payments");
-  expect(
-    [...select(page, "Payment method").options].map(
-      (option) => option.textContent,
-    ),
-  ).toEqual([
+  expect(await options(select(page, "Payment method"))).toEqual([
     "All methods",
     "Bank Transfer",
     "Credit Card",
@@ -310,23 +323,15 @@ it("filters by method, date, and sorts as the menus offer", async () => {
     "Others",
     "On a receipt",
   ]);
-  expect(
-    [...select(page, "Sort payments").options].map(
-      (option) => option.textContent,
-    ),
-  ).toEqual([
+  expect(await options(select(page, "Sort payments"))).toEqual([
     "Newest first",
     "Oldest first",
     "Highest amount",
     "Lowest amount",
     "Customer A–Z",
   ]);
-  expect(select(page, "Date paid").options[1].textContent).toBe("Last 30 days");
-  await act(async () => {
-    const method = select(page, "Payment method");
-    method.value = "receipt";
-    method.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  expect((await options(select(page, "Date paid")))[1]).toBe("Last 30 days");
+  await choose(select(page, "Payment method"), "receipt");
   expect(address).toBe("?method=receipt");
   await act(() =>
     vi.waitFor(() =>

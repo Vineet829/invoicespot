@@ -62,6 +62,35 @@ const timeZones = (current) => {
   }
   return [...new Set(["UTC", current, browserZone(), ...zones])].sort();
 };
+// A zone's offset from UTC today, shown beside it in the menu; worked out
+// once per zone, as there are hundreds.
+const offsets = new Map();
+const zoneOffset = (zone) => {
+  if (!offsets.has(zone)) {
+    let offset = "";
+    try {
+      const name = new Intl.DateTimeFormat("en", {
+        timeZone: zone,
+        timeZoneName: "longOffset",
+      })
+        .formatToParts(new Date())
+        .find((part) => part.type === "timeZoneName")?.value;
+      const [, sign, hours, minutes] =
+        name.match(/GMT([+-])(\d\d):(\d\d)/) || [];
+      offset = sign ? `UTC${sign}${Number(hours)}:${minutes}` : "UTC+0:00";
+    } catch {
+      offset = "";
+    }
+    offsets.set(zone, offset);
+  }
+  return offsets.get(zone);
+};
+const zoneOptions = (current) =>
+  timeZones(current).map((zone) => ({
+    value: zone,
+    label: zone.replace(/_/g, " "),
+    meta: zoneOffset(zone),
+  }));
 
 const NUMBERING = [
   { type: "Invoices", prefix: "invoicePrefix", next: "nextInvoiceNumber" },
@@ -78,22 +107,24 @@ const NUMBERING = [
   },
 ];
 
-// How every PDF can look, with what sets each apart.
+// How every PDF can look, with what sets each apart, under its name in the
+// menu.
 const PDF_TEMPLATES = [
   {
     value: "CLASSIC",
     label: "Classic",
-    hint: "The layout your PDFs have had so far.",
+    description: "The layout your PDFs have had so far.",
   },
   {
     value: "MODERN",
     label: "Modern",
-    hint: "A tinted heading band, with violet titles and table headings.",
+    description:
+      "A tinted heading band, with violet titles and table headings.",
   },
   {
     value: "COMPACT",
     label: "Compact",
-    hint: "Smaller type and tighter spacing, to fit more on a page.",
+    description: "Smaller type and tighter spacing, to fit more on a page.",
   },
 ];
 
@@ -358,13 +389,8 @@ const SettingsForm = ({ settings }) => {
                 value={values.timeZone}
                 onChange={change("timeZone")}
                 disabled={locked}
-              >
-                {timeZones(values.timeZone).map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </Field>
+                options={zoneOptions(values.timeZone)}
+              />
               <Field
                 label="Reporting currency"
                 as="select"
@@ -395,18 +421,8 @@ const SettingsForm = ({ settings }) => {
               value={values.pdfTemplate}
               onChange={change("pdfTemplate")}
               disabled={locked}
-              hint={
-                PDF_TEMPLATES.find(
-                  (template) => template.value === values.pdfTemplate,
-                )?.hint
-              }
-            >
-              {PDF_TEMPLATES.map((template) => (
-                <option key={template.value} value={template.value}>
-                  {template.label}
-                </option>
-              ))}
-            </Field>
+              options={PDF_TEMPLATES}
+            />
           </Panel>
           <Panel
             title="GST"
