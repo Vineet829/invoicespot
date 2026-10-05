@@ -17,12 +17,17 @@ import {
   attentionPair,
   chartPair,
   historyPair,
+  listRow,
 } from "../components/DashboardPanels";
 import OverviewTiles from "../components/OverviewTiles";
 import CashFlowPanel from "../components/CashFlowPanel";
 import OwedPanel from "../components/OwedPanel";
 import AttentionPanel from "../components/AttentionPanel";
+import TopClientsPanel from "../components/TopClientsPanel";
 import SpendingPanel from "../components/SpendingPanel";
+import TopItemsPanel from "../components/TopItemsPanel";
+import ComingUpPanel from "../components/ComingUpPanel";
+import SetupStrip from "../components/SetupStrip";
 import Shortcuts from "../components/Shortcuts";
 import {
   errorBanner,
@@ -153,6 +158,9 @@ const DashboardPage = () => {
             )}
           </div>
         </header>
+        {/* What is left to set up is the same in any period and currency,
+            so it stays as it is while other figures load. */}
+        {snapshot?.setup && <SetupStrip setup={snapshot.setup} />}
         {hasError && (
           <div className={errorBanner} role="alert">
             <FiAlertCircle aria-hidden="true" />
@@ -189,25 +197,39 @@ const DashboardPage = () => {
                   currencyChosen={Boolean(params.get("currency"))}
                 />
               </div>
-              <div className={attentionPair}>
+              {/* A panel an older server's answer has no figures for is
+                  left out, and the rest of its row takes its room. */}
+              <div className={snapshot.topClients ? attentionPair : "contents"}>
                 <AttentionPanel
                   snapshot={snapshot}
                   currencyChosen={Boolean(params.get("currency"))}
                 />
-                <DocumentStatus
-                  snapshot={snapshot}
-                  total={snapshot.documents}
-                />
+                {snapshot.topClients && <TopClientsPanel snapshot={snapshot} />}
               </div>
-              {/* An answer without spending, as an older server sends,
-                  leaves the latest payments on their own. */}
-              <div className={snapshot.spending ? historyPair : "contents"}>
+              {(snapshot.spending ||
+                snapshot.topItems ||
+                snapshot.comingUp) && (
+                <div className={listRow}>
+                  {snapshot.spending && <SpendingPanel snapshot={snapshot} />}
+                  {snapshot.topItems && <TopItemsPanel snapshot={snapshot} />}
+                  {snapshot.comingUp && (
+                    <ComingUpPanel
+                      snapshot={snapshot}
+                      currencyChosen={Boolean(params.get("currency"))}
+                    />
+                  )}
+                </div>
+              )}
+              <div className={historyPair}>
                 <PaymentHistory
                   sortPaymentHistory={payments.rows}
                   paymentDocuments={payments.documents}
                   currency={snapshot.currency}
                 />
-                {snapshot.spending && <SpendingPanel snapshot={snapshot} />}
+                <DocumentStatus
+                  snapshot={snapshot}
+                  total={snapshot.documents}
+                />
               </div>
             </div>
           )

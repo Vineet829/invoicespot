@@ -4,8 +4,14 @@ import { textLink } from "../../../components/workspace/pastel";
 // up to, then a way back to the whole list. Each part may hold a figure
 // that stands out; an overdue part takes the overdue colour. A part keeps to
 // one line and starts with its dot, so a wrapped line never ends on one.
-// The line dims with the list while the next figures load.
-const ResultLine = ({ parts, onClear, busy = false }) => (
+// The line dims with the list while the next figures load. A list with only
+// a search names its way back after it.
+const ResultLine = ({
+  parts,
+  onClear,
+  busy = false,
+  clearLabel = "Clear filters",
+}) => (
   <div
     className={`mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[14px] bg-spot-brand/[.08] px-3.5 py-2.5 text-[13.5px] text-spot-text transition-opacity ${busy ? "opacity-60" : ""}`}
   >
@@ -36,7 +42,7 @@ const ResultLine = ({ parts, onClear, busy = false }) => (
       className={`ml-auto ${textLink} bg-transparent p-0 text-[13px] coarse:min-h-11`}
       onClick={onClear}
     >
-      Clear filters
+      {clearLabel}
     </button>
   </div>
 );

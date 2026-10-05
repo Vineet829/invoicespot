@@ -11,14 +11,12 @@ import {
   spendingLink,
   spendingRows,
 } from "../dashboardModel";
-import { overviewPanel, panelLink } from "./DashboardPanels";
+import { overviewPanel, panelAction, panelLink } from "./DashboardPanels";
 
 // A row: the category and its count above its bar, then its amount, which
 // can widen the column, and its share.
 const row =
   "grid grid-cols-[minmax(0,1fr)_minmax(92px,auto)_44px] items-center gap-2.5 py-[7px]";
-const recordButton =
-  "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[13px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
 // What was spent in the period shown, as the Profit tile takes it off
 // income, by category, largest first. The figures count one currency, the
@@ -139,7 +137,7 @@ const SpendingPanel = ({ snapshot }) => {
             <ActionLink
               to={recordExpenseLink(currency)}
               reason={editRefusal}
-              className={recordButton}
+              className={panelAction}
             >
               <FiPlus aria-hidden="true" />
               Record an expense

@@ -153,6 +153,113 @@ export const spendingRows = (spending) => {
   }));
 };
 
+// The clients billed the most in the period, largest first, each with a bar
+// against the largest. A client's name opens the client; documents saved
+// without a linked client are added up under their saved name, which opens
+// nothing.
+export const topClientRows = (topClients = []) => {
+  const largest = Math.max(0, ...topClients.map((row) => asAmount(row.billed)));
+  return topClients.map((row) => ({
+    ...row,
+    bar: share(row.billed, largest),
+    to: row.clientId ? `/single-customer/${row.clientId}` : null,
+  }));
+};
+
+// The items that brought in the most in the period, before tax, each with a
+// bar against the largest and its share of the income behind Profit, which
+// every item sold adds up to. An item opens the Items list searched for it.
+// Lines saved without a name are added up as other lines, which open
+// nothing.
+const OTHER_LINES = "Other lines";
+export const itemLink = (item) => `/items?${new URLSearchParams({ q: item })}`;
+export const topItemRows = (topItems = [], itemsTotal) => {
+  const largest = Math.max(0, ...topItems.map((row) => asAmount(row.amount)));
+  const income = asAmount(itemsTotal);
+  return topItems.map((row) => {
+    const item = typeof row.item === "string" ? row.item.trim() : "";
+    const named = item !== "" && item !== OTHER_LINES;
+    return {
+      ...row,
+      name: named ? item : OTHER_LINES,
+      bar: share(row.amount, largest),
+      share: income > 0 ? shareOfTotal(asAmount(row.amount), income) : null,
+      to: named ? itemLink(item) : null,
+    };
+  });
+};
+
+// What is coming up. Each of the next recurring invoices opens the
+// recurring list; its template is named by its number, or as a draft, which
+// has none yet. Each quotation waiting for an answer opens the quotation,
+// named with its last valid day, or as having none: one without a date
+// waits too, without a count of days. Those past their day open the
+// quotations, sorted by their last valid day. The quotations' figures count
+// the overview's currency, so their lists keep to it when one was chosen.
+export const recurringLink = "/recurring";
+export const quotationsLink = (currency) =>
+  documentsLink({ type: "quotation", currency });
+export const expiredQuotationsLink = (currency) =>
+  documentsLink({ type: "quotation", currency, sort: "dueDate", dir: "asc" });
+const dayOf = (value) => (value ? dayMonth(parseDate(value)) : "");
+export const runRows = (nextRuns = []) =>
+  nextRuns.map((run) => ({
+    ...run,
+    day: dayOf(run.date),
+    number: run.documentNumber || "Draft invoice",
+  }));
+export const awaitingRows = (items = []) =>
+  items.map((item) => ({
+    ...item,
+    until: item.validUntil
+      ? `valid until ${dayOf(item.validUntil)}`
+      : "No expiry",
+    to: `/document/${item.documentId}`,
+  }));
+
+// The steps that make a new business ready, in the order the setup strip
+// lists them, each opening the page that does it. The server says which are
+// done; a step it doesn't name isn't.
+export const SETUP_STEPS = [
+  {
+    key: "businessDetails",
+    label: "Business details",
+    detail: "Address and tax ID",
+    to: "/settings/business",
+  },
+  {
+    key: "logo",
+    label: "Logo",
+    detail: "On your documents",
+    to: "/settings/business",
+  },
+  {
+    key: "paymentDetails",
+    label: "How clients pay you",
+    detail: "Bank, UPI or a link",
+    to: "/settings/payments",
+  },
+  {
+    key: "firstInvoice",
+    label: "First invoice",
+    detail: "Create and issue one",
+    to: "/create-doc",
+  },
+  {
+    key: "team",
+    label: "Your team",
+    detail: "Invite people to help",
+    to: "/settings/team",
+  },
+];
+export const setupSteps = (setup) =>
+  SETUP_STEPS.map((step) => ({
+    ...step,
+    done: Boolean(
+      setup?.steps?.some((answer) => answer.key === step.key && answer.done),
+    ),
+  }));
+
 // Counts of invoices are worded as on the Documents list.
 export { invoiceCount } from "../../utils/counts";
 

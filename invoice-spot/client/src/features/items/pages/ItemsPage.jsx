@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { FiEdit2, FiPackage, FiPlus, FiTrash2 } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FiEdit2, FiPackage, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useTitle from "../../../hooks/useTitle";
+import useListState from "../../../hooks/useListState";
+import { countOf } from "../../../utils/counts";
 import { useDeleteItemMutation, useGetItemsQuery } from "../itemsApiSlice";
+import { itemListSearch, matchingItems, readItemList } from "../itemFilters";
 import ItemDialog from "../components/ItemDialog";
+import ResultLine from "../../documents/components/ResultLine";
 import {
   WorkspacePage,
   PageHeader,
@@ -11,6 +15,7 @@ import {
   DataTable,
   Pagination,
   usePagination,
+  SearchField,
   ConfirmDialog,
   EmptyState,
   LoadingState,
@@ -22,16 +27,47 @@ import {
   primaryButton,
   rowAction,
   rowActionDanger,
+  secondaryButton,
 } from "../../../components/workspace/pastel";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 import LineName from "../../gst/LineName";
 
+const NO_ITEMS = [];
+
 const ItemsPage = () => {
   useTitle("Items — Invoice Spot");
+  const [list, update] = useListState(readItemList, itemListSearch);
   const query = useGetItemsQuery();
-  const rows = query.data?.items || [];
+  const items = query.data?.items || NO_ITEMS;
+  const rows = useMemo(() => matchingItems(items, list.q), [items, list.q]);
   const pagination = usePagination(rows, 10);
+  // A search shows its first page.
+  const { setPage } = pagination;
+  const search = useCallback(
+    (q) => {
+      update({ q });
+      setPage(0);
+    },
+    [update, setPage],
+  );
+  // Clear search is gone once the search is cleared, so focus moves to the
+  // search box. The list is searched here, so the box is there at once, or
+  // not at all: a business with no items has none, and focus stays put.
+  const tools = useRef(null);
+  const [refocus, setRefocus] = useState(false);
+  const clearSearch = () => {
+    search("");
+    setRefocus(true);
+  };
+  useEffect(() => {
+    if (!refocus) return;
+    setRefocus(false);
+    tools.current?.querySelector('input[type="search"]')?.focus();
+  }, [refocus]);
+  // A new business has nothing to search yet.
+  const showTools =
+    Boolean(query.data) && (items.length > 0 || Boolean(list.q));
   // `editing` is the item being edited, or "new" for the add dialog.
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
@@ -141,9 +177,32 @@ const ItemsPage = () => {
       ) : query.isError && !query.data ? (
         <ErrorState error={query.error} retry={query.refetch} />
       ) : (
-        <Panel title="Your items" fill={rows.length > 0}>
+        <Panel
+          title="Your items"
+          fill={rows.length > 0}
+          aside={
+            showTools && (
+              <div ref={tools} className="min-w-0 max-[700px]:w-full">
+                <SearchField
+                  value={list.q}
+                  onSearch={search}
+                  label="Search items"
+                  placeholder="Name or unit"
+                  className="w-[240px] max-[700px]:w-full"
+                />
+              </div>
+            )
+          }
+        >
           {rows.length ? (
             <>
+              {list.q && (
+                <ResultLine
+                  parts={[{ strong: countOf(rows.length, "item", "items") }]}
+                  onClear={clearSearch}
+                  clearLabel="Clear search"
+                />
+              )}
               <DataTable
                 columns={shown}
                 rows={pagination.rows}
@@ -152,6 +211,21 @@ const ItemsPage = () => {
               />
               <Pagination pagination={pagination} />
             </>
+          ) : list.q ? (
+            <EmptyState
+              title="No items match."
+              text="Try another name or unit, or clear the search to see every item."
+              icon={FiSearch}
+              action={
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={clearSearch}
+                >
+                  Clear search
+                </button>
+              }
+            />
           ) : (
             <EmptyState
               title="Price it once, reuse it everywhere."
