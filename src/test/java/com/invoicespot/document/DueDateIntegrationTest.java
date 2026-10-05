@@ -134,11 +134,10 @@ class DueDateIntegrationTest extends IntegrationTest {
     }
 
     // A business in the given zone with an invoice due on 15 October, sent as
-    // given, shared and paid in part: each view sends that day.
+    // given and shared: each view sends that day.
     private void seenAs(String timeZone, String dueDate) throws Exception {
         business(timeZone);
         String id = made(false, dueDate);
-        send(post("/api/v1/document/{id}/payment", id), "{\"amountPaid\": 50}").andExpect(status().isCreated());
         String share = JsonPath.read(body(send(post("/api/v1/document/{id}/share", id), "")), "$.url");
         String portal = JsonPath.read(
                 body(send(post("/api/v1/customer/{id}/portal", client), "").andExpect(status().isCreated())),
@@ -146,8 +145,6 @@ class DueDateIntegrationTest extends IntegrationTest {
 
         send(get("/api/v1/document/{id}", id), "").andExpect(jsonPath("$.document.dueDate").value("2026-10-15"));
         send(get("/api/v1/document/all"), "").andExpect(jsonPath("$.myDocuments[0].dueDate").value("2026-10-15"));
-        send(get("/api/v1/report/overview"), "")
-                .andExpect(jsonPath("$.payments[0].document.dueDate").value("2026-10-15"));
         open("share", share).andExpect(jsonPath("$.dueDate").value("2026-10-15"));
         open("portal", portal).andExpect(jsonPath("$.documents[0].dueDate").value("2026-10-15"));
     }

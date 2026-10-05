@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -42,9 +43,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-// The documents list narrowed to what the overview's figures count: the
-// invoices owed now and when they fall due, and the documents billed in one
-// of its periods, in one currency; and what the listed documents come to.
+// The documents list narrowed to what the overview's figures count, the
+// invoices owed now and the documents billed in one of its periods, and to
+// the week an invoice falls due in or one currency; and what the listed
+// documents come to.
 class DocumentListIntegrationTest extends IntegrationTest {
 
     @Autowired
@@ -188,6 +190,24 @@ class DocumentListIntegrationTest extends IntegrationTest {
                 .skip(1)
                 .map(line -> line.substring(0, line.indexOf(',')))
                 .toList();
+    }
+
+    // The invoices still owed in dollars that fall due in the week, as the
+    // list finds them: which they are and how many, what is still owed on
+    // them in its rows and its totals, and the days they fall due.
+    private void owedIn(String week, String owed, List<String> invoices, List<LocalDate> days) throws Exception {
+        String listed = body(list("outstanding", "true", "due", week, "currency", "USD")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder(invoices.toArray())))
+                .andExpect(jsonPath("$.totalDocuments").value(invoices.size()))
+                .andExpect(jsonPath("$.totals[0].documents").value(invoices.size()))
+                .andExpect(jsonPath(
+                        "$.myDocuments[*].dueDate",
+                        containsInAnyOrder(days.stream()
+                                .map(day -> day == null ? null : day.toString())
+                                .toArray()))));
+        assertThat(sum(listed, "$.myDocuments[*].ledger.balanceDue")).isEqualByComparingTo(owed);
+        assertThat(sum(listed, "$.totals[*].balanceDue")).isEqualByComparingTo(owed);
     }
 
     // The amounts at the path added up, leaving out any there are none of.
@@ -342,7 +362,7 @@ class DocumentListIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("due is the week an invoice falls due in, as the overview groups what is owed; later takes the undated")
+    @DisplayName("due is the week an invoice falls due in, counted from today; later takes the undated")
     void due(ZoneId zone) throws Exception {
         inZone(zone);
         // Due on each side of where one week ends and the next begins.
@@ -366,24 +386,16 @@ class DocumentListIntegrationTest extends IntegrationTest {
         dueAt(issue("Invoice", "20", today.minusDays(3), today.plusDays(6)), today.plusDays(6).atTime(23, 30), zone);
         dueAt(issue("Invoice", "40", today.minusDays(3), today.plusDays(7)), today.plusDays(7).atTime(0, 30), zone);
 
-        String overview = body(send(get("/api/v1/report/overview").param("currency", "USD"), ""));
-        List<String> weeks = List.of("this-week", "next-week", "week-after", "later");
-        List<String[]> invoices = List.of(
-                new String[] {"INV-0002", "INV-0003", "INV-0012"},
-                new String[] {"INV-0004", "INV-0005", "INV-0013"},
-                new String[] {"INV-0006", "INV-0007"},
-                new String[] {"INV-0008", "INV-0009"});
-        for (int week = 0; week < weeks.size(); week++) {
-            String owed = body(list("outstanding", "true", "due", weeks.get(week), "currency", "USD")
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder(invoices.get(week)))));
-            // The overview's weeks come after its overdue column.
-            String column = "$.owedByWeek[%d]".formatted(week + 1);
-            assertThat(sum(owed, "$.myDocuments[*].ledger.balanceDue"))
-                    .isEqualByComparingTo(amount(overview, column + ".amount"));
-            assertThat((Integer) JsonPath.read(owed, "$.totalDocuments"))
-                    .isEqualTo(JsonPath.read(overview, column + ".invoices"));
-        }
+        // Each week runs seven days from today, or from where the one before
+        // it ends, so the invoice due yesterday is in none of them. The one
+        // paid in part counts what is left on it, and later takes the
+        // undated one.
+        owedIn("this-week", "270", List.of("INV-0002", "INV-0003", "INV-0012"),
+                List.of(today, today.plusDays(6), today.plusDays(6)));
+        owedIn("next-week", "490", List.of("INV-0004", "INV-0005", "INV-0013"),
+                List.of(today.plusDays(7), today.plusDays(13), today.plusDays(7)));
+        owedIn("week-after", "430", List.of("INV-0006", "INV-0007"), List.of(today.plusDays(14), today.plusDays(20)));
+        owedIn("later", "1100", List.of("INV-0008", "INV-0009"), Arrays.asList(today.plusDays(21), null));
         // On its own, due goes by the due date alone.
         list("due", "this-week")
                 .andExpect(jsonPath(

@@ -1,19 +1,15 @@
 package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
-import com.invoicespot.business.Permission;
 import com.invoicespot.document.DocumentLedger;
 import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.report.dto.DocumentSummaryResponse;
 import com.invoicespot.report.dto.OverviewClient;
 import com.invoicespot.report.dto.OverviewItem;
 import com.invoicespot.report.dto.OverviewOwed;
-import com.invoicespot.report.dto.OverviewPayment;
 import com.invoicespot.report.dto.OverviewResponse;
-import com.invoicespot.report.dto.OverviewSetup;
 import com.invoicespot.report.dto.OverviewSpending;
 import com.invoicespot.report.dto.OverviewTotals;
-import com.invoicespot.report.dto.OwedWeek;
 import com.invoicespot.report.dto.TrendBucket;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
@@ -24,9 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -37,8 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 // The overview's figures, from issued documents; a draft isn't billed yet.
 // Income, received and pending are for one currency, from invoices and
-// receipts; a quotation is an offer, not income. Status counts and totals
-// cover every issued document. Payments are the currency's, most recent first.
+// receipts; a quotation is an offer, not income.
 // A period's totals, and those of the period before it, count money as the
 // reports do; what is owed is as of today. Spending is what the currency's
 // expenses paid in the period cost, by category, as its profit counts them.
@@ -46,13 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 // counts them, and the top items those its lines sold most of before tax,
 // which all add up to its income. What is coming up is the currency's, from
 // today: the invoices schedules will make and the quotations still open.
-// Those who may change the business's details and settings also see what is
-// left to set up.
 @Service
 public class Overview {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
-    private static final List<String> WEEKS = List.of("overdue", "thisWeek", "nextWeek", "weekAfter", "later");
     private static final int TOP_CATEGORIES = 5;
     private static final int TOP_CLIENTS = 5;
     private static final int TOP_ITEMS = 5;
@@ -73,8 +63,6 @@ public class Overview {
     private static final String SIGN = "(case when d.document_type = 'Credit Note' then -1 else 1 end)";
 
     private record Money(BigDecimal expected, BigDecimal received, BigDecimal withheld) {}
-
-    private record Counts(long documents, long paid, long partial, long unpaid, long overdue) {}
 
     // An issued invoice with money still owed on it, and when it falls due.
     private record Owed(Instant dueDate, BigDecimal amount) {}
@@ -115,7 +103,6 @@ public class Overview {
         String currency = chosen(currencies, requested, settings.getDefaultCurrency());
         Money money = money(businessPkid, currency);
         ZonedDateTime startOfToday = today.atStartOfDay(zone);
-        Counts counts = counts(businessPkid, startOfToday);
         MoneyByDay byDay = MoneyByDay.read(queries, businessPkid, currency, window);
         List<Owed> owed = owed(businessPkid, currency);
         List<OverviewItem> items = itemsSold(businessPkid, currency, window);
@@ -123,7 +110,6 @@ public class Overview {
                 true,
                 currencies,
                 currency,
-                counts.documents(),
                 jdbc.sql("select count(*) from customers where business_pkid = :business")
                         .param("business", businessPkid)
                         .query(Long.class)
@@ -132,23 +118,16 @@ public class Overview {
                 money.received(),
                 money.withheld(),
                 money.expected().subtract(money.received()).subtract(money.withheld()).max(BigDecimal.ZERO),
-                counts.paid(),
-                counts.partial(),
-                counts.unpaid(),
-                counts.overdue(),
-                payments(businessPkid, currency, zone),
                 window.period(),
                 totals(byDay, window, activeBefore(businessPkid, currency, window.from())),
                 owedNow(owed, startOfToday),
                 trend(byDay, window),
-                owedByWeek(owed, zone, today),
                 needsAttention.list(businessPkid, currency, zone, today),
                 spending(businessPkid, currency, window, byDay),
                 topClients(businessPkid, currency, window),
                 items.stream().limit(TOP_ITEMS).toList(),
                 items.stream().map(OverviewItem::amount).reduce(ZERO, BigDecimal::add),
-                comingUp.read(businessPkid, currency, zone, today),
-                access.can(Permission.MANAGE_BUSINESS) ? setup(businessPkid, settings) : null);
+                comingUp.read(businessPkid, currency, zone, today));
     }
 
     // The money bar over the documents list, in a currency chosen as above:
@@ -217,62 +196,6 @@ public class Overview {
                         result.getBigDecimal("received").setScale(2),
                         result.getBigDecimal("withheld").setScale(2)))
                 .single();
-    }
-
-    // Overdue matches the documents list: an unpaid invoice due before today.
-    private Counts counts(Long businessPkid, ZonedDateTime startOfToday) {
-        return jdbc.sql("""
-                        select count(*) as documents,
-                               count(*) filter (where status = 'Paid') as paid,
-                               count(*) filter (where status = 'Not Fully Paid') as partial,
-                               count(*) filter (where status = 'Not Paid') as unpaid,
-                               count(*) filter (where document_type = 'Invoice' and status <> 'Paid'
-                                   and due_date < :startOfToday) as overdue
-                        from documents d
-                        where d.business_pkid = :business and %s and d.document_type <> 'Credit Note'
-                        """.formatted(DocumentLedger.COUNTED))
-                .param("business", businessPkid)
-                .param("startOfToday", Timestamp.from(startOfToday.toInstant()))
-                .query((result, rowNumber) -> new Counts(
-                        result.getLong("documents"),
-                        result.getLong("paid"),
-                        result.getLong("partial"),
-                        result.getLong("unpaid"),
-                        result.getLong("overdue")))
-                .single();
-    }
-
-    // A document's due date is its day in the business's time zone.
-    private List<OverviewPayment> payments(Long businessPkid, String currency, ZoneId zone) {
-        return jdbc.sql("""
-                        select p.id, p.paid_by, p.date_paid, p.payment_method, p.additional_info, p.amount_paid,
-                               d.id as document_id, d.document_type, d.document_number, d.total, d.status,
-                               d.due_date
-                        from payments p
-                        join documents d on d.pkid = p.document_pkid
-                        where d.business_pkid = :business and %s and coalesce(d.currency, '') = :currency
-                        order by p.date_paid desc, p.pkid desc
-                        """.formatted(DocumentLedger.COUNTED))
-                .param("business", businessPkid)
-                .param("currency", currency)
-                .query((result, rowNumber) -> {
-                    Timestamp due = result.getTimestamp("due_date");
-                    return new OverviewPayment(
-                            result.getObject("id", UUID.class),
-                            result.getString("paid_by"),
-                            result.getObject("date_paid", LocalDate.class),
-                            result.getString("payment_method"),
-                            result.getString("additional_info"),
-                            result.getBigDecimal("amount_paid"),
-                            new OverviewPayment.Document(
-                                    result.getObject("document_id", UUID.class),
-                                    result.getString("document_type"),
-                                    result.getString("document_number"),
-                                    result.getBigDecimal("total"),
-                                    result.getString("status"),
-                                    due == null ? null : LocalDate.ofInstant(due.toInstant(), zone)));
-                })
-                .list();
     }
 
     // The period's totals beside those of the period before it.
@@ -417,31 +340,6 @@ public class Overview {
                 .toList();
     }
 
-    // What is left to set up, step by step: an address and a tax ID, a logo,
-    // a way for clients to pay, a first invoice issued and not void, and
-    // someone else in the team. A detail of nothing but spaces isn't set.
-    private OverviewSetup setup(Long businessPkid, BusinessSettings settings) {
-        return jdbc.sql("""
-                        select nullif(btrim(b.address), '') is not null and nullif(btrim(b.tax_id), '') is not null
-                                   as business_details,
-                               nullif(btrim(b.logo), '') is not null as logo,
-                               exists (select 1 from documents d
-                                       where d.business_pkid = b.pkid and %s and d.document_type = 'Invoice')
-                                   as first_invoice,
-                               (select count(*) from business_members m where m.business_pkid = b.pkid) > 1 as team
-                        from businesses b
-                        where b.pkid = :business
-                        """.formatted(DocumentLedger.COUNTED))
-                .param("business", businessPkid)
-                .query((result, rowNumber) -> new OverviewSetup(List.of(
-                        new OverviewSetup.Step("businessDetails", result.getBoolean("business_details")),
-                        new OverviewSetup.Step("logo", result.getBoolean("logo")),
-                        new OverviewSetup.Step("paymentDetails", settings.getPaymentDetails().hasWayToPay()),
-                        new OverviewSetup.Step("firstInvoice", result.getBoolean("first_invoice")),
-                        new OverviewSetup.Step("team", result.getBoolean("team")))))
-                .single();
-    }
-
     // Whether the currency had money dated before the period: an invoice or
     // receipt, a payment on an invoice, or an expense.
     private boolean activeBefore(Long businessPkid, String currency, LocalDate from) {
@@ -484,8 +382,7 @@ public class Overview {
                 .list();
     }
 
-    // Overdue as the documents list and the overdue count have it: due before
-    // today began.
+    // Overdue as the documents list has it: due before today began.
     private static OverviewOwed owedNow(List<Owed> invoices, ZonedDateTime startOfToday) {
         BigDecimal total = ZERO;
         BigDecimal overdue = ZERO;
@@ -498,34 +395,5 @@ public class Overview {
             }
         }
         return new OverviewOwed(total, total.subtract(overdue), overdue, invoices.size(), late);
-    }
-
-    // What is owed by the week it falls due, counted from today: overdue
-    // before today, then this week and the two after it, then later or with
-    // no due date. A due date is its day in the business's time zone.
-    private static List<OwedWeek> owedByWeek(List<Owed> invoices, ZoneId zone, LocalDate today) {
-        long[] counts = new long[WEEKS.size()];
-        BigDecimal[] amounts = new BigDecimal[WEEKS.size()];
-        Arrays.fill(amounts, ZERO);
-        int later = WEEKS.size() - 1;
-        for (Owed invoice : invoices) {
-            int week = later;
-            if (invoice.dueDate() != null) {
-                long days = ChronoUnit.DAYS.between(today, LocalDate.ofInstant(invoice.dueDate(), zone));
-                week = days < 0 ? 0 : (int) Math.min(1 + days / 7, later);
-            }
-            counts[week]++;
-            amounts[week] = amounts[week].add(invoice.amount());
-        }
-        List<OwedWeek> weeks = new ArrayList<>();
-        for (int week = 0; week < WEEKS.size(); week++) {
-            weeks.add(new OwedWeek(
-                    WEEKS.get(week),
-                    week == 0 ? null : today.plusDays(7L * (week - 1)),
-                    week == later ? null : today.plusDays(7L * week - 1),
-                    amounts[week],
-                    counts[week]));
-        }
-        return weeks;
     }
 }

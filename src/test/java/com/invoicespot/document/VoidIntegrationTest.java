@@ -214,10 +214,7 @@ class VoidIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.myDocuments[*]._id", contains(kept)));
         assertThat(body(send(get("/api/v1/document/csv"), ""))).contains("INV-0002,Invoice,Void,Beta LLC,");
 
-        send(get("/api/v1/report/overview"), "")
-                .andExpect(jsonPath("$.documents").value(1))
-                .andExpect(jsonPath("$.expectedIncome").value(100.0))
-                .andExpect(jsonPath("$.overdue").value(1));
+        send(get("/api/v1/report/overview"), "").andExpect(jsonPath("$.expectedIncome").value(100.0));
         send(get("/api/v1/report").param("period", "12m"), "")
                 .andExpect(jsonPath("$.currencies[0].billed").value(100.0))
                 .andExpect(jsonPath("$.currencies[0].outstanding").value(100.0));

@@ -55,14 +55,4 @@ public class PaymentDetails {
         return Stream.of(accountHolder, bankName, accountNumber, bankCode, upiId, link, instructions)
                 .allMatch(value -> value == null);
     }
-
-    // Whether clients have a way to pay: into a bank account, by its number
-    // or by an IBAN, which names the account on its own, by UPI, or at a
-    // payment link.
-    public boolean hasWayToPay() {
-        return accountNumber != null
-                || (bankCodeType == BankCodeType.IBAN && bankCode != null)
-                || upiId != null
-                || link != null;
-    }
 }

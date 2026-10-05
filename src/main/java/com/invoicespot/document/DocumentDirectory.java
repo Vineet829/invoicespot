@@ -178,8 +178,7 @@ class DocumentDirectory {
         if (search.billed()) {
             conditions.add(DocumentLedger.BILLED_DOCUMENT);
         }
-        // A week begins when its first day does in the business's time zone,
-        // as the overview's weeks do.
+        // A week begins when its first day does in the business's time zone.
         if (search.due() != null) {
             LocalDate first = search.due().firstDay(today);
             params.put("dueFrom", startOf(first, zone));

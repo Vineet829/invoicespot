@@ -2,7 +2,6 @@ package com.invoicespot.report;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,17 +25,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 class OverviewIntegrationTest extends IntegrationTest {
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private User owner;
@@ -208,7 +202,7 @@ class OverviewIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("income is invoices and receipts, pending what they still await; statuses count every document")
+    @DisplayName("income is invoices and receipts, pending what they still await")
     void figures() throws Exception {
         String partly = document("Invoice", "USD", "100", -1);
         pay(partly, "20", "2025-01-10");
@@ -221,28 +215,14 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currencies[0]").value("USD"))
                 .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.documents").value(5))
                 .andExpect(jsonPath("$.clients").value(1))
                 .andExpect(jsonPath("$.expectedIncome").value(390.0))
                 .andExpect(jsonPath("$.cashReceived").value(280.0))
-                .andExpect(jsonPath("$.cashPending").value(110.0))
-                .andExpect(jsonPath("$.paid").value(2))
-                .andExpect(jsonPath("$.partial").value(1))
-                .andExpect(jsonPath("$.unpaid").value(2))
-                .andExpect(jsonPath("$.overdue").value(2))
-                .andExpect(jsonPath("$.payments[0].datePaid").value("2025-02-01"))
-                .andExpect(jsonPath("$.payments[0].amountPaid").value(200.0))
-                .andExpect(jsonPath("$.payments[0].paidBy").value("Acme"))
-                .andExpect(jsonPath("$.payments[0].document.status").value("Paid"))
-                .andExpect(jsonPath("$.payments[1].datePaid").value("2025-01-10"))
-                .andExpect(jsonPath("$.payments[1].document._id").value(partly))
-                .andExpect(jsonPath("$.payments[1].document.documentNumber").value("INV-0001"))
-                .andExpect(jsonPath("$.payments[1].document.status").value("Not Fully Paid"))
-                .andExpect(jsonPath("$.payments.length()").value(2));
+                .andExpect(jsonPath("$.cashPending").value(110.0));
     }
 
     @Test
-    @DisplayName("money is shown one currency at a time, the default first; counts still cover everything")
+    @DisplayName("money is shown one currency at a time, the default first")
     void currencies() throws Exception {
         pay(document("Invoice", "USD", "100", 5), "40", "2025-01-10");
         pay(document("Invoice", "EUR", "50", 5), "10", "2025-03-01");
@@ -254,11 +234,7 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.currencies[1]").value("EUR"))
                 .andExpect(jsonPath("$.currency").value("EUR"))
                 .andExpect(jsonPath("$.expectedIncome").value(50.0))
-                .andExpect(jsonPath("$.cashReceived").value(10.0))
-                .andExpect(jsonPath("$.payments.length()").value(1))
-                .andExpect(jsonPath("$.payments[0].amountPaid").value(10.0))
-                .andExpect(jsonPath("$.documents").value(3))
-                .andExpect(jsonPath("$.partial").value(2));
+                .andExpect(jsonPath("$.cashReceived").value(10.0));
         overview("JPY")
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.expectedIncome").value(100.0));
@@ -271,9 +247,7 @@ class OverviewIntegrationTest extends IntegrationTest {
         overview(null)
                 .andExpect(jsonPath("$.currencies").isEmpty())
                 .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.documents").value(0))
                 .andExpect(jsonPath("$.expectedIncome").value(0.0))
-                .andExpect(jsonPath("$.payments").isEmpty())
                 .andExpect(content().string(containsString(
                         "\"totals\":{\"billed\":{\"current\":0.00,\"previous\":0.00}")))
                 .andExpect(jsonPath("$.totals.hasPrevious").value(false))
@@ -511,7 +485,7 @@ class OverviewIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("what is owed now is the pending money, split by due date as the overdue count splits invoices")
+    @DisplayName("what is owed now is the pending money, split by due date into overdue and not due yet")
     void owedNow(ZoneId zone) throws Exception {
         LocalDate day = inZone(zone);
         issue("Invoice", "USD", "100", day.minusDays(10), day.minusDays(1));
@@ -535,72 +509,13 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.owedNow.overdue").value(280.0))
                 .andExpect(jsonPath("$.owedNow.notDue").value(300.0))
                 .andExpect(jsonPath("$.owedNow.invoices").value(4))
-                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(2))
-                .andExpect(jsonPath("$.overdue").value(3));
+                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(2));
         overview("EUR", "30d")
                 .andExpect(jsonPath("$.cashPending").value(800.0))
                 .andExpect(jsonPath("$.owedNow.total").value(800.0))
                 .andExpect(jsonPath("$.owedNow.overdue").value(800.0))
                 .andExpect(jsonPath("$.owedNow.notDue").value(0.0))
                 .andExpect(jsonPath("$.owedNow.overdueInvoices").value(1));
-    }
-
-    @ParameterizedTest(name = "in {0}")
-    @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("what is owed is grouped by the week it falls due from today: overdue first, then later or undated")
-    void owedByWeek(ZoneId zone) throws Exception {
-        LocalDate day = inZone(zone);
-        // Due on each side of where one week ends and the next begins.
-        issue("Invoice", "USD", "100", day.minusDays(3), day.minusDays(1));
-        issue("Invoice", "USD", "200", day.minusDays(3), day);
-        issue("Invoice", "USD", "50", day.minusDays(3), day.plusDays(6));
-        issue("Invoice", "USD", "300", day.minusDays(3), day.plusDays(7));
-        pay(issue("Invoice", "USD", "250", day.minusDays(3), day.plusDays(13)), "100", "0", day);
-        issue("Invoice", "USD", "30", day.minusDays(3), day.plusDays(14));
-        issue("Invoice", "USD", "400", day.minusDays(3), day.plusDays(20));
-        issue("Invoice", "USD", "500", day.minusDays(3), day.plusDays(21));
-        // One made before every invoice took a due date.
-        String undated = issue("Invoice", "USD", "600", day.minusDays(3), day.plusDays(40));
-        jdbcTemplate.update("update documents set due_date = null where id = ?", UUID.fromString(undated));
-        // Nothing owed in dollars: a paid invoice, and one in euros.
-        pay(issue("Invoice", "USD", "70", day.minusDays(3), day.plusDays(2)), "70", "0", day);
-        issue("Invoice", "EUR", "80", day.minusDays(3), day.plusDays(2));
-
-        overview("USD", null)
-                .andExpect(jsonPath("$.owedByWeek.length()").value(5))
-                .andExpect(jsonPath("$.owedByWeek[0].key").value("overdue"))
-                .andExpect(jsonPath("$.owedByWeek[0].from").value(nullValue()))
-                .andExpect(jsonPath("$.owedByWeek[0].to").value(day.minusDays(1).toString()))
-                .andExpect(jsonPath("$.owedByWeek[0].amount").value(100.0))
-                .andExpect(jsonPath("$.owedByWeek[0].invoices").value(1))
-                .andExpect(jsonPath("$.owedByWeek[1].key").value("thisWeek"))
-                .andExpect(jsonPath("$.owedByWeek[1].from").value(day.toString()))
-                .andExpect(jsonPath("$.owedByWeek[1].to").value(day.plusDays(6).toString()))
-                .andExpect(jsonPath("$.owedByWeek[1].amount").value(250.0))
-                .andExpect(jsonPath("$.owedByWeek[1].invoices").value(2))
-                .andExpect(jsonPath("$.owedByWeek[2].key").value("nextWeek"))
-                .andExpect(jsonPath("$.owedByWeek[2].from").value(day.plusDays(7).toString()))
-                .andExpect(jsonPath("$.owedByWeek[2].to").value(day.plusDays(13).toString()))
-                .andExpect(jsonPath("$.owedByWeek[2].amount").value(450.0))
-                .andExpect(jsonPath("$.owedByWeek[2].invoices").value(2))
-                .andExpect(jsonPath("$.owedByWeek[3].key").value("weekAfter"))
-                .andExpect(jsonPath("$.owedByWeek[3].from").value(day.plusDays(14).toString()))
-                .andExpect(jsonPath("$.owedByWeek[3].to").value(day.plusDays(20).toString()))
-                .andExpect(jsonPath("$.owedByWeek[3].amount").value(430.0))
-                .andExpect(jsonPath("$.owedByWeek[3].invoices").value(2))
-                .andExpect(jsonPath("$.owedByWeek[4].key").value("later"))
-                .andExpect(jsonPath("$.owedByWeek[4].from").value(day.plusDays(21).toString()))
-                .andExpect(jsonPath("$.owedByWeek[4].to").value(nullValue()))
-                .andExpect(jsonPath("$.owedByWeek[4].amount").value(1100.0))
-                .andExpect(jsonPath("$.owedByWeek[4].invoices").value(2))
-                .andExpect(jsonPath("$.owedNow.total").value(2330.0))
-                .andExpect(jsonPath("$.owedNow.overdue").value(100.0))
-                .andExpect(jsonPath("$.cashPending").value(2330.0));
-        overview("EUR", null)
-                .andExpect(jsonPath("$.owedByWeek[1].amount").value(80.0))
-                .andExpect(jsonPath("$.owedByWeek[1].invoices").value(1))
-                .andExpect(jsonPath("$.owedByWeek[4].amount").value(0.0))
-                .andExpect(jsonPath("$.owedByWeek[4].invoices").value(0));
     }
 
     @ParameterizedTest(name = "in {0}")

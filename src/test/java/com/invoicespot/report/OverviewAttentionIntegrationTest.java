@@ -296,8 +296,7 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.counts.quotations").value(0))
                 .andExpect(jsonPath("$.attention.counts.recurring").value(0))
                 .andExpect(jsonPath("$.attention.counts.drafts").value(7))
-                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(3))
-                .andExpect(jsonPath("$.owedByWeek[1].invoices").value(2));
+                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(3));
     }
 
     @ParameterizedTest(name = "in {0}")

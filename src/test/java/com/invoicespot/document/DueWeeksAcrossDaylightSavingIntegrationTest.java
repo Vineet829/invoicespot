@@ -101,24 +101,30 @@ class DueWeeksAcrossDaylightSavingIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a week the clocks go back in runs to the end of its last day, as the overview's weeks do")
+    @DisplayName("a week the clocks go back in runs to the end of its last day")
     void clocksGoBack() throws Exception {
         String first = dueAt("100", TODAY.atTime(0, 30));
         String last = dueAt("200", LocalDate.of(2026, 11, 1).atTime(23, 30));
         String next = dueAt("300", LocalDate.of(2026, 11, 2).atTime(0, 30));
-        dueAt("400", TODAY.minusDays(1).atTime(23, 30));
+        String late = dueAt("400", TODAY.minusDays(1).atTime(23, 30));
 
+        // This week ends with the last minutes of Sunday 1 November, and the
+        // next begins with the first of Monday.
         send(get("/api/v1/document/all").param("outstanding", "true").param("due", "this-week"), "")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myDocuments[*]._id", containsInAnyOrder(first, last)));
+                .andExpect(jsonPath("$.myDocuments[*]._id", containsInAnyOrder(first, last)))
+                .andExpect(jsonPath("$.myDocuments[*].dueDate", containsInAnyOrder("2026-10-26", "2026-11-01")))
+                .andExpect(jsonPath("$.totalDocuments").value(2))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(300.0));
         send(get("/api/v1/document/all").param("outstanding", "true").param("due", "next-week"), "")
-                .andExpect(jsonPath("$.myDocuments[*]._id", containsInAnyOrder(next)));
-        send(get("/api/v1/report/overview").param("currency", "USD"), "")
-                .andExpect(jsonPath("$.owedByWeek[0].invoices").value(1))
-                .andExpect(jsonPath("$.owedByWeek[1].to").value("2026-11-01"))
-                .andExpect(jsonPath("$.owedByWeek[1].invoices").value(2))
-                .andExpect(jsonPath("$.owedByWeek[1].amount").value(300.0))
-                .andExpect(jsonPath("$.owedByWeek[2].invoices").value(1))
-                .andExpect(jsonPath("$.owedByWeek[2].amount").value(300.0));
+                .andExpect(jsonPath("$.myDocuments[*]._id", containsInAnyOrder(next)))
+                .andExpect(jsonPath("$.myDocuments[*].dueDate", containsInAnyOrder("2026-11-02")))
+                .andExpect(jsonPath("$.totalDocuments").value(1))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(300.0));
+        // Due in the last minutes of the day before, it is overdue already.
+        send(get("/api/v1/document/all").param("overdue", "true"), "")
+                .andExpect(jsonPath("$.myDocuments[*]._id", containsInAnyOrder(late)))
+                .andExpect(jsonPath("$.myDocuments[*].dueDate", containsInAnyOrder("2026-10-25")))
+                .andExpect(jsonPath("$.totalDocuments").value(1));
     }
 }

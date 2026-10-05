@@ -260,8 +260,7 @@ class CreditNoteIntegrationTest extends IntegrationTest {
         send(get("/api/v1/report/overview"), "")
                 .andExpect(jsonPath("$.expectedIncome").value(700.0))
                 .andExpect(jsonPath("$.cashReceived").value(200.0))
-                .andExpect(jsonPath("$.cashPending").value(500.0))
-                .andExpect(jsonPath("$.documents").value(1));
+                .andExpect(jsonPath("$.cashPending").value(500.0));
         send(get("/api/v1/report").param("period", "12m"), "")
                 .andExpect(jsonPath("$.currencies[0].billed").value(700.0))
                 .andExpect(jsonPath("$.currencies[0].outstanding").value(500.0))
