@@ -133,6 +133,11 @@ module.exports = {
         nav: "0 10px 24px -14px #3c346473, inset 0 0 0 1px #ffffffe6",
         float: "0 18px 40px -20px #3c346473",
         key: "0 6px 14px -8px #3c346480",
+        // The styled dropdown: its trigger's rings, its menu and its sheet.
+        focus: "0 0 0 3px #5b47a029",
+        invalid: "0 0 0 3px #b5532f24",
+        menu: "0 24px 48px -28px #28225080, 0 2px 6px -2px #2822501f",
+        sheet: "0 -20px 40px -24px #28225080",
       },
       keyframes: {
         "ov-rise": { from: { opacity: "0", transform: "translateY(10px)" } },
@@ -145,6 +150,9 @@ module.exports = {
         },
         "ov-pulse": { to: { opacity: "0.4" } },
         "ov-fade": { from: { opacity: "0" } },
+        // A dropdown menu fades in and lifts into place; set --lift to 4px
+        // below a trigger and -4px above it.
+        "ov-lift": { from: { opacity: "0", translate: "0 var(--lift, 4px)" } },
         // Log in and sign up. Entrances move with `translate`, so hover
         // transforms still apply.
         "auth-rise": {
@@ -222,6 +230,7 @@ module.exports = {
           "ov-roll 1.4s calc(300ms + var(--digit-delay, 0ms)) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-pulse": "ov-pulse 1.6s ease-in-out infinite alternate",
         "ov-fade": "ov-fade 0.12s ease-out both",
+        "ov-lift": "ov-lift 0.12s ease-out both",
         // Content rises in sequence; set --d (and --rise) per element.
         "auth-rise":
           "auth-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0s) backwards",

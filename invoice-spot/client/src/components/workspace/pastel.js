@@ -27,8 +27,6 @@ export const iconButton =
 // Table pager controls.
 export const pagerButton =
   "inline-flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-0 bg-white/70 p-0 text-spot-night transition-colors hover:enabled:bg-white disabled:cursor-default disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 coarse:min-w-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.7]";
-export const pageSizeSelect =
-  "h-[30px] rounded-[9px] border border-[#23273524] bg-white/80 px-2 text-[12.5px] text-spot-ink coarse:min-h-11 coarse:min-w-11";
 
 // The frosted surface panels and cards sit on, and a workspace panel.
 export const surface =
@@ -71,8 +69,6 @@ export const inputControl = `${control} h-11 px-3 text-[14px]`;
 // A list's search box, sized like the toolbar around it, with room on the
 // left for the magnifier drawn inside it.
 export const searchControl = `${control} h-11 pl-10 pr-3 text-[13px]`;
-// A select in a list's toolbar, as wide as its longest option.
-export const toolbarSelect = `${controlSurface} h-11 max-w-full px-3 text-[13px]`;
 
 // One option of a filter group: a pill around a visually hidden radio, so
 // the pill shows the radio's checked and keyboard focus states.
@@ -80,6 +76,40 @@ export const filterChip =
   "relative inline-flex h-9 cursor-pointer select-none items-center whitespace-nowrap rounded-full border border-spot-violet/15 bg-white/60 px-3.5 text-[13px] text-spot-body transition-colors has-[:checked]:border-spot-night has-[:checked]:bg-spot-night has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[3px] has-[:focus-visible]:outline-[#5b47a0] coarse:h-11 [&:not(:has(:checked)):hover]:bg-white";
 export const textareaControl = `${control} min-h-[120px] resize-y px-3 py-2.5 text-[14px] leading-[1.6]`;
 export const fileControl = `${control} px-2 py-1.5 text-[13px] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-spot-violet/10 file:px-3 file:py-2 file:text-[13px] file:[font-family:inherit] file:text-spot-violet`;
+
+// The styled dropdown (Select.jsx). Its trigger is the controls' surface
+// with the violet ring while focused or open and the rust ring when not
+// valid, and fades as a whole when disabled; each size sets its own height
+// and type, and the toolbar and mini sizes are as wide as their longest
+// option unless the control is told to fit its chosen one.
+const selectSurface =
+  "inline-flex w-full cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#23273524] bg-white/80 text-left text-spot-ink transition-[border-color,background-color,box-shadow] hover:enabled:border-[#23273547] hover:enabled:bg-white/95 focus-visible:border-spot-violet focus-visible:bg-white focus-visible:shadow-focus focus-visible:outline-none aria-expanded:border-spot-violet aria-expanded:bg-white aria-expanded:shadow-focus disabled:cursor-default disabled:opacity-50 aria-[invalid=true]:border-owed-overdue aria-[invalid=true]:shadow-invalid [&>svg]:shrink-0 [&>svg]:text-spot-nav [&>svg]:transition-transform";
+export const selectTrigger = {
+  toolbar: `${selectSurface} h-11 pl-3 pr-2.5 text-[13.5px] [&>svg]:size-[15px]`,
+  form: `${selectSurface} h-11 pl-3 pr-2.5 text-[14px] [&>svg]:size-[15px]`,
+  mini: `${selectSurface} h-[30px] rounded-[9px] pl-2 pr-1.5 text-[12.5px] coarse:min-h-11 [&>svg]:size-3.5`,
+};
+// The floating menu, and the rows inside it: options (36px, taller with a
+// description, 32px under a mini trigger, 44px in the phone sheet), group
+// headings, the search row at the top and the match count at the bottom.
+export const selectMenu =
+  "flex flex-col rounded-2xl border border-[#23273514] bg-white p-1.5 shadow-menu";
+export const selectOption =
+  "flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-spot-ink aria-disabled:cursor-default aria-disabled:text-spot-disabled";
+export const selectOptionActive =
+  "bg-spot-violet/[.09] outline outline-2 -outline-offset-2 outline-spot-violet";
+export const selectGroup =
+  "px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-spot-muted";
+export const selectSearch =
+  "mx-0.5 mb-1.5 mt-0.5 flex h-[38px] shrink-0 items-center gap-2 rounded-[10px] bg-[#2327350d] px-2.5 text-[13.5px] text-spot-muted [&>svg]:size-[15px] [&>svg]:shrink-0";
+export const selectFooter =
+  "mx-0.5 mt-1.5 shrink-0 border-t border-[#23273512] px-2.5 pb-1 pt-2 text-[11.5px] text-spot-muted";
+// On a phone the menu is a sheet at the bottom of the window, with a
+// larger search row.
+export const selectSheet =
+  "fixed inset-0 m-0 mt-auto max-h-[85dvh] w-full max-w-none overflow-hidden rounded-t-3xl border-0 bg-white p-0 text-spot-ink shadow-sheet backdrop:bg-[#241d3d59]";
+export const selectSheetSearch =
+  "flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#2327350d] px-3 text-[15px] text-spot-muted [&>svg]:size-4 [&>svg]:shrink-0";
 
 // The peach banner for data that failed to load, and its retry button.
 export const errorBanner =

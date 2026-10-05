@@ -147,15 +147,33 @@ const open = async (path, answers = {}, ready = listed) => {
 
 const listRequests = () =>
   requests.filter((request) => request.includes("/document/all"));
+// The styled dropdown with this label: its trigger, which carries the value
+// chosen and shows that option's words.
 const select = (page, label) =>
   [...page.querySelectorAll("label")]
     .find((element) => element.textContent.startsWith(label))
-    ?.querySelector("select");
-const choose = (element, value) =>
-  act(async () => {
-    element.value = value;
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+    ?.querySelector('[role="combobox"]');
+const shown = (combobox) => combobox.firstChild.firstChild.textContent;
+// What the dropdown offers, opening it to look and closing it again.
+const options = async (combobox) => {
+  await act(async () => combobox.click());
+  const words = [...document.querySelectorAll('[role="option"]')].map(
+    (option) => option.firstChild.textContent,
+  );
+  await act(async () =>
+    combobox.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  return words;
+};
+// Opens the dropdown and picks the option with this value.
+const choose = async (combobox, value) => {
+  await act(async () => combobox.click());
+  await act(async () =>
+    document.querySelector(`[role="option"][data-value="${value}"]`).click(),
+  );
+};
 
 it("opens the invoices with money owed, soonest due first, as a link asks", async () => {
   const page = await open("/documents?status=outstanding&sort=dueDate&dir=asc");
@@ -183,12 +201,10 @@ it("asks for what was billed in the overview's last 90 days by name", async () =
     "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&period=90d",
   ]);
   expect(select(page, "Document type").value).toBe("billed");
-  expect(select(page, "Document type").selectedOptions[0].textContent).toBe(
+  expect(shown(select(page, "Document type"))).toBe(
     "Billed: invoices, receipts and credit notes",
   );
-  expect(select(page, "Issued").selectedOptions[0].textContent).toBe(
-    "Last 90 days",
-  );
+  expect(shown(select(page, "Issued"))).toBe("Last 90 days");
 });
 
 it("shows a week of due dates as a filter that can be removed", async () => {
@@ -231,11 +247,7 @@ it("offers each currency when the business bills in more than one", async () => 
     vi.waitFor(() => expect(select(page, "Currency")).toBeDefined()),
   );
   const currency = select(page, "Currency");
-  expect([...currency.options].map((option) => option.textContent)).toEqual([
-    "All currencies",
-    "USD",
-    "EUR",
-  ]);
+  expect(await options(currency)).toEqual(["All currencies", "USD", "EUR"]);
   await choose(currency, "EUR");
   await act(() => vi.waitFor(() => expect(listRequests()).toHaveLength(2)));
   expect(address).toBe("?currency=EUR");
@@ -313,10 +325,7 @@ it("keeps showing a currency the address names when the currencies can't be load
   });
   const currency = select(page, "Currency");
   expect(currency.value).toBe("EUR");
-  expect([...currency.options].map((option) => option.textContent)).toEqual([
-    "All currencies",
-    "EUR",
-  ]);
+  expect(await options(currency)).toEqual(["All currencies", "EUR"]);
 });
 
 it("clears every filter, then moves focus to All", async () => {

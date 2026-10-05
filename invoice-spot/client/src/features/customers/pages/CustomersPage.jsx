@@ -50,8 +50,8 @@ import {
   rowActionDanger,
   secondaryButton,
   secondaryIconButton,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 
 const NO_CLIENTS = [];
@@ -274,11 +274,12 @@ const CustomersPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-1">
                   <span className="sr-only">Sort clients</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={`${list.sort}:${list.dir}`}
-                    onChange={(event) => {
-                      const [sort, dir] = event.target.value.split(":");
+                    onChange={(value) => {
+                      const [sort, dir] = value.split(":");
                       update({ sort, dir, page: 1 });
                     }}
                   >
@@ -287,7 +288,7 @@ const CustomersPage = () => {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </div>
             )

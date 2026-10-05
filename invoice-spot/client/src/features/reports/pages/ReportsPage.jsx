@@ -29,8 +29,8 @@ import {
   panelNote,
   rowAction,
   textLink,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import {
   FinancialCard,
   financeCards,
@@ -488,17 +488,17 @@ const ReportsPage = () => {
               )}
             <label className="flex items-center gap-2.5">
               <span className="sr-only">Period</span>
-              <select
-                className={toolbarSelect}
+              <Select
+                size="toolbar"
                 value={period}
-                onChange={(event) => choose({ period: event.target.value })}
+                onChange={(period) => choose({ period })}
               >
                 {options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </>
         }

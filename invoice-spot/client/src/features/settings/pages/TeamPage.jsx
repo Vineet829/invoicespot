@@ -34,8 +34,8 @@ import {
   rowAction,
   rowActionDanger,
   secondaryButton,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import {
   useChangeMemberRoleMutation,
   useDeleteBusinessMutation,
@@ -163,15 +163,13 @@ const InviteDialog = ({ open, business, onClose }) => {
           label="Role"
           value={role}
           onChange={(event) => setRole(event.target.value)}
-          hint={ROLE_SUMMARIES[role]}
           disabled={isLoading}
-        >
-          {ROLES.map((option) => (
-            <option key={option} value={option}>
-              {ROLE_LABELS[option]}
-            </option>
-          ))}
-        </Field>
+          options={ROLES.map((option) => ({
+            value: option,
+            label: ROLE_LABELS[option],
+            description: ROLE_SUMMARIES[option],
+          }))}
+        />
         <p className={panelNote}>
           The link in the email is open for 7 days. They join once they accept
           it signed in with this address.
@@ -407,17 +405,17 @@ const TeamPage = () => {
         member.role === "OWNER" || member.you || teamRefusal ? (
           ROLE_LABELS[member.role]
         ) : (
-          <select
-            className={toolbarSelect}
+          <Select
+            size="toolbar"
             value={member.role}
-            onChange={(event) =>
+            onChange={(role) =>
               run(
                 () =>
                   changeRole({
                     userId: member._id,
-                    role: event.target.value,
+                    role,
                   }).unwrap(),
-                `${nameOf(member)} is now ${ROLE_LABELS[event.target.value].toLowerCase()}.`,
+                `${nameOf(member)} is now ${ROLE_LABELS[role].toLowerCase()}.`,
                 "The role could not be changed.",
               )
             }
@@ -429,7 +427,7 @@ const TeamPage = () => {
                 {ROLE_LABELS[role]}
               </option>
             ))}
-          </select>
+          </Select>
         ),
     },
     { label: "Joined", render: (member) => dateLabel(member.joinedAt) },
@@ -543,10 +541,10 @@ const TeamPage = () => {
             </div>
             {others.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className={toolbarSelect}
+                <Select
+                  size="toolbar"
                   value={successor}
-                  onChange={(event) => setSuccessor(event.target.value)}
+                  onChange={setSuccessor}
                   aria-label="New owner"
                 >
                   <option value="">Choose a member</option>
@@ -555,7 +553,7 @@ const TeamPage = () => {
                       {nameOf(member)}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <button
                   type="button"
                   className={secondaryButton}

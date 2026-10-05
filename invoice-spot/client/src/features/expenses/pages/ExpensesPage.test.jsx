@@ -201,15 +201,33 @@ const open = async (path, answers, before = []) => {
 
 const listRequests = () =>
   requests.filter((request) => /\/expense(\?|$)/.test(request));
+// The styled dropdown with this label: its trigger, which carries the value
+// chosen and shows that option's words.
 const select = (page, label) =>
   [...page.querySelectorAll("label")]
     .find((element) => element.textContent.startsWith(label))
-    ?.querySelector("select");
-const choose = (element, value) =>
-  act(async () => {
-    element.value = value;
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+    ?.querySelector('[role="combobox"]');
+const shown = (combobox) => combobox.firstChild.firstChild.textContent;
+// What the dropdown offers, opening it to look and closing it again.
+const options = async (combobox) => {
+  await act(async () => combobox.click());
+  const words = [...document.querySelectorAll('[role="option"]')].map(
+    (option) => option.firstChild.textContent,
+  );
+  await act(async () =>
+    combobox.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  return words;
+};
+// Opens the dropdown and picks the option with this value.
+const choose = async (combobox, value) => {
+  await act(async () => combobox.click());
+  await act(async () =>
+    document.querySelector(`[role="option"][data-value="${value}"]`).click(),
+  );
+};
 // Downloads the list as CSV and waits for the file to be saved.
 const download = async (page) => {
   const saved = saves.mock.calls.length;
@@ -232,9 +250,7 @@ it("asks for the overview's periods by name and the others as dates, in the list
   expect(listRequests()).toEqual([
     "/api/v1/expense?page=1&size=10&category=Travel&period=30d",
   ]);
-  expect(select(page, "Paid").selectedOptions[0].textContent).toBe(
-    "Last 30 days",
-  );
+  expect(shown(select(page, "Paid"))).toBe("Last 30 days");
   await download(page);
 
   await choose(select(page, "Paid"), "last-month");
@@ -264,11 +280,7 @@ it("offers each currency when the business bills in more than one, and asks for 
     vi.waitFor(() => expect(select(page, "Currency")).toBeDefined()),
   );
   const currency = select(page, "Currency");
-  expect([...currency.options].map((option) => option.textContent)).toEqual([
-    "All currencies",
-    "USD",
-    "EUR",
-  ]);
+  expect(await options(currency)).toEqual(["All currencies", "USD", "EUR"]);
   await choose(currency, "EUR");
   await act(() => vi.waitFor(() => expect(listRequests()).toHaveLength(2)));
   expect(address).toBe("?currency=EUR");

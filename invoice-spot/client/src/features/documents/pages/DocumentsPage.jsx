@@ -68,8 +68,8 @@ import {
   rowActionDanger,
   secondaryButton,
   secondaryIconButton,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 
 const NO_DOCUMENTS = [];
 
@@ -386,38 +386,37 @@ const DocumentsPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-[1_1_100%]">
                   <span className="sr-only">Document type</span>
-                  {/* One option is much longer than the rest, so where the
-                      browser can, the menu is as wide as the type chosen,
-                      and on a phone it has a row of its own. */}
-                  <select
-                    className={`${toolbarSelect} [field-sizing:content] max-[700px]:w-full`}
+                  {/* One option is much longer than the rest, so the trigger
+                      is as wide as the type chosen, and on a phone it has a
+                      row of its own. */}
+                  <Select
+                    size="toolbar"
+                    fit="content"
+                    className="max-[700px]:w-full"
                     value={list.type}
-                    onChange={(event) =>
-                      update({ type: event.target.value, page: 1 })
-                    }
+                    onChange={(type) => update({ type, page: 1 })}
                   >
                     {TYPE_FILTERS.map((filter) => (
                       <option key={filter.value} value={filter.value}>
                         {filter.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Issued</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={list.period}
-                    onChange={(event) =>
-                      update({ period: event.target.value, page: 1 })
-                    }
+                    onChange={(period) => update({ period, page: 1 })}
                   >
                     {PERIODS.map((period) => (
                       <option key={period.value} value={period.value}>
                         {period.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <CurrencyFilter
                   value={list.currency}
@@ -426,11 +425,12 @@ const DocumentsPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Sort documents</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={`${list.sort}:${list.dir}`}
-                    onChange={(event) => {
-                      const [sort, dir] = event.target.value.split(":");
+                    onChange={(value) => {
+                      const [sort, dir] = value.split(":");
                       update({ sort, dir, page: 1 });
                     }}
                   >
@@ -439,7 +439,7 @@ const DocumentsPage = () => {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </div>
             </div>

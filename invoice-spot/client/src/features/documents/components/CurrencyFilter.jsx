@@ -1,4 +1,4 @@
-import { toolbarSelect } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 
 // The currency a list is narrowed to, offered when the business bills in
 // more than one. A currency the address names is always shown, even while
@@ -11,10 +11,11 @@ const CurrencyFilter = ({ value, currencies = [], onChange }) => {
   return (
     <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
       <span className="sr-only">Currency</span>
-      <select
-        className={`${toolbarSelect} max-[700px]:w-full`}
+      <Select
+        size="toolbar"
+        className="max-[700px]:w-full"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
       >
         <option value="">All currencies</option>
         {options.map((currency) => (
@@ -22,7 +23,7 @@ const CurrencyFilter = ({ value, currencies = [], onChange }) => {
             {currency}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 };

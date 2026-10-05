@@ -58,8 +58,8 @@ import {
   rowActionDanger,
   secondaryButton,
   secondaryIconButton,
-  toolbarSelect,
 } from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 import { RefusalNote, useBusiness } from "../../business/permissions";
 
 const NO_EXPENSES = [];
@@ -349,12 +349,11 @@ const ExpensesPage = () => {
                 />
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Category</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={list.category}
-                    onChange={(event) =>
-                      update({ category: event.target.value, page: 1 })
-                    }
+                    onChange={(category) => update({ category, page: 1 })}
                   >
                     <option value="">All categories</option>
                     {categoryOptions.map((category) => (
@@ -362,23 +361,22 @@ const ExpensesPage = () => {
                         {category}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label className="min-w-0 max-[700px]:flex-[1_1_40%]">
                   <span className="sr-only">Paid</span>
-                  <select
-                    className={`${toolbarSelect} max-[700px]:w-full`}
+                  <Select
+                    size="toolbar"
+                    className="max-[700px]:w-full"
                     value={list.period}
-                    onChange={(event) =>
-                      update({ period: event.target.value, page: 1 })
-                    }
+                    onChange={(period) => update({ period, page: 1 })}
                   >
                     {PERIODS.map((period) => (
                       <option key={period.value} value={period.value}>
                         {period.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <CurrencyFilter
                   value={list.currency}
