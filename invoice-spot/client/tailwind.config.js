@@ -80,6 +80,7 @@ module.exports = {
             muted: "#3f5a3a",
             decimal: "#4f6a4a",
             label: "#233621",
+            icon: "#2f5a2a",
             bar: "#4f8a4a",
             loss: "#8c3b1f",
           },

@@ -22,8 +22,9 @@ import {
 import { DashboardNumber, tileCard, tileRow } from "./DashboardPanels";
 
 // Each tile's colours: the financial cards' blue, lilac and peach, and sage
-// for profit.
-const TONES = {
+// for profit. The homepage draws its picture of the overview with these
+// and the tile parts below, at a smaller size.
+export const TONES = {
   blue: {
     tile: "bg-card-blue",
     label: "text-card-blue-label",
@@ -91,14 +92,14 @@ const Change = ({ change, compared }) => {
 };
 
 // A trend across the period as a line over a light wash, with a dot on the
-// latest figure.
-const Sparkline = ({ values, colors }) => {
+// latest figure. The class sets its height.
+export const Sparkline = ({ values, colors, className = "h-10" }) => {
   const points = trendPoints(values);
   if (!points.length) return null;
   const line = points.map(({ x, y }) => `${x},${y}`).join(" ");
   const end = points.at(-1);
   return (
-    <span className="relative block h-10" aria-hidden="true">
+    <span className={`relative block ${className}`} aria-hidden="true">
       <span className="absolute inset-x-0 inset-y-1">
         <svg
           className="absolute inset-0 size-full overflow-visible"
@@ -130,12 +131,13 @@ const Sparkline = ({ values, colors }) => {
 };
 
 // Profit in each part of the period as columns: profit stands on zero and
-// a loss hangs below it, in a darker rust. The latest column is solid.
-const TrendColumns = ({ values }) => {
+// a loss hangs below it, in a darker rust. The latest column is solid. The
+// class sets its height.
+export const TrendColumns = ({ values, className = "h-10" }) => {
   const { zero, columns } = trendColumns(values);
   return (
     <span
-      className={`relative flex h-10 ${columns.length > 16 ? "gap-0.5" : "gap-1"}`}
+      className={`relative flex ${className} ${columns.length > 16 ? "gap-0.5" : "gap-1"}`}
       aria-hidden="true"
     >
       {columns.map((column, index) => (
@@ -159,15 +161,20 @@ const TrendColumns = ({ values }) => {
 };
 
 // What is owed now, split into what is not due yet and what is overdue.
-const OwedSplit = ({ owed, currency }) => {
+// The class sets its text size, which the bar follows, and its spacing.
+export const OwedSplit = ({
+  owed,
+  currency,
+  className = "gap-[7px] text-[12px]",
+}) => {
   const parts = [
     ["notDue", "bg-owed-due"],
     ["overdue", "bg-owed-overdue"],
   ].filter(([key]) => Number(owed[key]) > 0);
   return (
-    <span className="flex flex-col gap-[7px]">
+    <span className={`flex flex-col ${className}`}>
       <span
-        className={`flex h-3 gap-0.5 overflow-hidden rounded-full ${parts.length ? "" : "bg-white/50"}`}
+        className={`flex h-[1em] gap-0.5 overflow-hidden rounded-full ${parts.length ? "" : "bg-white/50"}`}
         aria-hidden="true"
       >
         {parts.map(([key, color]) => (
@@ -178,7 +185,7 @@ const OwedSplit = ({ owed, currency }) => {
           />
         ))}
       </span>
-      <span className="flex flex-wrap justify-between gap-x-3 text-[12px]">
+      <span className="flex flex-wrap justify-between gap-x-3">
         <span>Not due {formatMoney(owed.notDue, currency)}</span>
         <span>Overdue {formatMoney(owed.overdue, currency)}</span>
       </span>
