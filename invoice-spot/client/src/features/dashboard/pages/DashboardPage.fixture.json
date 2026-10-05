@@ -2,50 +2,11 @@
   "success": true,
   "currencies": ["USD"],
   "currency": "USD",
-  "documents": 48,
   "clients": 12,
   "expectedIncome": 209842.18,
   "cashReceived": 185556.39,
   "taxWithheld": 0.0,
   "cashPending": 24285.79,
-  "paid": 32,
-  "partial": 6,
-  "unpaid": 10,
-  "overdue": 3,
-  "payments": [
-    {
-      "_id": "4fe2bf84-9f7f-4c0d-94a7-01c371c5b8da",
-      "paidBy": "Harbor & Pine Architects",
-      "datePaid": "2026-10-04",
-      "paymentMethod": "Bank Transfer",
-      "additionalInfo": "Deposit",
-      "amountPaid": 262.76,
-      "document": {
-        "_id": "b8e30d46-18fd-4b4e-b035-dcc4ce1081cf",
-        "documentType": "Invoice",
-        "documentNumber": "INV-1038",
-        "total": 750.75,
-        "status": "Not Fully Paid",
-        "dueDate": "2026-10-18"
-      }
-    },
-    {
-      "_id": "5f39497b-40f6-4d51-80ed-8db7b750a700",
-      "paidBy": "Atlas Robotics",
-      "datePaid": "2026-09-30",
-      "paymentMethod": "Credit Card",
-      "additionalInfo": "Deposit",
-      "amountPaid": 1846.85,
-      "document": {
-        "_id": "cf9b556d-a176-4659-a843-d54e518d2820",
-        "documentType": "Invoice",
-        "documentNumber": "INV-1034",
-        "total": 4397.25,
-        "status": "Not Fully Paid",
-        "dueDate": "2026-10-12"
-      }
-    }
-  ],
   "period": {
     "key": "90d",
     "from": "2026-07-07",
@@ -197,43 +158,6 @@
       "expenses": 0.0,
       "moneyIn": 17256.86,
       "moneyOut": 0.0
-    }
-  ],
-  "owedByWeek": [
-    {
-      "key": "overdue",
-      "from": null,
-      "to": "2026-10-03",
-      "amount": 6326.03,
-      "invoices": 3
-    },
-    {
-      "key": "thisWeek",
-      "from": "2026-10-04",
-      "to": "2026-10-10",
-      "amount": 2664.09,
-      "invoices": 1
-    },
-    {
-      "key": "nextWeek",
-      "from": "2026-10-11",
-      "to": "2026-10-17",
-      "amount": 13353.37,
-      "invoices": 4
-    },
-    {
-      "key": "weekAfter",
-      "from": "2026-10-18",
-      "to": "2026-10-24",
-      "amount": 1942.3,
-      "invoices": 2
-    },
-    {
-      "key": "later",
-      "from": "2026-10-25",
-      "to": null,
-      "amount": 0.0,
-      "invoices": 0
     }
   ],
   "attention": {
@@ -433,14 +357,5 @@
       },
       "expired": { "count": 5, "amount": 25343.18 }
     }
-  },
-  "setup": {
-    "steps": [
-      { "key": "businessDetails", "done": false },
-      { "key": "logo", "done": false },
-      { "key": "paymentDetails", "done": false },
-      { "key": "firstInvoice", "done": true },
-      { "key": "team", "done": false }
-    ]
   }
 }

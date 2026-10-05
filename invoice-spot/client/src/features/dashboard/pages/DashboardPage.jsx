@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FiAlertCircle } from "react-icons/fi";
 import useTitle from "../../../hooks/useTitle";
@@ -7,27 +6,21 @@ import {
   DEFAULT_PERIOD,
   PERIODS,
   findPeriod,
-  paymentRows,
   periodSubtitle,
 } from "../dashboardModel";
 import DashboardShell from "../components/DashboardShell";
 import {
   DashboardLoading,
-  DocumentStatus,
   attentionPair,
-  chartPair,
-  historyPair,
   listRow,
 } from "../components/DashboardPanels";
 import OverviewTiles from "../components/OverviewTiles";
 import CashFlowPanel from "../components/CashFlowPanel";
-import OwedPanel from "../components/OwedPanel";
 import AttentionPanel from "../components/AttentionPanel";
 import TopClientsPanel from "../components/TopClientsPanel";
 import SpendingPanel from "../components/SpendingPanel";
 import TopItemsPanel from "../components/TopItemsPanel";
 import ComingUpPanel from "../components/ComingUpPanel";
-import SetupStrip from "../components/SetupStrip";
 import Shortcuts from "../components/Shortcuts";
 import {
   errorBanner,
@@ -38,9 +31,7 @@ import {
   retryButton,
 } from "../../../components/workspace/pastel";
 import { Select } from "../../../components/workspace/Select";
-import PaymentHistory from "./components/paymentHistory";
 
-const NO_PAYMENTS = [];
 // What the overview draws from. An answer without these, as an older server
 // sends, can't be shown.
 const OVERVIEW_FIELDS = ["period", "totals", "owedNow", "trend"];
@@ -59,10 +50,6 @@ const DashboardPage = () => {
   const answer = overviewQuery.data;
   const snapshot =
     answer && OVERVIEW_FIELDS.every((key) => answer[key]) ? answer : undefined;
-  const payments = useMemo(
-    () => paymentRows(snapshot?.payments || NO_PAYMENTS),
-    [snapshot],
-  );
   const refreshing = overviewQuery.isFetching;
   const hasError = overviewQuery.isError || (Boolean(answer) && !snapshot);
   // Until the chosen period's or currency's figures arrive, or when they
@@ -158,9 +145,6 @@ const DashboardPage = () => {
             )}
           </div>
         </header>
-        {/* What is left to set up is the same in any period and currency,
-            so it stays as it is while other figures load. */}
-        {snapshot?.setup && <SetupStrip setup={snapshot.setup} />}
         {hasError && (
           <div className={errorBanner} role="alert">
             <FiAlertCircle aria-hidden="true" />
@@ -190,13 +174,7 @@ const DashboardPage = () => {
                 snapshot={snapshot}
                 currencyChosen={Boolean(params.get("currency"))}
               />
-              <div className={chartPair}>
-                <CashFlowPanel snapshot={snapshot} />
-                <OwedPanel
-                  snapshot={snapshot}
-                  currencyChosen={Boolean(params.get("currency"))}
-                />
-              </div>
+              <CashFlowPanel snapshot={snapshot} />
               {/* A panel an older server's answer has no figures for is
                   left out, and the rest of its row takes its room. */}
               <div className={snapshot.topClients ? attentionPair : "contents"}>
@@ -220,17 +198,6 @@ const DashboardPage = () => {
                   )}
                 </div>
               )}
-              <div className={historyPair}>
-                <PaymentHistory
-                  sortPaymentHistory={payments.rows}
-                  paymentDocuments={payments.documents}
-                  currency={snapshot.currency}
-                />
-                <DocumentStatus
-                  snapshot={snapshot}
-                  total={snapshot.documents}
-                />
-              </div>
             </div>
           )
         )}

@@ -38,8 +38,7 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
       providesTags: ["Customer"],
     }),
     // The logo's address comes back as text; a refusal comes back as the
-    // usual error, so its message can be shown. The logo is one of the
-    // overview's setup steps.
+    // usual error, so its message can be shown.
     uploadProfileLogo: builder.mutation({
       query: (body) => ({
         url: "/upload",
@@ -48,7 +47,6 @@ export const workspaceApiSlice = baseApiSlice.injectEndpoints({
         responseHandler: (response) =>
           response.ok ? response.text() : response.json(),
       }),
-      invalidatesTags: ["Settings"],
     }),
   }),
 });

@@ -3,36 +3,14 @@ import { compactAmount, formatAmount } from "../../utils/money";
 import {
   documentsLink,
   expensesLink,
-  outstandingLink,
-  overdueLink,
   paymentsLink,
 } from "../documents/listLinks";
 import { share } from "../reports/reportModel";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
 
-// The server's payments as the payment history shows them: each row keyed by
-// its id, and the document it was recorded against for the hover card.
-export const paymentRows = (payments = []) => ({
-  rows: payments.map((payment) => ({ ...payment, id: payment._id })),
-  documents: new Map(
-    payments.map((payment) => [payment._id, payment.document]),
-  ),
-});
-
 export const formatMoney = (value, currency) =>
   formatAmount(asAmount(value), currency);
-
-export const formatDate = (value) => {
-  const date = value ? parseDate(value) : null;
-  return date && Number.isFinite(date.getTime())
-    ? date.toLocaleDateString("en", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
-};
 
 // The periods the overview can show, as its pills name them. The last 90
 // days is the default, so it stays out of the address. Each names the same
@@ -105,25 +83,11 @@ export const reportLink = (section, period, currency) => {
 };
 
 // The records behind the overview's figures, for the period shown and, when
-// one was chosen, the currency: what was billed, the payments received, and
-// the invoices owed in each week. Overdue opens the overdue invoices.
+// one was chosen, the currency: what was billed and the payments received.
 export const billedLink = (period, currency) =>
   documentsLink({ type: "billed", period: findPeriod(period).list, currency });
 export const receivedLink = (period, currency) =>
   paymentsLink(findPeriod(period).list, currency);
-const DUE_WEEKS = {
-  thisWeek: "this-week",
-  nextWeek: "next-week",
-  weekAfter: "week-after",
-  later: "later",
-};
-export const owedWeekLink = (key, currency) =>
-  key === "overdue"
-    ? overdueLink(currency)
-    : outstandingLink(currency, DUE_WEEKS[key]);
-// The document status counts documents in every currency, so its links
-// keep to none.
-export const statusLink = (status) => documentsLink({ status });
 // The expenses behind Spending, for the period shown, in the currency its
 // figures count: a category's, or every one without a category. Recording
 // an expense from it opens the add dialog over that currency's expenses.
@@ -215,49 +179,6 @@ export const awaitingRows = (items = []) =>
       ? `valid until ${dayOf(item.validUntil)}`
       : "No expiry",
     to: `/document/${item.documentId}`,
-  }));
-
-// The steps that make a new business ready, in the order the setup strip
-// lists them, each opening the page that does it. The server says which are
-// done; a step it doesn't name isn't.
-export const SETUP_STEPS = [
-  {
-    key: "businessDetails",
-    label: "Business details",
-    detail: "Address and tax ID",
-    to: "/settings/business",
-  },
-  {
-    key: "logo",
-    label: "Logo",
-    detail: "On your documents",
-    to: "/settings/business",
-  },
-  {
-    key: "paymentDetails",
-    label: "How clients pay you",
-    detail: "Bank, UPI or a link",
-    to: "/settings/payments",
-  },
-  {
-    key: "firstInvoice",
-    label: "First invoice",
-    detail: "Create and issue one",
-    to: "/create-doc",
-  },
-  {
-    key: "team",
-    label: "Your team",
-    detail: "Invite people to help",
-    to: "/settings/team",
-  },
-];
-export const setupSteps = (setup) =>
-  SETUP_STEPS.map((step) => ({
-    ...step,
-    done: Boolean(
-      setup?.steps?.some((answer) => answer.key === step.key && answer.done),
-    ),
   }));
 
 // Counts of invoices are worded as on the Documents list.
@@ -414,48 +335,6 @@ export const labelStep = (count, width, room) =>
 export const showsLabel = (index, count, step) =>
   (count - 1 - index) % step === 0;
 
-// What clients owe, by when it is due, as columns: each one's name, its
-// days, how it is read out, and its height as a share of the tallest.
-// Later is left out while nothing is due then.
-const OWED_WEEKS = {
-  overdue: "Overdue",
-  thisWeek: "This week",
-  nextWeek: "Next week",
-  weekAfter: "Week after",
-  later: "Later",
-};
-export const owedColumns = (owedByWeek = []) => {
-  const columns = owedByWeek.filter(
-    (bucket) =>
-      bucket.key !== "later" || asAmount(bucket.amount) > 0 || bucket.invoices,
-  );
-  const tallest = Math.max(
-    0,
-    ...columns.map((bucket) => asAmount(bucket.amount)),
-  );
-  return columns.map((bucket) => {
-    const name = OWED_WEEKS[bucket.key] || bucket.key;
-    const from = bucket.from && dayMonth(parseDate(bucket.from));
-    return {
-      ...bucket,
-      name,
-      when:
-        bucket.key === "overdue"
-          ? "Past due"
-          : bucket.to
-            ? dayRange(bucket.from, bucket.to)
-            : `From ${from}`,
-      spoken:
-        bucket.key === "overdue"
-          ? name
-          : bucket.to
-            ? `${name}, due ${dayRange(bucket.from, bucket.to)}`
-            : `${name}, due from ${from} or with no due date`,
-      share: tallest > 0 ? Math.max(asAmount(bucket.amount), 0) / tallest : 0,
-    };
-  });
-};
-
 // What needs attention, in the overview's words: each kind's label above
 // the document's number, and what the footer calls it when there is none
 // of it, or when the list leaves some of it out.
@@ -589,17 +468,7 @@ export const attentionFooter = (counts = {}, items = []) => {
   return sentences.length ? sentences.join(" ") : null;
 };
 
-// An empty or invalid status draws only its track. Overdue is never a ring.
-export const getStatusRingRatio = (count, total) =>
-  Number.isFinite(total) &&
-  total > 0 &&
-  Number.isFinite(count) &&
-  count >= 0 &&
-  count <= total
-    ? count / total
-    : 0;
-
-// Stored status values, in the words the overview uses for them.
+// Stored status values, in the words the app shows for them.
 export const STATUS_LABELS = {
   Paid: "Paid",
   "Not Fully Paid": "Partially paid",

@@ -12,15 +12,10 @@ import {
   dateSpan,
   expiredQuotationsLink,
   findPeriod,
-  formatDate,
   formatMoney,
-  getStatusRingRatio,
   invoiceCount,
   itemLink,
   labelStep,
-  owedColumns,
-  owedWeekLink,
-  paymentRows,
   percentLabel,
   periodSubtitle,
   quotationsLink,
@@ -29,11 +24,9 @@ import {
   recurringLink,
   reportLink,
   runRows,
-  setupSteps,
   showsLabel,
   spendingLink,
   spendingRows,
-  statusLink,
   topClientRows,
   topItemRows,
   trendColumns,
@@ -41,58 +34,9 @@ import {
   wholeAmount,
 } from "./dashboardModel";
 
-describe("status ring comparisons", () => {
-  it.each([
-    [4, 12, 1 / 3],
-    [3, 12, 0.25],
-    [5, 12, 5 / 12],
-    [12, 12, 1],
-    [0, 12, 0],
-    [0, 0, 0],
-    [1, 0, 0],
-    [-1, 12, 0],
-    [13, 12, 0],
-    [NaN, 12, 0],
-    [1, Infinity, 0],
-    [undefined, 12, 0],
-  ])("draws count %s against total %s as %s", (count, total, ratio) => {
-    expect(getStatusRingRatio(count, total)).toBe(ratio);
-  });
-});
-
-it("keys each payment by its id and finds the document it was recorded against", () => {
-  const payments = [
-    {
-      _id: "p2",
-      paidBy: "Second client",
-      datePaid: "2026-09-20",
-      amountPaid: 10,
-      document: { _id: "d2", documentNumber: "INV-2" },
-    },
-    {
-      _id: "p1",
-      paidBy: "First client",
-      datePaid: "2026-08-01",
-      amountPaid: 24.5,
-      document: { _id: "d1", documentNumber: "INV-1" },
-    },
-  ];
-  const { rows, documents } = paymentRows(payments);
-  expect(rows.map((row) => [row.id, row.paidBy])).toEqual([
-    ["p2", "Second client"],
-    ["p1", "First client"],
-  ]);
-  expect(rows.map((row) => documents.get(row.id).documentNumber)).toEqual([
-    "INV-2",
-    "INV-1",
-  ]);
-  expect(paymentRows().rows).toEqual([]);
-});
-
-it("formats amounts and dates safely", () => {
+it("formats amounts safely", () => {
   expect(formatMoney(undefined)).toBe("0.00");
   expect(formatMoney(1234.5)).toBe("1,234.50");
-  expect(formatDate("invalid")).toBe("—");
 });
 
 describe("periods", () => {
@@ -219,39 +163,6 @@ describe("links to the records behind each figure", () => {
       );
     },
   );
-
-  it("opens the invoices owed in each week, soonest due first, and the overdue ones", () => {
-    expect(
-      ["overdue", "thisWeek", "nextWeek", "weekAfter", "later"].map((key) =>
-        owedWeekLink(key),
-      ),
-    ).toEqual([
-      "/documents?status=overdue",
-      "/documents?status=outstanding&due=this-week&sort=dueDate&dir=asc",
-      "/documents?status=outstanding&due=next-week&sort=dueDate&dir=asc",
-      "/documents?status=outstanding&due=week-after&sort=dueDate&dir=asc",
-      "/documents?status=outstanding&due=later&sort=dueDate&dir=asc",
-    ]);
-    expect(owedWeekLink("overdue", "EUR")).toBe(
-      "/documents?status=overdue&currency=EUR",
-    );
-    expect(owedWeekLink("nextWeek", "EUR")).toBe(
-      "/documents?status=outstanding&due=next-week&currency=EUR&sort=dueDate&dir=asc",
-    );
-  });
-
-  it("opens each payment status, which counts every currency", () => {
-    expect(
-      ["paid", "partial", "unpaid", "overdue"].map((status) =>
-        statusLink(status),
-      ),
-    ).toEqual([
-      "/documents?status=paid",
-      "/documents?status=partial",
-      "/documents?status=unpaid",
-      "/documents?status=overdue",
-    ]);
-  });
 
   it.each([
     ["30d", "30d"],
@@ -501,32 +412,6 @@ describe("what is coming up", () => {
   });
 });
 
-describe("what is left to set up", () => {
-  it("lists the five steps in order, each opening its page, ticked as the server says", () => {
-    expect(
-      setupSteps({
-        steps: [
-          { key: "team", done: false },
-          { key: "firstInvoice", done: true },
-          { key: "logo", done: true },
-          { key: "somethingNew", done: true },
-        ],
-      }).map(({ key, label, to, done }) => [key, label, to, done]),
-    ).toEqual([
-      ["businessDetails", "Business details", "/settings/business", false],
-      ["logo", "Logo", "/settings/business", true],
-      ["paymentDetails", "How clients pay you", "/settings/payments", false],
-      ["firstInvoice", "First invoice", "/create-doc", true],
-      ["team", "Your team", "/settings/team", false],
-    ]);
-  });
-
-  it("counts no step done without the server's answer", () => {
-    expect(setupSteps(null).every((step) => !step.done)).toBe(true);
-    expect(setupSteps({}).every((step) => !step.done)).toBe(true);
-  });
-});
-
 it("counts invoices", () => {
   expect(invoiceCount(1)).toBe("1 invoice");
   expect(invoiceCount(0)).toBe("0 invoices");
@@ -648,6 +533,12 @@ describe("the cash flow chart", () => {
     expect(axisLabel(200000, [200000, -100000], "INR")).toBe("2L");
   });
 
+  it("rounds amounts to whole units", () => {
+    expect(wholeAmount(6326.03)).toBe("6,326");
+    expect(wholeAmount(999.5)).toBe("1,000");
+    expect(wholeAmount(123456, "INR")).toBe("1,23,456");
+  });
+
   it.each([
     [{ from: "2026-09-05", to: "2026-09-05" }, "day", "Sep 5", "Sep 5"],
     [{ from: "2026-07-07", to: "2026-07-13" }, "week", "Jul 7", "Jul 7–13"],
@@ -681,84 +572,6 @@ describe("the cash flow chart", () => {
       (index) => showsLabel(index, 13, 3),
     );
     expect(named).toEqual([0, 3, 6, 9, 12]);
-  });
-});
-
-describe("what is owed, by due date", () => {
-  const weeks = [
-    {
-      key: "overdue",
-      from: null,
-      to: "2026-10-03",
-      amount: 6326.03,
-      invoices: 3,
-    },
-    {
-      key: "thisWeek",
-      from: "2026-10-04",
-      to: "2026-10-10",
-      amount: 2664.09,
-      invoices: 1,
-    },
-    {
-      key: "nextWeek",
-      from: "2026-10-11",
-      to: "2026-10-17",
-      amount: 13353.37,
-      invoices: 4,
-    },
-    {
-      key: "weekAfter",
-      from: "2026-10-18",
-      to: "2026-10-24",
-      amount: 1942.3,
-      invoices: 2,
-    },
-    { key: "later", from: "2026-10-25", to: null, amount: 0, invoices: 0 },
-  ];
-
-  it("names each week, against the tallest, and leaves Later out while nothing is due then", () => {
-    const columns = owedColumns(weeks);
-    expect(
-      columns.map((column) => [column.name, column.when, column.spoken]),
-    ).toEqual([
-      ["Overdue", "Past due", "Overdue"],
-      ["This week", "Oct 4–10", "This week, due Oct 4–10"],
-      ["Next week", "Oct 11–17", "Next week, due Oct 11–17"],
-      ["Week after", "Oct 18–24", "Week after, due Oct 18–24"],
-    ]);
-    expect(columns.map((column) => column.share)).toEqual([
-      6326.03 / 13353.37,
-      2664.09 / 13353.37,
-      1,
-      1942.3 / 13353.37,
-    ]);
-  });
-
-  it("shows Later once something is due then, or has no due date", () => {
-    const later = owedColumns([
-      ...weeks.slice(0, 4),
-      { ...weeks[4], amount: 500, invoices: 1 },
-    ]).at(-1);
-    expect([later.name, later.when, later.spoken]).toEqual([
-      "Later",
-      "From Oct 25",
-      "Later, due from Oct 25 or with no due date",
-    ]);
-  });
-
-  it("draws no columns when nothing is owed", () => {
-    const empty = weeks.map((week) => ({ ...week, amount: 0, invoices: 0 }));
-    expect(owedColumns(empty).map((column) => column.share)).toEqual([
-      0, 0, 0, 0,
-    ]);
-    expect(owedColumns()).toEqual([]);
-  });
-
-  it("rounds amounts to whole units for the columns", () => {
-    expect(wholeAmount(6326.03)).toBe("6,326");
-    expect(wholeAmount(999.5)).toBe("1,000");
-    expect(wholeAmount(123456, "INR")).toBe("1,23,456");
   });
 });
 

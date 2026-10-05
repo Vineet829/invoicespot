@@ -25,7 +25,6 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
-  localStorage.clear();
 });
 
 const json = (body, status = 200) =>
@@ -70,9 +69,7 @@ const serve = (answer, session) =>
   );
 
 const loaded = (page) =>
-  vi.waitFor(() =>
-    expect(page.querySelector("#document-status-title")).not.toBeNull(),
-  );
+  vi.waitFor(() => expect(page.querySelector("#figures-title")).not.toBeNull());
 
 const open = async (
   path,
@@ -113,8 +110,6 @@ const pill = (page, label) =>
   );
 const content = (page) =>
   page.querySelector("[aria-busy], .transition-opacity");
-const setupStrip = (page) =>
-  page.querySelector('[aria-labelledby="setup-title"]');
 // The titles of the panels in each row.
 const layout = (page) =>
   [...content(page).children].map((row) =>
@@ -214,27 +209,25 @@ it("draws the last 90 days from the server's figures, against the 90 days before
     "10 invoices · 3 overdue",
     "Not due 17,959.76",
     "Overdue 6,326.03",
-    "48 documents",
   ]) {
     expect(page.textContent).toContain(text);
   }
   // One currency, so there is nothing to switch.
   expect(page.textContent).not.toContain("Currency");
-  // The panels in their rows, in reading order: what needs attention beside
-  // the top clients, Spending, the top items and what is coming up side by
-  // side, then the latest payments beside the document status.
+  // The panels in their rows, in reading order, right under the header:
+  // the figures, the cash flow across the width, what needs attention beside
+  // the top clients, then Spending, the top items and what is coming up side
+  // by side. Nothing else on the page has a title.
+  expect(page.querySelector("header").nextElementSibling).toBe(content(page));
   expect(layout(page)).toEqual([
     ["Figures in the last 90 days"],
-    ["Cash flow", "Invoices owed to you"],
+    ["Cash flow"],
     ["Needs your attention", "Top clients"],
     ["Spending", "Top items", "Coming up"],
-    ["Latest payments", "Document status"],
   ]);
-  // Above them, under the header, what is left to set up.
-  await act(() => vi.waitFor(() => expect(setupStrip(page)).not.toBeNull()));
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
-  ).toEqual(["Finish setting up", ...layout(page).flat()]);
+  ).toEqual(layout(page).flat());
 });
 
 it("charts money in and out, with the same figures in a table and on hover or focus", async () => {
@@ -585,32 +578,10 @@ it("opens each figure's records for the same period and the chosen currency", as
     "/reports?period=ytd&currency=EUR#profit",
     "/documents?status=outstanding&currency=EUR&sort=dueDate&dir=asc",
   ]);
-  const owed = page.querySelector('[aria-labelledby="owed-title"]');
-  expect(
-    [...owed.querySelectorAll("a")].map((link) => link.getAttribute("href")),
-  ).toEqual([
-    "/reports?currency=EUR#ageing",
-    "/documents?status=overdue&currency=EUR",
-    "/documents?status=outstanding&due=this-week&currency=EUR&sort=dueDate&dir=asc",
-    "/documents?status=outstanding&due=next-week&currency=EUR&sort=dueDate&dir=asc",
-    "/documents?status=outstanding&due=week-after&currency=EUR&sort=dueDate&dir=asc",
-  ]);
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(attention.querySelector("a").getAttribute("href")).toBe(
     "/documents?status=overdue&currency=EUR",
   );
-  // The document status counts every currency, so it keeps to none.
-  const status = page.querySelector(
-    '[aria-labelledby="document-status-title"]',
-  );
-  expect(
-    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
-  ).toEqual([
-    "/documents?status=paid",
-    "/documents?status=partial",
-    "/documents?status=unpaid",
-    "/documents?status=overdue",
-  ]);
 });
 
 it("opens the last 30 days' records, and Reports at the same days", async () => {
@@ -623,47 +594,8 @@ it("opens the last 30 days' records, and Reports at the same days", async () => 
   ]);
 });
 
-it("shows what is owed by due date and what needs attention, each opening its list", async () => {
+it("shows what needs attention, each opening its list", async () => {
   const page = await open("/dashboard");
-  const owed = page.querySelector('[aria-labelledby="owed-title"]');
-  expect(owed.textContent).toContain("24,285.79across 10 invoices");
-  expect(
-    [...owed.querySelectorAll("a")].map((link) => [
-      link.getAttribute("href"),
-      link.getAttribute("aria-label") || link.textContent,
-    ]),
-  ).toEqual([
-    ["/reports#ageing", "View report"],
-    [
-      "/documents?status=overdue",
-      "Overdue: 6,326.03 on 3 invoices. Open the overdue invoices",
-    ],
-    [
-      "/documents?status=outstanding&due=this-week&sort=dueDate&dir=asc",
-      "This week, due Oct 4–10: 2,664.09 on 1 invoice. Open these invoices",
-    ],
-    [
-      "/documents?status=outstanding&due=next-week&sort=dueDate&dir=asc",
-      "Next week, due Oct 11–17: 13,353.37 on 4 invoices. Open these invoices",
-    ],
-    [
-      "/documents?status=outstanding&due=week-after&sort=dueDate&dir=asc",
-      "Week after, due Oct 18–24: 1,942.30 on 2 invoices. Open these invoices",
-    ],
-  ]);
-  for (const text of [
-    "6,326",
-    "Past due · 3",
-    "Oct 4–10 · 1",
-    "Oct 11–17 · 4",
-    "Oct 18–24 · 2",
-    "Grouped by due date. Each column opens its invoices.",
-  ]) {
-    expect(owed.textContent).toContain(text);
-  }
-  // Nothing is due later, so that column is left out.
-  expect(owed.textContent).not.toContain("Later");
-
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(
     [...attention.querySelectorAll("ol > li")].map((item) => item.textContent),
@@ -721,48 +653,11 @@ it("shows what is owed by due date and what needs attention, each opening its li
   expect(attention.textContent).toContain(
     "No payment reports to confirm, drafts to issue or recurring invoices due this week.",
   );
-
-  const status = page.querySelector(
-    '[aria-labelledby="document-status-title"]',
-  );
-  expect(
-    [...status.querySelectorAll("a")].map((link) => [
-      link.getAttribute("href"),
-      link.getAttribute("aria-label"),
-    ]),
-  ).toEqual([
-    ["/documents?status=paid", "Paid: 32 documents. Open them"],
-    ["/documents?status=partial", "Partially paid: 6 documents. Open them"],
-    ["/documents?status=unpaid", "Unpaid: 10 documents. Open them"],
-    [
-      "/documents?status=overdue",
-      "Overdue: 3 unpaid invoices past their due date. Open them",
-    ],
-  ]);
 });
 
-it("opens a status only when it has documents", async () => {
+it("says when nothing needs attention", async () => {
   const page = await open("/dashboard", {
     ...overview,
-    partial: 0,
-    overdue: 0,
-  });
-  const status = page.querySelector(
-    '[aria-labelledby="document-status-title"]',
-  );
-  expect(
-    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
-  ).toEqual(["/documents?status=paid", "/documents?status=unpaid"]);
-  expect(status.textContent).toContain("Partially paid");
-  expect(status.textContent).toContain("Unpaid invoices past their due date");
-});
-
-it("shows a later column when something is due then, and says when nothing needs attention", async () => {
-  const page = await open("/dashboard", {
-    ...overview,
-    owedByWeek: overview.owedByWeek.map((week) =>
-      week.key === "later" ? { ...week, amount: 500, invoices: 1 } : week,
-    ),
     attention: {
       items: [],
       counts: {
@@ -775,15 +670,6 @@ it("shows a later column when something is due then, and says when nothing needs
       },
     },
   });
-  const owed = page.querySelector('[aria-labelledby="owed-title"]');
-  expect(owed.textContent).toContain("LaterFrom Oct 25 · 1");
-  const later = [...owed.querySelectorAll("a")].at(-1);
-  expect(later.getAttribute("href")).toBe(
-    "/documents?status=outstanding&due=later&sort=dueDate&dir=asc",
-  );
-  expect(later.getAttribute("aria-label")).toBe(
-    "Later, due from Oct 25 or with no due date: 500.00 on 1 invoice. Open these invoices",
-  );
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(attention.textContent).toBe(
     "Needs your attentionNothing needs your attention right now.",
@@ -801,16 +687,7 @@ it("says when nothing is owed", async () => {
       invoices: 0,
       overdueInvoices: 0,
     },
-    owedByWeek: overview.owedByWeek.map((week) => ({
-      ...week,
-      amount: 0,
-      invoices: 0,
-    })),
   });
-  const owed = page.querySelector('[aria-labelledby="owed-title"]');
-  expect(owed.textContent).toContain("0.00No unpaid invoices");
-  expect(owed.textContent).toContain("Nothing is owed to you right now.");
-  expect(owed.querySelector('a[href^="/documents"]')).toBeNull();
   expect(tiles(page)[3][1]).toBe(
     "Outstanding now: USD 0.00, no unpaid invoices. View the invoices owed, soonest due first",
   );
@@ -839,19 +716,6 @@ it("names what the attention list leaves out", async () => {
   expect(attention.querySelectorAll("ol > li")).toHaveLength(6);
   expect(attention.textContent).toContain(
     "No payment reports to confirm. Also 3 more overdue invoices, 4 due this week, 2 quotations, 1 recurring invoice and 7 drafts.",
-  );
-});
-
-it("opens the ageing report from the owed panel in the chosen currency, whatever the period", async () => {
-  const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
-    ...overview,
-    currencies: ["USD", "EUR"],
-    currency: url.searchParams.get("currency") || "USD",
-    period: { ...overview.period, key: "ytd" },
-  }));
-  const owed = page.querySelector('[aria-labelledby="owed-title"]');
-  expect(owed.querySelector("a").getAttribute("href")).toBe(
-    "/reports?currency=EUR#ageing",
   );
 });
 
@@ -1016,13 +880,12 @@ it("keeps each panel's place in its row while the overview loads", async () => {
   const loading = page.querySelector(
     '[aria-label="Loading your business overview"]',
   );
-  // After the words for screen readers: the four tiles, the cash flow and
-  // what is owed, what needs attention and the top clients, Spending, the
-  // top items and what is coming up, then the latest payments and the
-  // document status.
+  // After the words for screen readers: the four tiles, the cash flow
+  // across the width, what needs attention and the top clients, then
+  // Spending, the top items and what is coming up.
   expect(
     [...loading.children].slice(1).map((row) => row.children.length),
-  ).toEqual([4, 2, 2, 3, 2]);
+  ).toEqual([4, 1, 2, 3]);
   expect(spendingPanel(page)).toBeNull();
   await act(async () => respond({ ...overview, spending: spent }));
   await act(() => loaded(page));
@@ -1067,10 +930,9 @@ it("leaves Spending out when the server sends no spending", async () => {
   expect(spendingPanel(page)).toBeNull();
   expect(layout(page)).toEqual([
     ["Figures in the last 90 days"],
-    ["Cash flow", "Invoices owed to you"],
+    ["Cash flow"],
     ["Needs your attention", "Top clients"],
     ["Top items", "Coming up"],
-    ["Latest payments", "Document status"],
   ]);
 });
 
@@ -1269,7 +1131,7 @@ const C = "00000000-0000-0000-0000-00000000c";
 it("lists the clients billed the most beside what needs attention, each linked name opening the client", async () => {
   const page = await open("/dashboard");
   const panel = topClients(page);
-  // In the row the document status had, beside what needs attention.
+  // Beside what needs attention, in a row of their own.
   expect(
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
@@ -1408,38 +1270,14 @@ it("leaves what needs attention its whole row when the server sends no top clien
   expect(topClients(page)).toBeNull();
   expect(layout(page)).toEqual([
     ["Figures in the last 90 days"],
-    ["Cash flow", "Invoices owed to you"],
+    ["Cash flow"],
     ["Needs your attention"],
     ["Spending", "Top items", "Coming up"],
-    ["Latest payments", "Document status"],
   ]);
   expect(
     page.querySelector('[aria-labelledby="attention-title"]').parentElement
       .className,
   ).toBe("contents");
-});
-
-it("keeps the document status, beside the latest payments, in the last row", async () => {
-  const page = await open("/dashboard");
-  const status = page.querySelector(
-    '[aria-labelledby="document-status-title"]',
-  );
-  const last = content(page).lastElementChild;
-  expect(status.parentElement).toBe(last);
-  expect(
-    [...last.children].map((section) =>
-      section.getAttribute("aria-labelledby"),
-    ),
-  ).toEqual(["payments-title", "document-status-title"]);
-  expect(status.textContent).toContain("48 documents");
-  expect(
-    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
-  ).toEqual([
-    "/documents?status=paid",
-    "/documents?status=partial",
-    "/documents?status=unpaid",
-    "/documents?status=overdue",
-  ]);
 });
 
 it("keeps the last period's top clients, dimmed, when the chosen period's can't be loaded", async () => {
@@ -1864,201 +1702,4 @@ it("names a quotation with no last valid day as having no expiry", async () => {
     "/document/00000000-0000-0000-0000-000000000206",
     "QUO-0206, Kestrel Outdoor, No expiry, 1,201.20. Open the quotation",
   ]);
-});
-
-// Waits for the business the session works in, which decides who sees the
-// setup steps.
-const businessLoaded = async () => {
-  const { store } = await import("../../../app/store");
-  await act(() =>
-    vi.waitFor(() =>
-      expect(
-        Object.values(store.getState().api.queries).some(
-          (query) =>
-            query.endpointName === "getBusinesses" &&
-            query.status === "fulfilled",
-        ),
-      ).toBe(true),
-    ),
-  );
-};
-const stripShown = (page) =>
-  act(() => vi.waitFor(() => expect(setupStrip(page)).not.toBeNull()));
-const steps = (strip) =>
-  [...strip.querySelectorAll("li a")].map((link) => [
-    link.getAttribute("href"),
-    link.textContent,
-  ]);
-const marks = (strip) =>
-  [...strip.querySelectorAll("li a > span:first-child")].map((mark) =>
-    mark.querySelector("svg") ? "ticked" : mark.textContent,
-  );
-const setupWith = (done) => ({
-  ...overview,
-  setup: {
-    steps: [
-      "businessDetails",
-      "logo",
-      "paymentDetails",
-      "firstInvoice",
-      "team",
-    ].map((key) => ({ key, done: done.includes(key) })),
-  },
-});
-
-it("shows owners and admins what is left to set up under the header, each step opening its page", async () => {
-  const page = await open("/dashboard");
-  await stripShown(page);
-  const strip = setupStrip(page);
-  expect(page.querySelector("header").nextElementSibling).toBe(strip);
-  expect(strip.querySelector("h2").textContent).toBe("Finish setting up");
-  expect(strip.querySelector("p").textContent).toBe(
-    "1 of 5 done · each opens its setting",
-  );
-  expect(strip.querySelector("[style]").style.width).toBe("20%");
-  expect(steps(strip)).toEqual([
-    ["/settings/business", "1Business detailsAddress and tax ID"],
-    ["/settings/business", "2LogoOn your documents"],
-    ["/settings/payments", "3How clients pay youBank, UPI or a link"],
-    ["/create-doc", "First invoiceDone"],
-    ["/settings/team", "5Your teamInvite people to help"],
-  ]);
-  // A done step is ticked; the rest keep their number.
-  expect(marks(strip)).toEqual(["1", "2", "3", "ticked", "5"]);
-  const hide = strip.querySelector("button");
-  expect(hide.textContent).toBe("Hide");
-  expect(hide.getAttribute("aria-label")).toBe("Hide the setup steps");
-  // It stays as it is while another period loads.
-  expect(strip.closest("[aria-busy]")).toBeNull();
-});
-
-it("ticks every step the server says is done, and counts them", async () => {
-  const page = await open(
-    "/dashboard",
-    setupWith(["businessDetails", "logo", "firstInvoice"]),
-  );
-  await stripShown(page);
-  const strip = setupStrip(page);
-  expect(strip.querySelector("p").textContent).toBe(
-    "3 of 5 done · each opens its setting",
-  );
-  expect(strip.querySelector("[style]").style.width).toBe("60%");
-  expect(marks(strip)).toEqual(["ticked", "ticked", "3", "ticked", "5"]);
-  expect(steps(strip).map(([, text]) => text)).toEqual([
-    "Business detailsDone",
-    "LogoDone",
-    "3How clients pay youBank, UPI or a link",
-    "First invoiceDone",
-    "5Your teamInvite people to help",
-  ]);
-});
-
-it("shows no setup steps once every step is done", async () => {
-  const page = await open(
-    "/dashboard",
-    setupWith([
-      "businessDetails",
-      "logo",
-      "paymentDetails",
-      "firstInvoice",
-      "team",
-    ]),
-  );
-  await businessLoaded();
-  expect(setupStrip(page)).toBeNull();
-});
-
-it("hides the steps in this business when asked, leaving focus in their place", async () => {
-  const page = await open("/dashboard");
-  await stripShown(page);
-  await click(setupStrip(page).querySelector("button"));
-  expect(setupStrip(page)).toBeNull();
-  expect(page.textContent).not.toContain("Finish setting up");
-  expect(localStorage.getItem("setupHidden:b-1")).toBe("1");
-  // A note for screen readers takes the strip's place and its focus.
-  const note = page.querySelector("header").nextElementSibling;
-  expect(document.activeElement).toBe(note);
-  expect(note.className).toBe("sr-only");
-  expect(note.textContent).toBe("The setup steps are hidden.");
-});
-
-it("keeps the steps hidden in the business they were hidden in, and only there", async () => {
-  localStorage.setItem("setupHidden:b-1", "1");
-  let page = await open("/dashboard");
-  await businessLoaded();
-  expect(setupStrip(page)).toBeNull();
-  expect(page.querySelector("header").nextElementSibling.tagName).not.toBe("P");
-  act(() => root.unmount());
-  container.remove();
-
-  vi.resetModules();
-  page = await open("/dashboard", overview, loaded, {
-    businesses: [{ ...owner.businesses[0], _id: "b-2", name: "Second Studio" }],
-  });
-  await stripShown(page);
-  expect(steps(setupStrip(page))).toHaveLength(5);
-});
-
-it("shows the steps when storage can't be read, and hides them until the page is left when it can't be written", async () => {
-  const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-    throw new Error("Storage is off");
-  });
-  const write = vi
-    .spyOn(Storage.prototype, "setItem")
-    .mockImplementation(() => {
-      throw new Error("Storage is off");
-    });
-  try {
-    const page = await open("/dashboard");
-    await stripShown(page);
-    await click(setupStrip(page).querySelector("button"));
-    expect(write).toHaveBeenCalledWith("setupHidden:b-1", "1");
-    expect(setupStrip(page)).toBeNull();
-    expect(document.activeElement.textContent).toBe(
-      "The setup steps are hidden.",
-    );
-  } finally {
-    read.mockRestore();
-    write.mockRestore();
-  }
-});
-
-it("shows a viewer no setup steps", async () => {
-  const page = await open("/dashboard", overview, loaded, viewer);
-  await businessLoaded();
-  expect(setupStrip(page)).toBeNull();
-  expect(page.textContent).not.toContain("Finish setting up");
-});
-
-it("shows no setup steps when the server sends none, as it does to those who can't change the business's details", async () => {
-  const page = await open("/dashboard", { ...overview, setup: null });
-  await businessLoaded();
-  expect(setupStrip(page)).toBeNull();
-  const { setup, ...older } = overview;
-  act(() => root.unmount());
-  container.remove();
-  vi.resetModules();
-  const again = await open("/dashboard", older);
-  await businessLoaded();
-  expect(setupStrip(again)).toBeNull();
-});
-
-it("asks for the overview again once a setup step is done on another page", async () => {
-  const page = await open("/dashboard");
-  await stripShown(page);
-  const overviews = () =>
-    requests.filter((request) => request.includes("/report/overview"));
-  expect(overviews()).toHaveLength(1);
-  // How clients pay you, saved on the payment details page.
-  const { store } = await import("../../../app/store");
-  const { settingsApiSlice } = await import("../../settings/settingsApiSlice");
-  await act(async () => {
-    await store.dispatch(
-      settingsApiSlice.endpoints.updatePaymentDetails.initiate({
-        bankAccount: "12345678",
-      }),
-    );
-  });
-  await act(() => vi.waitFor(() => expect(overviews()).toHaveLength(2)));
-  expect(setupStrip(page)).not.toBeNull();
 });

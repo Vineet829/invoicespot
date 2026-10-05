@@ -143,7 +143,6 @@ module.exports = {
         "ov-rise": { from: { opacity: "0", transform: "translateY(10px)" } },
         "ov-bar": { from: { transform: "scaleX(0)" } },
         "ov-column": { from: { transform: "scaleY(0)" } },
-        "ov-ring": { from: { strokeDashoffset: "100" } },
         "ov-roll": {
           from: { transform: "translateY(400%)" },
           to: { transform: "translateY(0)" },
@@ -224,8 +223,6 @@ module.exports = {
         // Chart columns grow from the baseline; set --column-delay per column.
         "ov-column":
           "ov-column 0.9s var(--column-delay, 300ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
-        "ov-ring":
-          "ov-ring 1.4s var(--ring-delay, 0ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-roll":
           "ov-roll 1.4s calc(300ms + var(--digit-delay, 0ms)) cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "ov-pulse": "ov-pulse 1.6s ease-in-out infinite alternate",
