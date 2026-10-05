@@ -50,9 +50,9 @@ export const PERIODS = [
   { value: "last-year", label: "Last year" },
 ];
 
-// Due dates by the overview's weeks, counted from today; later includes
-// invoices with no due date. Only links from the overview set one, so it
-// shows as a filter to remove rather than in a menu.
+// Due dates by the week, counted from today; later includes invoices with
+// no due date. Only the address sets one, so it shows as a filter to remove
+// rather than in a menu.
 export const DUE_FILTERS = [
   { value: "this-week", label: "Due this week" },
   { value: "next-week", label: "Due next week" },

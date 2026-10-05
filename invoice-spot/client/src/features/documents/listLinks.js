@@ -11,12 +11,10 @@ const listLink = (path, filters) => {
 
 export const documentsLink = (filters) => listLink("/documents", filters);
 
-// Invoices with money owed, soonest due first; `due` keeps those due in one
-// of the overview's weeks.
-export const outstandingLink = (currency, due) =>
+// Invoices with money owed, soonest due first.
+export const outstandingLink = (currency) =>
   documentsLink({
     status: "outstanding",
-    due,
     currency,
     sort: "dueDate",
     dir: "asc",

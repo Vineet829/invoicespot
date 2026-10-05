@@ -239,7 +239,7 @@ export const statusTone = (value) =>
       : value === "Not Paid"
         ? "unpaid"
         : "neutral";
-// A stored payment status in the words the overview uses.
+// A stored payment status in the app's words for it.
 export const StatusBadge = ({ status }) => (
   <Badge tone={statusTone(status)}>{STATUS_LABELS[status] || status}</Badge>
 );
