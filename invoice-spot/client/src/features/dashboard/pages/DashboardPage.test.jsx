@@ -25,6 +25,7 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+  localStorage.clear();
 });
 
 const json = (body, status = 200) =>
@@ -112,6 +113,13 @@ const pill = (page, label) =>
   );
 const content = (page) =>
   page.querySelector("[aria-busy], .transition-opacity");
+const setupStrip = (page) =>
+  page.querySelector('[aria-labelledby="setup-title"]');
+// The titles of the panels in each row.
+const layout = (page) =>
+  [...content(page).children].map((row) =>
+    [...row.querySelectorAll("h2")].map((heading) => heading.textContent),
+  );
 const tiles = (page) =>
   [...page.querySelectorAll('[aria-labelledby="figures-title"] a')].map(
     (link) => [link.getAttribute("href"), link.getAttribute("aria-label")],
@@ -212,17 +220,21 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   }
   // One currency, so there is nothing to switch.
   expect(page.textContent).not.toContain("Currency");
+  // The panels in their rows, in reading order: what needs attention beside
+  // the top clients, Spending, the top items and what is coming up side by
+  // side, then the latest payments beside the document status.
+  expect(layout(page)).toEqual([
+    ["Figures in the last 90 days"],
+    ["Cash flow", "Invoices owed to you"],
+    ["Needs your attention", "Top clients"],
+    ["Spending", "Top items", "Coming up"],
+    ["Latest payments", "Document status"],
+  ]);
+  // Above them, under the header, what is left to set up.
+  await act(() => vi.waitFor(() => expect(setupStrip(page)).not.toBeNull()));
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
-  ).toEqual([
-    "Figures in the last 90 days",
-    "Cash flow",
-    "Invoices owed to you",
-    "Needs your attention",
-    "Document status",
-    "Latest payments",
-    "Spending",
-  ]);
+  ).toEqual(["Finish setting up", ...layout(page).flat()]);
 });
 
 it("charts money in and out, with the same figures in a table and on hover or focus", async () => {
@@ -344,7 +356,10 @@ it("leaves every comparison out when nothing came before the period", async () =
   expect(page.textContent).toContain("Last 90 days, Jul 7 – Oct 4, 2026");
   expect(page.textContent).not.toContain("compared with");
   expect(page.textContent).not.toContain("vs previous");
-  expect(page.textContent).not.toMatch(/\d%/);
+  // The top items' shares of income compare nothing with before.
+  const rest = page.cloneNode(true);
+  rest.querySelector('[aria-labelledby="top-items-title"]').remove();
+  expect(rest.textContent).not.toMatch(/\d%/);
   expect(tiles(page)[0][1]).toBe(
     "Billed in the last 90 days: USD 68,848.08. View the invoices, receipts and credit notes",
   );
@@ -995,7 +1010,7 @@ it("shows a viewer the way to record an expense disabled, with the reason", asyn
   ]);
 });
 
-it("keeps Spending's place beside the latest payments while the overview loads", async () => {
+it("keeps each panel's place in its row while the overview loads", async () => {
   let respond;
   const page = await open(
     "/dashboard",
@@ -1005,8 +1020,13 @@ it("keeps Spending's place beside the latest payments while the overview loads",
   const loading = page.querySelector(
     '[aria-label="Loading your business overview"]',
   );
-  // The last row holds the latest payments' placeholder and Spending's.
-  expect(loading.lastElementChild.children).toHaveLength(2);
+  // After the words for screen readers: the four tiles, the cash flow and
+  // what is owed, what needs attention and the top clients, Spending, the
+  // top items and what is coming up, then the latest payments and the
+  // document status.
+  expect(
+    [...loading.children].slice(1).map((row) => row.children.length),
+  ).toEqual([4, 2, 2, 3, 2]);
   expect(spendingPanel(page)).toBeNull();
   await act(async () => respond({ ...overview, spending: spent }));
   await act(() => loaded(page));
@@ -1045,13 +1065,17 @@ it("keeps the last period's spending, dimmed, when the chosen period's can't be 
   );
 });
 
-it("leaves the latest payments on their own when the server sends no spending", async () => {
+it("leaves Spending out when the server sends no spending", async () => {
   const { spending, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(spendingPanel(page)).toBeNull();
-  expect(page.querySelector("#payments-title").textContent).toBe(
-    "Latest payments",
-  );
+  expect(layout(page)).toEqual([
+    ["Figures in the last 90 days"],
+    ["Cash flow", "Invoices owed to you"],
+    ["Needs your attention", "Top clients"],
+    ["Top items", "Coming up"],
+    ["Latest payments", "Document status"],
+  ]);
 });
 
 it.each([
@@ -1240,4 +1264,805 @@ it("hides the cash flow's table for screen readers inside a box that clips it", 
     "Cash flow each week, USD",
   );
   expect(table.querySelectorAll("tbody tr")).toHaveLength(13);
+});
+
+const topClients = (page) =>
+  page.querySelector('[aria-labelledby="top-clients-title"]');
+const C = "00000000-0000-0000-0000-00000000c";
+
+it("lists the clients billed the most beside what needs attention, each linked name opening the client", async () => {
+  const page = await open("/dashboard");
+  const panel = topClients(page);
+  // In the row the document status had, beside what needs attention.
+  expect(
+    [...panel.parentElement.children].map((section) =>
+      section.getAttribute("aria-labelledby"),
+    ),
+  ).toEqual(["attention-title", "top-clients-title"]);
+  expect(panel.querySelector("p").textContent).toBe(
+    "Billed in these 90 days, largest first",
+  );
+  expect(links(panel)).toEqual([
+    ["/customers", "All clients"],
+    [
+      `/single-customer/${C}107`,
+      "Quill & Co. Publishing: 13,459.88 billed on 2 documents, owes 1,969.11. View the client",
+    ],
+    [
+      `/single-customer/${C}109`,
+      "Kestrel Outdoor: 10,317.45 billed on 2 documents, owes nothing. View the client",
+    ],
+    [
+      `/single-customer/${C}110`,
+      "Oak Street Bakery: 8,363.36 billed on 3 documents, owes 3,217.50. View the client",
+    ],
+    [
+      `/single-customer/${C}101`,
+      "Atlas Robotics: 5,298.15 billed on 2 documents, owes 2,550.40. View the client",
+    ],
+  ]);
+  const rows = [...panel.querySelectorAll("ol > li")];
+  expect(rows.map((row) => row.textContent)).toEqual([
+    "Quill & Co. PublishingOwes 1,969.11 · 2 documents13,459.88",
+    "Kestrel OutdoorOwes nothing · 2 documents10,317.45",
+    "Verdant FarmsOwes 5,311.77 · 2 documents8,590.73",
+    "Oak Street BakeryOwes 3,217.50 · 3 documents8,363.36",
+    "Atlas RoboticsOwes 2,550.40 · 2 documents5,298.15",
+  ]);
+  // Each bar is against the largest.
+  expect(
+    rows.map((row) =>
+      Math.round(parseFloat(row.querySelector("[style]").style.width)),
+    ),
+  ).toEqual([100, 77, 64, 62, 39]);
+  // The count of documents keeps to one line.
+  expect(
+    rows.map((row) => row.querySelector(".whitespace-nowrap").textContent),
+  ).toEqual([
+    "· 2 documents",
+    "· 2 documents",
+    "· 2 documents",
+    "· 3 documents",
+    "· 2 documents",
+  ]);
+  // What a client owes reads in the usual ink, since it needn't be overdue;
+  // owing nothing is muted.
+  expect(
+    rows.map((row) =>
+      row.querySelector(".text-spot-ink") ? "owes" : "settled",
+    ),
+  ).toEqual(["owes", "settled", "owes", "owes", "owes"]);
+  expect(panel.querySelector(".text-overdue-strong")).toBeNull();
+  // Documents saved without a linked client: the name is only words, and
+  // the row is read as one figure.
+  const unlinked = rows[2].firstElementChild;
+  expect(unlinked.querySelector("a")).toBeNull();
+  expect(unlinked.getAttribute("role")).toBe("img");
+  expect(unlinked.getAttribute("aria-label")).toBe(
+    "Verdant Farms: 8,590.73 billed on 2 documents, owes 5,311.77",
+  );
+  // A linked row is read once: its name reads the whole row.
+  for (const row of [rows[0], rows[1], rows[3], rows[4]]) {
+    const read = row.cloneNode(true);
+    read
+      .querySelectorAll('a, [aria-hidden="true"]')
+      .forEach((node) => node.remove());
+    expect(read.textContent).toBe("");
+  }
+  expect(panel.lastElementChild.textContent).toBe(
+    "A name opens the client: their documents, balance and statement.",
+  );
+});
+
+it("opens every client the same way in any currency and period", async () => {
+  const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
+    ...overview,
+    currencies: ["USD", "EUR"],
+    currency: url.searchParams.get("currency") || "USD",
+    period: { ...overview.period, key: "ytd" },
+  }));
+  const panel = topClients(page);
+  expect(panel.querySelector("p").textContent).toBe(
+    "Billed this year, largest first",
+  );
+  expect(links(panel).map(([href]) => href)).toEqual([
+    "/customers",
+    `/single-customer/${C}107`,
+    `/single-customer/${C}109`,
+    `/single-customer/${C}110`,
+    `/single-customer/${C}101`,
+  ]);
+});
+
+it("says nothing of names opening clients when no client is linked", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    topClients: overview.topClients.map((client) => ({
+      ...client,
+      clientId: null,
+    })),
+  });
+  const panel = topClients(page);
+  expect(links(panel)).toEqual([["/customers", "All clients"]]);
+  expect(panel.querySelectorAll('ol > li > [role="img"]')).toHaveLength(5);
+  expect(panel.lastElementChild.tagName).toBe("OL");
+});
+
+it.each([
+  ["30d", "in these 30 days"],
+  ["90d", "in these 90 days"],
+  ["12m", "in these 12 months"],
+  ["ytd", "this year"],
+])("says when no one was billed over %s", async (key, words) => {
+  const page = await open(`/dashboard?period=${key}`, {
+    ...overview,
+    period: { ...overview.period, key },
+    topClients: [],
+  });
+  const panel = topClients(page);
+  expect(panel.textContent).toBe(
+    `Top clientsAll clientsNo one billed ${words}.`,
+  );
+  expect(links(panel)).toEqual([["/customers", "All clients"]]);
+});
+
+it("leaves what needs attention its whole row when the server sends no top clients", async () => {
+  const { topClients: left, ...older } = overview;
+  const page = await open("/dashboard", older);
+  expect(topClients(page)).toBeNull();
+  expect(layout(page)).toEqual([
+    ["Figures in the last 90 days"],
+    ["Cash flow", "Invoices owed to you"],
+    ["Needs your attention"],
+    ["Spending", "Top items", "Coming up"],
+    ["Latest payments", "Document status"],
+  ]);
+  expect(
+    page.querySelector('[aria-labelledby="attention-title"]').parentElement
+      .className,
+  ).toBe("contents");
+});
+
+it("keeps the document status, beside the latest payments, in the last row", async () => {
+  const page = await open("/dashboard");
+  const status = page.querySelector(
+    '[aria-labelledby="document-status-title"]',
+  );
+  const last = content(page).lastElementChild;
+  expect(status.parentElement).toBe(last);
+  expect(
+    [...last.children].map((section) =>
+      section.getAttribute("aria-labelledby"),
+    ),
+  ).toEqual(["payments-title", "document-status-title"]);
+  expect(status.textContent).toContain("48 documents");
+  expect(
+    [...status.querySelectorAll("a")].map((link) => link.getAttribute("href")),
+  ).toEqual([
+    "/documents?status=paid",
+    "/documents?status=partial",
+    "/documents?status=unpaid",
+    "/documents?status=overdue",
+  ]);
+});
+
+it("keeps the last period's top clients, dimmed, when the chosen period's can't be loaded", async () => {
+  const page = await open("/dashboard", (url) =>
+    url.searchParams.get("period") === "30d"
+      ? json({ message: "Try later" }, 500)
+      : overview,
+  );
+  await click(pill(page, "30 days"));
+  await act(() =>
+    vi.waitFor(() =>
+      expect(page.querySelector('[role="alert"]')).not.toBeNull(),
+    ),
+  );
+  const panel = topClients(page);
+  expect(panel.closest("[aria-busy]").getAttribute("aria-busy")).toBe("true");
+  expect(panel.querySelector("p").textContent).toBe(
+    "Billed in these 90 days, largest first",
+  );
+  expect(panel.querySelectorAll("ol > li")).toHaveLength(5);
+});
+
+const topItems = (page) =>
+  page.querySelector('[aria-labelledby="top-items-title"]');
+
+it("lists the items that brought in the most beside Spending, each opening Items searched for it", async () => {
+  const page = await open("/dashboard");
+  const panel = topItems(page);
+  expect(
+    [...panel.parentElement.children].map((section) =>
+      section.getAttribute("aria-labelledby"),
+    ),
+  ).toEqual(["spending-title", "top-items-title", "coming-up-title"]);
+  expect(panel.querySelector("p").textContent).toBe(
+    "What you sold in these 90 days, before tax",
+  );
+  expect(links(panel)).toEqual([
+    ["/items", "All items"],
+    [
+      "/items?q=Motion+graphics+%28per+15+seconds%29",
+      "Motion graphics (per 15 seconds): 18,200.00, 28 sold, 28% of income. Search Items for it",
+    ],
+    [
+      "/items?q=Logo+and+identity+system",
+      "Logo and identity system: 9,280.00, 3 sold, 14% of income. Search Items for it",
+    ],
+    [
+      "/items?q=Consulting+%28hourly%29",
+      "Consulting (hourly): 7,140.00, 52 sold, 11% of income. Search Items for it",
+    ],
+    [
+      "/items?q=Front-end+build+%28per+page%29",
+      "Front-end build (per page): 6,460.00, 17 sold, 10% of income. Search Items for it",
+    ],
+    [
+      "/items?q=Brand+strategy+workshop",
+      "Brand strategy workshop: 5,400.00, 3 sold, 8% of income. Search Items for it",
+    ],
+  ]);
+  const rows = [...panel.querySelectorAll("ol > li")];
+  expect(rows.map((row) => row.textContent)).toEqual([
+    "Motion graphics (per 15 seconds)28 sold · 28% of income18,200.00",
+    "Logo and identity system3 sold · 14% of income9,280.00",
+    "Consulting (hourly)52 sold · 11% of income7,140.00",
+    "Front-end build (per page)17 sold · 10% of income6,460.00",
+    "Brand strategy workshop3 sold · 8% of income5,400.00",
+  ]);
+  // Each bar is against the largest.
+  expect(
+    rows.map((row) =>
+      Math.round(parseFloat(row.querySelector("[style]").style.width)),
+    ),
+  ).toEqual([100, 51, 39, 35, 30]);
+  expect(panel.lastElementChild.textContent).toBe(
+    "Everything sold adds up to the income behind Profit. Each row searches Items for it.",
+  );
+});
+
+it("adds up lines without a name as other lines, which open nothing", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    topItems: [
+      ...overview.topItems.slice(0, 3),
+      { item: null, quantity: 4, amount: 650.5, documents: 2 },
+      { item: "Stickers", quantity: 40, amount: 12, documents: 1 },
+    ],
+  });
+  const rows = [...topItems(page).querySelectorAll("ol > li")];
+  expect(rows.map((row) => row.textContent)).toEqual([
+    "Motion graphics (per 15 seconds)28 sold · 28% of income18,200.00",
+    "Logo and identity system3 sold · 14% of income9,280.00",
+    "Consulting (hourly)52 sold · 11% of income7,140.00",
+    "Other lines4 sold · 1% of income650.50",
+    "Stickers40 sold · <1% of income12.00",
+  ]);
+  const other = rows[3].firstElementChild;
+  expect(other.tagName).toBe("DIV");
+  expect(other.getAttribute("role")).toBe("img");
+  expect(other.getAttribute("aria-label")).toBe(
+    "Other lines: 650.50, 4 sold, 1% of income",
+  );
+  expect(links(topItems(page)).map(([href]) => href)).toEqual([
+    "/items",
+    "/items?q=Motion+graphics+%28per+15+seconds%29",
+    "/items?q=Logo+and+identity+system",
+    "/items?q=Consulting+%28hourly%29",
+    "/items?q=Stickers",
+  ]);
+});
+
+it("leaves the shares out when there was no income to share", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    topItems: [{ item: "Refunded work", quantity: 2, amount: 0, documents: 2 }],
+    itemsTotal: 0,
+  });
+  const panel = topItems(page);
+  expect(panel.querySelector("ol > li").textContent).toBe(
+    "Refunded work2 sold0.00",
+  );
+  expect(links(panel)[1]).toEqual([
+    "/items?q=Refunded+work",
+    "Refunded work: 0.00, 2 sold. Search Items for it",
+  ]);
+});
+
+it.each([
+  ["30d", "in these 30 days"],
+  ["90d", "in these 90 days"],
+  ["12m", "in these 12 months"],
+  ["ytd", "this year"],
+])("says when nothing was sold over %s", async (key, words) => {
+  const page = await open(`/dashboard?period=${key}`, {
+    ...overview,
+    period: { ...overview.period, key },
+    topItems: [],
+    itemsTotal: 0,
+  });
+  const panel = topItems(page);
+  expect(panel.textContent).toBe(`Top itemsAll itemsNothing sold ${words}.`);
+  expect(links(panel)).toEqual([["/items", "All items"]]);
+});
+
+it("leaves the rest of its row when the server sends no top items", async () => {
+  const { topItems: left, itemsTotal, ...older } = overview;
+  const page = await open("/dashboard", older);
+  expect(topItems(page)).toBeNull();
+  expect(layout(page)[3]).toEqual(["Spending", "Coming up"]);
+});
+
+const comingUp = (page) =>
+  page.querySelector('[aria-labelledby="coming-up-title"]');
+// A detail after a quotation's number starts with its dot, kept on the line
+// of the word after it.
+const DOT = " ·\u00a0";
+const withComingUp = (changes) => ({
+  ...overview,
+  comingUp: { ...overview.comingUp, ...changes },
+});
+
+it("shows what is coming up beside the top items: the next recurring invoices and the quotations waiting for an answer", async () => {
+  const page = await open("/dashboard");
+  const panel = comingUp(page);
+  expect(
+    [...panel.parentElement.children].map((section) =>
+      section.getAttribute("aria-labelledby"),
+    ),
+  ).toEqual(["spending-title", "top-items-title", "coming-up-title"]);
+  expect(
+    [...panel.querySelectorAll("h3")].map((heading) => heading.textContent),
+  ).toEqual(["Recurring invoices", "Quotations"]);
+  expect(panel.textContent).toContain("Next 90 days: 7 invoices · 10,650.00");
+  expect(links(panel)).toEqual([
+    ["/recurring", "Recurring"],
+    [
+      "/recurring",
+      "Oct 12: Harbor & Pine Architects, INV-1012, 450.00. Open the recurring invoices",
+    ],
+    [
+      "/recurring",
+      "Oct 20: Bluefin Analytics, INV-1020, 2,500.00. Open the recurring invoices",
+    ],
+    [
+      "/recurring",
+      "Nov 3: Oak Street Bakery, INV-1027, 1,800.00. Open the recurring invoices",
+    ],
+    [
+      "/recurring",
+      "Nov 12: Harbor & Pine Architects, INV-1012, 450.00. Open the recurring invoices",
+    ],
+    [
+      "/recurring",
+      "Nov 20: Bluefin Analytics, INV-1020, 2,500.00. Open the recurring invoices",
+    ],
+    ["/documents?type=quotation", "All quotations"],
+    [
+      "/document/00000000-0000-0000-0000-000000000206",
+      "QUO-0206, Kestrel Outdoor, valid until Oct 9, 1,201.20. Open the quotation",
+    ],
+    [
+      "/documents?type=quotation&sort=dueDate&dir=asc",
+      "Expired without an answer: 5 quotations, 25,343.18. Open the quotations, sorted by their last valid day",
+    ],
+  ]);
+  const [runs, awaiting] = panel.querySelectorAll("ol");
+  expect([...runs.children].map((run) => run.textContent)).toEqual([
+    "Oct 12Harbor & Pine ArchitectsINV-1012450.00",
+    "Oct 20Bluefin AnalyticsINV-10202,500.00",
+    "Nov 3Oak Street BakeryINV-10271,800.00",
+    "Nov 12Harbor & Pine ArchitectsINV-1012450.00",
+    "Nov 20Bluefin AnalyticsINV-10202,500.00",
+  ]);
+  expect(awaiting.previousElementSibling.textContent).toBe(
+    "Awaiting an answer · 1",
+  );
+  expect(awaiting.textContent).toBe(
+    `QUO-0206${DOT}Kestrel Outdoor${DOT}valid until Oct 91,201.20`,
+  );
+  // The day keeps to one line; a long client's name can wrap.
+  expect(
+    [...awaiting.querySelectorAll("a > span:first-child > span")].map(
+      (detail) => detail.className,
+    ),
+  ).toEqual(["whitespace-nowrap", "", "whitespace-nowrap"]);
+  expect(panel.lastElementChild.lastElementChild.textContent).toBe(
+    "Expired without an answer · 5Worth following up, or letting go25,343.18",
+  );
+});
+
+it("keeps the quotations' lists to the chosen currency", async () => {
+  const page = await open("/dashboard?currency=EUR", (url) => ({
+    ...overview,
+    currencies: ["USD", "EUR"],
+    currency: url.searchParams.get("currency") || "USD",
+  }));
+  expect(
+    links(comingUp(page))
+      .map(([href]) => href)
+      .filter((href) => !href.startsWith("/recurring")),
+  ).toEqual([
+    "/documents?type=quotation&currency=EUR",
+    "/document/00000000-0000-0000-0000-000000000206",
+    "/documents?type=quotation&currency=EUR&sort=dueDate&dir=asc",
+  ]);
+});
+
+const noSchedules = {
+  active: 0,
+  next90Days: { invoices: 0, amount: 0 },
+  nextRuns: [],
+};
+
+it("offers to set up a recurring invoice while there is none", async () => {
+  const page = await open(
+    "/dashboard",
+    withComingUp({ recurring: noSchedules }),
+  );
+  const panel = comingUp(page);
+  expect(panel.textContent).toContain(
+    "Recurring invoicesRecurringNone yet. Bill a client every week, month or year without lifting a finger.Set one upQuotations",
+  );
+  expect(panel.textContent).not.toContain("Next 90 days");
+  expect(links(panel).slice(0, 3)).toEqual([
+    ["/recurring", "Recurring"],
+    ["/recurring", "Set one up"],
+    ["/documents?type=quotation", "All quotations"],
+  ]);
+});
+
+it("shows a viewer the way to set up a recurring invoice disabled, with the reason", async () => {
+  const page = await open(
+    "/dashboard",
+    withComingUp({ recurring: noSchedules }),
+    loaded,
+    viewer,
+  );
+  const panel = comingUp(page);
+  await act(() =>
+    vi.waitFor(() => expect(panel.querySelector("button")).not.toBeNull()),
+  );
+  const setUp = panel.querySelector("button");
+  expect(setUp.textContent).toBe("Set one up");
+  expect(setUp.disabled).toBe(true);
+  expect(setUp.title).toBe(REFUSAL);
+  expect(
+    document.getElementById(setUp.getAttribute("aria-describedby")).textContent,
+  ).toBe(REFUSAL);
+  expect(links(panel)[0]).toEqual(["/recurring", "Recurring"]);
+  expect(links(panel)[1]).toEqual([
+    "/documents?type=quotation",
+    "All quotations",
+  ]);
+});
+
+it("says when no recurring invoice runs in the next 90 days", async () => {
+  const page = await open(
+    "/dashboard",
+    withComingUp({ recurring: { ...noSchedules, active: 2 } }),
+  );
+  const panel = comingUp(page);
+  expect(panel.textContent).toContain(
+    "Recurring invoicesRecurringNothing runs in the next 90 days.Quotations",
+  );
+  expect(panel.textContent).not.toContain("Set one up");
+});
+
+it("names a schedule's draft template and a run without a client", async () => {
+  const [run] = overview.comingUp.recurring.nextRuns;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      recurring: {
+        active: 1,
+        next90Days: { invoices: 1, amount: 450 },
+        nextRuns: [{ ...run, documentNumber: null, client: null }],
+      },
+    }),
+  );
+  const panel = comingUp(page);
+  expect(panel.textContent).toContain("Next 90 days: 1 invoice · 450.00");
+  expect(panel.querySelector("ol").textContent).toBe(
+    "Oct 12No clientDraft invoice450.00",
+  );
+  expect(links(panel)[1]).toEqual([
+    "/recurring",
+    "Oct 12: No client, Draft invoice, 450.00. Open the recurring invoices",
+  ]);
+});
+
+it("says when no quotation is waiting for an answer", async () => {
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      quotations: {
+        awaiting: { count: 0, amount: 0, items: [] },
+        expired: { count: 0, amount: 0 },
+      },
+    }),
+  );
+  const panel = comingUp(page);
+  expect(panel.lastElementChild.textContent).toBe(
+    "QuotationsAll quotationsNo quotations are waiting for an answer.",
+  );
+  expect(links(panel).at(-1)).toEqual([
+    "/documents?type=quotation",
+    "All quotations",
+  ]);
+});
+
+it("names the quotations waiting for an answer that it leaves out, and leaves out the expired ones when there are none", async () => {
+  const [quote] = overview.comingUp.quotations.awaiting.items;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      quotations: {
+        awaiting: {
+          count: 5,
+          amount: 6006,
+          items: ["206", "207", "208"].map((number, index) => ({
+            ...quote,
+            documentId: `00000000-0000-0000-0000-000000000${number}`,
+            documentNumber: `QUO-0${number}`,
+            validUntil: `2026-10-${String(9 + index * 5).padStart(2, "0")}`,
+          })),
+        },
+        expired: { count: 0, amount: 0 },
+      },
+    }),
+  );
+  const panel = comingUp(page);
+  const awaiting = panel.querySelectorAll("ol")[1];
+  expect([...awaiting.children].map((item) => item.textContent)).toEqual([
+    `QUO-0206${DOT}Kestrel Outdoor${DOT}valid until Oct 91,201.20`,
+    `QUO-0207${DOT}Kestrel Outdoor${DOT}valid until Oct 141,201.20`,
+    `QUO-0208${DOT}Kestrel Outdoor${DOT}valid until Oct 191,201.20`,
+  ]);
+  expect(awaiting.previousElementSibling.textContent).toBe(
+    "Awaiting an answer · 5",
+  );
+  expect(awaiting.nextElementSibling.textContent).toBe(
+    "Also 2 more quotations",
+  );
+  expect(panel.textContent).not.toContain("Expired");
+  expect(
+    links(panel)
+      .map(([href]) => href)
+      .slice(-3),
+  ).toEqual([
+    "/document/00000000-0000-0000-0000-000000000206",
+    "/document/00000000-0000-0000-0000-000000000207",
+    "/document/00000000-0000-0000-0000-000000000208",
+  ]);
+});
+
+it("leaves the rest of its row when the server sends nothing coming up", async () => {
+  const { comingUp: left, ...older } = overview;
+  const page = await open("/dashboard", older);
+  expect(comingUp(page)).toBeNull();
+  expect(layout(page)[3]).toEqual(["Spending", "Top items"]);
+});
+
+it("names a quotation with no last valid day as having no expiry", async () => {
+  const [quote] = overview.comingUp.quotations.awaiting.items;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      quotations: {
+        ...overview.comingUp.quotations,
+        awaiting: {
+          count: 1,
+          amount: 1201.2,
+          items: [{ ...quote, validUntil: null, days: null }],
+        },
+      },
+    }),
+  );
+  const panel = comingUp(page);
+  expect(panel.querySelectorAll("ol")[1].textContent).toBe(
+    `QUO-0206${DOT}Kestrel Outdoor${DOT}No expiry1,201.20`,
+  );
+  expect(links(panel)).toContainEqual([
+    "/document/00000000-0000-0000-0000-000000000206",
+    "QUO-0206, Kestrel Outdoor, No expiry, 1,201.20. Open the quotation",
+  ]);
+});
+
+// Waits for the business the session works in, which decides who sees the
+// setup steps.
+const businessLoaded = async () => {
+  const { store } = await import("../../../app/store");
+  await act(() =>
+    vi.waitFor(() =>
+      expect(
+        Object.values(store.getState().api.queries).some(
+          (query) =>
+            query.endpointName === "getBusinesses" &&
+            query.status === "fulfilled",
+        ),
+      ).toBe(true),
+    ),
+  );
+};
+const stripShown = (page) =>
+  act(() => vi.waitFor(() => expect(setupStrip(page)).not.toBeNull()));
+const steps = (strip) =>
+  [...strip.querySelectorAll("li a")].map((link) => [
+    link.getAttribute("href"),
+    link.textContent,
+  ]);
+const marks = (strip) =>
+  [...strip.querySelectorAll("li a > span:first-child")].map((mark) =>
+    mark.querySelector("svg") ? "ticked" : mark.textContent,
+  );
+const setupWith = (done) => ({
+  ...overview,
+  setup: {
+    steps: [
+      "businessDetails",
+      "logo",
+      "paymentDetails",
+      "firstInvoice",
+      "team",
+    ].map((key) => ({ key, done: done.includes(key) })),
+  },
+});
+
+it("shows owners and admins what is left to set up under the header, each step opening its page", async () => {
+  const page = await open("/dashboard");
+  await stripShown(page);
+  const strip = setupStrip(page);
+  expect(page.querySelector("header").nextElementSibling).toBe(strip);
+  expect(strip.querySelector("h2").textContent).toBe("Finish setting up");
+  expect(strip.querySelector("p").textContent).toBe(
+    "1 of 5 done · each opens its setting",
+  );
+  expect(strip.querySelector("[style]").style.width).toBe("20%");
+  expect(steps(strip)).toEqual([
+    ["/settings/business", "1Business detailsAddress and tax ID"],
+    ["/settings/business", "2LogoOn your documents"],
+    ["/settings/payments", "3How clients pay youBank, UPI or a link"],
+    ["/create-doc", "First invoiceDone"],
+    ["/settings/team", "5Your teamInvite people to help"],
+  ]);
+  // A done step is ticked; the rest keep their number.
+  expect(marks(strip)).toEqual(["1", "2", "3", "ticked", "5"]);
+  const hide = strip.querySelector("button");
+  expect(hide.textContent).toBe("Hide");
+  expect(hide.getAttribute("aria-label")).toBe("Hide the setup steps");
+  // It stays as it is while another period loads.
+  expect(strip.closest("[aria-busy]")).toBeNull();
+});
+
+it("ticks every step the server says is done, and counts them", async () => {
+  const page = await open(
+    "/dashboard",
+    setupWith(["businessDetails", "logo", "firstInvoice"]),
+  );
+  await stripShown(page);
+  const strip = setupStrip(page);
+  expect(strip.querySelector("p").textContent).toBe(
+    "3 of 5 done · each opens its setting",
+  );
+  expect(strip.querySelector("[style]").style.width).toBe("60%");
+  expect(marks(strip)).toEqual(["ticked", "ticked", "3", "ticked", "5"]);
+  expect(steps(strip).map(([, text]) => text)).toEqual([
+    "Business detailsDone",
+    "LogoDone",
+    "3How clients pay youBank, UPI or a link",
+    "First invoiceDone",
+    "5Your teamInvite people to help",
+  ]);
+});
+
+it("shows no setup steps once every step is done", async () => {
+  const page = await open(
+    "/dashboard",
+    setupWith([
+      "businessDetails",
+      "logo",
+      "paymentDetails",
+      "firstInvoice",
+      "team",
+    ]),
+  );
+  await businessLoaded();
+  expect(setupStrip(page)).toBeNull();
+});
+
+it("hides the steps in this business when asked, leaving focus in their place", async () => {
+  const page = await open("/dashboard");
+  await stripShown(page);
+  await click(setupStrip(page).querySelector("button"));
+  expect(setupStrip(page)).toBeNull();
+  expect(page.textContent).not.toContain("Finish setting up");
+  expect(localStorage.getItem("setupHidden:b-1")).toBe("1");
+  // A note for screen readers takes the strip's place and its focus.
+  const note = page.querySelector("header").nextElementSibling;
+  expect(document.activeElement).toBe(note);
+  expect(note.className).toBe("sr-only");
+  expect(note.textContent).toBe("The setup steps are hidden.");
+});
+
+it("keeps the steps hidden in the business they were hidden in, and only there", async () => {
+  localStorage.setItem("setupHidden:b-1", "1");
+  let page = await open("/dashboard");
+  await businessLoaded();
+  expect(setupStrip(page)).toBeNull();
+  expect(page.querySelector("header").nextElementSibling.tagName).not.toBe("P");
+  act(() => root.unmount());
+  container.remove();
+
+  vi.resetModules();
+  page = await open("/dashboard", overview, loaded, {
+    businesses: [{ ...owner.businesses[0], _id: "b-2", name: "Second Studio" }],
+  });
+  await stripShown(page);
+  expect(steps(setupStrip(page))).toHaveLength(5);
+});
+
+it("shows the steps when storage can't be read, and hides them until the page is left when it can't be written", async () => {
+  const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new Error("Storage is off");
+  });
+  const write = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(() => {
+      throw new Error("Storage is off");
+    });
+  try {
+    const page = await open("/dashboard");
+    await stripShown(page);
+    await click(setupStrip(page).querySelector("button"));
+    expect(write).toHaveBeenCalledWith("setupHidden:b-1", "1");
+    expect(setupStrip(page)).toBeNull();
+    expect(document.activeElement.textContent).toBe(
+      "The setup steps are hidden.",
+    );
+  } finally {
+    read.mockRestore();
+    write.mockRestore();
+  }
+});
+
+it("shows a viewer no setup steps", async () => {
+  const page = await open("/dashboard", overview, loaded, viewer);
+  await businessLoaded();
+  expect(setupStrip(page)).toBeNull();
+  expect(page.textContent).not.toContain("Finish setting up");
+});
+
+it("shows no setup steps when the server sends none, as it does to those who can't change the business's details", async () => {
+  const page = await open("/dashboard", { ...overview, setup: null });
+  await businessLoaded();
+  expect(setupStrip(page)).toBeNull();
+  const { setup, ...older } = overview;
+  act(() => root.unmount());
+  container.remove();
+  vi.resetModules();
+  const again = await open("/dashboard", older);
+  await businessLoaded();
+  expect(setupStrip(again)).toBeNull();
+});
+
+it("asks for the overview again once a setup step is done on another page", async () => {
+  const page = await open("/dashboard");
+  await stripShown(page);
+  const overviews = () =>
+    requests.filter((request) => request.includes("/report/overview"));
+  expect(overviews()).toHaveLength(1);
+  // How clients pay you, saved on the payment details page.
+  const { store } = await import("../../../app/store");
+  const { settingsApiSlice } = await import("../../settings/settingsApiSlice");
+  await act(async () => {
+    await store.dispatch(
+      settingsApiSlice.endpoints.updatePaymentDetails.initiate({
+        bankAccount: "12345678",
+      }),
+    );
+  });
+  await act(() => vi.waitFor(() => expect(overviews()).toHaveLength(2)));
+  expect(setupStrip(page)).not.toBeNull();
 });

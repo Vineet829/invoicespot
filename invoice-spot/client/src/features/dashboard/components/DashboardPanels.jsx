@@ -234,11 +234,11 @@ export const StatusRings = ({
 );
 
 // The rings beside their legend; on phones, the legend under the rings.
-// From 1200px wide the panel sits beside the attention list, so the rings
-// are smaller and the spacing tighter, and any height the list adds goes
-// around the rings.
+// From 1200px wide the rings are smaller and the spacing tighter, so the
+// panel stays short, whether it has a row to itself or, from 1440px, sits
+// beside the latest payments, whose height then goes around the rings.
 export const statusPanel =
-  "flex min-w-0 animate-ov-rise flex-col gap-5 rounded-[30px] border border-white/85 bg-white/50 p-[26px] shadow-panel-soft backdrop-blur-[16px] [--rise-delay:240ms] min-[1200px]:gap-3.5 min-[1200px]:p-[18px] max-[700px]:gap-4 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
+  "flex min-w-0 animate-ov-rise flex-col gap-5 rounded-[30px] border border-white/85 bg-white/50 p-[26px] shadow-panel-soft backdrop-blur-[16px] [--rise-delay:400ms] min-[1200px]:gap-3.5 min-[1200px]:p-[18px] max-[700px]:gap-4 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
 export const statusCard =
   "relative grid min-w-0 flex-1 grid-cols-[260px_minmax(0,1fr)] grid-rows-[auto_1fr_auto] items-center gap-x-8 gap-y-5 rounded-3xl border border-white/95 bg-white/[.72] px-[26px] py-6 min-[1200px]:grid-cols-[170px_minmax(0,1fr)] min-[1200px]:gap-x-6 min-[1200px]:gap-y-3 min-[1200px]:px-5 min-[1200px]:py-[18px] max-[700px]:flex max-[700px]:flex-col max-[700px]:gap-7 max-[700px]:rounded-[20px] max-[700px]:px-5 max-[700px]:py-[22px] max-[700px]:[&>:not(svg)]:w-full";
 export const statusLegend = "col-start-2 row-start-2";
@@ -397,7 +397,7 @@ export const DocumentStatus = ({ snapshot, total }) => {
 };
 
 export const historyPanel =
-  "relative flex min-w-0 animate-ov-rise flex-col gap-1.5 rounded-[30px] border border-white/90 bg-white/60 px-6 pb-[18px] pt-[22px] backdrop-blur-[16px] [--rise-delay:320ms] max-[700px]:gap-3 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
+  "relative flex min-w-0 animate-ov-rise flex-col gap-1.5 rounded-[30px] border border-white/90 bg-white/60 px-6 pb-[18px] pt-[22px] backdrop-blur-[16px] [--rise-delay:400ms] max-[700px]:gap-3 max-[700px]:rounded-3xl max-[700px]:p-[18px]";
 export const historyHeading =
   "flex min-w-0 flex-[0_0_40px] items-center justify-between gap-4 max-[700px]:basis-auto max-[700px]:flex-wrap max-[700px]:gap-x-3 max-[700px]:gap-y-0.5";
 
@@ -406,16 +406,25 @@ export const historyHeading =
 export const overviewPanel = `${surface} relative flex min-w-0 animate-ov-rise flex-col gap-2.5 px-6 pb-4 pt-5 max-[700px]:rounded-3xl max-[700px]:p-[18px]`;
 export const panelLink =
   "inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12.5px] text-spot-night underline-offset-4 transition-colors hover:text-spot-violet hover:underline coarse:min-h-11 [&>svg]:size-[13px] [&>svg]:stroke-[1.5]";
+// A panel's way to start what it has none of yet, such as recording an
+// expense: a white key, greyed out when the role can't use it.
+export const panelAction =
+  "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[13px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
 // The overview's rows below the tiles: the cash flow beside what is owed
-// from 1360px wide, what needs attention beside the document status from
-// 1200px, and the latest payments beside spending from 1440px. Narrower,
-// the payments' columns would break names and headings inside words.
-// Spending is as wide as the status above it.
+// from 1360px wide, what needs attention beside the top clients from
+// 1200px, then the lists that sum up the other tabs, two side by side from
+// 1200px, with one left over across both, and all side by side from 1440px,
+// each as wide as the others; and the latest payments beside the document
+// status from 1440px. Narrower, the payments' columns would break names and
+// headings inside words, and the lists would shorten most names. The top
+// clients and the document status are as wide as each other.
 export const chartPair =
   "grid min-w-0 gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_clamp(400px,36%,560px)]";
 export const attentionPair =
   "grid min-w-0 gap-5 min-[1200px]:grid-cols-[minmax(0,1fr)_480px]";
+export const listRow =
+  "grid min-w-0 gap-5 min-[1200px]:grid-cols-2 min-[1200px]:[&>:nth-child(odd):last-child]:col-span-2 min-[1440px]:grid-cols-none min-[1440px]:auto-cols-fr min-[1440px]:grid-flow-col min-[1440px]:[&>:nth-child(odd):last-child]:col-span-1";
 export const historyPair =
   "grid min-w-0 gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_480px]";
 
@@ -425,6 +434,24 @@ export const tileRow =
   "grid min-w-0 animate-ov-rise grid-cols-4 gap-[18px] [--rise-delay:80ms] max-[1199px]:grid-cols-2 max-[700px]:gap-4 max-[599px]:grid-cols-1";
 export const tileCard =
   "flex min-w-0 flex-col gap-2.5 rounded-[22px] px-5 pb-4 pt-[18px]";
+
+// A list with a bar in each row, such as Spending, while it loads: its
+// title, the figure or words under it, then five rows.
+const BarListLoading = ({ lead, className = "" }) => (
+  <div className={`${overviewPanel} ${className}`}>
+    <Skeleton className="h-6 w-[120px] rounded-md" />
+    {lead}
+    {Array.from({ length: 5 }, (_, index) => (
+      <div className="flex items-center gap-2.5 py-[7px]" key={index}>
+        <span className="flex flex-1 flex-col gap-2">
+          <Skeleton className="h-3 w-2/5 rounded-md" />
+          <Skeleton className="h-1.5 w-full rounded-full" />
+        </span>
+        <Skeleton className="h-3 w-[72px] rounded-md" />
+      </div>
+    ))}
+  </div>
+);
 
 export const DashboardLoading = () => (
   <div
@@ -468,24 +495,36 @@ export const DashboardLoading = () => (
           </div>
         ))}
       </div>
-      <div className={statusPanel}>
-        <div className={statusCard}>
-          <Skeleton className="col-span-full h-6 w-[185px] rounded-md" />
-          <StatusRings paid={0} partial={0} unpaid={0} total={0} />
-          <div className={statusLegend}>
-            {Array.from({ length: 3 }, (_, index) => (
-              <div className={statusRow(index)} key={index}>
-                <Skeleton className="h-[22px] w-[116px] rounded-md" />
-                <Skeleton className="h-[46px] w-12 rounded-md" />
-              </div>
+      <BarListLoading
+        lead={<Skeleton className="h-[13px] w-[55%] rounded-md" />}
+        className="[--rise-delay:240ms]"
+      />
+    </div>
+    <div className={listRow} aria-hidden="true">
+      <BarListLoading
+        lead={<Skeleton className="h-[30px] w-[45%] rounded-md" />}
+        className="[--rise-delay:320ms]"
+      />
+      <BarListLoading
+        lead={<Skeleton className="h-[13px] w-[55%] rounded-md" />}
+        className="[--rise-delay:320ms]"
+      />
+      <div className={`${overviewPanel} [--rise-delay:320ms]`}>
+        <Skeleton className="h-6 w-[120px] rounded-md" />
+        {[3, 2].map((rows, part) => (
+          <div
+            className={`flex flex-col gap-2 ${part ? "border-t border-[#23273512] pt-2.5" : ""}`}
+            key={part}
+          >
+            <span className="flex items-center gap-2">
+              <Skeleton className="size-7 rounded-[10px]" />
+              <Skeleton className="h-3.5 w-2/5 rounded-md" />
+            </span>
+            {Array.from({ length: rows }, (_, index) => (
+              <Skeleton className="h-11 w-full rounded-[14px]" key={index} />
             ))}
           </div>
-          <Skeleton className="col-span-full h-[13px] w-[70%] rounded-md" />
-        </div>
-        <div className={overdueBar}>
-          <Skeleton className="size-8 rounded-[11px]" />
-          <Skeleton className="h-[13px] w-[70%] rounded-md" />
-        </div>
+        ))}
       </div>
     </div>
     <div className={historyPair} aria-hidden="true">
@@ -507,18 +546,24 @@ export const DashboardLoading = () => (
         </div>
         <Skeleton className="mt-2.5 h-[22px] w-[116px] rounded-md" />
       </div>
-      <div className={`${overviewPanel} [--rise-delay:320ms]`}>
-        <Skeleton className="h-6 w-[120px] rounded-md" />
-        <Skeleton className="h-[30px] w-[45%] rounded-md" />
-        {Array.from({ length: 5 }, (_, index) => (
-          <div className="flex items-center gap-2.5 py-[7px]" key={index}>
-            <span className="flex flex-1 flex-col gap-2">
-              <Skeleton className="h-3 w-2/5 rounded-md" />
-              <Skeleton className="h-1.5 w-full rounded-full" />
-            </span>
-            <Skeleton className="h-3 w-[72px] rounded-md" />
+      <div className={statusPanel}>
+        <div className={statusCard}>
+          <Skeleton className="col-span-full h-6 w-[185px] rounded-md" />
+          <StatusRings paid={0} partial={0} unpaid={0} total={0} />
+          <div className={statusLegend}>
+            {Array.from({ length: 3 }, (_, index) => (
+              <div className={statusRow(index)} key={index}>
+                <Skeleton className="h-[22px] w-[116px] rounded-md" />
+                <Skeleton className="h-[46px] w-12 rounded-md" />
+              </div>
+            ))}
           </div>
-        ))}
+          <Skeleton className="col-span-full h-[13px] w-[70%] rounded-md" />
+        </div>
+        <div className={overdueBar}>
+          <Skeleton className="size-8 rounded-[11px]" />
+          <Skeleton className="h-[13px] w-[70%] rounded-md" />
+        </div>
       </div>
     </div>
   </div>

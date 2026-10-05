@@ -298,5 +298,149 @@
       "drafts": 0
     }
   },
-  "spending": { "total": 0.0, "categories": [], "others": null }
+  "spending": { "total": 0.0, "categories": [], "others": null },
+  "topClients": [
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c107",
+      "client": "Quill & Co. Publishing",
+      "billed": 13459.88,
+      "owed": 1969.11,
+      "documents": 2
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c109",
+      "client": "Kestrel Outdoor",
+      "billed": 10317.45,
+      "owed": 0.0,
+      "documents": 2
+    },
+    {
+      "clientId": null,
+      "client": "Verdant Farms",
+      "billed": 8590.73,
+      "owed": 5311.77,
+      "documents": 2
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c110",
+      "client": "Oak Street Bakery",
+      "billed": 8363.36,
+      "owed": 3217.5,
+      "documents": 3
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c101",
+      "client": "Atlas Robotics",
+      "billed": 5298.15,
+      "owed": 2550.4,
+      "documents": 2
+    }
+  ],
+  "topItems": [
+    {
+      "item": "Motion graphics (per 15 seconds)",
+      "quantity": 28.0,
+      "amount": 18200.0,
+      "documents": 6
+    },
+    {
+      "item": "Logo and identity system",
+      "quantity": 3.0,
+      "amount": 9280.0,
+      "documents": 3
+    },
+    {
+      "item": "Consulting (hourly)",
+      "quantity": 52.0,
+      "amount": 7140.0,
+      "documents": 5
+    },
+    {
+      "item": "Front-end build (per page)",
+      "quantity": 17.0,
+      "amount": 6460.0,
+      "documents": 3
+    },
+    {
+      "item": "Brand strategy workshop",
+      "quantity": 3.0,
+      "amount": 5400.0,
+      "documents": 3
+    }
+  ],
+  "itemsTotal": 64194.0,
+  "comingUp": {
+    "recurring": {
+      "active": 3,
+      "next90Days": { "invoices": 7, "amount": 10650.0 },
+      "nextRuns": [
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c1",
+          "templateId": "00000000-0000-0000-0000-000000001012",
+          "documentNumber": "INV-1012",
+          "client": "Harbor & Pine Architects",
+          "amount": 450.0,
+          "date": "2026-10-12"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c2",
+          "templateId": "00000000-0000-0000-0000-000000001020",
+          "documentNumber": "INV-1020",
+          "client": "Bluefin Analytics",
+          "amount": 2500.0,
+          "date": "2026-10-20"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c3",
+          "templateId": "00000000-0000-0000-0000-000000001027",
+          "documentNumber": "INV-1027",
+          "client": "Oak Street Bakery",
+          "amount": 1800.0,
+          "date": "2026-11-03"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c1",
+          "templateId": "00000000-0000-0000-0000-000000001012",
+          "documentNumber": "INV-1012",
+          "client": "Harbor & Pine Architects",
+          "amount": 450.0,
+          "date": "2026-11-12"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c2",
+          "templateId": "00000000-0000-0000-0000-000000001020",
+          "documentNumber": "INV-1020",
+          "client": "Bluefin Analytics",
+          "amount": 2500.0,
+          "date": "2026-11-20"
+        }
+      ]
+    },
+    "quotations": {
+      "awaiting": {
+        "count": 1,
+        "amount": 1201.2,
+        "items": [
+          {
+            "documentId": "00000000-0000-0000-0000-000000000206",
+            "documentNumber": "QUO-0206",
+            "client": "Kestrel Outdoor",
+            "amount": 1201.2,
+            "validUntil": "2026-10-09",
+            "days": 5
+          }
+        ]
+      },
+      "expired": { "count": 5, "amount": 25343.18 }
+    }
+  },
+  "setup": {
+    "steps": [
+      { "key": "businessDetails", "done": false },
+      { "key": "logo", "done": false },
+      { "key": "paymentDetails", "done": false },
+      { "key": "firstInvoice", "done": true },
+      { "key": "team", "done": false }
+    ]
+  }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   attentionFooter,
   attentionRow,
+  awaitingRows,
   axisLabel,
   billedLink,
   bucketLabel,
@@ -9,24 +10,32 @@ import {
   cashFlowScale,
   changeFrom,
   dateSpan,
+  expiredQuotationsLink,
   findPeriod,
   formatDate,
   formatMoney,
   getStatusRingRatio,
   invoiceCount,
+  itemLink,
   labelStep,
   owedColumns,
   owedWeekLink,
   paymentRows,
   percentLabel,
   periodSubtitle,
+  quotationsLink,
   receivedLink,
   recordExpenseLink,
+  recurringLink,
   reportLink,
+  runRows,
+  setupSteps,
   showsLabel,
   spendingLink,
   spendingRows,
   statusLink,
+  topClientRows,
+  topItemRows,
   trendColumns,
   trendPoints,
   wholeAmount,
@@ -330,6 +339,191 @@ describe("spending by category", () => {
     expect(spendingRows({ total: 0, categories: [], others: null })).toEqual(
       [],
     );
+  });
+});
+
+describe("the top clients", () => {
+  it("measures each bar against the largest and opens a linked client", () => {
+    expect(
+      topClientRows([
+        {
+          clientId: "c-1",
+          client: "Quill",
+          billed: 200,
+          owed: 0,
+          documents: 2,
+        },
+        {
+          clientId: null,
+          client: "Verdant",
+          billed: 50,
+          owed: 10,
+          documents: 1,
+        },
+        {
+          clientId: "c-3",
+          client: "Atlas",
+          billed: -20,
+          owed: 5,
+          documents: 1,
+        },
+      ]),
+    ).toEqual([
+      {
+        clientId: "c-1",
+        client: "Quill",
+        billed: 200,
+        owed: 0,
+        documents: 2,
+        bar: 1,
+        to: "/single-customer/c-1",
+      },
+      {
+        clientId: null,
+        client: "Verdant",
+        billed: 50,
+        owed: 10,
+        documents: 1,
+        bar: 0.25,
+        to: null,
+      },
+      {
+        clientId: "c-3",
+        client: "Atlas",
+        billed: -20,
+        owed: 5,
+        documents: 1,
+        bar: 0,
+        to: "/single-customer/c-3",
+      },
+    ]);
+  });
+
+  it("has no rows when no one was billed", () => {
+    expect(topClientRows([])).toEqual([]);
+    expect(topClientRows()).toEqual([]);
+  });
+});
+
+describe("the top items", () => {
+  it("measures each bar against the largest and shares out the income", () => {
+    const rows = topItemRows(
+      [
+        { item: "Motion graphics", quantity: 28, amount: 400, documents: 6 },
+        { item: " Logo ", quantity: 3, amount: 100, documents: 3 },
+        { item: "Stickers", quantity: 500, amount: 2, documents: 1 },
+      ],
+      1000,
+    );
+    expect(
+      rows.map(({ name, bar, share, to }) => [name, bar, share, to]),
+    ).toEqual([
+      ["Motion graphics", 1, "40%", "/items?q=Motion+graphics"],
+      ["Logo", 0.25, "10%", "/items?q=Logo"],
+      ["Stickers", 0.005, "<1%", "/items?q=Stickers"],
+    ]);
+  });
+
+  it("names lines without a name other lines, which open nothing", () => {
+    expect(
+      topItemRows(
+        [
+          { item: null, quantity: 1, amount: 50 },
+          { item: "", quantity: 1, amount: 40 },
+          { item: "Other lines", quantity: 1, amount: 30 },
+        ],
+        200,
+      ).map(({ name, to }) => [name, to]),
+    ).toEqual([
+      ["Other lines", null],
+      ["Other lines", null],
+      ["Other lines", null],
+    ]);
+  });
+
+  it("shares out nothing without income, and draws no bar below zero", () => {
+    expect(
+      topItemRows([{ item: "Refund", quantity: -1, amount: -80 }], 0).map(
+        ({ bar, share }) => [bar, share],
+      ),
+    ).toEqual([[0, null]]);
+    expect(topItemRows([], 0)).toEqual([]);
+    expect(topItemRows()).toEqual([]);
+  });
+
+  it("opens the Items list searched for an item", () => {
+    expect(itemLink("Front-end build (per page)")).toBe(
+      "/items?q=Front-end+build+%28per+page%29",
+    );
+    expect(itemLink("Rock & roll")).toBe("/items?q=Rock+%26+roll");
+  });
+});
+
+describe("what is coming up", () => {
+  it("names each recurring run's day and template, and opens the recurring list", () => {
+    expect(
+      runRows([
+        { documentNumber: "INV-1012", client: "Harbor", date: "2026-10-12" },
+        { documentNumber: null, client: "Bluefin", date: "2027-01-01" },
+      ]).map(({ day, number }) => [day, number]),
+    ).toEqual([
+      ["Oct 12", "INV-1012"],
+      ["Jan 1", "Draft invoice"],
+    ]);
+    expect(runRows()).toEqual([]);
+    expect(recurringLink).toBe("/recurring");
+  });
+
+  it("opens each quotation waiting for an answer, named with its last valid day, or as having none", () => {
+    expect(
+      awaitingRows([
+        { documentId: "q-1", validUntil: "2026-10-09", days: 5 },
+        { documentId: "q-2", validUntil: null, days: null },
+      ]).map(({ to, until }) => [to, until]),
+    ).toEqual([
+      ["/document/q-1", "valid until Oct 9"],
+      ["/document/q-2", "No expiry"],
+    ]);
+    expect(awaitingRows()).toEqual([]);
+  });
+
+  it("opens the quotations, and those expired sorted by their last valid day, in a chosen currency", () => {
+    expect(quotationsLink()).toBe("/documents?type=quotation");
+    expect(quotationsLink("EUR")).toBe(
+      "/documents?type=quotation&currency=EUR",
+    );
+    expect(expiredQuotationsLink()).toBe(
+      "/documents?type=quotation&sort=dueDate&dir=asc",
+    );
+    expect(expiredQuotationsLink("EUR")).toBe(
+      "/documents?type=quotation&currency=EUR&sort=dueDate&dir=asc",
+    );
+  });
+});
+
+describe("what is left to set up", () => {
+  it("lists the five steps in order, each opening its page, ticked as the server says", () => {
+    expect(
+      setupSteps({
+        steps: [
+          { key: "team", done: false },
+          { key: "firstInvoice", done: true },
+          { key: "logo", done: true },
+          { key: "somethingNew", done: true },
+        ],
+      }).map(({ key, label, to, done }) => [key, label, to, done]),
+    ).toEqual([
+      ["businessDetails", "Business details", "/settings/business", false],
+      ["logo", "Logo", "/settings/business", true],
+      ["paymentDetails", "How clients pay you", "/settings/payments", false],
+      ["firstInvoice", "First invoice", "/create-doc", true],
+      ["team", "Your team", "/settings/team", false],
+    ]);
+  });
+
+  it("counts no step done without the server's answer", () => {
+    expect(setupSteps(null).every((step) => !step.done)).toBe(true);
+    expect(setupSteps({}).every((step) => !step.done)).toBe(true);
   });
 });
 
