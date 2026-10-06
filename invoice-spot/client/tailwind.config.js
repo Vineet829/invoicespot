@@ -223,6 +223,37 @@ module.exports = {
           "12%, 85%": { opacity: "1", translate: "0 0" },
           "100%": { opacity: "0", translate: "0 -4px" },
         },
+        // The homepage. The hero's text and frame lift into place, the
+        // tour's notes pop in, a click ripples out, and the client's phone
+        // floats.
+        "home-lift": { from: { transform: "translateY(16px)" } },
+        "home-pop": {
+          from: { opacity: "0", transform: "translateY(-8px) scale(0.96)" },
+        },
+        "home-ripple": {
+          from: {
+            opacity: "0.9",
+            transform: "translate(-50%, -50%) scale(0.3)",
+          },
+          to: { opacity: "0", transform: "translate(-50%, -50%) scale(1.9)" },
+        },
+        "home-float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        // The sample invoice's stamp lands.
+        "home-stamp": {
+          from: {
+            opacity: "0",
+            transform: "translate(-50%, -50%) rotate(-12deg) scale(1.6)",
+          },
+          to: {
+            opacity: "1",
+            transform: "translate(-50%, -50%) rotate(-12deg) scale(1)",
+          },
+        },
+        // The step's bar fills over its turn, TURN in GetPaid.jsx.
+        "home-progress": { from: { transform: "scaleX(0)" } },
       },
       animation: {
         // Panels rise in sequence; set --rise-delay per panel.
@@ -263,6 +294,15 @@ module.exports = {
           "auth-wave 2.2s ease-in-out calc(1.9s + var(--sd, 0s)) infinite",
         "auth-fade": "ov-fade 0.6s ease 1.8s backwards",
         "auth-toast": "auth-toast 2.6s ease 3.2s",
+        // The homepage; set --lift-delay and --pop-delay per element.
+        "home-lift":
+          "home-lift 0.9s var(--lift-delay, 0ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
+        "home-pop":
+          "home-pop 0.45s var(--pop-delay, 0ms) cubic-bezier(0.2, 0.7, 0.2, 1) both",
+        "home-ripple": "home-ripple 0.8s ease-out both",
+        "home-float": "home-float 7s ease-in-out infinite",
+        "home-stamp": "home-stamp 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both",
+        "home-progress": "home-progress 2.8s linear both",
       },
     },
   },

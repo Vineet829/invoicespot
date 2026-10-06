@@ -37,8 +37,11 @@ export const panel = `min-w-0 ${surface} p-6 compact:p-[18px] max-[700px]:rounde
 // workspace reset (dashboard-app, see src/index.css).
 export const appSurface =
   "dashboard-app bg-spot-canvas bg-canvas font-ui font-normal leading-[normal] tracking-normal text-spot-ink [color-scheme:light]";
-export const brandMark =
-  "whitespace-nowrap font-display text-[24px] font-normal leading-[normal] tracking-[-0.045em] text-spot-ink coarse:inline-flex coarse:min-h-11 coarse:items-center [&>span]:text-spot-brand";
+// The brand mark's shape, and the mark in the workspace's colours; the
+// homepage's dark stage dresses the shape in its own.
+export const brandMarkBase =
+  "whitespace-nowrap font-display text-[24px] font-normal leading-[normal] tracking-[-0.045em] coarse:inline-flex coarse:min-h-11 coarse:items-center";
+export const brandMark = `${brandMarkBase} text-spot-ink [&>span]:text-spot-brand`;
 export const textLink =
   "text-spot-violet underline-offset-4 transition-colors hover:text-spot-night hover:underline";
 
