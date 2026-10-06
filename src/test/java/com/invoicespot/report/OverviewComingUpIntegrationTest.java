@@ -15,6 +15,7 @@ import com.invoicespot.IntegrationTest;
 import com.invoicespot.document.RecurringService;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -436,6 +437,65 @@ class OverviewComingUpIntegrationTest extends IntegrationTest {
                 .andExpect(content().string(containsString("\"comingUp\":{\"recurring\":{\"active\":0,"
                         + "\"next90Days\":{\"invoices\":0,\"amount\":0.00},\"nextRuns\":[]},"
                         + "\"quotations\":{\"awaiting\":{\"count\":0,\"amount\":0.00,\"items\":[]},"
-                        + "\"expired\":{\"count\":0,\"amount\":0.00}}}")));
+                        + "\"expired\":{\"count\":0,\"amount\":0.00,\"items\":[]}}}")));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the three quotations that expired without an answer most recently are listed, latest first, each"
+            + " with its last valid day")
+    void expired(ZoneId zone) throws Exception {
+        inZone(zone);
+        // Two whose last day was yesterday, made in turn, one a week ago, and
+        // one a month ago.
+        Made yesterday = quotation(acme, "USD", "100", today.minusDays(1));
+        Made alsoYesterday = quotation(birch, "USD", "200", today.minusDays(1));
+        Made week = quotation(acme, "USD", "300", today.minusDays(7));
+        quotation(birch, "USD", "400", today.minusDays(30));
+        // Never listed: quotations still waiting, one accepted before its last
+        // day went by, one void, one still a draft, one in euros, and
+        // invoices, which bill in each currency.
+        invoice(acme, "USD", "1350");
+        invoice(birch, "EUR", "1250");
+        quotation(acme, "USD", "500", today);
+        quotation(acme, "USD", "600", null);
+        Made accepted = quotation(acme, "USD", "700", today.plusDays(5));
+        fromLink(accepted, "accept").andExpect(status().isOk());
+        jdbcTemplate.update(
+                "update documents set due_date = ? where id = ?",
+                Timestamp.from(today.minusDays(3).atTime(12, 0).atZone(zone).toInstant()),
+                UUID.fromString(accepted.id()));
+        voided(quotation(acme, "USD", "800", today.minusDays(2)));
+        create("Quotation", acme, "USD", "900", today.minusDays(2), true);
+        Made euros = quotation(birch, "EUR", "1000", today.minusDays(4));
+
+        overview()
+                .andExpect(jsonPath("$.comingUp.quotations.expired.count").value(4))
+                .andExpect(jsonPath("$.comingUp.quotations.expired.amount").value(1000.0))
+                .andExpect(jsonPath(
+                        "$.comingUp.quotations.expired.items[*].documentId",
+                        contains(yesterday.id(), alsoYesterday.id(), week.id())))
+                .andExpect(jsonPath(
+                        "$.comingUp.quotations.expired.items[*].documentNumber",
+                        contains(yesterday.number(), alsoYesterday.number(), week.number())))
+                .andExpect(jsonPath(
+                        "$.comingUp.quotations.expired.items[*].client", contains("Acme", "Birch Studio", "Acme")))
+                .andExpect(jsonPath("$.comingUp.quotations.expired.items[*].amount", contains(100.0, 200.0, 300.0)))
+                .andExpect(jsonPath(
+                        "$.comingUp.quotations.expired.items[*].validUntil",
+                        contains(
+                                today.minusDays(1).toString(),
+                                today.minusDays(1).toString(),
+                                today.minusDays(7).toString())))
+                // Each row has these fields and no others.
+                .andExpect(content().string(containsString(("\"expired\":{\"count\":4,\"amount\":1000.00,"
+                                + "\"items\":[{\"documentId\":\"%s\",\"documentNumber\":\"%s\",\"client\":\"Acme\","
+                                + "\"amount\":100.00,\"validUntil\":\"%s\"},")
+                        .formatted(yesterday.id(), yesterday.number(), today.minusDays(1)))));
+        overview("currency", "EUR")
+                .andExpect(jsonPath("$.comingUp.quotations.expired.count").value(1))
+                .andExpect(jsonPath("$.comingUp.quotations.expired.items[*].documentId", contains(euros.id())))
+                .andExpect(jsonPath("$.comingUp.quotations.expired.items[0].validUntil")
+                        .value(today.minusDays(4).toString()));
     }
 }

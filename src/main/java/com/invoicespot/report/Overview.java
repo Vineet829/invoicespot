@@ -2,25 +2,21 @@ package com.invoicespot.report;
 
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.document.DocumentLedger;
-import com.invoicespot.document.dto.BillingItemResponse;
 import com.invoicespot.report.dto.DocumentSummaryResponse;
 import com.invoicespot.report.dto.OverviewClient;
 import com.invoicespot.report.dto.OverviewItem;
 import com.invoicespot.report.dto.OverviewOwed;
 import com.invoicespot.report.dto.OverviewResponse;
-import com.invoicespot.report.dto.OverviewSpending;
 import com.invoicespot.report.dto.OverviewTotals;
 import com.invoicespot.report.dto.TrendBucket;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -33,8 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 // Income, received and pending are for one currency, from invoices and
 // receipts; a quotation is an offer, not income.
 // A period's totals, and those of the period before it, count money as the
-// reports do; what is owed is as of today. Spending is what the currency's
-// expenses paid in the period cost, by category, as its profit counts them.
+// reports do, and the tax in what they billed as the tax report does; what is
+// owed is as of today.
 // The top clients are those the period billed most, as its billed total
 // counts them, and the top items those its lines sold most of before tax,
 // which all add up to its income. What is coming up is the currency's, from
@@ -43,33 +39,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class Overview {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
-    private static final int TOP_CATEGORIES = 5;
     private static final int TOP_CLIENTS = 5;
     private static final int TOP_ITEMS = 5;
-    private static final String OTHER_LINES = "Other lines";
+
+    // What is owed, by days late: not due yet, then 1 to 15, 16 to 30, 31 to
+    // 45, and over 45.
+    private static final List<String> OWED_BANDS =
+            List.of("current", "days1to15", "days16to30", "days31to45", "over45");
 
     // The name a document linked to no client was saved with, for SQL over
     // documents aliased d; none for a document linked to one.
-    private static final String SAVED_NAME = "(case when d.customer_pkid is null then d.customer_name end)";
-
-    // What a line comes to before tax, as DocumentTotals works it out: its
-    // quantity at its unit price, less its discount as a percentage, rounded
-    // half up to the cent, for SQL over billing items aliased i. Only the
-    // discount is divided, so that nothing is rounded before the cent.
-    private static final String LINE_NET =
-            "round(i.quantity * coalesce(i.unit_price, 0) * (1 - i.discount / 100), 2)";
-
-    // A credit note's lines take theirs off, for SQL over documents aliased d.
-    private static final String SIGN = "(case when d.document_type = 'Credit Note' then -1 else 1 end)";
+    static final String SAVED_NAME = "(case when d.customer_pkid is null then d.customer_name end)";
 
     private record Money(BigDecimal expected, BigDecimal received, BigDecimal withheld) {}
-
-    // An issued invoice with money still owed on it, and when it falls due.
-    private record Owed(Instant dueDate, BigDecimal amount) {}
 
     private final JdbcClient jdbc;
     private final ReportQueries queries;
     private final PaymentQueries paymentQueries;
+    private final BilledCurrencies billedCurrencies;
+    private final OwedInvoices owedInvoices;
+    private final ItemQueries itemQueries;
     private final NeedsAttention needsAttention;
     private final ComingUp comingUp;
     private final SettingsService settingsService;
@@ -79,6 +68,9 @@ public class Overview {
             JdbcClient jdbc,
             ReportQueries queries,
             PaymentQueries paymentQueries,
+            BilledCurrencies billedCurrencies,
+            OwedInvoices owedInvoices,
+            ItemQueries itemQueries,
             NeedsAttention needsAttention,
             ComingUp comingUp,
             SettingsService settingsService,
@@ -86,6 +78,9 @@ public class Overview {
         this.jdbc = jdbc;
         this.queries = queries;
         this.paymentQueries = paymentQueries;
+        this.billedCurrencies = billedCurrencies;
+        this.owedInvoices = owedInvoices;
+        this.itemQueries = itemQueries;
         this.needsAttention = needsAttention;
         this.comingUp = comingUp;
         this.settingsService = settingsService;
@@ -99,13 +94,14 @@ public class Overview {
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         OverviewWindow window = OverviewWindow.of(periodKey, today);
-        List<String> currencies = currencies(businessPkid, settings.getDefaultCurrency());
-        String currency = chosen(currencies, requested, settings.getDefaultCurrency());
+        List<String> currencies = billedCurrencies.list(businessPkid, settings.getDefaultCurrency());
+        String currency = BilledCurrencies.chosen(currencies, requested, settings.getDefaultCurrency());
         Money money = money(businessPkid, currency);
-        ZonedDateTime startOfToday = today.atStartOfDay(zone);
         MoneyByDay byDay = MoneyByDay.read(queries, businessPkid, currency, window);
-        List<Owed> owed = owed(businessPkid, currency);
-        List<OverviewItem> items = itemsSold(businessPkid, currency, window);
+        List<OwedInvoices.Owed> owed = owedInvoices.read(businessPkid, currency);
+        List<OverviewItem> items = itemQueries.sold(businessPkid, currency, window.from(), window.to()).stream()
+                .map(ItemQueries.Sold::item)
+                .toList();
         return new OverviewResponse(
                 true,
                 currencies,
@@ -119,11 +115,14 @@ public class Overview {
                 money.withheld(),
                 money.expected().subtract(money.received()).subtract(money.withheld()).max(BigDecimal.ZERO),
                 window.period(),
-                totals(byDay, window, activeBefore(businessPkid, currency, window.from())),
-                owedNow(owed, startOfToday),
+                totals(
+                        byDay,
+                        queries.taxBilled(businessPkid, currency, window),
+                        window,
+                        activeBefore(businessPkid, currency, window.from())),
+                owedNow(owed, zone, today),
                 trend(byDay, window),
                 needsAttention.list(businessPkid, currency, zone, today),
-                spending(businessPkid, currency, window, byDay),
                 topClients(businessPkid, currency, window),
                 items.stream().limit(TOP_ITEMS).toList(),
                 items.stream().map(OverviewItem::amount).reduce(ZERO, BigDecimal::add),
@@ -141,43 +140,17 @@ public class Overview {
         BusinessSettings settings = settingsService.forBusiness(businessPkid);
         ZoneId zone = ZoneId.of(settings.getTimeZone());
         LocalDate today = LocalDate.now(clock.withZone(zone));
-        List<String> currencies = currencies(businessPkid, settings.getDefaultCurrency()).stream()
+        List<String> currencies = billedCurrencies.list(businessPkid, settings.getDefaultCurrency()).stream()
                 .filter(currency -> !currency.isEmpty())
                 .toList();
-        String currency = chosen(currencies, requested, settings.getDefaultCurrency());
+        String currency = BilledCurrencies.chosen(currencies, requested, settings.getDefaultCurrency());
         OverviewWindow month = OverviewWindow.of("30d", today);
         return new DocumentSummaryResponse(
                 true,
                 currency,
                 currencies,
-                owedNow(owed(businessPkid, currency), today.atStartOfDay(zone)),
+                owedNow(owedInvoices.read(businessPkid, currency), zone, today),
                 paymentQueries.received(businessPkid, currency, month.from(), month.to()));
-    }
-
-    // The currency asked for when the business has money in it; else the
-    // first it has money in, its default one coming first; else the default.
-    private static String chosen(List<String> currencies, String requested, String defaultCurrency) {
-        return currencies.contains(requested)
-                ? requested
-                : currencies.isEmpty() ? defaultCurrency : currencies.get(0);
-    }
-
-    // The currencies of the business's invoices and receipts, its default first.
-    private List<String> currencies(Long businessPkid, String defaultCurrency) {
-        List<String> found = jdbc.sql("""
-                        select distinct coalesce(d.currency, '') as currency from documents d
-                        where d.business_pkid = :business and %s and d.document_type <> 'Quotation'
-                        order by 1
-                        """.formatted(DocumentLedger.COUNTED))
-                .param("business", businessPkid)
-                .query(String.class)
-                .list();
-        List<String> currencies = new ArrayList<>();
-        if (found.contains(defaultCurrency)) {
-            currencies.add(defaultCurrency);
-        }
-        found.stream().filter(currency -> !currency.equals(defaultCurrency)).forEach(currencies::add);
-        return currencies;
     }
 
     private Money money(Long businessPkid, String currency) {
@@ -199,13 +172,16 @@ public class Overview {
     }
 
     // The period's totals beside those of the period before it.
-    private static OverviewTotals totals(MoneyByDay money, OverviewWindow window, boolean hasPrevious) {
+    private static OverviewTotals totals(
+            MoneyByDay money, ReportQueries.TaxBilled tax, OverviewWindow window, boolean hasPrevious) {
         MoneyByDay.Sums current = money.between(window.from(), window.to());
         MoneyByDay.Sums previous = money.between(window.previousFrom(), window.previousTo());
         return new OverviewTotals(
                 new OverviewTotals.Figure(current.billed(), previous.billed()),
                 new OverviewTotals.Figure(current.received(), previous.received()),
                 new OverviewTotals.Figure(current.profit(), previous.profit()),
+                tax.current(),
+                tax.previous(),
                 hasPrevious);
     }
 
@@ -225,32 +201,6 @@ public class Overview {
                             sums.moneyOut());
                 })
                 .toList();
-    }
-
-    // What the period's expenses cost, as its profit and its trend count
-    // them, with the five categories that cost most, told apart and ordered
-    // as the profit report's are, and the rest added up together.
-    private OverviewSpending spending(Long businessPkid, String currency, OverviewWindow window, MoneyByDay money) {
-        List<ReportQueries.CategorySpent> categories =
-                queries.spentByCategory(businessPkid, window.from(), window.to()).stream()
-                        .filter(category -> category.currency().equals(currency))
-                        .sorted(ProfitReport.largestFirst(
-                                ReportQueries.CategorySpent::amount, ReportQueries.CategorySpent::category))
-                        .toList();
-        List<ReportQueries.CategorySpent> rest = categories.stream().skip(TOP_CATEGORIES).toList();
-        return new OverviewSpending(
-                money.between(window.from(), window.to()).expenses(),
-                categories.stream()
-                        .limit(TOP_CATEGORIES)
-                        .map(category -> new OverviewSpending.Category(
-                                category.category(), category.amount(), category.expenses()))
-                        .toList(),
-                rest.isEmpty()
-                        ? null
-                        : new OverviewSpending.Others(
-                                rest.stream().map(ReportQueries.CategorySpent::amount).reduce(ZERO, BigDecimal::add),
-                                rest.stream().mapToLong(ReportQueries.CategorySpent::expenses).sum(),
-                                rest.size()));
     }
 
     // The five clients the period billed most, as its billed total counts
@@ -305,41 +255,6 @@ public class Overview {
                 .toList();
     }
 
-    // Every item the lines of the period's invoices and receipts sold, less
-    // what the lines of its credit notes took off, largest first and by name
-    // when two came to the same. An item is its name, whatever its letter case
-    // and the spaces around it, spelled as it was first used, and lines
-    // without a name are one item. As each document's lines add up to it
-    // before tax, they all add up to the period's income.
-    private List<OverviewItem> itemsSold(Long businessPkid, String currency, OverviewWindow window) {
-        return jdbc.sql("""
-                        select (array_agg(btrim(i.item_name) order by d.pkid, i.position))[1] as item,
-                               sum(%1$s * i.quantity) as quantity, sum(%1$s * %2$s) as amount,
-                               count(distinct d.pkid) as documents
-                        from documents d
-                        join document_billing_items i on i.document_pkid = d.pkid
-                        where d.business_pkid = :business and %3$s and coalesce(d.currency, '') = :currency
-                          and d.issue_date between :from and :to
-                        group by lower(nullif(btrim(i.item_name), ''))
-                        """.formatted(SIGN, LINE_NET, DocumentLedger.BILLED_DOCUMENT))
-                .param("business", businessPkid)
-                .param("currency", currency)
-                .param("from", window.from())
-                .param("to", window.to())
-                .query((result, rowNumber) -> {
-                    String item = result.getString("item");
-                    return new OverviewItem(
-                            item == null || item.isEmpty() ? OTHER_LINES : item,
-                            BillingItemResponse.plain(result.getBigDecimal("quantity")),
-                            result.getBigDecimal("amount"),
-                            result.getLong("documents"));
-                })
-                .list()
-                .stream()
-                .sorted(ProfitReport.largestFirst(OverviewItem::amount, OverviewItem::item))
-                .toList();
-    }
-
     // Whether the currency had money dated before the period: an invoice or
     // receipt, a payment on an invoice, or an expense.
     private boolean activeBefore(Long businessPkid, String currency, LocalDate from) {
@@ -366,34 +281,28 @@ public class Overview {
                 .single();
     }
 
-    // The currency's issued invoices with money still owed on them.
-    private List<Owed> owed(Long businessPkid, String currency) {
-        return jdbc.sql("""
-                        select d.due_date, %s as owed
-                        from documents d
-                        where d.business_pkid = :business and %s and coalesce(d.currency, '') = :currency
-                        """.formatted(DocumentLedger.OWED, DocumentLedger.OWED_INVOICE))
-                .param("business", businessPkid)
-                .param("currency", currency)
-                .query((result, rowNumber) -> {
-                    Timestamp due = result.getTimestamp("due_date");
-                    return new Owed(due == null ? null : due.toInstant(), result.getBigDecimal("owed"));
-                })
-                .list();
-    }
-
-    // Overdue as the documents list has it: due before today began.
-    private static OverviewOwed owedNow(List<Owed> invoices, ZonedDateTime startOfToday) {
-        BigDecimal total = ZERO;
+    // Overdue as the documents list has it: due before today began, by days
+    // late as OwedInvoices counts them. The receivables view splits the same
+    // invoices the same way.
+    static OverviewOwed owedNow(List<OwedInvoices.Owed> invoices, ZoneId zone, LocalDate today) {
+        long[] counts = new long[OWED_BANDS.size()];
+        BigDecimal[] amounts = new BigDecimal[OWED_BANDS.size()];
+        Arrays.fill(amounts, ZERO);
+        for (OwedInvoices.Owed invoice : invoices) {
+            long days = OwedInvoices.daysLate(invoice, zone, today);
+            int band = days <= 0 ? 0 : 1 + OwedInvoices.fifteenDays(days);
+            counts[band]++;
+            amounts[band] = amounts[band].add(invoice.amount());
+        }
+        List<OverviewOwed.Band> bands = new ArrayList<>();
         BigDecimal overdue = ZERO;
-        long late = 0;
-        for (Owed invoice : invoices) {
-            total = total.add(invoice.amount());
-            if (invoice.dueDate() != null && invoice.dueDate().isBefore(startOfToday.toInstant())) {
-                overdue = overdue.add(invoice.amount());
-                late++;
+        for (int band = 0; band < OWED_BANDS.size(); band++) {
+            bands.add(new OverviewOwed.Band(OWED_BANDS.get(band), amounts[band], counts[band]));
+            if (band > 0) {
+                overdue = overdue.add(amounts[band]);
             }
         }
-        return new OverviewOwed(total, total.subtract(overdue), overdue, invoices.size(), late);
+        return new OverviewOwed(
+                amounts[0].add(overdue), amounts[0], overdue, invoices.size(), invoices.size() - counts[0], bands);
     }
 }

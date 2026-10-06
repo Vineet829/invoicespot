@@ -1,6 +1,7 @@
 package com.invoicespot.report;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -14,7 +15,9 @@ import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -25,12 +28,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 class OverviewIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private User owner;
@@ -152,7 +160,18 @@ class OverviewIntegrationTest extends IntegrationTest {
     }
 
     // A credit note taking the amount off the document, dated the given day.
+    // Its line takes the one tax rate the note was copied with, if it had one.
     private void credit(String document, String amount, LocalDate issued) throws Exception {
+        creditNote(document, "\"unitPrice\": %s".formatted(amount), issued);
+    }
+
+    // The same, with the line taxed at the given rate.
+    private void credit(String document, String amount, String rate, LocalDate issued) throws Exception {
+        creditNote(document, "\"unitPrice\": %s, \"taxRate\": \"%s\"".formatted(amount, rate), issued);
+    }
+
+    // A credit note on the document with one line of work, issued on the day.
+    private void creditNote(String document, String line, LocalDate issued) throws Exception {
         String note = JsonPath.read(
                 send(post("/api/v1/document/{id}/credit-note", document), "")
                         .andExpect(status().isCreated())
@@ -161,8 +180,8 @@ class OverviewIntegrationTest extends IntegrationTest {
                         .getContentAsString(),
                 "$.newDocument._id");
         send(patch("/api/v1/document/{id}", note), """
-                {"billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
-                """.formatted(amount))
+                {"billingItems": [{"itemName": "Work", "quantity": 1, %s}]}
+                """.formatted(line))
                 .andExpect(status().isOk());
         send(post("/api/v1/document/{id}/issue", note), "{\"issueDate\": \"%s\"}".formatted(issued))
                 .andExpect(status().isOk());
@@ -187,6 +206,14 @@ class OverviewIntegrationTest extends IntegrationTest {
     private void voided(String document) throws Exception {
         send(post("/api/v1/document/{id}/void", document), "{\"reason\": \"Issued twice\"}")
                 .andExpect(status().isOk());
+    }
+
+    // Moves a document's due date to a moment on the business's clock.
+    private void dueAt(String document, LocalDateTime moment, ZoneId zone) {
+        jdbcTemplate.update(
+                "update documents set due_date = ? where id = ?",
+                Timestamp.from(moment.atZone(zone).toInstant()),
+                UUID.fromString(document));
     }
 
     private static BigDecimal amount(String body, String path) {
@@ -250,10 +277,16 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.expectedIncome").value(0.0))
                 .andExpect(content().string(containsString(
                         "\"totals\":{\"billed\":{\"current\":0.00,\"previous\":0.00}")))
+                .andExpect(content().string(containsString("\"tax\":0.00,\"previousTax\":0.00,\"hasPrevious\":false")))
                 .andExpect(jsonPath("$.totals.hasPrevious").value(false))
                 .andExpect(content().string(containsString(
                         "\"owedNow\":{\"total\":0.00,\"notDue\":0.00,\"overdue\":0.00,"
-                                + "\"invoices\":0,\"overdueInvoices\":0}")));
+                                + "\"invoices\":0,\"overdueInvoices\":0,\"bands\":["
+                                + "{\"key\":\"current\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days1to15\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days16to30\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days31to45\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"over45\",\"amount\":0.00,\"invoices\":0}]}")));
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -520,6 +553,83 @@ class OverviewIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("what is owed now is split by days late on the business's calendar: not due yet, then up to 15, 30"
+            + " and 45 days, and over 45")
+    void owedBands(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // Not due yet: due in the first minutes of today by the business's
+        // clock, due later, and saved without a due date, as the oldest
+        // invoices were.
+        String early = issue("Invoice", "USD", "100", day.minusDays(1), day);
+        dueAt(early, day.atTime(0, 30), zone);
+        issue("Invoice", "USD", "200", day.minusDays(1), day.plusDays(30));
+        String undated = issue("Invoice", "USD", "300", day.minusDays(1), day.plusDays(5));
+        jdbcTemplate.update("update documents set due_date = null where id = ?", UUID.fromString(undated));
+        // Due in the last minutes of yesterday, then each side of 15, 30 and
+        // 45 days late: one partly paid with tax withheld, and one partly
+        // credited.
+        String late = issue("Invoice", "USD", "10", day.minusDays(20), day.minusDays(1));
+        dueAt(late, day.minusDays(1).atTime(23, 30), zone);
+        pay(issue("Invoice", "USD", "1000", day.minusDays(40), day.minusDays(15)), "400", "50", day.minusDays(3));
+        issue("Invoice", "USD", "20", day.minusDays(40), day.minusDays(16));
+        credit(issue("Invoice", "USD", "500", day.minusDays(60), day.minusDays(30)), "120", day.minusDays(2));
+        issue("Invoice", "USD", "40", day.minusDays(60), day.minusDays(31));
+        issue("Invoice", "USD", "50", day.minusDays(60), day.minusDays(45));
+        issue("Invoice", "USD", "60", day.minusDays(90), day.minusDays(46));
+        issue("Invoice", "USD", "70", day.minusDays(400), day.minusDays(365));
+        // Nothing owed: paid in full, a receipt, a draft, a void invoice and a
+        // quotation. Euros are owed in euros.
+        pay(issue("Invoice", "USD", "80", day.minusDays(30), day.minusDays(20)), "80", "0", day);
+        create("Receipt", "USD", "90", "0", day.minusDays(20), null, false);
+        create("Invoice", "USD", "500", "0", day.minusDays(30), day.minusDays(20), true);
+        voided(issue("Invoice", "USD", "600", day.minusDays(30), day.minusDays(20)));
+        issue("Quotation", "USD", "700", day.minusDays(30), day.minusDays(20));
+        issue("Invoice", "EUR", "800", day.minusDays(30), day.minusDays(20));
+        pay(issue("Invoice", "EUR", "90", day.minusDays(80), day.minusDays(50)), "40", "0", day.minusDays(10));
+
+        String dollars = overview("USD", null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                        "$.owedNow.bands[*].key",
+                        contains("current", "days1to15", "days16to30", "days31to45", "over45")))
+                .andExpect(jsonPath("$.owedNow.bands[*].amount", contains(600.0, 560.0, 400.0, 90.0, 130.0)))
+                .andExpect(jsonPath("$.owedNow.bands[*].invoices", contains(3, 2, 2, 2, 2)))
+                .andExpect(jsonPath("$.owedNow.total").value(1780.0))
+                .andExpect(jsonPath("$.owedNow.invoices").value(11))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String euros = overview("EUR", "30d")
+                .andExpect(jsonPath("$.owedNow.bands[*].amount", contains(0.0, 0.0, 800.0, 0.0, 50.0)))
+                .andExpect(jsonPath("$.owedNow.bands[*].invoices", contains(0, 0, 1, 0, 1)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        for (String body : List.of(dollars, euros)) {
+            bandsAddUp(body);
+        }
+    }
+
+    // The bands add up to what is owed now: not due yet is the first, and the
+    // other four are what is overdue, in money and in invoices.
+    private static void bandsAddUp(String body) {
+        BigDecimal overdue = BigDecimal.ZERO;
+        int late = 0;
+        for (int band = 1; band < 5; band++) {
+            overdue = overdue.add(amount(body, "$.owedNow.bands[%d].amount".formatted(band)));
+            late += JsonPath.<Integer>read(body, "$.owedNow.bands[%d].invoices".formatted(band));
+        }
+        BigDecimal notDue = amount(body, "$.owedNow.bands[0].amount");
+        int current = JsonPath.read(body, "$.owedNow.bands[0].invoices");
+        assertThat(notDue).isEqualByComparingTo(amount(body, "$.owedNow.notDue"));
+        assertThat(overdue).isEqualByComparingTo(amount(body, "$.owedNow.overdue"));
+        assertThat(notDue.add(overdue)).isEqualByComparingTo(amount(body, "$.owedNow.total"));
+        assertThat(late).isEqualTo(JsonPath.<Integer>read(body, "$.owedNow.overdueInvoices"));
+        assertThat(current + late).isEqualTo(JsonPath.<Integer>read(body, "$.owedNow.invoices"));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
     @DisplayName("the reports' last 30 and 90 days are the overview's, and bill, receive and earn as it does")
     void reportPeriods(ZoneId zone) throws Exception {
         LocalDate day = inZone(zone);
@@ -584,5 +694,59 @@ class OverviewIntegrationTest extends IntegrationTest {
         send(get("/api/v1/report/csv/income").param("period", "90d"), "")
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("USD," + YearMonth.from(day) + ",")));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the tax in what was billed is the tax report's, in every period and currency, and the period"
+            + " before it counts the same way")
+    void taxBilled(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // In the last 30 days: an invoice taxed 10%, a receipt taxed 18%, an
+        // invoice taxed 5% on their first day, and a credit note taking 18%
+        // off an invoice from the 90 days.
+        create("Invoice", "USD", "1000", "10", day.minusDays(10), day.plusDays(20), false);
+        create("Receipt", "USD", "200", "18", day.minusDays(3), null, false);
+        create("Invoice", "USD", "300", "5", day.minusDays(29), day.plusDays(1), false);
+        String older = create("Invoice", "USD", "500", "18", day.minusDays(60), day.minusDays(30), false);
+        credit(older, "100", "18", day.minusDays(2));
+        // The day before the last 30 days, and the 90 days before the last 90.
+        create("Invoice", "USD", "400", "10", day.minusDays(30), day.plusDays(1), false);
+        create("Invoice", "USD", "700", "10", day.minusDays(100), day.minusDays(70), false);
+        // Never counted: a draft, a void invoice and a quotation. Euros count
+        // as euros.
+        create("Invoice", "USD", "900", "18", day.minusDays(1), null, true);
+        voided(create("Invoice", "USD", "800", "18", day.minusDays(1), day.plusDays(10), false));
+        create("Quotation", "USD", "600", "18", day.minusDays(1), day.plusDays(10), false);
+        create("Invoice", "EUR", "250", "20", day.minusDays(1), day.plusDays(10), false);
+
+        // The last 30 days: 100 + 36 + 15 - 18, with 40 the day before them.
+        // The last 90 days add that 40 and the older invoice's 90, with 70 in
+        // the 90 days before them.
+        overview("USD", "30d")
+                .andExpect(jsonPath("$.totals.tax").value(133.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(40.0));
+        overview("USD", null)
+                .andExpect(jsonPath("$.totals.tax").value(263.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(70.0));
+        overview("EUR", "30d")
+                .andExpect(jsonPath("$.totals.tax").value(50.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(0.0));
+        for (String currency : List.of("USD", "EUR")) {
+            for (String period : List.of("30d", "90d", "12m", "ytd")) {
+                String overview = overview(currency, period).andReturn().getResponse().getContentAsString();
+                String report = send(get("/api/v1/report/tax").param("period", period), "")
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+                // A currency the report has nothing in, as early in January
+                // this year can be, had no tax.
+                List<Object> tax = JsonPath.read(report, "$.currencies[?(@.currency == '%s')].tax".formatted(currency));
+                assertThat(amount(overview, "$.totals.tax"))
+                        .as(currency + " " + period)
+                        .isEqualByComparingTo(tax.isEmpty() ? BigDecimal.ZERO : new BigDecimal(tax.get(0).toString()));
+            }
+        }
     }
 }

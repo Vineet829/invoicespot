@@ -179,10 +179,16 @@ class DocumentDirectory {
             conditions.add(DocumentLedger.BILLED_DOCUMENT);
         }
         // A week begins when its first day does in the business's time zone.
+        // Current keeps to the invoices with money owed on them, as the
+        // overview's band of what is not due yet does, and begins today: an
+        // invoice is overdue only once the day after its due date has begun.
         if (search.due() != null) {
             LocalDate first = search.due().firstDay(today);
             params.put("dueFrom", startOf(first, zone));
-            if (search.due() == DueWeek.LATER) {
+            if (search.due() == DueWeek.CURRENT) {
+                conditions.add(DocumentLedger.OWED_INVOICE);
+            }
+            if (search.due().runsOn()) {
                 conditions.add("(d.due_date >= :dueFrom or d.due_date is null)");
             } else {
                 conditions.add("d.due_date >= :dueFrom and d.due_date < :dueBefore");

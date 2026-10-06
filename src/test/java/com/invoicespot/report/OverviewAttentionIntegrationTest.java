@@ -33,9 +33,10 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 // What needs attention on the overview, most urgent first: payments clients
-// reported, overdue invoices, invoices due within the week, quotations about
-// to expire, invoices a schedule is about to make, and drafts. Clients answer
-// and report from a network of their own each time, so no limit is shared.
+// reported, overdue invoices, invoices due within the week, and drafts.
+// Quotations about to expire and invoices a schedule is about to make are
+// what is coming up instead. Clients answer and report from a network of
+// their own each time, so no limit is shared.
 class OverviewAttentionIntegrationTest extends IntegrationTest {
 
     private static final AtomicInteger NETWORKS = new AtomicInteger();
@@ -160,7 +161,8 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("each kind is listed in turn, with what the client reported, owes, was offered or will be billed")
+    @DisplayName("each kind is listed in turn, with what the client reported or owes, and the drafts to issue;"
+            + " quotations and schedules are left to what is coming up")
     void kinds(ZoneId zone) throws Exception {
         inZone(zone);
         Made reported = invoice(acme, "500", today.plusDays(30));
@@ -168,11 +170,13 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
         Made overdue = invoice(birch, "300", today.minusDays(4));
         pay(overdue, "100");
         Made dueSoon = invoice(acme, "150", today.plusDays(3));
+        Made draft = create("Invoice", birch, "USD", "250", today.minusDays(10), true);
+
+        // Coming up instead: a quotation whose last day is this week, and a
+        // schedule making an invoice this week.
         Made quotation = quotation("900", today.plusDays(6));
         Made repeating = invoice(acme, "400", today.plusDays(40));
         repeat(repeating, today.plusDays(5));
-        Made draft = create("Invoice", birch, "USD", "250", today.minusDays(10), true);
-
         // None of these: a report dismissed, and one on an invoice in euros;
         // an invoice paid, a void one, one in euros, and one due in a week;
         // quotations valid for longer, accepted, declined, expired, void or
@@ -201,7 +205,7 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
 
         overview()
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.attention.items.length()").value(6))
+                .andExpect(jsonPath("$.attention.items.length()").value(4))
                 .andExpect(jsonPath("$.attention.items[0].kind").value("paymentReport"))
                 .andExpect(jsonPath("$.attention.items[0].documentId").value(reported.id()))
                 .andExpect(jsonPath("$.attention.items[0].documentNumber").value(reported.number()))
@@ -224,35 +228,22 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.items[2].amount").value(150.0))
                 .andExpect(jsonPath("$.attention.items[2].date").value(today.plusDays(3).toString()))
                 .andExpect(jsonPath("$.attention.items[2].days").value(3))
-                .andExpect(jsonPath("$.attention.items[3].kind").value("quotation"))
-                .andExpect(jsonPath("$.attention.items[3].documentId").value(quotation.id()))
-                .andExpect(jsonPath("$.attention.items[3].documentNumber").value(quotation.number()))
-                .andExpect(jsonPath("$.attention.items[3].client").value("Acme"))
-                .andExpect(jsonPath("$.attention.items[3].clientId").value(acme))
-                .andExpect(jsonPath("$.attention.items[3].amount").value(900.0))
-                .andExpect(jsonPath("$.attention.items[3].date").value(today.plusDays(6).toString()))
-                .andExpect(jsonPath("$.attention.items[3].days").value(6))
-                .andExpect(jsonPath("$.attention.items[4].kind").value("recurring"))
-                .andExpect(jsonPath("$.attention.items[4].documentId").value(repeating.id()))
-                .andExpect(jsonPath("$.attention.items[4].documentNumber").value(repeating.number()))
-                .andExpect(jsonPath("$.attention.items[4].clientId").value(acme))
-                .andExpect(jsonPath("$.attention.items[4].amount").value(400.0))
-                .andExpect(jsonPath("$.attention.items[4].date").value(today.plusDays(5).toString()))
-                .andExpect(jsonPath("$.attention.items[4].days").value(5))
-                .andExpect(jsonPath("$.attention.items[5].kind").value("draft"))
-                .andExpect(jsonPath("$.attention.items[5].documentId").value(draft.id()))
-                .andExpect(jsonPath("$.attention.items[5].documentNumber").value(nullValue()))
-                .andExpect(jsonPath("$.attention.items[5].client").value("Birch Studio"))
-                .andExpect(jsonPath("$.attention.items[5].clientId").value(birch))
-                .andExpect(jsonPath("$.attention.items[5].amount").value(250.0))
-                .andExpect(jsonPath("$.attention.items[5].date").value(today.toString()))
-                .andExpect(jsonPath("$.attention.items[5].days").value(nullValue()))
+                .andExpect(jsonPath("$.attention.items[3].kind").value("draft"))
+                .andExpect(jsonPath("$.attention.items[3].documentId").value(draft.id()))
+                .andExpect(jsonPath("$.attention.items[3].documentNumber").value(nullValue()))
+                .andExpect(jsonPath("$.attention.items[3].client").value("Birch Studio"))
+                .andExpect(jsonPath("$.attention.items[3].clientId").value(birch))
+                .andExpect(jsonPath("$.attention.items[3].amount").value(250.0))
+                .andExpect(jsonPath("$.attention.items[3].date").value(today.toString()))
+                .andExpect(jsonPath("$.attention.items[3].days").value(nullValue()))
                 .andExpect(jsonPath("$.attention.counts.paymentReports").value(1))
                 .andExpect(jsonPath("$.attention.counts.overdue").value(1))
                 .andExpect(jsonPath("$.attention.counts.dueSoon").value(1))
-                .andExpect(jsonPath("$.attention.counts.quotations").value(1))
-                .andExpect(jsonPath("$.attention.counts.recurring").value(1))
-                .andExpect(jsonPath("$.attention.counts.drafts").value(1));
+                .andExpect(jsonPath("$.attention.counts.drafts").value(1))
+                .andExpect(jsonPath("$.attention.counts.quotations").doesNotExist())
+                .andExpect(jsonPath("$.attention.counts.recurring").doesNotExist())
+                .andExpect(jsonPath("$.comingUp.quotations.awaiting.items[0].documentId").value(quotation.id()))
+                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[0].templateId").value(repeating.id()));
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -293,16 +284,15 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.attention.counts.paymentReports").value(2))
                 .andExpect(jsonPath("$.attention.counts.overdue").value(3))
                 .andExpect(jsonPath("$.attention.counts.dueSoon").value(2))
-                .andExpect(jsonPath("$.attention.counts.quotations").value(0))
-                .andExpect(jsonPath("$.attention.counts.recurring").value(0))
                 .andExpect(jsonPath("$.attention.counts.drafts").value(7))
                 .andExpect(jsonPath("$.owedNow.overdueInvoices").value(3));
     }
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("quotations and schedules soonest first, and the newest draft first")
-    void soonestFirst(ZoneId zone) throws Exception {
+    @DisplayName("quotations about to expire and schedules about to run are left to what is coming up, and the"
+            + " newest draft comes first")
+    void comingUpInstead(ZoneId zone) throws Exception {
         inZone(zone);
         Made fourDays = quotation("900", today.plusDays(4));
         Made oneDay = quotation("800", today.plusDays(1));
@@ -316,26 +306,16 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
         Made newer = create("Receipt", birch, "USD", "400", today, true);
 
         overview()
-                .andExpect(jsonPath("$.attention.items.length()").value(6))
-                .andExpect(jsonPath("$.attention.items[0].documentId").value(oneDay.id()))
-                .andExpect(jsonPath("$.attention.items[0].days").value(1))
-                .andExpect(jsonPath("$.attention.items[1].documentId").value(fourDays.id()))
-                .andExpect(jsonPath("$.attention.items[1].days").value(4))
-                .andExpect(jsonPath("$.attention.items[2].kind").value("recurring"))
-                .andExpect(jsonPath("$.attention.items[2].documentId").value(runsToday.id()))
-                .andExpect(jsonPath("$.attention.items[2].client").value("Birch Studio"))
-                .andExpect(jsonPath("$.attention.items[2].date").value(today.toString()))
-                .andExpect(jsonPath("$.attention.items[2].days").value(0))
-                .andExpect(jsonPath("$.attention.items[3].documentId").value(sixDays.id()))
-                .andExpect(jsonPath("$.attention.items[3].days").value(6))
-                .andExpect(jsonPath("$.attention.items[4].kind").value("draft"))
-                .andExpect(jsonPath("$.attention.items[4].documentId").value(newer.id()))
-                .andExpect(jsonPath("$.attention.items[4].amount").value(400.0))
-                .andExpect(jsonPath("$.attention.items[5].documentId").value(older.id()))
+                .andExpect(jsonPath("$.attention.items[*].kind", contains("draft", "draft")))
+                .andExpect(jsonPath("$.attention.items[0].documentId").value(newer.id()))
+                .andExpect(jsonPath("$.attention.items[0].amount").value(400.0))
+                .andExpect(jsonPath("$.attention.items[1].documentId").value(older.id()))
                 .andExpect(jsonPath("$.attention.counts.paymentReports").value(0))
-                .andExpect(jsonPath("$.attention.counts.quotations").value(2))
-                .andExpect(jsonPath("$.attention.counts.recurring").value(2))
-                .andExpect(jsonPath("$.attention.counts.drafts").value(2));
+                .andExpect(jsonPath("$.attention.counts.drafts").value(2))
+                .andExpect(jsonPath(
+                        "$.comingUp.quotations.awaiting.items[*].documentId", contains(oneDay.id(), fourDays.id())))
+                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[0].templateId").value(runsToday.id()))
+                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[1].templateId").value(sixDays.id()));
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -354,8 +334,7 @@ class OverviewAttentionIntegrationTest extends IntegrationTest {
 
         overview()
                 .andExpect(jsonPath(
-                        "$.attention.items[*].kind",
-                        contains("paymentReport", "overdue", "dueSoon", "quotation", "recurring", "draft")))
+                        "$.attention.items[*].kind", contains("paymentReport", "overdue", "dueSoon", "draft")))
                 .andExpect(jsonPath("$.attention.items[*].client", everyItem(is("Cedar Works"))))
                 .andExpect(jsonPath("$.attention.items[*].clientId", everyItem(nullValue())))
                 .andExpect(content().string(containsString("\"client\":\"Cedar Works\",\"clientId\":null,")));

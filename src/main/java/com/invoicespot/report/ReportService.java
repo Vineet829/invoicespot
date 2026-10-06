@@ -269,7 +269,9 @@ public class ReportService {
                 .toList();
     }
 
-    private static ClientTotals clientTotals(ReportQueries.Client client) {
+    // A client's figures as the top clients list them; the sales by customer
+    // view lists every client the same way.
+    static ClientTotals clientTotals(ReportQueries.Client client) {
         return new ClientTotals(
                 client.customerId(),
                 client.name(),

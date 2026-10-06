@@ -274,7 +274,8 @@ class DocumentSummaryIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.currencies").isEmpty())
                 .andExpect(content().string(containsString(
                         "\"outstanding\":{\"total\":0.00,\"notDue\":0.00,\"overdue\":0.00,"
-                                + "\"invoices\":0,\"overdueInvoices\":0}")))
+                                + "\"invoices\":0,\"overdueInvoices\":0,\"bands\":["
+                                + "{\"key\":\"current\",\"amount\":0.00,\"invoices\":0},")))
                 .andExpect(content().string(containsString("\"receivedLast30Days\":{\"total\":0.00,\"payments\":0}")));
     }
 

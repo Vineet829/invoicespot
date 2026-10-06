@@ -17,7 +17,6 @@ public record OverviewResponse(
         OverviewOwed owedNow,
         List<TrendBucket> trend,
         OverviewAttention attention,
-        OverviewSpending spending,
         List<OverviewClient> topClients,
         List<OverviewItem> topItems,
         BigDecimal itemsTotal,

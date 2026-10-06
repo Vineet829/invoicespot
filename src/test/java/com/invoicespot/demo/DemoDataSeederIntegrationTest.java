@@ -2,7 +2,6 @@ package com.invoicespot.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -198,28 +197,28 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
         String session = bearer(demo);
 
         // The last 90 days hold all five categories.
-        read(session, get("/api/v1/report/overview").param("period", "90d"))
-                .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.spending.total").value(5914.67))
+        read(session, get("/api/v1/report/profit").param("period", "90d"))
+                .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
+                .andExpect(jsonPath("$.currencies[0].expenses").value(5914.67))
                 .andExpect(jsonPath(
-                        "$.spending.categories[*].category",
+                        "$.currencies[0].categories[*].category",
                         contains("Contractors", "Travel", "Software and subscriptions", "Marketing", "Office")))
-                .andExpect(jsonPath("$.spending.categories[*].amount", contains(3600.0, 847.84, 743.88, 450.45, 272.5)))
-                .andExpect(jsonPath("$.spending.categories[*].expenses", contains(2, 2, 2, 1, 2)))
-                .andExpect(jsonPath("$.spending.others").value(nullValue()));
+                .andExpect(jsonPath(
+                        "$.currencies[0].categories[*].expenses", contains(3600.0, 847.84, 743.88, 450.45, 272.5)));
         for (String period : List.of("30d", "90d", "12m", "ytd")) {
             String overview = body(read(session, get("/api/v1/report/overview").param("period", period)));
-            BigDecimal total = new BigDecimal(JsonPath.read(overview, "$.spending.total").toString());
-            assertThat(sum(overview, "$.trend[*].expenses")).as(period).isEqualByComparingTo(total);
+            BigDecimal total = sum(overview, "$.trend[*].expenses");
+            assertThat(total).as(period).isPositive();
             assertThat(sum(overview, "$.trend[*].income").subtract(total))
                     .as(period)
                     .isEqualByComparingTo(JsonPath.read(overview, "$.totals.profit.current").toString());
             String profit = body(read(session, get("/api/v1/report/profit").param("period", period)));
             List<Object> spent = JsonPath.read(profit, "$.currencies[?(@.currency == 'USD')].expenses");
             assertThat(new BigDecimal(spent.get(0).toString())).as(period).isEqualByComparingTo(total);
-            // The expenses list for each category and the same days lists the
-            // expenses behind its amount.
-            List<Map<String, Object>> categories = JsonPath.read(overview, "$.spending.categories");
+            // The expenses list for each of the profit report's categories and
+            // the same days adds up to what it says the category cost.
+            List<Map<String, Object>> categories =
+                    JsonPath.read(profit, "$.currencies[?(@.currency == 'USD')].categories[*]");
             for (Map<String, Object> category : categories) {
                 MockHttpServletRequestBuilder list = get("/api/v1/expense")
                         .param("size", "100")
@@ -234,10 +233,10 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
                 String listed = body(read(session, list));
                 assertThat((Integer) JsonPath.read(listed, "$.totalExpenses"))
                         .as(period + " " + category.get("category"))
-                        .isEqualTo(category.get("expenses"));
+                        .isPositive();
                 assertThat(sum(listed, "$.totals[*].spent"))
                         .as(period + " " + category.get("category"))
-                        .isEqualByComparingTo(category.get("amount").toString());
+                        .isEqualByComparingTo(category.get("expenses").toString());
             }
         }
     }

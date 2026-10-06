@@ -95,9 +95,11 @@ class ComingUp {
     }
 
     // How many of the unanswered quotations await an answer and how many
-    // have expired, what each come to, and the three that expire soonest,
-    // those valid for as long as it takes last. A last day is a day in the
-    // business's time zone.
+    // have expired, what each come to, the three that expire soonest, those
+    // valid for as long as it takes last, and the three that expired most
+    // recently, latest first. Those whose last day was the same day stay in
+    // the order they were made. A last day is a day in the business's time
+    // zone.
     private OverviewComingUp.Quotations quotations(long businessPkid, String currency, ZoneId zone, LocalDate today) {
         Map<String, Object> params = Map.of(
                 "business", businessPkid,
@@ -124,6 +126,21 @@ class ComingUp {
                             validUntil == null ? null : ChronoUnit.DAYS.between(today, validUntil));
                 })
                 .list();
+        List<OverviewComingUp.ExpiredQuotation> latest = jdbc.sql("""
+                        select d.id, d.document_number, d.customer_name, d.total, d.due_date
+                        from documents d
+                        where %s and not %s
+                        order by d.due_date desc, d.pkid
+                        limit :most
+                        """.formatted(UNANSWERED, AWAITING))
+                .params(params)
+                .query((result, rowNumber) -> new OverviewComingUp.ExpiredQuotation(
+                        result.getObject("id", UUID.class),
+                        result.getString("document_number"),
+                        result.getString("customer_name"),
+                        result.getBigDecimal("total"),
+                        LocalDate.ofInstant(result.getTimestamp("due_date").toInstant(), zone)))
+                .list();
         return jdbc.sql("""
                         select count(*) filter (where %1$s) as awaiting,
                                coalesce(sum(d.total) filter (where %1$s), 0) as awaiting_amount,
@@ -139,7 +156,9 @@ class ComingUp {
                                 result.getBigDecimal("awaiting_amount").setScale(2),
                                 soonest),
                         new OverviewComingUp.Expired(
-                                result.getLong("expired"), result.getBigDecimal("expired_amount").setScale(2))))
+                                result.getLong("expired"),
+                                result.getBigDecimal("expired_amount").setScale(2),
+                                latest)))
                 .single();
     }
 }

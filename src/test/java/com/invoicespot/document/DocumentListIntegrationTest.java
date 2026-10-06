@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.business.BusinessRole;
 import com.invoicespot.report.AwayFromUtc;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
@@ -406,6 +407,109 @@ class DocumentListIntegrationTest extends IntegrationTest {
                         "$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0008", "INV-0009", "REC-0001")));
         list("outstanding", "true", "due", "This-Week", "currency", "EUR")
                 .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0011")));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("current lists the invoices owed that are not due yet by the business's clock, or have no due date,"
+            + " as the overview's current band counts them")
+    void current(ZoneId zone) throws Exception {
+        inZone(zone);
+        // Not due yet: due in the first minutes of today by the business's
+        // clock, due later, partly paid with tax withheld, partly credited,
+        // and saved without a due date, as the oldest invoices were.
+        dueAt(issue("Invoice", "100", today.minusDays(3), today), today.atTime(0, 30), zone);
+        issue("Invoice", "200", today.minusDays(3), today.plusDays(40));
+        pay(issue("Invoice", "300", today.minusDays(3), today.plusDays(5)), "100", "20", today);
+        credit(issue("Invoice", "400", today.minusDays(3), today.plusDays(16)), "150", today);
+        String undated = issue("Invoice", "500", today.minusDays(3), today.plusDays(10));
+        jdbcTemplate.update("update documents set due_date = null where id = ?", UUID.fromString(undated));
+        // Overdue: due in the last minutes of yesterday, and a week ago.
+        dueAt(issue("Invoice", "60", today.minusDays(3), today), today.minusDays(1).atTime(23, 30), zone);
+        issue("Invoice", "70", today.minusDays(20), today.minusDays(7));
+        // Never current: an invoice paid in full, a receipt, a quotation, a
+        // draft and a void invoice. One in euros is owed in euros.
+        pay(issue("Invoice", "80", today.minusDays(3), today.plusDays(5)), "80", "0", today);
+        issue("Receipt", "90", today, null);
+        issue("Quotation", "900", today, today.plusDays(10));
+        create("Invoice", "800", today, today.plusDays(10), true);
+        voided(issue("Invoice", "700", today.minusDays(1), today.plusDays(10)));
+        issue("Invoice", "EUR", "600", today.minusDays(3), today.plusDays(10));
+
+        // Soonest due first, the undated one last, with what is still owed on
+        // each; the totals count every one of them, none overdue.
+        String dollars = body(list("due", "current", "currency", "USD", "sort", "dueDate", "dir", "asc")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                        "$.myDocuments[*].documentNumber",
+                        contains("INV-0001", "INV-0003", "INV-0004", "INV-0002", "INV-0005")))
+                .andExpect(jsonPath("$.myDocuments[*].balanceDue", contains(100.0, 180.0, 250.0, 200.0, 500.0)))
+                .andExpect(jsonPath("$.myDocuments[4].dueDate").value(nullValue()))
+                .andExpect(jsonPath("$.totalDocuments").value(5))
+                .andExpect(jsonPath("$.totals.length()").value(1))
+                .andExpect(jsonPath("$.totals[0].currency").value("USD"))
+                .andExpect(jsonPath("$.totals[0].documents").value(5))
+                .andExpect(jsonPath("$.totals[0].billed").value(1500.0))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(1230.0))
+                .andExpect(jsonPath("$.totals[0].overdue").value(0.0))
+                .andExpect(jsonPath("$.totals[0].overdueDocuments").value(0)));
+        // They are the overview's current band, in each currency.
+        for (String currency : List.of("USD", "EUR")) {
+            String listed = currency.equals("USD") ? dollars : body(list("due", "current", "currency", currency));
+            String overview = body(send(get("/api/v1/report/overview").param("currency", currency), "")
+                    .andExpect(jsonPath("$.owedNow.bands[0].key").value("current")));
+            assertThat(amount(listed, "$.totals[0].balanceDue"))
+                    .as(currency)
+                    .isEqualByComparingTo(amount(overview, "$.owedNow.bands[0].amount"))
+                    .isEqualByComparingTo(amount(overview, "$.owedNow.notDue"))
+                    .isEqualByComparingTo(sum(listed, "$.myDocuments[*].balanceDue"));
+            assertThat((Integer) JsonPath.read(listed, "$.totalDocuments"))
+                    .as(currency)
+                    .isEqualTo(JsonPath.read(overview, "$.owedNow.bands[0].invoices"));
+        }
+        assertThat(amount(body(list("due", "current", "currency", "EUR")), "$.totals[0].balanceDue"))
+                .isEqualByComparingTo("600");
+        // Without a currency, each one's invoices are totalled apart; with
+        // what is owed on them asked for as well, nothing changes.
+        list("due", "Current")
+                .andExpect(jsonPath("$.totalDocuments").value(6))
+                .andExpect(jsonPath("$.totals[*].currency", contains("EUR", "USD")))
+                .andExpect(jsonPath("$.totals[*].balanceDue", contains(600.0, 1230.0)));
+        list("due", "current", "outstanding", "true", "currency", "USD")
+                .andExpect(jsonPath(
+                        "$.myDocuments[*].documentNumber",
+                        containsInAnyOrder("INV-0001", "INV-0002", "INV-0003", "INV-0004", "INV-0005")));
+        // A page at a time, the totals on every page.
+        mockMvc.perform(get("/api/v1/document/all")
+                        .param("due", "current")
+                        .param("currency", "USD")
+                        .param("sort", "dueDate")
+                        .param("dir", "asc")
+                        .param("size", "2")
+                        .param("page", "2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.myDocuments[*].documentNumber", contains("INV-0004", "INV-0002")))
+                .andExpect(jsonPath("$.totalDocuments").value(5))
+                .andExpect(jsonPath("$.numberOfPages").value(3))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(1230.0));
+        assertThat(csv("due", "current", "currency", "USD", "sort", "number", "dir", "asc"))
+                .containsExactly("INV-0001", "INV-0002", "INV-0003", "INV-0004", "INV-0005");
+        // A viewer sees the same; another business has nothing current.
+        User viewer = createMember(businessOf(owner), BusinessRole.VIEWER);
+        mockMvc.perform(get("/api/v1/document/all")
+                        .param("due", "current")
+                        .param("currency", "USD")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(viewer, businessOf(owner))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDocuments").value(5))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(1230.0));
+        owner = createUser();
+        list("due", "current")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myDocuments").isEmpty())
+                .andExpect(jsonPath("$.totals").isEmpty())
+                .andExpect(jsonPath("$.totalDocuments").value(0))
+                .andExpect(jsonPath("$.numberOfPages").value(0));
     }
 
     @Test

@@ -63,7 +63,8 @@ public class DocumentController {
     }
 
     // A period is the last 30 or 90 days or 12 months, as the overview has
-    // them; due is a week what is owed falls due in, counted from today.
+    // them; due is a week what is owed falls due in, counted from today, or
+    // current for the invoices owed that are not due yet.
     @GetMapping("/all")
     public DocumentListResponse listMine(
             @Requires(Permission.VIEW_RECORDS) BusinessAccess access,

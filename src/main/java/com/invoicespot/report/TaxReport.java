@@ -133,8 +133,9 @@ public class TaxReport {
     }
 
     // Rates in order, 18 and 18.00 being one; months in order, each with the
-    // rates charged in it.
-    private static TaxCurrency currency(String currency, List<ReportQueries.Taxed> rows) {
+    // rates charged in it. The documents' sales view reads one currency's tax
+    // from here too, so that it is always this report's.
+    static TaxCurrency currency(String currency, List<ReportQueries.Taxed> rows) {
         Sum all = new Sum();
         Map<BigDecimal, Sum> rates = new TreeMap<>();
         Map<YearMonth, Map<BigDecimal, Sum>> months = new TreeMap<>();

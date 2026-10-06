@@ -9,16 +9,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -26,6 +30,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 // less credit notes, by the day each is dated, against expenses by the day
 // each was paid, with the tax on them unless it can be claimed back.
 class ProfitReportIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     private final LocalDate lastMonth = today.withDayOfMonth(1).minusMonths(1);
@@ -177,5 +184,56 @@ class ProfitReportIntegrationTest extends IntegrationTest {
         report("forever")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Choose a period from the list"));
+    }
+
+    @Test
+    @DisplayName("categories that cost the same go by name, whatever its case")
+    void ties() throws Exception {
+        session = business();
+        expense(session, today, "delta", "USD", "300", "0", false);
+        expense(session, today, "Fees", "USD", "50", "0", false);
+        expense(session, today, "ads", "USD", "50", "0", false);
+        expense(session, today, "Books", "USD", "50", "0", false);
+        expense(session, today, "cloud", "USD", "50", "0", false);
+        // Each 50 once tax that can't be claimed back is added and tax that
+        // can is left out.
+        expense(session, today, "Equipment", "USD", "40", "10", false);
+        expense(session, today, "Dues", "USD", "50", "5", true);
+
+        report("90d")
+                .andExpect(jsonPath(
+                        "$.currencies[0].categories[*].category",
+                        contains("delta", "ads", "Books", "cloud", "Dues", "Equipment", "Fees")))
+                .andExpect(jsonPath(
+                        "$.currencies[0].categories[*].expenses",
+                        contains(300.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0)));
+    }
+
+    @Test
+    @DisplayName("a category in two spellings is one row, spelled as first used, as the expenses list finds it")
+    void twoSpellings() throws Exception {
+        User owner = createUser();
+        session = bearer(owner);
+        // Two members can save a new category at the same moment, each in
+        // their own spelling; otherwise a new expense takes the one in use.
+        for (String spelling : List.of("Travel", "travel", "travel")) {
+            jdbcTemplate.update("""
+                    insert into expenses (business_pkid, expense_date, category, amount, currency)
+                    values (?, ?, ?, 100, 'USD')
+                    """, businessOf(owner).getPkid(), today, spelling);
+        }
+        expense(session, today, "Office", "USD", "50", "0", false);
+
+        report("30d")
+                .andExpect(jsonPath("$.currencies[0].categories[*].category", contains("Travel", "Office")))
+                .andExpect(jsonPath("$.currencies[0].categories[*].expenses", contains(300.0, 50.0)));
+        send(session, get("/api/v1/expense")
+                                .param("period", "30d")
+                                .param("currency", "USD")
+                                .param("category", "Travel"),
+                        "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalExpenses").value(3))
+                .andExpect(jsonPath("$.totals[0].spent").value(300.0));
     }
 }

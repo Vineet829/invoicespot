@@ -4,6 +4,7 @@ import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.Permission;
 import com.invoicespot.business.Requires;
 import com.invoicespot.report.dto.PaymentListResponse;
+import com.invoicespot.report.dto.PaymentSummaryResponse;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentList paymentList;
+    private final PaymentSummary paymentSummary;
 
-    public PaymentController(PaymentList paymentList) {
+    public PaymentController(PaymentList paymentList, PaymentSummary paymentSummary) {
         this.paymentList = paymentList;
+        this.paymentSummary = paymentSummary;
     }
 
     // A method is a payment method's name, or receipt for receipts; a period
@@ -40,5 +43,15 @@ public class PaymentController {
             @RequestParam(name = "dir", defaultValue = "desc") String direction) {
         return paymentList.list(
                 access, PaymentSearch.of(query, method, currency, period, from, to, sort, direction, page, size));
+    }
+
+    // What the list comes to in one currency over one of the documents list's
+    // periods, or all dates when none is given, by method and by who paid.
+    @GetMapping("/summary")
+    public PaymentSummaryResponse summary(
+            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @RequestParam(name = "period", required = false) String period,
+            @RequestParam(name = "currency", required = false) String currency) {
+        return paymentSummary.summary(access, period, currency);
     }
 }

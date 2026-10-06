@@ -105,8 +105,8 @@ public class ProfitReport {
 
     // The largest amounts first, and by name, whatever its case, when two are
     // the same, then by spelling, so that none comes in whatever order the
-    // database read it: categories as they are listed here and on the
-    // overview, and the clients and items the overview lists.
+    // database read it: categories as they are listed here, and the clients
+    // and items the overview lists.
     static <T> Comparator<T> largestFirst(Function<T, BigDecimal> amount, Function<T, String> name) {
         return Comparator.comparing(amount, Comparator.<BigDecimal>reverseOrder())
                 .thenComparing(row -> name.apply(row).toLowerCase(Locale.ROOT))

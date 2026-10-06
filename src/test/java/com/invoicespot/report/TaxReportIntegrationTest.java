@@ -210,6 +210,15 @@ class TaxReportIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.currencies[0].rates[0].sgst").value(81.0))
                 .andExpect(jsonPath("$.currencies[0].rates[0].igst").value(360.0))
                 .andExpect(jsonPath("$.currencies[0].rates[0].reverseChargeTaxable").value(500.0));
+        // The overview's tax in what was billed leaves out the supply under
+        // reverse charge too.
+        report("30d", null).andExpect(jsonPath("$.currencies[0].tax").value(522.0));
+        mockMvc.perform(get("/api/v1/report/overview")
+                        .param("period", "30d")
+                        .header(HttpHeaders.AUTHORIZATION, session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("INR"))
+                .andExpect(jsonPath("$.totals.tax").value(522.0));
 
         String csv = new String(
                 mockMvc.perform(get("/api/v1/report/csv/tax")

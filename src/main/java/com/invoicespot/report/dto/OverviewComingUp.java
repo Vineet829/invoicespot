@@ -42,5 +42,11 @@ public record OverviewComingUp(Recurring recurring, Quotations quotations) {
             LocalDate validUntil,
             Long days) {}
 
-    public record Expired(long count, BigDecimal amount) {}
+    // The quotations that expired without an answer, what they come to, and
+    // the few that expired most recently.
+    public record Expired(long count, BigDecimal amount, List<ExpiredQuotation> items) {}
+
+    // An expired quotation and the last day it was valid.
+    public record ExpiredQuotation(
+            UUID documentId, String documentNumber, String client, BigDecimal amount, LocalDate validUntil) {}
 }

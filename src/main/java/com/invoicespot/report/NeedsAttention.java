@@ -18,10 +18,11 @@ import org.springframework.stereotype.Repository;
 
 // What needs doing in one currency, most urgent first: payments clients
 // reported that wait to be confirmed, overdue invoices, invoices due within
-// the week, unanswered quotations whose last day is within it, invoices a
-// running schedule makes within it, and drafts. Each kind is counted in full;
-// six things at most are listed. Each names its client as its document does,
-// with the id of the client the document is linked to while it is linked.
+// the week, and drafts. Quotations and the invoices schedules will make are
+// what is coming up, so they are listed there instead. Each kind is counted
+// in full; six things at most are listed. Each names its client as its
+// document does, with the id of the client the document is linked to while
+// it is linked.
 @Repository
 class NeedsAttention {
 
@@ -43,8 +44,6 @@ class NeedsAttention {
         Map<String, Object> params = Map.of(
                 "business", businessPkid,
                 "currency", currency,
-                "today", today,
-                "lastDay", today.plusDays(6),
                 "startOfToday", Timestamp.from(today.atStartOfDay(zone).toInstant()),
                 "startOfNextWeek", Timestamp.from(today.plusDays(7).atStartOfDay(zone).toInstant()),
                 "most", MOST);
@@ -52,21 +51,13 @@ class NeedsAttention {
         Group overdue = owed("overdue", "d.due_date < :startOfToday", params, zone, today);
         Group dueSoon = owed(
                 "dueSoon", "d.due_date >= :startOfToday and d.due_date < :startOfNextWeek", params, zone, today);
-        Group quotations = quotations(params, zone, today);
-        Group recurring = recurring(params, today);
         Group drafts = drafts(params, zone);
         return new OverviewAttention(
-                Stream.of(reports, overdue, dueSoon, quotations, recurring, drafts)
+                Stream.of(reports, overdue, dueSoon, drafts)
                         .flatMap(group -> group.items().stream())
                         .limit(MOST)
                         .toList(),
-                new OverviewAttention.Counts(
-                        reports.count(),
-                        overdue.count(),
-                        dueSoon.count(),
-                        quotations.count(),
-                        recurring.count(),
-                        drafts.count()));
+                new OverviewAttention.Counts(reports.count(), overdue.count(), dueSoon.count(), drafts.count()));
     }
 
     // Newest report first, with the amount and the day the client gave.
@@ -106,50 +97,6 @@ class NeedsAttention {
                 (result, rowNumber) -> {
                     LocalDate date = day(result.getTimestamp("due_date"), zone);
                     return item(kind, result, date, Math.abs(ChronoUnit.DAYS.between(today, date)));
-                });
-    }
-
-    // Issued quotations nobody accepted or declined, valid until a day this
-    // week, the soonest first.
-    private Group quotations(Map<String, Object> params, ZoneId zone, LocalDate today) {
-        return group(
-                """
-                select d.id, d.document_number, d.customer_name, client.id as client_id, d.total as amount,
-                       d.due_date, count(*) over () as kind_count
-                from documents d
-                left join customers client on client.pkid = d.customer_pkid
-                where d.business_pkid = :business and %s and d.document_type = 'Quotation'
-                  and coalesce(d.currency, '') = :currency and d.accepted_at is null and d.declined_at is null
-                  and d.due_date >= :startOfToday and d.due_date < :startOfNextWeek
-                order by d.due_date, d.pkid
-                limit :most
-                """.formatted(DocumentLedger.COUNTED),
-                params,
-                (result, rowNumber) -> {
-                    LocalDate date = day(result.getTimestamp("due_date"), zone);
-                    return item("quotation", result, date, ChronoUnit.DAYS.between(today, date));
-                });
-    }
-
-    // Schedules not paused or finished whose next invoice is made this week,
-    // the soonest first, with the invoice each copies.
-    private Group recurring(Map<String, Object> params, LocalDate today) {
-        return group(
-                """
-                select d.id, d.document_number, d.customer_name, client.id as client_id, d.total as amount,
-                       s.next_run, count(*) over () as kind_count
-                from recurring_schedules s
-                join documents d on d.pkid = s.template_pkid
-                left join customers client on client.pkid = d.customer_pkid
-                where s.business_pkid = :business and not s.paused and s.next_run between :today and :lastDay
-                  and coalesce(d.currency, '') = :currency
-                order by s.next_run, s.pkid
-                limit :most
-                """,
-                params,
-                (result, rowNumber) -> {
-                    LocalDate date = result.getObject("next_run", LocalDate.class);
-                    return item("recurring", result, date, ChronoUnit.DAYS.between(today, date));
                 });
     }
 

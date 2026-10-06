@@ -3,7 +3,9 @@ package com.invoicespot.report;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.document.DocumentLedger;
 import com.invoicespot.report.dto.DocumentSummaryResponse;
+import com.invoicespot.report.dto.MethodTotals;
 import com.invoicespot.report.dto.PaymentEntry;
+import com.invoicespot.report.dto.PaymentSummaryResponse;
 import com.invoicespot.report.dto.PaymentTotals;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
@@ -24,10 +26,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 class PaymentQueries {
 
-    // What each one was on: the document, the client named on it, and its currency.
+    // What each one was on: the document, the client named on it, the one it
+    // is linked to or else the name it was saved with, and its currency.
     private static final String DOCUMENT = """
             d.id as document_id, d.document_number, d.document_type, d.customer_name as client,
-            d.customer_email as client_email, d.currency""";
+            d.customer_email as client_email, d.customer_pkid, %s as saved_name, d.currency"""
+            .formatted(Overview.SAVED_NAME);
 
     // Every one of them, in the business :business; a sequence orders rows
     // of one kind as they were recorded.
@@ -56,6 +60,10 @@ class PaymentQueries {
             "client", "lower(m.client)");
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
+
+    // What the list calls the method of a receipt, which has none of its own;
+    // its method filter asks for receipts as PaymentSearch.RECEIPT.
+    static final String ON_A_RECEIPT = "On a receipt";
 
     // A search's conditions on the rows aliased m, and their values.
     private record Filter(String where, Map<String, Object> params) {}
@@ -113,6 +121,50 @@ class PaymentQueries {
                 .findFirst()
                 .map(totals -> new DocumentSummaryResponse.Received(totals.received(), totals.payments()))
                 .orElse(new DocumentSummaryResponse.Received(ZERO, 0));
+    }
+
+    // What the rows a search with dates matches come to, by method as the
+    // list's method filter finds them: a payment or a refund under its own,
+    // and receipts together, under what the list calls them. A refund takes
+    // what went back off its method's total.
+    List<MethodTotals> byMethod(long businessPkid, PaymentSearch search) {
+        Filter filter = filter(businessPkid, search);
+        return jdbc.sql("""
+                        select case when m.kind = 'receipt' then :receipt else m.method end as method,
+                               count(*) as payments, sum(m.amount) as amount
+                        from (%s) m
+                        where %s
+                        group by 1
+                        """.formatted(ROWS, filter.where()))
+                .params(filter.params())
+                .param("receipt", ON_A_RECEIPT)
+                .query((result, rowNumber) -> new MethodTotals(
+                        result.getString("method"), result.getLong("payments"), result.getBigDecimal("amount")))
+                .list();
+    }
+
+    // What they come to by who paid, as the overview tells its top clients
+    // apart: the client the document is linked to, named as it is now, or
+    // for documents linked to none, no id and the name they were saved with.
+    // In the order the clients were added, those linked to none last.
+    List<PaymentSummaryResponse.Payer> byPayer(long businessPkid, PaymentSearch search) {
+        Filter filter = filter(businessPkid, search);
+        return jdbc.sql("""
+                        select c.id as client_id, coalesce(c.name, m.saved_name) as client,
+                               count(*) as payments, sum(m.amount) as amount
+                        from (%s) m
+                        left join customers c on c.pkid = m.customer_pkid
+                        where %s
+                        group by m.customer_pkid, m.saved_name, c.id, c.name
+                        order by m.customer_pkid, m.saved_name
+                        """.formatted(ROWS, filter.where()))
+                .params(filter.params())
+                .query((result, rowNumber) -> new PaymentSummaryResponse.Payer(
+                        result.getObject("client_id", UUID.class),
+                        result.getString("client"),
+                        result.getLong("payments"),
+                        result.getBigDecimal("amount")))
+                .list();
     }
 
     // The methods the business was paid or paid back by, by name.

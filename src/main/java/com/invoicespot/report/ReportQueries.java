@@ -25,6 +25,8 @@ class ReportQueries {
 
     record Billed(String currency, boolean receipt, LocalDate issueDate, BigDecimal total) {}
 
+    record BilledByType(String type, long documents, BigDecimal amount) {}
+
     record Paid(String currency, LocalDate datePaid, BigDecimal amount, String method) {}
 
     record Refunded(String currency, LocalDate dateRefunded, BigDecimal amount) {}
@@ -75,13 +77,20 @@ class ReportQueries {
 
     record Daily(LocalDate day, BigDecimal amount) {}
 
-    record CategorySpent(String currency, String category, BigDecimal amount, long expenses) {}
+    record CategorySpent(String currency, String category, BigDecimal amount) {}
+
+    record TaxBilled(BigDecimal current, BigDecimal previous) {}
 
     // Income and costs, as profit and loss counts them by month or by day;
     // the expenses list adds up costs the same way.
     private static final String EARNED =
             "(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)";
     private static final String SPENT = ExpenseLedger.SPENT;
+
+    // The tax a document charged at one rate, as the tax report counts it: a
+    // credit note takes its tax off, for SQL over tax summaries aliased s and
+    // their documents aliased d.
+    private static final String TAX = "(case when d.document_type = 'Credit Note' then -s.tax else s.tax end)";
 
     // A document in the reporting currency, or with a rate typed in against it.
     private static final String CONVERTIBLE = "(coalesce(d.currency, '') = :base"
@@ -142,6 +151,26 @@ class ReportQueries {
                         "Receipt".equals(result.getString("document_type")),
                         result.getObject("issue_date", LocalDate.class),
                         result.getBigDecimal("total")))
+                .list();
+    }
+
+    // What one currency's documents dated between the days billed, by kind
+    // of document, as the overview's Billed counts it: invoices and receipts
+    // add their totals, and credit notes take theirs off.
+    List<BilledByType> billedByType(long businessPkid, String currency, LocalDate from, LocalDate to) {
+        return jdbc.sql("""
+                        select d.document_type, count(*) as documents, sum(%s) as amount
+                        from documents d
+                        where d.business_pkid = :business and %s and coalesce(d.currency, '') = :currency
+                          and d.issue_date between :from and :to
+                        group by 1
+                        """.formatted(DocumentLedger.BILLED, DocumentLedger.BILLED_DOCUMENT))
+                .param("business", businessPkid)
+                .param("currency", currency)
+                .param("from", from)
+                .param("to", to)
+                .query((result, rowNumber) -> new BilledByType(
+                        result.getString("document_type"), result.getLong("documents"), result.getBigDecimal("amount")))
                 .list();
     }
 
@@ -290,13 +319,13 @@ class ReportQueries {
     }
 
     // What expenses paid between the days cost in each currency and
-    // category, and how many there were. A category is the same in any
-    // letter case, as the expenses list finds it, and goes by the spelling
-    // used first, as a new expense takes it.
+    // category. A category is the same in any letter case, as the expenses
+    // list finds it, and goes by the spelling used first, as a new expense
+    // takes it.
     List<CategorySpent> spentByCategory(long businessPkid, LocalDate from, LocalDate to) {
         return jdbc.sql("""
                         select e.currency, (array_agg(e.category order by e.pkid))[1] as category,
-                               sum(%s) as amount, count(*) as expenses
+                               sum(%s) as amount
                         from expenses e
                         where e.business_pkid = :business and e.expense_date between :from and :to
                         group by e.currency, lower(e.category)
@@ -305,10 +334,7 @@ class ReportQueries {
                 .param("from", from)
                 .param("to", to)
                 .query((result, rowNumber) -> new CategorySpent(
-                        result.getString("currency"),
-                        result.getString("category"),
-                        result.getBigDecimal("amount"),
-                        result.getLong("expenses")))
+                        result.getString("currency"), result.getString("category"), result.getBigDecimal("amount")))
                 .list();
     }
 
@@ -379,6 +405,26 @@ class ReportQueries {
                 .params(overview(businessPkid, currency, window))
                 .query(ReportQueries::daily)
                 .list();
+    }
+
+    // The tax included in what the currency's documents billed over the
+    // overview's period and over the period before it, as the tax report
+    // counts it: by the day each document is dated, and none on a supply
+    // under reverse charge, whose tax the client pays.
+    TaxBilled taxBilled(long businessPkid, String currency, OverviewWindow window) {
+        return jdbc.sql("""
+                        select coalesce(sum(%1$s) filter (where d.issue_date between :from and :to), 0) as tax,
+                               coalesce(sum(%1$s) filter (where d.issue_date between :previousFrom and :previousTo), 0)
+                                   as previous_tax
+                        from document_tax_summaries s
+                        join documents d on d.pkid = s.document_pkid
+                        where d.business_pkid = :business and %2$s and not d.reverse_charge
+                          and coalesce(d.currency, '') = :currency and %3$s
+                        """.formatted(TAX, DocumentLedger.BILLED_DOCUMENT, inOverview("d.issue_date")))
+                .params(overview(businessPkid, currency, window))
+                .query((result, rowNumber) -> new TaxBilled(
+                        result.getBigDecimal("tax").setScale(2), result.getBigDecimal("previous_tax").setScale(2)))
+                .single();
     }
 
     // The business, the currency, and the overview's period and the period

@@ -9,12 +9,11 @@ import java.util.UUID;
 // kind there are in all.
 public record OverviewAttention(List<Item> items, Counts counts) {
 
-    // The kind is paymentReport, overdue, dueSoon, quotation, recurring or
-    // draft, and the document is the one to open: for a schedule, the invoice
-    // it copies. The client is named as the document names it; its id is that
-    // of the client the document is linked to, and none once it isn't linked
-    // to one. Days are days late for an overdue invoice and days left for the
-    // rest; a payment report and a draft have none.
+    // The kind is paymentReport, overdue, dueSoon or draft, and the document
+    // is the one to open. The client is named as the document names it; its
+    // id is that of the client the document is linked to, and none once it
+    // isn't linked to one. Days are days late for an overdue invoice and days
+    // left for one due soon; a payment report and a draft have none.
     public record Item(
             String kind,
             UUID documentId,
@@ -25,6 +24,5 @@ public record OverviewAttention(List<Item> items, Counts counts) {
             LocalDate date,
             Long days) {}
 
-    public record Counts(
-            long paymentReports, long overdue, long dueSoon, long quotations, long recurring, long drafts) {}
+    public record Counts(long paymentReports, long overdue, long dueSoon, long drafts) {}
 }
