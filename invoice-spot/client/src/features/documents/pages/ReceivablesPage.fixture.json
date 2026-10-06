@@ -1,0 +1,273 @@
+{
+  "receivables": {
+    "success": true,
+    "currency": "USD",
+    "currencies": ["USD"],
+    "total": 24285.79,
+    "invoices": 10,
+    "current": {
+      "amount": 17959.76,
+      "invoices": 7,
+      "bands": [
+        { "key": "dueIn0to15", "amount": 11194.74, "invoices": 4 },
+        { "key": "dueIn16to30", "amount": 6277.02, "invoices": 2 },
+        { "key": "dueIn31to45", "amount": 488.0, "invoices": 1 },
+        { "key": "dueAfter45", "amount": 0.0, "invoices": 0 }
+      ],
+      "clients": [
+        {
+          "clientId": null,
+          "client": "Verdant Farms",
+          "amount": 4346.52,
+          "invoices": 1
+        },
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c110",
+          "client": "Oak Street Bakery",
+          "amount": 3217.5,
+          "invoices": 1
+        },
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c111",
+          "client": "Lumen Health",
+          "amount": 2762.75,
+          "invoices": 1
+        },
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c103",
+          "client": "Bluefin Analytics",
+          "amount": 2664.09,
+          "invoices": 1
+        },
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c101",
+          "client": "Atlas Robotics",
+          "amount": 2550.4,
+          "invoices": 1
+        }
+      ]
+    },
+    "overdue": {
+      "amount": 6326.03,
+      "invoices": 3,
+      "bands": [
+        { "key": "days1to15", "amount": 965.25, "invoices": 1 },
+        { "key": "days16to30", "amount": 1969.11, "invoices": 1 },
+        { "key": "days31to45", "amount": 0.0, "invoices": 0 },
+        { "key": "over45", "amount": 3391.67, "invoices": 1 }
+      ],
+      "clients": [
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c105",
+          "client": "Sable Fitness",
+          "amount": 3391.67,
+          "invoices": 1
+        },
+        {
+          "clientId": "00000000-0000-0000-0000-00000000c107",
+          "client": "Quill & Co. Publishing",
+          "amount": 1969.11,
+          "invoices": 1
+        },
+        {
+          "clientId": null,
+          "client": "Verdant Farms",
+          "amount": 965.25,
+          "invoices": 1
+        }
+      ]
+    }
+  },
+  "overdue": {
+    "success": true,
+    "totalDocuments": 3,
+    "numberOfPages": 1,
+    "page": 1,
+    "size": 10,
+    "issuedFrom": null,
+    "issuedTo": null,
+    "myDocuments": [
+      {
+        "_id": "00000000-0000-0000-0000-000000001026",
+        "customerId": "00000000-0000-0000-0000-00000000c105",
+        "customer": { "name": "Sable Fitness" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1026",
+        "state": "issued",
+        "issueDate": "2026-07-28",
+        "dueDate": "2026-08-11",
+        "status": "Not Paid",
+        "overdue": true,
+        "total": 3391.67,
+        "currency": "USD",
+        "balanceDue": 3391.67
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001030",
+        "customerId": "00000000-0000-0000-0000-00000000c107",
+        "customer": { "name": "Quill & Co. Publishing" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1030",
+        "state": "issued",
+        "issueDate": "2026-08-30",
+        "dueDate": "2026-09-13",
+        "status": "Not Paid",
+        "overdue": true,
+        "total": 1969.11,
+        "currency": "USD",
+        "balanceDue": 1969.11
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001031",
+        "customerId": null,
+        "customer": { "name": "Verdant Farms" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1031",
+        "state": "issued",
+        "issueDate": "2026-09-10",
+        "dueDate": "2026-09-24",
+        "status": "Not Paid",
+        "overdue": true,
+        "total": 965.25,
+        "currency": "USD",
+        "balanceDue": 965.25
+      }
+    ],
+    "totals": [
+      {
+        "currency": "USD",
+        "documents": 3,
+        "billed": 6326.03,
+        "balanceDue": 6326.03,
+        "overdue": 6326.03,
+        "overdueDocuments": 3
+      }
+    ]
+  },
+  "comingIn": {
+    "success": true,
+    "totalDocuments": 7,
+    "numberOfPages": 1,
+    "page": 1,
+    "size": 10,
+    "issuedFrom": null,
+    "issuedTo": null,
+    "myDocuments": [
+      {
+        "_id": "00000000-0000-0000-0000-000000001032",
+        "customerId": "00000000-0000-0000-0000-00000000c103",
+        "customer": { "name": "Bluefin Analytics" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1032",
+        "state": "issued",
+        "issueDate": "2026-09-22",
+        "dueDate": "2026-10-06",
+        "status": "Not Paid",
+        "overdue": false,
+        "total": 2664.09,
+        "currency": "USD",
+        "balanceDue": 2664.09
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001034",
+        "customerId": "00000000-0000-0000-0000-00000000c101",
+        "customer": { "name": "Atlas Robotics" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1034",
+        "state": "issued",
+        "issueDate": "2026-09-28",
+        "dueDate": "2026-10-12",
+        "status": "Not Fully Paid",
+        "overdue": false,
+        "total": 4397.25,
+        "currency": "USD",
+        "balanceDue": 2550.4
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001035",
+        "customerId": "00000000-0000-0000-0000-00000000c110",
+        "customer": { "name": "Oak Street Bakery" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1035",
+        "state": "issued",
+        "issueDate": "2026-10-01",
+        "dueDate": "2026-10-15",
+        "status": "Not Paid",
+        "overdue": false,
+        "total": 3217.5,
+        "currency": "USD",
+        "balanceDue": 3217.5
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001036",
+        "customerId": null,
+        "customer": { "name": "Verdant Farms" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1036",
+        "state": "issued",
+        "issueDate": "2026-09-24",
+        "dueDate": "2026-10-24",
+        "status": "Not Paid",
+        "overdue": false,
+        "total": 4346.52,
+        "currency": "USD",
+        "balanceDue": 4346.52
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001037",
+        "customerId": "00000000-0000-0000-0000-00000000c112",
+        "customer": { "name": "Juniper Films" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1037",
+        "state": "issued",
+        "issueDate": "2026-10-01",
+        "dueDate": "2026-10-31",
+        "status": "Not Paid",
+        "overdue": false,
+        "total": 1930.5,
+        "currency": "USD",
+        "balanceDue": 1930.5
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001038",
+        "customerId": "00000000-0000-0000-0000-00000000c104",
+        "customer": { "name": "Harbor & Pine Architects" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1038",
+        "state": "issued",
+        "issueDate": "2026-10-02",
+        "dueDate": "2026-11-16",
+        "status": "Not Fully Paid",
+        "overdue": false,
+        "total": 750.76,
+        "currency": "USD",
+        "balanceDue": 488.0
+      },
+      {
+        "_id": "00000000-0000-0000-0000-000000001039",
+        "customerId": "00000000-0000-0000-0000-00000000c111",
+        "customer": { "name": "Lumen Health" },
+        "documentType": "Invoice",
+        "documentNumber": "INV-1039",
+        "state": "issued",
+        "issueDate": "2026-10-03",
+        "dueDate": null,
+        "status": "Not Paid",
+        "overdue": false,
+        "total": 2762.75,
+        "currency": "USD",
+        "balanceDue": 2762.75
+      }
+    ],
+    "totals": [
+      {
+        "currency": "USD",
+        "documents": 7,
+        "billed": 20069.37,
+        "balanceDue": 17959.76,
+        "overdue": 0.0,
+        "overdueDocuments": 0
+      }
+    ]
+  }
+}

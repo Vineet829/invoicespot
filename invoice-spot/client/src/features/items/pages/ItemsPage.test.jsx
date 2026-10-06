@@ -240,10 +240,16 @@ it("leaves focus where it is when the search box is gone, and doesn't move it th
   expect(document.activeElement).toBe(document.body);
 });
 
-it("opens at an item the overview's top items link to", async () => {
-  const { itemLink } = await import("../../dashboard/dashboardModel");
-  const page = await open(itemLink("Consulting (hourly)"));
-  expect(names(page)).toEqual(["Consulting (hourly)"]);
-  expect(searchBox(page).value).toBe("Consulting (hourly)");
-  expect(line(page)).toBe("1 item");
+it("sits beside Sales by item", async () => {
+  const page = await open("/items");
+  expect(
+    [...page.querySelectorAll('nav[aria-label="Items views"] a')].map((tab) => [
+      tab.textContent,
+      tab.getAttribute("href"),
+      tab.getAttribute("aria-current"),
+    ]),
+  ).toEqual([
+    ["All items", "/items", "page"],
+    ["Sales by item", "/items/sales", null],
+  ]);
 });

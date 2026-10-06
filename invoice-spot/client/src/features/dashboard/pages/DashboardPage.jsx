@@ -14,11 +14,11 @@ import {
   attentionPair,
   listRow,
 } from "../components/DashboardPanels";
+import ReceivablesCard from "../components/ReceivablesCard";
 import OverviewTiles from "../components/OverviewTiles";
 import CashFlowPanel from "../components/CashFlowPanel";
 import AttentionPanel from "../components/AttentionPanel";
 import TopClientsPanel from "../components/TopClientsPanel";
-import SpendingPanel from "../components/SpendingPanel";
 import TopItemsPanel from "../components/TopItemsPanel";
 import ComingUpPanel from "../components/ComingUpPanel";
 import Shortcuts from "../components/Shortcuts";
@@ -170,6 +170,10 @@ const DashboardPage = () => {
               className={`flex min-w-0 flex-col gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
               aria-busy={stale || undefined}
             >
+              <ReceivablesCard
+                snapshot={snapshot}
+                currencyChosen={Boolean(params.get("currency"))}
+              />
               <OverviewTiles
                 snapshot={snapshot}
                 currencyChosen={Boolean(params.get("currency"))}
@@ -178,18 +182,22 @@ const DashboardPage = () => {
               {/* A panel an older server's answer has no figures for is
                   left out, and the rest of its row takes its room. */}
               <div className={snapshot.topClients ? attentionPair : "contents"}>
-                <AttentionPanel
-                  snapshot={snapshot}
-                  currencyChosen={Boolean(params.get("currency"))}
-                />
-                {snapshot.topClients && <TopClientsPanel snapshot={snapshot} />}
+                <AttentionPanel snapshot={snapshot} />
+                {snapshot.topClients && (
+                  <TopClientsPanel
+                    snapshot={snapshot}
+                    currencyChosen={Boolean(params.get("currency"))}
+                  />
+                )}
               </div>
-              {(snapshot.spending ||
-                snapshot.topItems ||
-                snapshot.comingUp) && (
+              {(snapshot.topItems || snapshot.comingUp) && (
                 <div className={listRow}>
-                  {snapshot.spending && <SpendingPanel snapshot={snapshot} />}
-                  {snapshot.topItems && <TopItemsPanel snapshot={snapshot} />}
+                  {snapshot.topItems && (
+                    <TopItemsPanel
+                      snapshot={snapshot}
+                      currencyChosen={Boolean(params.get("currency"))}
+                    />
+                  )}
                   {snapshot.comingUp && (
                     <ComingUpPanel
                       snapshot={snapshot}

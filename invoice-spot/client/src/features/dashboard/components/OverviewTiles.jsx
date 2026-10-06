@@ -6,24 +6,30 @@ import {
   FiMinus,
 } from "react-icons/fi";
 import { money } from "../../../components/workspace/Workspace";
-import { outstandingLink } from "../../documents/listLinks";
 import {
   billedLink,
   changeFrom,
   findPeriod,
   formatMoney,
-  invoiceCount,
   percentLabel,
   receivedLink,
   reportLink,
   trendColumns,
   trendPoints,
 } from "../dashboardModel";
-import { DashboardNumber, tileCard, tileRow } from "./DashboardPanels";
+import {
+  DashboardNumber,
+  figureRow,
+  financeCard,
+  financeFigure,
+  financeLabel,
+  financeTones,
+} from "./DashboardPanels";
 
-// Each tile's colours: the financial cards' blue, lilac and peach, and sage
-// for profit. The homepage draws its picture of the overview with these
-// and the tile parts below, at a smaller size.
+// The colours of the tiles in the homepage's picture of the overview: the
+// financial cards' blue, lilac and peach, and sage for profit. The homepage
+// draws its picture with these and the parts below, at a smaller size; the
+// overview's own cards take these for their trends.
 export const TONES = {
   blue: {
     tile: "bg-card-blue",
@@ -193,80 +199,86 @@ export const OwedSplit = ({
   );
 };
 
-// A tile is a link to the records behind its figure. Its name for assistive
-// technology carries the figure, the change and where it leads; the
-// figure's size follows the tile's width, so long amounts still fit.
-const Tile = ({ to, label, title, value, tone, line, chart }) => {
-  const colors = TONES[tone];
+// A figure card is a link to the view behind its figure, as large as the
+// Reports page's cards. Its name for assistive technology carries the
+// figure, what it includes, the change and where it leads. The figure and
+// the line under it keep to the top, and the change and the trend to the
+// foot, so all three cards line up whatever each has under its figure.
+const FigureCard = ({ to, label, title, value, tone, detail, line, chart }) => {
+  const colors = financeTones[tone];
   return (
     <Link
       to={to}
       aria-label={label}
-      className={`${tileCard} transition-shadow [container-type:inline-size] hover:shadow-float ${colors.tile}`}
+      className={`${financeCard(tone)} transition-shadow hover:shadow-float`}
       style={{ "--chars": value.length }}
     >
-      <span className="flex items-center justify-between gap-2">
-        <span
-          className={`rounded-full bg-white/70 px-[11px] py-[5px] text-[12.5px] leading-[1.25] ${colors.label}`}
-        >
-          {title}
-        </span>
+      <span className="flex items-center justify-between gap-2.5">
+        <span className={financeLabel(tone)}>{title}</span>
         <FiChevronRight
           aria-hidden="true"
-          className={`size-[15px] stroke-[1.5] ${colors.muted}`}
+          className={`size-[18px] stroke-[1.5] ${colors.muted}`}
         />
       </span>
-      <span className={colors.ink}>
+      <span className={`flex flex-col gap-2 ${colors.ink}`}>
         <DashboardNumber
           value={value}
-          className="[font-size:min(40px,calc(100cqi_/_(var(--chars)_*_0.5)))]"
+          className={financeFigure}
           decimalClass={colors.decimal}
         />
+        {detail && (
+          <span
+            className={`text-[15px] [@container_finance-card_(min-width:162px)]:text-[16px] ${colors.muted}`}
+          >
+            {detail}
+          </span>
+        )}
       </span>
-      {line && <span className={colors.muted}>{line}</span>}
-      <span className="mt-auto block pt-1">{chart}</span>
+      <span className={`mt-auto flex flex-col gap-3 pt-1 ${colors.muted}`}>
+        {line}
+        {chart}
+      </span>
     </Link>
   );
 };
 
 // The period's billed, received and profit, each against the period before
-// when there was one, and what is owed today. Each opens the records behind
-// it for the same period, profit the profit and loss report, in the same
-// currency when one was chosen.
+// when there was one, and the tax billed includes. Each opens the view that
+// explains it, for the same period, in the same currency when one was
+// chosen: billed the Documents tab's Sales, received the Payments list with
+// its summary, and profit the Reports page's profit and loss.
 const OverviewTiles = ({ snapshot, currencyChosen }) => {
-  const { currency, totals, owedNow, trend } = snapshot;
+  const { currency, totals, trend } = snapshot;
   const period = findPeriod(snapshot.period.key);
   const chosen = currencyChosen ? currency : undefined;
-  const figure = (key, title, opens) => {
+  const figure = (key, title, opens, includes = "") => {
     const { current, previous } = totals[key];
     const change = totals.hasPrevious ? changeFrom(current, previous) : null;
     return {
       value: formatMoney(current, currency),
-      label: `${title} ${period.during}: ${money(current, currency)}${change ? `, ${changeWords(change)} ${period.compared}` : ""}. View ${opens}`,
+      label: `${title} ${period.during}: ${money(current, currency)}${includes}${change ? `, ${changeWords(change)} ${period.compared}` : ""}. View ${opens}`,
       line: change && <Change change={change} compared={period.compared} />,
     };
   };
-  const owedLine = owedNow.invoices
-    ? `${invoiceCount(owedNow.invoices)} · ${owedNow.overdueInvoices ? owedNow.overdueInvoices.toLocaleString("en") : "none"} overdue`
-    : "No unpaid invoices";
-  const owedLabel = owedNow.invoices
-    ? `${money(owedNow.total, currency)} on ${invoiceCount(owedNow.invoices)}, ${owedNow.overdueInvoices ? `${money(owedNow.overdue, currency)} of it overdue on ${invoiceCount(owedNow.overdueInvoices)}` : "none of it overdue"}`
-    : `${money(owedNow.total, currency)}, no unpaid invoices`;
+  // An older server's answer has no tax.
+  const taxed = totals.tax != null;
   return (
     <section aria-labelledby="figures-title">
       <h2 id="figures-title" className="sr-only">
         Figures {period.during}
       </h2>
-      <div className={tileRow}>
-        <Tile
+      <div className={figureRow}>
+        <FigureCard
           to={billedLink(period.key, chosen)}
           title="Billed"
           tone="blue"
           {...figure(
             "billed",
             "Billed",
-            "the invoices, receipts and credit notes",
+            "the sales",
+            taxed ? `, including ${money(totals.tax, currency)} tax` : "",
           )}
+          detail={taxed && `includes ${formatMoney(totals.tax, currency)} tax`}
           chart={
             <Sparkline
               values={trend.map((bucket) => bucket.billed)}
@@ -274,7 +286,7 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
             />
           }
         />
-        <Tile
+        <FigureCard
           to={receivedLink(period.key, chosen)}
           title="Received"
           tone="lilac"
@@ -286,7 +298,7 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
             />
           }
         />
-        <Tile
+        <FigureCard
           to={reportLink("profit", period.key, chosen)}
           title="Profit"
           tone="sage"
@@ -298,15 +310,6 @@ const OverviewTiles = ({ snapshot, currencyChosen }) => {
               )}
             />
           }
-        />
-        <Tile
-          to={outstandingLink(chosen)}
-          title="Outstanding now"
-          tone="peach"
-          value={formatMoney(owedNow.total, currency)}
-          label={`Outstanding now: ${owedLabel}. View the invoices owed, soonest due first`}
-          line={<span className="text-[12.5px]">{owedLine}</span>}
-          chart={<OwedSplit owed={owedNow} currency={currency} />}
         />
       </div>
     </section>

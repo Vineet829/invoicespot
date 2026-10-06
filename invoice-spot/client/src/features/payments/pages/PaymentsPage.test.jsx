@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
+import fixture from "./PaymentsPage.fixture.json";
 
 // The page as the app draws it, through its own store and RTK Query, with
 // only fetch faked. The answers follow the server's shapes for the demo
-// account on Oct 4, 2026; the signed-in shell is left out.
+// account on Oct 4, 2026: the fixture has the payments list, and the
+// summary of the last 90 days, the same 44,562.29 as the overview's
+// Received. The signed-in shell is left out.
 vi.mock("../../dashboard/components/DashboardShell", () => ({
   default: ({ children }) => children,
 }));
@@ -33,52 +36,7 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 
-const payments = {
-  success: true,
-  total: 18,
-  numberOfPages: 2,
-  page: 1,
-  size: 10,
-  from: null,
-  to: null,
-  payments: [
-    {
-      kind: "payment",
-      id: "p-1",
-      date: "2026-10-04",
-      client: "Harbor & Pine Architects",
-      document: { id: "doc-1038", number: "INV-1038", type: "Invoice" },
-      method: "Bank Transfer",
-      note: "Deposit",
-      amount: 262.76,
-      currency: "USD",
-    },
-    {
-      kind: "receipt",
-      id: "doc-304",
-      date: "2026-10-02",
-      client: "Quill & Co. Publishing",
-      document: { id: "doc-304", number: "REC-0304", type: "Receipt" },
-      method: null,
-      note: null,
-      amount: 9598.88,
-      currency: "USD",
-    },
-    {
-      kind: "refund",
-      id: "r-7",
-      date: "2026-09-20",
-      client: "Tidewater Logistics",
-      document: { id: "doc-1019", number: "INV-1019", type: "Invoice" },
-      method: "Credit Card",
-      note: "REF-0042",
-      amount: -150,
-      currency: "USD",
-    },
-  ],
-  totals: [{ currency: "USD", payments: 18, received: 44562.29, receipts: 2 }],
-  methods: ["Bank Transfer", "Credit Card", "Mobile Money", "PayPal", "Others"],
-};
+const { payments } = fixture;
 
 const summary = {
   success: true,
@@ -101,7 +59,8 @@ const ninetyDays = (address) =>
     : {};
 
 // Answers each request by its path; `answers` replaces any of them with a
-// body, a promise of one, or a function of the request's address giving one.
+// body or a Response, a promise of either, or a function of the request's
+// address giving one.
 // Receipts alone are 2 of the 18.
 const serve = (answers = {}) =>
   vi.stubGlobal(
@@ -129,16 +88,22 @@ const serve = (answers = {}) =>
               }
             : { ...payments, ...ninetyDays(address) },
         "/document/summary": summary,
+        "/payments/summary": fixture.summary,
         "/businesses": { businesses: [] },
         ...answers,
       }[url.pathname.replace("/api/v1", "")];
       const body = await (typeof answer === "function" ? answer(url) : answer);
+      if (body instanceof Response) return body;
       return body ? json(body) : json({ message: "Not found" }, 404);
     }),
   );
 
-const listed = (page) =>
-  vi.waitFor(() => expect(page.querySelector("table")).not.toBeNull());
+// The list's own table, below the summary's.
+const listTable = (page) =>
+  [...page.querySelectorAll("table")].find(
+    (table) => table.querySelector("caption").textContent === "Payments",
+  );
+const listed = (page) => vi.waitFor(() => expect(listTable(page)).toBeTruthy());
 
 const open = async (path, answers) => {
   serve(answers);
@@ -168,12 +133,12 @@ const open = async (path, answers) => {
 
 // A sortable column's header holds a button with its name.
 const headings = (page) =>
-  [...page.querySelectorAll("thead th")].map(
+  [...listTable(page).querySelectorAll("thead th")].map(
     (header) =>
       header.querySelector("button")?.textContent ?? header.textContent,
   );
 const rows = (page) =>
-  [...page.querySelectorAll("tbody tr")].map((row) =>
+  [...listTable(page).querySelectorAll("tbody tr")].map((row) =>
     [...row.children].map((cell) => cell.textContent),
   );
 // The styled dropdown with this label: its trigger, which carries the value
@@ -250,7 +215,9 @@ it("lists payments, receipts and refunds as the Received figure opens them", asy
       "View",
     ],
   ]);
-  const links = [...page.querySelectorAll("tbody tr")[1].querySelectorAll("a")];
+  const links = [
+    ...listTable(page).querySelectorAll("tbody tr")[1].querySelectorAll("a"),
+  ];
   expect(links.map((link) => link.getAttribute("href"))).toEqual([
     "/document/doc-304",
     "/document/doc-304",
@@ -270,9 +237,9 @@ it("says how many payments the filters found and what came in, with receipts cou
     "18 payments from Jul 7 – Oct 4, 2026, ·Received 44,562.29, ·2 of them on receipts",
   );
   // The totals count the receipts, so nothing else is asked.
-  expect(requests.filter((request) => request.includes("/payments"))).toEqual([
-    "/api/v1/payments?page=1&size=10&sort=date&dir=desc&period=90d",
-  ]);
+  expect(
+    requests.filter((request) => request.startsWith("/api/v1/payments?")),
+  ).toEqual(["/api/v1/payments?page=1&size=10&sort=date&dir=desc&period=90d"]);
   const clear = [...page.querySelectorAll("button")].find(
     (button) => button.textContent === "Clear filters",
   );
@@ -348,7 +315,7 @@ it("filters by method, date, and sorts as the menus offer", async () => {
   expect(address).toBe("?method=receipt&sort=amount&dir=desc");
 });
 
-it("sits beside All documents and Recurring", async () => {
+it("sits beside All documents, Receivables, Sales and Recurring", async () => {
   const page = await open("/payments");
   const tabs = [
     ...page.querySelectorAll('nav[aria-label="Documents views"] a'),
@@ -361,6 +328,8 @@ it("sits beside All documents and Recurring", async () => {
     ]),
   ).toEqual([
     ["All documents", "/documents", null],
+    ["Receivables", "/receivables", null],
+    ["Sales", "/sales", null],
     ["Payments", "/payments", "page"],
     ["Recurring", "/recurring", null],
   ]);
@@ -394,3 +363,206 @@ it.each(["/payments?period=90d", "/payments?period=30d&method=receipt"])(
     ).toEqual([null, null, null]);
   },
 );
+
+// The summary above the list, and its tables.
+const summed = (page) =>
+  [...page.querySelectorAll("section")].find(
+    (section) => section.querySelector("h2")?.textContent === "What came in",
+  );
+const summedUp = (page) =>
+  act(() =>
+    vi.waitFor(() => expect(summed(page)?.querySelector("table")).toBeTruthy()),
+  );
+const breakdown = (page, title) =>
+  [...summed(page).querySelectorAll("h3")].find(
+    (heading) => heading.textContent === title,
+  ).parentElement;
+const cells = (element) =>
+  [...element.querySelectorAll("tbody tr")].map((row) =>
+    [...row.children].map((cell) => cell.textContent),
+  );
+const summaries = () =>
+  requests.filter((request) => request.startsWith("/api/v1/payments/summary"));
+
+it("sums up what came in over the list's period by method and by who paid most, against the period before", async () => {
+  const page = await open("/payments?period=90d");
+  await summedUp(page);
+  expect(summaries()).toEqual(["/api/v1/payments/summary?period=90d"]);
+  const summary = summed(page);
+  // The same total as the overview's Received for the last 90 days.
+  expect(summary.textContent).toContain(
+    "Received44,562.29from 18 payments, Jul 7 – Oct 4, 2026",
+  );
+  const compared = [...summary.querySelectorAll("p")].find((line) =>
+    line.textContent.includes("vs "),
+  );
+  expect(compared.textContent).toBe(
+    "down 25.6%vs 59,864.82 in Apr 8 – Jul 6, 2026",
+  );
+  expect(compared.querySelector(".text-change-down")).not.toBeNull();
+  // Every method, receipts included, largest first.
+  const methods = breakdown(page, "Received by method");
+  expect(cells(methods)).toEqual([
+    ["Bank Transfer", "6", "17,342.70"],
+    ["On a receipt", "2", "12,011.28"],
+    ["Credit Card", "5", "8,960.11"],
+    ["PayPal", "3", "4,248.20"],
+    ["Mobile Money", "2", "2,000.00"],
+  ]);
+  // The clients who paid the most, each linked one opening the client.
+  const payers = breakdown(page, "Who paid most");
+  expect(cells(payers)).toEqual([
+    ["Quill & Co. Publishing", "3", "11,490.77"],
+    ["Kestrel Outdoor", "2", "10,317.45"],
+    ["Atlas Robotics", "2", "4,331.10"],
+    ["Verdant Farms", "2", "3,278.96"],
+    ["Bluefin Analytics", "1", "2,500.00"],
+  ]);
+  expect(
+    [...payers.querySelectorAll("a")].map((link) => [
+      link.textContent,
+      link.getAttribute("href"),
+    ]),
+  ).toEqual([
+    [
+      "Quill & Co. Publishing",
+      "/single-customer/00000000-0000-0000-0000-00000000c107",
+    ],
+    [
+      "Kestrel Outdoor",
+      "/single-customer/00000000-0000-0000-0000-00000000c109",
+    ],
+    ["Atlas Robotics", "/single-customer/00000000-0000-0000-0000-00000000c101"],
+    [
+      "Bluefin Analytics",
+      "/single-customer/00000000-0000-0000-0000-00000000c103",
+    ],
+  ]);
+  // It sits between the money bar and the list.
+  const sections = [...page.querySelectorAll("section")];
+  expect(sections.indexOf(summary)).toBe(1);
+  expect(sections[2].contains(listTable(page))).toBe(true);
+});
+
+it("follows the list's period and currency, but not its method", async () => {
+  const page = await open("/payments?period=90d&currency=EUR");
+  await summedUp(page);
+  expect(summaries()).toEqual([
+    "/api/v1/payments/summary?period=90d&currency=EUR",
+  ]);
+  await choose(select(page, "Payment method"), "Bank Transfer");
+  expect(address).toBe("?method=Bank+Transfer&period=90d&currency=EUR");
+  await act(() =>
+    vi.waitFor(() =>
+      expect(requests).toContain(
+        "/api/v1/payments?page=1&size=10&sort=date&dir=desc&method=Bank+Transfer&period=90d&currency=EUR",
+      ),
+    ),
+  );
+  expect(summaries()).toHaveLength(1);
+  await choose(select(page, "Date paid"), "30d");
+  await act(() =>
+    vi.waitFor(() =>
+      expect(summaries()).toContain(
+        "/api/v1/payments/summary?period=30d&currency=EUR",
+      ),
+    ),
+  );
+});
+
+it("sums up every date until a period is chosen, with nothing to compare with", async () => {
+  const page = await open("/payments", {
+    "/payments/summary": {
+      ...fixture.summary,
+      period: {
+        key: "",
+        from: null,
+        to: null,
+        previousFrom: null,
+        previousTo: null,
+      },
+      previousTotal: null,
+    },
+  });
+  await summedUp(page);
+  expect(summaries()).toEqual(["/api/v1/payments/summary"]);
+  expect(summed(page).textContent).toContain(
+    "Received44,562.29from 18 payments",
+  );
+  expect(summed(page).textContent).not.toContain("vs ");
+  expect(summed(page).textContent).not.toContain("Jul 7");
+});
+
+it("names each amount's currency when the business bills in several", async () => {
+  const page = await open("/payments?period=90d", {
+    "/payments/summary": { ...fixture.summary, currencies: ["USD", "EUR"] },
+  });
+  await summedUp(page);
+  expect(summed(page).textContent).toContain("ReceivedUSD44,562.29");
+  expect(summed(page).textContent).toContain("vs USD 59,864.82 in");
+  expect(cells(breakdown(page, "Received by method"))[0]).toEqual([
+    "Bank Transfer",
+    "6",
+    "USD17,342.70",
+  ]);
+});
+
+it("says when nothing came in over the period", async () => {
+  const page = await open("/payments?period=30d", {
+    "/payments/summary": {
+      ...fixture.summary,
+      total: 0,
+      previousTotal: 0,
+      payments: 0,
+      methods: [],
+      payers: [],
+    },
+  });
+  await act(() =>
+    vi.waitFor(() =>
+      expect(summed(page)?.textContent).toContain(
+        "Nothing came in over this period.",
+      ),
+    ),
+  );
+  expect(summed(page).textContent).toContain("Received0.00from 0 payments");
+  expect(summed(page).querySelector("table")).toBeNull();
+});
+
+it("holds the summary's place while it loads", async () => {
+  let answer;
+  const page = await open("/payments?period=90d", {
+    "/payments/summary": new Promise((resolve) => {
+      answer = resolve;
+    }),
+  });
+  // Blocks between the money bar and the list, and no figures yet.
+  const sections = [...page.querySelectorAll("section")];
+  const held = sections[0].nextElementSibling;
+  expect(held.getAttribute("aria-hidden")).toBe("true");
+  expect(held.querySelector(".animate-ov-pulse")).not.toBeNull();
+  expect(summed(page)).toBeUndefined();
+  await act(async () => answer(fixture.summary));
+  await summedUp(page);
+  expect(page.querySelector(".animate-ov-pulse")).toBeNull();
+});
+
+it("says when the summary can't be loaded, with a way to try again, and keeps the list", async () => {
+  let fails = true;
+  const page = await open("/payments?period=90d", {
+    "/payments/summary": () =>
+      fails ? json({ message: "Try later" }, 500) : fixture.summary,
+  });
+  await act(() =>
+    vi.waitFor(() =>
+      expect(page.querySelector('[role="alert"]')).not.toBeNull(),
+    ),
+  );
+  const alert = page.querySelector('[role="alert"]');
+  expect(alert.textContent).toBe("We couldn’t sum up these payments.Try again");
+  expect(rows(page)).toHaveLength(3);
+  fails = false;
+  await act(async () => alert.querySelector("button").click());
+  await summedUp(page);
+  expect(summed(page).textContent).toContain("44,562.29");
+});

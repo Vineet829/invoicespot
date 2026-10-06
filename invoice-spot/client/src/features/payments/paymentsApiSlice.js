@@ -11,7 +11,18 @@ export const paymentsApiSlice = baseApiSlice.injectEndpoints({
       query: (params = {}) => `/payments?${new URLSearchParams(params)}`,
       providesTags: ["Document"],
     }),
+    // What came in over a period, in a currency or the default one: the
+    // total against the period before, by method and by the clients who
+    // paid the most. See paymentSummaryQuery.
+    getPaymentsSummary: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams(params).toString();
+        return `/payments/summary${search ? `?${search}` : ""}`;
+      },
+      providesTags: ["Document"],
+    }),
   }),
 });
 
-export const { useGetPaymentsQuery } = paymentsApiSlice;
+export const { useGetPaymentsQuery, useGetPaymentsSummaryQuery } =
+  paymentsApiSlice;

@@ -6,9 +6,9 @@ import { sectionTitle } from "../../../components/workspace/pastel";
 import { countOf } from "../../../utils/counts";
 import { useBusiness } from "../../business/permissions";
 import {
-  awaitingRows,
-  expiredQuotationsLink,
+  attentionDocuments,
   formatMoney,
+  quotationRows,
   quotationsLink,
   recurringLink,
   runRows,
@@ -26,24 +26,71 @@ const amount = "text-[15px] font-light tracking-[-0.03em]";
 // A detail's dot, kept on the line of the word after it.
 const dot = "·\u00a0";
 // A row that opens something, as tall on a touch screen as the overview's
-// other small links.
-const rowLink =
-  "grid items-center gap-2.5 rounded-xl px-3 py-1.5 transition-colors hover:bg-white coarse:min-h-11";
+// other small links, white under the pointer unless its list says otherwise.
+const rowBase =
+  "grid items-center gap-2.5 rounded-xl px-3 py-1.5 transition-colors coarse:min-h-11";
+const rowLink = `${rowBase} hover:bg-white`;
 
-// What is coming up, in the overview's currency: the next invoices the
-// recurring schedules will make, and the quotations still waiting for an
-// answer, with those whose date has passed added up. Each recurring invoice
-// opens the recurring list, and each quotation its document.
+// A quotation's row: its number, client and last valid day, each detail
+// after the number starting with its dot, so a wrapped line never ends on
+// one, and the day keeps to one line; then its amount. It opens the
+// quotation.
+const QuotationRow = ({ quote, currency, hover = "hover:bg-white" }) => {
+  const details = [
+    quote.documentNumber || "No number yet",
+    quote.client || "No client",
+    quote.until,
+  ];
+  return (
+    <li>
+      <Link
+        to={quote.to}
+        className={`${rowBase} grid-cols-[minmax(0,1fr)_auto] ${hover}`}
+        aria-label={`${details.join(", ")}, ${formatMoney(quote.amount, currency)}. Open the quotation`}
+      >
+        <span className="min-w-0 text-[13.5px] [overflow-wrap:anywhere]">
+          {details.map((detail, index) => (
+            <Fragment key={index}>
+              {index > 0 && " "}
+              <span className={index === 1 ? "" : "whitespace-nowrap"}>
+                {index > 0 && dot}
+                {detail}
+              </span>
+            </Fragment>
+          ))}
+        </span>
+        <Amount
+          value={quote.amount}
+          currency={currency}
+          hideCode
+          className={amount}
+        />
+      </Link>
+    </li>
+  );
+};
+
+// What is coming up, in the overview's currency: the next invoice each
+// recurring schedule will make, the quotations still waiting for an answer,
+// and the latest few whose last day went by without one, with how many more
+// did. Each schedule opens the invoice it repeats, unless what needs
+// attention already opens it, and each quotation its document. With nothing
+// repeating yet, the way to set one up opens the recurring list, so the
+// link to it beside the title gives way.
 const ComingUpPanel = ({ snapshot, currencyChosen }) => {
   const { currency } = snapshot;
   const chosen = currencyChosen ? currency : undefined;
   const recurring = snapshot.comingUp.recurring || {};
-  const runs = runRows(recurring.nextRuns);
+  const runs = runRows(
+    recurring.nextRuns,
+    attentionDocuments(snapshot.attention?.items),
+  );
   const next = recurring.next90Days || {};
   const { awaiting = {}, expired = {} } = snapshot.comingUp.quotations || {};
-  const quotes = awaitingRows(awaiting.items);
+  const quotes = quotationRows(awaiting.items);
   const waiting = Number(awaiting.count) || 0;
   const lapsed = Number(expired.count) || 0;
+  const lapsedQuotes = quotationRows(expired.items);
   const editRefusal = useBusiness().reason("EDIT_RECORDS");
   return (
     <section
@@ -64,10 +111,12 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
             </span>
             Recurring invoices
           </h3>
-          <Link to={recurringLink} className={panelLink}>
-            Recurring
-            <FiChevronRight aria-hidden="true" />
-          </Link>
+          {(runs.length || recurring.active > 0 || editRefusal) && (
+            <Link to={recurringLink} className={panelLink}>
+              Recurring
+              <FiChevronRight aria-hidden="true" />
+            </Link>
+          )}
         </div>
         {runs.length ? (
           <>
@@ -76,13 +125,9 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
               {formatMoney(next.amount, currency)}
             </p>
             <ol className={`m-0 list-none p-1 ${card}`}>
-              {runs.map((run, index) => (
-                <li key={`${run.scheduleId}-${run.date}-${index}`}>
-                  <Link
-                    to={recurringLink}
-                    className={`${rowLink} grid-cols-[46px_minmax(0,1fr)_auto]`}
-                    aria-label={`${run.day}: ${run.client || "No client"}, ${run.number}, ${formatMoney(run.amount, currency)}. Open the recurring invoices`}
-                  >
+              {runs.map((run) => {
+                const content = (
+                  <>
                     <span className="text-[12.5px] text-spot-muted">
                       {run.day}
                     </span>
@@ -100,9 +145,25 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
                       hideCode
                       className={amount}
                     />
-                  </Link>
-                </li>
-              ))}
+                  </>
+                );
+                const grid = "grid-cols-[46px_minmax(0,1fr)_auto]";
+                return (
+                  <li key={run.scheduleId || run.templateId}>
+                    {run.to ? (
+                      <Link
+                        to={run.to}
+                        className={`${rowLink} ${grid}`}
+                        aria-label={`${run.day}: ${run.client || "No client"}, ${run.number}, ${formatMoney(run.amount, currency)}. Open the invoice it repeats`}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div className={`${rowBase} ${grid}`}>{content}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           </>
         ) : recurring.active > 0 ? (
@@ -150,45 +211,14 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
               Awaiting an answer · {waiting.toLocaleString("en")}
             </p>
             <ol className="m-0 list-none p-0">
-              {quotes.map((quote) => {
-                const details = [
-                  quote.documentNumber || "No number yet",
-                  quote.client || "No client",
-                  quote.until,
-                ];
-                return (
-                  <li key={quote.documentId}>
-                    <Link
-                      to={quote.to}
-                      className={`${rowLink} grid-cols-[minmax(0,1fr)_auto] hover:bg-spot-violet/[.06]`}
-                      aria-label={`${details.join(", ")}, ${formatMoney(quote.amount, currency)}. Open the quotation`}
-                    >
-                      {/* After the number, each detail starts with its dot,
-                          so a wrapped line never ends on one, and the day
-                          keeps to one line. */}
-                      <span className="min-w-0 text-[13.5px] [overflow-wrap:anywhere]">
-                        {details.map((detail, index) => (
-                          <Fragment key={index}>
-                            {index > 0 && " "}
-                            <span
-                              className={index === 1 ? "" : "whitespace-nowrap"}
-                            >
-                              {index > 0 && dot}
-                              {detail}
-                            </span>
-                          </Fragment>
-                        ))}
-                      </span>
-                      <Amount
-                        value={quote.amount}
-                        currency={currency}
-                        hideCode
-                        className={amount}
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
+              {quotes.map((quote) => (
+                <QuotationRow
+                  key={quote.documentId}
+                  quote={quote}
+                  currency={currency}
+                  hover="hover:bg-spot-violet/[.06]"
+                />
+              ))}
             </ol>
             {waiting > quotes.length && (
               <p className="px-3 pb-1.5 text-[12px] text-spot-muted">
@@ -203,26 +233,25 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
           </div>
         )}
         {lapsed > 0 && (
-          <Link
-            to={expiredQuotationsLink(chosen)}
-            className={`${card} grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white`}
-            aria-label={`Expired without an answer: ${countOf(lapsed, "quotation", "quotations")}, ${formatMoney(expired.amount, currency)}. Open the quotations, sorted by their last valid day`}
-          >
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[12px] text-spot-muted">
-                Expired without an answer · {lapsed.toLocaleString("en")}
-              </span>
-              <span className="text-[13.5px]">
-                Worth following up, or letting go
-              </span>
-            </span>
-            <Amount
-              value={expired.amount}
-              currency={currency}
-              hideCode
-              className={amount}
-            />
-          </Link>
+          <div className={`${card} p-1`}>
+            <p className="px-3 pt-1.5 text-[12px] text-spot-muted">
+              Expired without an answer · {lapsed.toLocaleString("en")}
+            </p>
+            <ol className="m-0 list-none p-0">
+              {lapsedQuotes.map((quote) => (
+                <QuotationRow
+                  key={quote.documentId}
+                  quote={quote}
+                  currency={currency}
+                />
+              ))}
+            </ol>
+            {lapsedQuotes.length > 0 && lapsed > lapsedQuotes.length && (
+              <p className="px-3 pb-1.5 text-[12px] text-spot-muted">
+                and {(lapsed - lapsedQuotes.length).toLocaleString("en")} more
+              </p>
+            )}
+          </div>
         )}
         {!waiting && !lapsed && (
           <p className={`${card} p-3 text-[13px] text-spot-body`}>

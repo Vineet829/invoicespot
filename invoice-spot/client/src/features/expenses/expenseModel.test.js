@@ -47,7 +47,7 @@ describe("the expenses list in the URL", () => {
     }
   });
 
-  it("reads what the overview's Spending links ask for", () => {
+  it("reads a category, a period and a currency together from the address", () => {
     const search =
       "category=Software+and+subscriptions&period=90d&currency=EUR";
     expect(read(search)).toMatchObject({

@@ -68,8 +68,8 @@ export const expenseQuery = (list, today) => ({
 });
 
 // The line above a filtered list: how many expenses it holds, from the days
-// the server applied, and what they cost, as Profit and the overview's
-// Spending count it, from the totals the server sends with each page.
+// the server applied, and what they cost, as Profit counts it, from the
+// totals the server sends with each page.
 // Amounts name their currency when the business bills in more than one, and
 // whenever one isn't its main currency, the first of `currencies`: an
 // expense can be paid in any currency.

@@ -22,9 +22,12 @@ import ProfilePage from "./features/users/pages/ProfilePage";
 import CustomerCreateForm from "./features/customers/pages/CustomerCreateForm";
 import CustomerEditForm from "./features/customers/pages/CustomerEditForm";
 import CustomersPage from "./features/customers/pages/CustomersPage";
+import CustomerSalesPage from "./features/customers/pages/CustomerSalesPage";
 import SingleCustomerPage from "./features/customers/pages/SingleCustomerPage";
 import DocCreateEditForm from "./features/documents/pages/DocCreateEditForm";
 import DocumentsPage from "./features/documents/pages/DocumentsPage";
+import ReceivablesPage from "./features/documents/pages/ReceivablesPage";
+import SalesPage from "./features/documents/pages/SalesPage";
 import PaymentsPage from "./features/payments/pages/PaymentsPage";
 
 import SingleDocumentPage from "./features/documents/pages/SingleDocumentPage";
@@ -38,6 +41,8 @@ import TeamPage from "./features/settings/pages/TeamPage";
 import PaymentDetailsPage from "./features/settings/pages/PaymentDetailsPage";
 import EmailTemplatesPage from "./features/settings/pages/EmailTemplatesPage";
 import ItemsPage from "./features/items/pages/ItemsPage";
+import ItemSalesPage from "./features/items/pages/ItemSalesPage";
+import ItemSalesDetailPage from "./features/items/pages/ItemSalesDetailPage";
 import ExpensesPage from "./features/expenses/pages/ExpensesPage";
 import SharedDocumentPage from "./features/public/pages/SharedDocumentPage";
 import ClientPortalPage from "./features/portal/pages/ClientPortalPage";
@@ -90,8 +95,14 @@ const App = () => {
               <Route path="settings/emails" element={<EmailTemplatesPage />} />
               <Route path="settings/team" element={<TeamPage />} />
               <Route path="items" element={<ItemsPage />} />
+              <Route path="items/sales" element={<ItemSalesPage />} />
+              <Route
+                path="items/sales/item"
+                element={<ItemSalesDetailPage />}
+              />
               <Route path="expenses" element={<ExpensesPage />} />
               <Route path="customers" element={<CustomersPage />} />
+              <Route path="customers/sales" element={<CustomerSalesPage />} />
               <Route path="create-customer" element={<CustomerCreateForm />} />
               <Route
                 path="single-customer/:custId"
@@ -102,6 +113,8 @@ const App = () => {
                 element={<CustomerEditForm />}
               />
               <Route path="documents" element={<DocumentsPage />} />
+              <Route path="receivables" element={<ReceivablesPage />} />
+              <Route path="sales" element={<SalesPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="recurring" element={<RecurringPage />} />
               <Route path="create-doc" element={<DocCreateEditForm />} />

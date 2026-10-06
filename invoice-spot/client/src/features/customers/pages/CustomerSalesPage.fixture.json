@@ -1,0 +1,106 @@
+{
+  "sales": {
+    "success": true,
+    "currency": "USD",
+    "currencies": ["USD"],
+    "period": {
+      "key": "90d",
+      "from": "2026-07-07",
+      "to": "2026-10-04",
+      "previousFrom": "2026-04-08",
+      "previousTo": "2026-07-06"
+    },
+    "totalClients": 10,
+    "page": 1,
+    "size": 10,
+    "numberOfPages": 1,
+    "totals": {
+      "documents": 21,
+      "billed": 68848.08,
+      "paid": 44562.29,
+      "owed": 24285.79
+    },
+    "clients": [
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c107",
+        "client": "Quill & Co. Publishing",
+        "documents": 2,
+        "billed": 13459.88,
+        "paid": 11490.77,
+        "owed": 1969.11
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c109",
+        "client": "Kestrel Outdoor",
+        "documents": 2,
+        "billed": 10317.45,
+        "paid": 10317.45,
+        "owed": 0.0
+      },
+      {
+        "clientId": null,
+        "client": "Verdant Farms",
+        "documents": 2,
+        "billed": 8590.73,
+        "paid": 3278.96,
+        "owed": 5311.77
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c110",
+        "client": "Oak Street Bakery",
+        "documents": 3,
+        "billed": 8363.36,
+        "paid": 5145.86,
+        "owed": 3217.5
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c101",
+        "client": "Atlas Robotics",
+        "documents": 2,
+        "billed": 5298.15,
+        "paid": 2747.75,
+        "owed": 2550.4
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c103",
+        "client": "Bluefin Analytics",
+        "documents": 2,
+        "billed": 5164.09,
+        "paid": 2500.0,
+        "owed": 2664.09
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c104",
+        "client": "Harbor & Pine Architects",
+        "documents": 2,
+        "billed": 4953.0,
+        "paid": 4465.0,
+        "owed": 488.0
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c112",
+        "client": "Juniper Films",
+        "documents": 2,
+        "billed": 4861.5,
+        "paid": 2931.0,
+        "owed": 1930.5
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c111",
+        "client": "Lumen Health",
+        "documents": 2,
+        "billed": 4262.75,
+        "paid": 1500.0,
+        "owed": 2762.75
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c105",
+        "client": "Sable Fitness",
+        "documents": 2,
+        "billed": 3577.17,
+        "paid": 185.5,
+        "owed": 3391.67
+      }
+    ]
+  }
+}

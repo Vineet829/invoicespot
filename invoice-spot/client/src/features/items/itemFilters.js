@@ -1,6 +1,6 @@
-// The Items list's search, as kept in the URL, so a link such as the
-// overview's top items can open the list at an item. The catalog comes in
-// one answer, so the search runs here rather than on the server.
+// The Items list's search, as kept in the URL, so a link can open the list
+// at an item. The catalog comes in one answer, so the search runs here
+// rather than on the server.
 export const readItemList = (params) => ({ q: params.get("q") || "" });
 
 export const itemListSearch = ({ q }) => {

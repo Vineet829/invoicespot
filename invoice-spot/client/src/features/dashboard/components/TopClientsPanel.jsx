@@ -3,7 +3,12 @@ import { FiChevronRight } from "react-icons/fi";
 import { Amount } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
 import { countOf } from "../../../utils/counts";
-import { findPeriod, formatMoney, topClientRows } from "../dashboardModel";
+import {
+  findPeriod,
+  formatMoney,
+  salesByCustomerLink,
+  topClientRows,
+} from "../dashboardModel";
 import { overviewPanel, panelLink } from "./DashboardPanels";
 
 // A row: the client's name, its bar, and what it owes then its count of
@@ -21,8 +26,9 @@ const linkedRow =
 
 // The clients billed the most in the period shown, in the overview's
 // currency, with what each owes now, in that currency too. A name opens the
-// client; All clients opens every one.
-const TopClientsPanel = ({ snapshot }) => {
+// client; Sales by customer opens every client's sales on the Clients tab,
+// for the same period, in the same currency when one was chosen.
+const TopClientsPanel = ({ snapshot, currencyChosen }) => {
   const { currency } = snapshot;
   const period = findPeriod(snapshot.period.key);
   const rows = topClientRows(snapshot.topClients);
@@ -35,8 +41,14 @@ const TopClientsPanel = ({ snapshot }) => {
         <h2 id="top-clients-title" className={sectionTitle}>
           Top clients
         </h2>
-        <Link to="/customers" className={panelLink}>
-          All clients
+        <Link
+          to={salesByCustomerLink(
+            period.key,
+            currencyChosen ? currency : undefined,
+          )}
+          className={panelLink}
+        >
+          Sales by customer
           <FiChevronRight aria-hidden="true" />
         </Link>
       </div>

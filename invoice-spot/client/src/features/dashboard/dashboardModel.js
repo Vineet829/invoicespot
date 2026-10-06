@@ -1,10 +1,14 @@
 import { dateSpan, dayMonth, dayMonthYear, parseDate } from "../../utils/dates";
 import { compactAmount, formatAmount } from "../../utils/money";
 import {
+  customerSalesLink,
   documentsLink,
   expensesLink,
+  itemsSoldLink,
   paymentsLink,
+  salesLink,
 } from "../documents/listLinks";
+import { itemName, itemSalesLink } from "../items/itemSalesModel";
 import { share } from "../reports/reportModel";
 const asAmount = (value) =>
   Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -15,8 +19,9 @@ export const formatMoney = (value, currency) =>
 // The periods the overview can show, as its pills name them. The last 90
 // days is the default, so it stays out of the address. Each names the same
 // period on the Reports page, where the last 12 months is the default, and
-// on the Documents, Payments and Expenses lists. `these` refers back to the
-// period the subtitle names.
+// on the lists and views the overview's figures open, such as Sales,
+// Payments and Expenses. `these` refers back to the period the subtitle
+// names.
 export const DEFAULT_PERIOD = "90d";
 export const PERIODS = [
   {
@@ -82,39 +87,50 @@ export const reportLink = (section, period, currency) => {
   return `/reports${search.toString() ? `?${search}` : ""}#${section}`;
 };
 
-// The records behind the overview's figures, for the period shown and, when
-// one was chosen, the currency: what was billed and the payments received.
+// What is owed today, on the Documents tab's Receivables view: what is
+// coming in, the view's default, or what is overdue, in the currency when
+// one was chosen. It is as of today, so its links name no period.
+export const receivablesLink = (mode, currency) => {
+  const search = new URLSearchParams();
+  if (mode) search.set("mode", mode);
+  if (currency) search.set("currency", currency);
+  return `/receivables${search.toString() ? `?${search}` : ""}`;
+};
+
+// What is owed past its due date, in the bands the server splits it into by
+// days late, each in a rust that deepens with age, as the Receivables view
+// draws them. What is not due yet is the server's first band, "current".
+export { AGE_BANDS } from "../documents/receivablesModel";
+// The bands by key, or none from an older server, which splits what is owed
+// only into what is overdue and what is not.
+export const owedBands = (owedNow) =>
+  Array.isArray(owedNow?.bands)
+    ? Object.fromEntries(owedNow.bands.map((band) => [band.key, band]))
+    : null;
+
+// The views behind the overview's figures, for the period shown and, when
+// one was chosen, the currency: what was billed, summed up on the Documents
+// tab's Sales view, and the payments received, summed up above the Payments
+// list.
 export const billedLink = (period, currency) =>
-  documentsLink({ type: "billed", period: findPeriod(period).list, currency });
+  salesLink(findPeriod(period).list, currency);
 export const receivedLink = (period, currency) =>
   paymentsLink(findPeriod(period).list, currency);
-// The expenses behind Spending, for the period shown, in the currency its
-// figures count: a category's, or every one without a category. Recording
-// an expense from it opens the add dialog over that currency's expenses.
-export const spendingLink = (period, currency, category) =>
-  expensesLink({ category, period: findPeriod(period).list, currency });
-export const recordExpenseLink = (currency) =>
-  expensesLink({ new: "1", currency });
+// Every client billed in the period shown, beyond the top few, on the
+// Clients tab's Sales by customer.
+export const salesByCustomerLink = (period, currency) =>
+  customerSalesLink(findPeriod(period).list, currency);
+// The expenses behind Cash flow's money out: those of the period shown, in
+// the currency its figures count, the overview's, even when the address
+// names none.
+export const moneyOutLink = (period, currency) =>
+  expensesLink({ period: findPeriod(period).list, currency });
 
-// Spending by category as the panel lists it: the largest categories, as
-// the server sends them, then the rest as one row when there are more.
-// Each row has its share of the total, with a share too small to round to
-// 1% shown as under it, and a bar against the largest row.
+// An amount's share of a total, rounded to a whole percentage, with a
+// share too small to round to 1% shown as under it.
 const shareOfTotal = (amount, total) => {
   const percent = total > 0 && amount > 0 ? (amount / total) * 100 : 0;
   return percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
-};
-export const spendingRows = (spending) => {
-  const rows = [
-    ...(spending?.categories || []),
-    ...(spending?.others ? [{ ...spending.others, others: true }] : []),
-  ];
-  const largest = Math.max(0, ...rows.map((row) => asAmount(row.amount)));
-  return rows.map((row) => ({
-    ...row,
-    share: shareOfTotal(asAmount(row.amount), asAmount(spending.total)),
-    bar: share(row.amount, largest),
-  }));
 };
 
 // The clients billed the most in the period, largest first, each with a bar
@@ -132,47 +148,61 @@ export const topClientRows = (topClients = []) => {
 
 // The items that brought in the most in the period, before tax, each with a
 // bar against the largest and its share of the income behind Profit, which
-// every item sold adds up to. An item opens the Items list searched for it.
-// Lines saved without a name are added up as other lines, which open
-// nothing.
-const OTHER_LINES = "Other lines";
-export const itemLink = (item) => `/items?${new URLSearchParams({ q: item })}`;
-export const topItemRows = (topItems = [], itemsTotal) => {
+// every item sold adds up to. An item opens its own sales for the period
+// shown, in the currency when one was chosen, on the Items tab; lines saved
+// without a name are added up as other lines, which open their own page
+// too. Sales by item has every item.
+export const topItemRows = (topItems = [], itemsTotal, period, currency) => {
   const largest = Math.max(0, ...topItems.map((row) => asAmount(row.amount)));
   const income = asAmount(itemsTotal);
   return topItems.map((row) => {
-    const item = typeof row.item === "string" ? row.item.trim() : "";
-    const named = item !== "" && item !== OTHER_LINES;
+    const name = itemName(row.item);
     return {
       ...row,
-      name: named ? item : OTHER_LINES,
+      name,
       bar: share(row.amount, largest),
       share: income > 0 ? shareOfTotal(asAmount(row.amount), income) : null,
-      to: named ? itemLink(item) : null,
+      to: itemSalesLink(name, findPeriod(period).list, currency),
     };
   });
 };
+export const salesByItemLink = (period, currency) =>
+  itemsSoldLink(findPeriod(period).list, currency);
 
-// What is coming up. Each of the next recurring invoices opens the
-// recurring list; its template is named by its number, or as a draft, which
-// has none yet. Each quotation waiting for an answer opens the quotation,
-// named with its last valid day, or as having none: one without a date
-// waits too, without a count of days. Those past their day open the
-// quotations, sorted by their last valid day. The quotations' figures count
-// the overview's currency, so their lists keep to it when one was chosen.
+// What is coming up. Each recurring schedule shows once, at its next run,
+// and opens the invoice it repeats, whose page shows the schedule, unless
+// what needs attention already opens that invoice; no invoice is linked
+// twice. Its template is named by its number, or as a draft, which has none
+// yet. Each quotation, waiting for an answer or expired without one, opens
+// the quotation, named with its last valid day, or as having none: one
+// without a date waits too, without a count of days. The quotations'
+// figures count the overview's currency, so their list keeps to it when one
+// was chosen.
 export const recurringLink = "/recurring";
 export const quotationsLink = (currency) =>
   documentsLink({ type: "quotation", currency });
-export const expiredQuotationsLink = (currency) =>
-  documentsLink({ type: "quotation", currency, sort: "dueDate", dir: "asc" });
 const dayOf = (value) => (value ? dayMonth(parseDate(value)) : "");
-export const runRows = (nextRuns = []) =>
-  nextRuns.map((run) => ({
-    ...run,
-    day: dayOf(run.date),
-    number: run.documentNumber || "Draft invoice",
-  }));
-export const awaitingRows = (items = []) =>
+export const runRows = (nextRuns = [], opened = new Set()) => {
+  const schedules = new Set();
+  return [...nextRuns]
+    .sort((one, other) => String(one.date).localeCompare(String(other.date)))
+    .filter((run) => {
+      const schedule = run.scheduleId || run.templateId;
+      if (schedules.has(schedule)) return false;
+      schedules.add(schedule);
+      return true;
+    })
+    .map((run) => ({
+      ...run,
+      day: dayOf(run.date),
+      number: run.documentNumber || "Draft invoice",
+      to:
+        run.templateId && !opened.has(run.templateId)
+          ? `/document/${run.templateId}`
+          : null,
+    }));
+};
+export const quotationRows = (items = []) =>
   items.map((item) => ({
     ...item,
     until: item.validUntil
@@ -336,8 +366,10 @@ export const showsLabel = (index, count, step) =>
   (count - 1 - index) % step === 0;
 
 // What needs attention, in the overview's words: each kind's label above
-// the document's number, and what the footer calls it when there is none
-// of it, or when the list leaves some of it out.
+// the document's number, and what the note under the list calls it when
+// there is none of it, or when the list leaves some of it out. Quotations
+// and the invoices schedules will make are what Coming up lists, so they
+// aren't kinds here.
 const ATTENTION = {
   paymentReport: {
     label: "To confirm",
@@ -357,18 +389,6 @@ const ATTENTION = {
     none: "invoices due this week",
     more: ["due this week", "due this week"],
   },
-  quotation: {
-    label: "Quotation",
-    count: "quotations",
-    none: "quotations expiring this week",
-    more: ["quotation", "quotations"],
-  },
-  recurring: {
-    label: "Recurring",
-    count: "recurring",
-    none: "recurring invoices due this week",
-    more: ["recurring invoice", "recurring invoices"],
-  },
   draft: {
     label: "To issue",
     count: "drafts",
@@ -376,24 +396,8 @@ const ATTENTION = {
     more: ["draft", "drafts"],
   },
 };
-// The kinds as the list orders them, most urgent first; the kinds there is
-// none of are named in an order that reads better.
-const ATTENTION_ORDER = [
-  "paymentReport",
-  "overdue",
-  "dueSoon",
-  "quotation",
-  "recurring",
-  "draft",
-];
-const NONE_ORDER = [
-  "paymentReport",
-  "overdue",
-  "dueSoon",
-  "quotation",
-  "draft",
-  "recurring",
-];
+// The kinds as the list orders them, most urgent first.
+const ATTENTION_ORDER = ["paymentReport", "overdue", "dueSoon", "draft"];
 const dayCount = (days) => `${days} ${days === 1 ? "day" : "days"}`;
 const soon = (days, today, tomorrow, later) =>
   days === 0 ? today : days === 1 ? tomorrow : later;
@@ -402,10 +406,20 @@ const listed = (phrases, last) =>
     ? `${phrases.slice(0, -1).join(", ")} ${last} ${phrases.at(-1)}`
     : phrases[0];
 
-// One item's row: its label, its state, the day that matters, and where it
-// leads. Without a number of days, only the day is given. A recurring
-// schedule opens the recurring list; the rest open their document. The
-// client's name opens the client when the item is linked to one.
+// The rows the list shows: only the kinds above, as an older server can
+// send quotations and recurring invoices too.
+export const attentionItems = (attention) =>
+  (attention?.items || []).filter((item) =>
+    Object.hasOwn(ATTENTION, item.kind),
+  );
+
+// The documents what needs attention opens, so no other panel opens them
+// too.
+export const attentionDocuments = (items = []) =>
+  new Set(attentionItems({ items }).map((item) => item.documentId));
+
+// One item's row: its label, its state, the day that matters, and the
+// document it opens. Without a number of days, only the day is given.
 export const attentionRow = (item) => {
   const date = item.date ? dayMonth(parseDate(item.date)) : "";
   const days = item.days == null ? NaN : Number(item.days);
@@ -419,33 +433,22 @@ export const attentionRow = (item) => {
         : "",
       date && `Due ${date}`,
     ],
-    quotation: ["Awaiting an answer", date && `Valid until ${date}`],
-    recurring: [
-      known
-        ? soon(days, "Runs today", "Runs tomorrow", `Runs in ${days} days`)
-        : "",
-      date && `Next run ${date}`,
-    ],
     draft: ["Draft", date && `Created ${date}`],
   }[item.kind] || ["", date];
   return {
     label: ATTENTION[item.kind]?.label || "",
     state,
     when,
-    to:
-      item.kind === "recurring" ? "/recurring" : `/document/${item.documentId}`,
-    clientTo:
-      item.clientId && item.client ? `/single-customer/${item.clientId}` : null,
+    to: `/document/${item.documentId}`,
   };
 };
 
-// The list's footer: the kinds there is none of, then what the list leaves
-// out, since it shows only the most urgent few, and that a client's name
-// opens the client, when one does.
+// The note under the list: the kinds there is none of, then what the list
+// leaves out, since it shows only the most urgent few.
 export const attentionFooter = (counts = {}, items = []) => {
-  const none = NONE_ORDER.filter((kind) => !counts[ATTENTION[kind].count]).map(
-    (kind) => ATTENTION[kind].none,
-  );
+  const none = ATTENTION_ORDER.filter(
+    (kind) => !counts[ATTENTION[kind].count],
+  ).map((kind) => ATTENTION[kind].none);
   const more = ATTENTION_ORDER.flatMap((kind) => {
     const {
       count,
@@ -462,8 +465,6 @@ export const attentionFooter = (counts = {}, items = []) => {
   const sentences = [
     none.length && `No ${listed(none, "or")}.`,
     more.length && `Also ${listed(more, "and")}.`,
-    items.some((item) => attentionRow(item).clientTo) &&
-      "A client’s name opens the client.",
   ].filter(Boolean);
   return sentences.length ? sentences.join(" ") : null;
 };

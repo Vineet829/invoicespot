@@ -96,6 +96,15 @@ module.exports = {
         owed: {
           due: "#9f91dc",
           overdue: "#b5532f",
+          // Overdue by age, light to dark: 1–15, 16–30, 31–45 and over 45
+          // days late. One rust hue in even lightness steps, so the bands
+          // read as an ordered ramp.
+          age: {
+            1: "#e8835f",
+            2: "#c9643f",
+            3: "#a4502f",
+            4: "#8c3b1f",
+          },
         },
         // The overview's cash flow: money in is spot violet, money out
         // peach, and what was left the dark net line.

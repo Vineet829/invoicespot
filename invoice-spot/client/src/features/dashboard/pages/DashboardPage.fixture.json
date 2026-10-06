@@ -19,6 +19,8 @@
     "billed": { "current": 68848.08, "previous": 53344.02 },
     "received": { "current": 44562.29, "previous": 59864.82 },
     "profit": { "current": 64194.0, "previous": 49738.0 },
+    "tax": 4654.08,
+    "previousTax": 3606.02,
     "hasPrevious": true
   },
   "owedNow": {
@@ -26,7 +28,14 @@
     "notDue": 17959.76,
     "overdue": 6326.03,
     "invoices": 10,
-    "overdueInvoices": 3
+    "overdueInvoices": 3,
+    "bands": [
+      { "key": "current", "amount": 17959.76, "invoices": 7 },
+      { "key": "days1to15", "amount": 965.25, "invoices": 1 },
+      { "key": "days16to30", "amount": 1969.11, "invoices": 1 },
+      { "key": "days31to45", "amount": 0.0, "invoices": 0 },
+      { "key": "over45", "amount": 3391.67, "invoices": 1 }
+    ]
   },
   "trend": [
     {
@@ -201,28 +210,15 @@
         "amount": 2664.09,
         "date": "2026-10-06",
         "days": 2
-      },
-      {
-        "kind": "quotation",
-        "documentId": "00000000-0000-0000-0000-000000000206",
-        "documentNumber": "QUO-0206",
-        "client": "Kestrel Outdoor",
-        "clientId": "00000000-0000-0000-0000-00000000c109",
-        "amount": 1201.2,
-        "date": "2026-10-09",
-        "days": 5
       }
     ],
     "counts": {
       "paymentReports": 0,
       "overdue": 3,
       "dueSoon": 1,
-      "quotations": 1,
-      "recurring": 0,
       "drafts": 0
     }
   },
-  "spending": { "total": 0.0, "categories": [], "others": null },
   "topClients": [
     {
       "clientId": "00000000-0000-0000-0000-00000000c107",
@@ -355,7 +351,33 @@
           }
         ]
       },
-      "expired": { "count": 5, "amount": 25343.18 }
+      "expired": {
+        "count": 5,
+        "amount": 25343.18,
+        "items": [
+          {
+            "documentId": "00000000-0000-0000-0000-000000000205",
+            "documentNumber": "QUO-0205",
+            "client": "Atlas Robotics",
+            "amount": 5362.5,
+            "validUntil": "2026-08-24"
+          },
+          {
+            "documentId": "00000000-0000-0000-0000-000000000204",
+            "documentNumber": "QUO-0204",
+            "client": "Lumen Health",
+            "amount": 8558.55,
+            "validUntil": "2026-07-02"
+          },
+          {
+            "documentId": "00000000-0000-0000-0000-000000000203",
+            "documentNumber": "QUO-0203",
+            "client": "Tidewater Logistics",
+            "amount": 321.75,
+            "validUntil": "2026-05-15"
+          }
+        ]
+      }
     }
   }
 }

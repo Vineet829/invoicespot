@@ -7,6 +7,7 @@ import { countOf } from "../../../utils/counts";
 import { useDeleteItemMutation, useGetItemsQuery } from "../itemsApiSlice";
 import { itemListSearch, matchingItems, readItemList } from "../itemFilters";
 import ItemDialog from "../components/ItemDialog";
+import ItemsTabs from "../components/ItemsTabs";
 import ResultLine from "../../documents/components/ResultLine";
 import {
   WorkspacePage,
@@ -159,16 +160,19 @@ const ItemsPage = () => {
         title="Items"
         description="The products and services you bill for, with their prices."
         actions={
-          <button
-            type="button"
-            className={primaryButton}
-            onClick={() => setEditing("new")}
-            disabled={Boolean(editRefusal)}
-            title={editRefusal}
-            aria-describedby={editRefusal ? "item-edit-refusal" : undefined}
-          >
-            <FiPlus aria-hidden="true" /> New item
-          </button>
+          <>
+            <ItemsTabs />
+            <button
+              type="button"
+              className={primaryButton}
+              onClick={() => setEditing("new")}
+              disabled={Boolean(editRefusal)}
+              title={editRefusal}
+              aria-describedby={editRefusal ? "item-edit-refusal" : undefined}
+            >
+              <FiPlus aria-hidden="true" /> New item
+            </button>
+          </>
         }
       />
       <RefusalNote id="item-edit-refusal" reason={editRefusal} />
