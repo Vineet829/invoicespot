@@ -352,6 +352,8 @@ it("says nothing above the list while no filter is set", async () => {
 });
 
 const dialog = () => document.querySelector("dialog");
+// The form's first field: the day paid, a calendar's button.
+const dayPaid = () => dialog().querySelector('button[aria-haspopup="dialog"]');
 const button = (element, text) =>
   [...element.querySelectorAll("button")].find((candidate) =>
     candidate.textContent.includes(text),
@@ -364,9 +366,7 @@ it("opens the add dialog from a link once, on its first field, leaving the rest 
   );
   expect(dialog().open).toBe(true);
   expect(dialog().querySelector("h2").textContent).toBe("New expense");
-  expect(document.activeElement).toBe(
-    dialog().querySelector('input[type="date"]'),
-  );
+  expect(document.activeElement).toBe(dayPaid());
   expect(where).toBe("/expenses?period=90d");
   expect(listRequests()).toEqual(["/api/v1/expense?page=1&size=10&period=90d"]);
   await act(async () => button(dialog(), "Cancel").click());
@@ -393,9 +393,7 @@ it("waits for the settings the form starts from, then opens on its first field",
     answer({ settings: { defaultCurrency: "USD", baseCurrency: "USD" } }),
   );
   await act(() => vi.waitFor(() => expect(dialog().open).toBe(true)));
-  expect(document.activeElement).toBe(
-    dialog().querySelector('input[type="date"]'),
-  );
+  expect(document.activeElement).toBe(dayPaid());
   expect(where).toBe("/expenses");
   expect(page.querySelector("h1").textContent).toBe("Expenses.");
 });

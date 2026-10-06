@@ -92,15 +92,18 @@ export const selectTrigger = {
   form: `${selectSurface} h-11 pl-3 pr-2.5 text-[14px] [&>svg]:size-[15px]`,
   mini: `${selectSurface} h-[30px] rounded-[9px] pl-2 pr-1.5 text-[12.5px] coarse:min-h-11 [&>svg]:size-3.5`,
 };
-// The floating menu, and the rows inside it: options (36px, taller with a
-// description, 32px under a mini trigger, 44px in the phone sheet), group
+// The floating menu, and the rows inside it: options (40px, taller with a
+// description, 32px under a mini trigger, 44px in the phone sheet), tinted
+// under the pointer or keys and on lilac when chosen, then group
 // headings, the search row at the top and the match count at the bottom.
 export const selectMenu =
-  "flex flex-col rounded-2xl border border-[#23273514] bg-white p-1.5 shadow-menu";
+  "flex flex-col rounded-[18px] border border-[#2327350f] bg-white p-2 text-spot-ink shadow-menu";
 export const selectOption =
-  "flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-spot-ink aria-disabled:cursor-default aria-disabled:text-spot-disabled";
-export const selectOptionActive =
-  "bg-spot-violet/[.09] outline outline-2 -outline-offset-2 outline-spot-violet";
+  "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 text-[14px] transition-colors aria-disabled:cursor-default aria-disabled:text-spot-disabled";
+export const selectOptionActive = "bg-[#f4f2fb]";
+export const selectOptionChosen = "bg-card-lilac font-medium text-[#3b2d78]";
+export const selectOptionChosenActive =
+  "bg-[#dad3f5] font-medium text-[#3b2d78]";
 export const selectGroup =
   "px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-spot-muted";
 export const selectSearch =
@@ -113,6 +116,33 @@ export const selectSheet =
   "fixed inset-0 m-0 mt-auto max-h-[85dvh] w-full max-w-none overflow-hidden rounded-t-3xl border-0 bg-white p-0 text-spot-ink shadow-sheet backdrop:bg-[#241d3d59]";
 export const selectSheetSearch =
   "flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#2327350d] px-3 text-[15px] text-spot-muted [&>svg]:size-4 [&>svg]:shrink-0";
+
+// The calendar (DatePicker.jsx): its floating panel, Today and the arrows
+// in its header, and each day or month in it: faded and out of reach
+// outside the field's limits, ringed for today, filled dark when chosen,
+// and larger in the phone sheet.
+export const calendarPanel =
+  "flex flex-col gap-1.5 rounded-[20px] border border-[#2327350f] bg-white p-3.5 text-spot-ink shadow-menu";
+export const calendarToday =
+  "mr-1 h-8 rounded-full bg-transparent px-2.5 text-[12.5px] text-spot-violet transition-colors hover:bg-card-lilac disabled:cursor-default disabled:text-spot-disabled disabled:hover:bg-transparent coarse:h-11";
+export const calendarNav =
+  "grid size-8 place-items-center rounded-full bg-transparent text-spot-nav transition-colors hover:bg-card-lilac hover:text-spot-violet coarse:size-11 [&>svg]:size-[17px]";
+export const calendarCell = ({ chosen, now, ok, outside, big, monthly }) =>
+  [
+    "grid place-items-center text-[13.5px] tabular-nums outline-none transition-colors focus-visible:shadow-focus",
+    monthly
+      ? `w-full rounded-xl ${big ? "h-12" : "h-10"}`
+      : `mx-auto rounded-full ${big ? "size-11" : "size-9"}`,
+    !ok
+      ? "cursor-default bg-transparent text-[#23273538]"
+      : chosen
+        ? "bg-spot-night font-medium text-white"
+        : now
+          ? "bg-transparent font-medium text-spot-violet ring-1 ring-inset ring-spot-violet/50 hover:bg-card-lilac"
+          : outside
+            ? "bg-transparent text-spot-faint hover:bg-[#2327350a]"
+            : "bg-transparent text-spot-ink hover:bg-card-lilac",
+  ].join(" ");
 
 // The peach banner for data that failed to load, and its retry button.
 export const errorBanner =

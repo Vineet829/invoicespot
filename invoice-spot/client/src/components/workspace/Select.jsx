@@ -16,6 +16,8 @@ import {
   selectMenu,
   selectOption,
   selectOptionActive,
+  selectOptionChosen,
+  selectOptionChosenActive,
   selectSearch,
   selectSheet,
   selectSheetSearch,
@@ -467,7 +469,7 @@ export const Select = ({
     ? "min-h-11"
     : size === "mini"
       ? "min-h-8"
-      : "min-h-9";
+      : "min-h-10";
   // In a sheet without a search, the list itself takes focus and the keys.
   const listFocus =
     sheet && !searchable
@@ -516,7 +518,7 @@ export const Select = ({
                 option.description ? `${optionId(option)}-note` : undefined
               }
               data-value={option.value}
-              className={`${selectOption} ${option.description ? "min-h-[52px] py-1.5" : rowHeight} ${index === active ? selectOptionActive : ""} ${selected ? "font-medium" : ""}`}
+              className={`${selectOption} ${option.description ? "min-h-[52px] py-1.5" : rowHeight} ${selected ? (index === active ? selectOptionChosenActive : selectOptionChosen) : index === active ? selectOptionActive : ""}`}
               onMouseMove={() => {
                 if (!option.disabled && index !== active) setActive(index);
               }}
@@ -541,10 +543,12 @@ export const Select = ({
                     <span id={`${optionId(option)}-meta`}>{option.meta}</span>
                   )}
                   {selected && (
-                    <FiCheck
+                    <span
                       aria-hidden="true"
-                      className="size-[15px] stroke-[2.2] text-spot-violet"
-                    />
+                      className="grid size-5 place-items-center rounded-full bg-spot-violet text-white"
+                    >
+                      <FiCheck className="size-3 stroke-[3]" />
+                    </span>
                   )}
                 </span>
               )}

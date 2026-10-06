@@ -51,46 +51,49 @@ const BandAmount = ({ value, currency }) => {
 };
 
 // Current or Overdue under the bar: a link to that part of what is owed on
-// the Receivables view, with its key, its figure and how many invoices it
-// is on.
-const Split = ({ to, label, swatch, value, invoices, currency, ariaLabel }) => (
-  <Link
-    to={to}
-    aria-label={ariaLabel}
-    className="-mx-3 -my-2 flex min-w-0 flex-col gap-2 rounded-2xl px-3 py-2 transition-colors hover:bg-white/45"
-  >
-    <span className={`flex items-center gap-2 text-[14px] ${colors.label}`}>
-      <span
-        className={`size-2.5 shrink-0 rounded-full ${swatch}`}
-        aria-hidden="true"
-      />
-      {label}
-      <FiChevronRight
-        aria-hidden="true"
-        className={`size-[15px] stroke-[1.5] ${colors.muted}`}
-      />
-    </span>
-    <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+// the Receivables view, with its key, its figure as large as half the card
+// allows, up to 34px, and how many invoices it is on.
+const Split = ({ to, label, swatch, value, invoices, currency, ariaLabel }) => {
+  const text = formatMoney(value, currency);
+  return (
+    <Link
+      to={to}
+      aria-label={ariaLabel}
+      className="-mx-3 -my-2 flex min-w-0 flex-col gap-2 rounded-2xl px-3 py-2 transition-colors hover:bg-white/45"
+      style={{ "--chars": text.length }}
+    >
+      <span className={`flex items-center gap-2 text-[14px] ${colors.label}`}>
+        <span
+          className={`size-2.5 shrink-0 rounded-full ${swatch}`}
+          aria-hidden="true"
+        />
+        {label}
+        <FiChevronRight
+          aria-hidden="true"
+          className={`size-[15px] stroke-[1.5] ${colors.muted}`}
+        />
+      </span>
       <span className={colors.ink}>
         <DashboardNumber
-          value={formatMoney(value, currency)}
-          className="text-[34px]"
+          value={text}
+          className="[font-size:min(34px,calc((50cqi_-_16px)_/_(var(--chars)_*_0.5)))]"
           decimalClass={colors.decimal}
         />
       </span>
-      <span className={`whitespace-nowrap text-[14px] ${colors.muted}`}>
-        · {invoiceCount(invoices)}
+      <span className={`text-[13px] ${colors.muted}`}>
+        {invoiceCount(invoices)}
       </span>
-    </span>
-  </Link>
-);
+    </Link>
+  );
+};
 
-// What clients owe today, as Zoho Invoice's total receivables shows it: the
-// total, a bar split into what is not due yet and what is overdue by how
-// late it is, then Current and Overdue, and the overdue bands. It is as of
-// today, whatever the period shown. Current opens what is coming in on the
-// Documents tab's Receivables view, and Overdue what is overdue there, in
-// the same currency when one was chosen.
+// What clients owe today, as Zoho Invoice's total receivables shows it, in
+// a card of its own beside what needs attention: the total, a bar split
+// into what is not due yet and what is overdue by how late it is, then
+// Current and Overdue, and the overdue bands. It is as of today, whatever
+// the period shown. Current opens what is coming in on the Documents tab's
+// Receivables view, and Overdue what is overdue there, in the same
+// currency when one was chosen.
 const ReceivablesCard = ({ snapshot, currencyChosen }) => {
   const { currency, owedNow } = snapshot;
   const chosen = currencyChosen ? currency : undefined;
@@ -140,10 +143,11 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
           />
         ))}
       </div>
-      {/* The bands' amounts sit at the foot of their column, level with
-          Current and Overdue. */}
-      <div className="mt-1 flex flex-wrap items-stretch justify-between gap-x-10 gap-y-4">
-        <div className="flex flex-wrap gap-x-12 gap-y-3">
+      {/* Current and Overdue side by side, then the overdue bands, two
+          across in the card's column and four across when it has the
+          whole width. */}
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-2 gap-4">
           <Split
             to={receivablesLink(undefined, chosen)}
             label="Current"
@@ -165,7 +169,7 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
         </div>
         {bands && (
           <ul
-            className="m-0 grid list-none grid-cols-4 gap-x-8 gap-y-3 p-0 max-[900px]:grid-cols-2"
+            className="m-0 grid list-none grid-cols-2 gap-x-6 gap-y-3.5 p-0 [@container_finance-card_(min-width:760px)]:grid-cols-4"
             aria-label="Overdue by days late"
           >
             {AGE_BANDS.map((band) => {

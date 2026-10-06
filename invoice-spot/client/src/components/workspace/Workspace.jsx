@@ -15,6 +15,7 @@ import {
 import DashboardShell from "../../features/dashboard/components/DashboardShell";
 import { Dialog } from "./Dialog";
 import { Select } from "./Select";
+import { DatePicker } from "./DatePicker";
 import { parseDate } from "../../utils/dates";
 import { formatAmount } from "../../utils/money";
 import { STATUS_LABELS } from "../../features/dashboard/dashboardModel";
@@ -287,8 +288,8 @@ export const ShareBar = ({ ratio, tone }) => (
 );
 
 // A labelled control with its hint or error below. `as="select"` draws the
-// styled dropdown, which reports its choice as a change event, so a form
-// reads it as it would a native select.
+// styled dropdown, and a date or month field the calendar; each reports its
+// choice as a change event, so a form reads it as it would a native control.
 export const Field = ({
   label,
   error,
@@ -311,7 +312,7 @@ export const Field = ({
   const describedBy = error || hint ? `${id}-hint` : undefined;
   return (
     <div className={`flex min-w-0 flex-col gap-2 ${className}`}>
-      <label htmlFor={id} className={fieldLabel}>
+      <label id={`${id}-label`} htmlFor={id} className={fieldLabel}>
         {label}
         {props.required && (
           <span className="text-spot-violet" aria-hidden="true">
@@ -319,7 +320,18 @@ export const Field = ({
           </span>
         )}
       </label>
-      {as === "select" ? (
+      {props.type === "date" || props.type === "month" ? (
+        <DatePicker
+          id={id}
+          labelId={`${id}-label`}
+          invalid={Boolean(error)}
+          aria-describedby={describedBy}
+          {...props}
+          onChange={(value) =>
+            props.onChange?.({ target: { value, name: props.name } })
+          }
+        />
+      ) : as === "select" ? (
         <Select
           id={id}
           label={label}

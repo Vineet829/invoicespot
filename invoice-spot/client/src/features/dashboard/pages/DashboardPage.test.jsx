@@ -210,21 +210,26 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   }
   // One currency, so there is nothing to switch.
   expect(page.textContent).not.toContain("Currency");
-  // The panels in their rows, in reading order, right under the header: what
-  // is owed today across the width, the period's figures, the cash flow
-  // across the width, what needs attention beside the top clients, then the
-  // top items beside what is coming up. Nothing else on the page has a title.
+  // The panels in their rows, in reading order, right under the header: the
+  // period's figures, what is owed today beside what needs attention, the
+  // cash flow across the width, then the top clients, the top items and
+  // what is coming up. Nothing else on the page has a title.
   expect(page.querySelector("header").nextElementSibling).toBe(content(page));
   expect(layout(page)).toEqual([
-    ["Total receivables"],
     ["Figures in the last 90 days"],
+    ["Total receivables", "Needs your attention"],
     ["Cash flow"],
-    ["Needs your attention", "Top clients"],
-    ["Top items", "Coming up"],
+    ["Top clients", "Top items", "Coming up"],
   ]);
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
   ).toEqual(layout(page).flat());
+  // From 1200px the rows keep to the figures' three columns: what needs
+  // attention takes two of them, and from 1440px each list takes one.
+  const [, owed, , lists] = content(page).children;
+  expect(owed.className).toContain("min-[1200px]:grid-cols-3");
+  expect(owed.className).toContain("min-[1200px]:[&>:last-child]:col-span-2");
+  expect(lists.className).toContain("min-[1440px]:grid-cols-3");
 });
 
 it("charts money in and out, with the same figures in a table and on hover or focus", async () => {
@@ -771,11 +776,15 @@ const legend = (card) =>
     (band) => band.textContent,
   );
 
-it("shows what is owed today across the width, split into current and overdue by days late", async () => {
+it("shows what is owed today beside what needs attention, split into current and overdue by days late", async () => {
   const page = await open("/dashboard");
   const card = receivables(page);
-  // Right under the header, above the period's figures.
-  expect(content(page).firstElementChild).toBe(card);
+  // Under the period's figures, first in its row, beside what needs
+  // attention.
+  expect(card.parentElement).toBe(content(page).children[1]);
+  expect(card.nextElementSibling.getAttribute("aria-labelledby")).toBe(
+    "attention-title",
+  );
   expect(card.querySelector("h2").textContent).toBe("Total receivables");
   expect(card.textContent).toContain("Total receivablesas of today");
   expect(card.textContent).toContain("24,285.79across 10 unpaid invoices");
@@ -821,10 +830,10 @@ it("shows what is owed today across the width, split into current and overdue by
   const [current, late] = card.querySelectorAll("a");
   expect(current.textContent).toContain("Current");
   expect(current.textContent).toContain("17,959.76");
-  expect(current.textContent).toContain("· 7 invoices");
+  expect(current.lastElementChild.textContent).toBe("7 invoices");
   expect(late.textContent).toContain("Overdue");
   expect(late.textContent).toContain("6,326.03");
-  expect(late.textContent).toContain("· 3 invoices");
+  expect(late.lastElementChild.textContent).toBe("3 invoices");
 });
 
 // Every link's address but the period tabs', which show the overview again
@@ -924,18 +933,18 @@ it("keeps each panel's place in its row while the overview loads", async () => {
   const loading = page.querySelector(
     '[aria-label="Loading your business overview"]',
   );
-  // After the words for screen readers: what is owed across the width, the
-  // three cards, the cash flow across the width, what needs attention and
-  // the top clients, then the top items and what is coming up.
+  // After the words for screen readers: the three cards, what is owed
+  // beside what needs attention, the cash flow across the width, then the
+  // three lists.
   expect(
     [...loading.children].slice(1).map((row) => row.children.length),
-  ).toEqual([1, 3, 1, 2, 2]);
-  expect(loading.children[1].firstElementChild.className).toContain(
+  ).toEqual([3, 2, 1, 3]);
+  expect(loading.children[2].firstElementChild.className).toContain(
     "bg-card-peach",
   );
   // The three cards as large as they will be, each in its tone.
   expect(
-    [...loading.children[2].children].map((card) => [
+    [...loading.children[1].children].map((card) => [
       card.className.match(/bg-card-\w+/)[0],
       card.className.includes("[container-name:finance-card]"),
     ]),
@@ -950,7 +959,7 @@ it("keeps each panel's place in its row while the overview loads", async () => {
   expect(
     page.querySelector('[aria-label="Loading your business overview"]'),
   ).toBeNull();
-  expect(layout(page).map((row) => row.length)).toEqual([1, 1, 1, 2, 2]);
+  expect(layout(page).map((row) => row.length)).toEqual([1, 2, 1, 3]);
   expect(receivables(page).textContent).toContain(
     "24,285.79across 10 unpaid invoices",
   );
@@ -969,11 +978,10 @@ it("shows no Spending, even when the server still sends it", async () => {
   expect(page.textContent).not.toContain("Spending");
   expect(page.textContent).not.toContain("Contractors");
   expect(layout(page)).toEqual([
-    ["Total receivables"],
     ["Figures in the last 90 days"],
+    ["Total receivables", "Needs your attention"],
     ["Cash flow"],
-    ["Needs your attention", "Top clients"],
-    ["Top items", "Coming up"],
+    ["Top clients", "Top items", "Coming up"],
   ]);
 });
 
@@ -1107,15 +1115,15 @@ const topClients = (page) =>
   page.querySelector('[aria-labelledby="top-clients-title"]');
 const C = "00000000-0000-0000-0000-00000000c";
 
-it("lists the clients billed the most beside what needs attention, each linked name opening the client", async () => {
+it("lists the clients billed the most first of the lists, each linked name opening the client", async () => {
   const page = await open("/dashboard");
   const panel = topClients(page);
-  // Beside what needs attention, in a row of their own.
+  // First of the lists under the cash flow, in a row of their own.
   expect(
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
     ),
-  ).toEqual(["attention-title", "top-clients-title"]);
+  ).toEqual(["top-clients-title", "top-items-title", "coming-up-title"]);
   expect(panel.querySelector("p").textContent).toBe(
     "Billed in these 90 days, largest first",
   );
@@ -1246,21 +1254,20 @@ it.each([
   expect(links(panel)).toEqual([[sales, "Sales by customer"]]);
 });
 
-it("leaves what needs attention its whole row when the server sends no top clients", async () => {
+it("leaves the top items and what is coming up the lists' row when the server sends no top clients", async () => {
   const { topClients: left, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(topClients(page)).toBeNull();
   expect(layout(page)).toEqual([
-    ["Total receivables"],
     ["Figures in the last 90 days"],
+    ["Total receivables", "Needs your attention"],
     ["Cash flow"],
-    ["Needs your attention"],
     ["Top items", "Coming up"],
   ]);
-  expect(
-    page.querySelector('[aria-labelledby="attention-title"]').parentElement
-      .className,
-  ).toBe("contents");
+  // The two share the row equally.
+  const lists = content(page).lastElementChild;
+  expect(lists.className).toContain("min-[1200px]:grid-cols-2");
+  expect(lists.className).not.toContain("grid-cols-3");
 });
 
 it("keeps the last period's top clients, dimmed, when the chosen period's can't be loaded", async () => {
@@ -1293,7 +1300,7 @@ it("lists the items that brought in the most beside what is coming up, each open
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
     ),
-  ).toEqual(["top-items-title", "coming-up-title"]);
+  ).toEqual(["top-clients-title", "top-items-title", "coming-up-title"]);
   expect(panel.querySelector("p").textContent).toBe(
     "What you sold in these 90 days, before tax",
   );
@@ -1429,7 +1436,7 @@ it("leaves the rest of its row when the server sends no top items", async () => 
   const { topItems: left, itemsTotal, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(topItems(page)).toBeNull();
-  expect(layout(page)[4]).toEqual(["Coming up"]);
+  expect(layout(page)[3]).toEqual(["Top clients", "Coming up"]);
 });
 
 const comingUp = (page) =>
@@ -1449,7 +1456,7 @@ it("shows what is coming up beside the top items: each schedule's next invoice, 
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
     ),
-  ).toEqual(["top-items-title", "coming-up-title"]);
+  ).toEqual(["top-clients-title", "top-items-title", "coming-up-title"]);
   expect(
     [...panel.querySelectorAll("h3")].map((heading) => heading.textContent),
   ).toEqual(["Recurring invoices", "Quotations"]);
@@ -1761,7 +1768,7 @@ it("leaves the rest of its row when the server sends nothing coming up", async (
   const { comingUp: left, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(comingUp(page)).toBeNull();
-  expect(layout(page)[4]).toEqual(["Top items"]);
+  expect(layout(page)[3]).toEqual(["Top clients", "Top items"]);
 });
 
 it("names a quotation with no last valid day as having no expiry", async () => {
