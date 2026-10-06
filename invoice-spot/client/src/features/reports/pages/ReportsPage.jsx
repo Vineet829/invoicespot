@@ -20,6 +20,7 @@ import {
   LoadingState,
   PageHeader,
   Panel,
+  ShareBar,
   WorkspacePage,
   dateLabel,
   money,
@@ -61,20 +62,6 @@ const AGEING_BARS = {
   days61to90: "bg-spot-coral/85",
   over90: "bg-overdue-icon",
 };
-
-// A row's share of the largest row, drawn under its name. The figures are
-// in the row's other cells.
-const ShareBar = ({ ratio, tone }) => (
-  <span
-    className="mt-2 block h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-[#23273510]"
-    aria-hidden="true"
-  >
-    <span
-      className={`block h-full origin-left animate-ov-bar rounded-[inherit] ${tone}`}
-      style={{ width: `${ratio * 100}%` }}
-    />
-  </span>
-);
 
 // Downloads one section for every currency, or in the reporting currency
 // as the report shows it, named like the server names it. The tax withheld

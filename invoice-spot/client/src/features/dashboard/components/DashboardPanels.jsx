@@ -91,7 +91,8 @@ const Skeleton = ({ className }) => (
   <span className={`${skeleton} ${className}`} aria-hidden="true" />
 );
 
-// The financial cards' pastel tones, as the Reports page shows them.
+// The financial cards' pastel tones, as the Reports page shows them, and
+// sage for the overview's profit.
 const CARD_TONES = {
   blue: {
     card: "bg-card-blue",
@@ -117,12 +118,27 @@ const CARD_TONES = {
     muted: "text-card-peach-muted",
     decimal: "text-card-peach-decimal",
   },
+  sage: {
+    card: "bg-card-sage",
+    label: "text-card-sage-label",
+    icon: "text-card-sage-icon",
+    ink: "text-card-sage-ink",
+    muted: "text-card-sage-muted",
+    decimal: "text-card-sage-decimal",
+  },
 };
+export const financeTones = CARD_TONES;
 
 export const financeCards =
   "grid min-h-0 grid-cols-3 gap-4 max-[1359px]:gap-3 max-[700px]:grid-cols-1";
-const financeCard = (tone) =>
+export const financeCard = (tone) =>
   `flex min-w-0 flex-col justify-between gap-[18px] rounded-[22px] p-6 [container-name:finance-card] [container-type:inline-size] compact:gap-2.5 compact:px-3.5 compact:py-[18px] max-[1359px]:p-[18px] max-[700px]:min-h-[240px] max-[700px]:p-[22px] ${CARD_TONES[tone].card}`;
+// A financial card's name, on a white pill, and its figure, as large as the
+// card's width allows for its count of characters, up to 56px.
+export const financeLabel = (tone) =>
+  `rounded-full bg-white/70 px-4 py-2 font-ui text-[15px] font-normal [@container_finance-card_(min-width:162px)]:text-[16px] ${CARD_TONES[tone].label}`;
+export const financeFigure =
+  "[font-size:min(56px,calc(100cqi_/_(var(--chars)_*_0.5)))]";
 
 export const FinancialCard = ({ label, value, detail, icon: Icon, tone }) => {
   const colors = CARD_TONES[tone];
@@ -132,11 +148,7 @@ export const FinancialCard = ({ label, value, detail, icon: Icon, tone }) => {
       style={{ "--chars": String(value).length }}
     >
       <header className="flex items-center justify-between gap-2.5">
-        <h3
-          className={`rounded-full bg-white/70 px-4 py-2 font-ui text-[15px] font-normal [@container_finance-card_(min-width:162px)]:text-[16px] ${colors.label}`}
-        >
-          {label}
-        </h3>
+        <h3 className={financeLabel(tone)}>{label}</h3>
         <span
           className={`grid size-[42px] shrink-0 place-items-center rounded-full bg-white/60 [&>svg]:size-5 [&>svg]:stroke-[1.6] [@container_finance-card_(max-width:210px)]:hidden ${colors.icon}`}
           aria-hidden="true"
@@ -172,25 +184,22 @@ export const panelLink =
 export const panelAction =
   "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[13px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
-// The overview's rows below the tiles: the cash flow across the width,
-// what needs attention beside the top clients from 1200px, then the lists
-// that sum up the other tabs, two side by side from 1200px, with one left
-// over across both, and all side by side from 1440px, each as wide as the
-// others. Narrower, the lists would shorten most names.
+// The overview's rows below the figures: the cash flow across the width,
+// what needs attention beside the top clients from 1200px, then the top
+// items beside what is coming up from 1200px, as wide as each other and each
+// as tall as its own list. Narrower, the lists would shorten most names.
 export const attentionPair =
   "grid min-w-0 gap-5 min-[1200px]:grid-cols-[minmax(0,1fr)_480px]";
 export const listRow =
-  "grid min-w-0 gap-5 min-[1200px]:grid-cols-2 min-[1200px]:[&>:nth-child(odd):last-child]:col-span-2 min-[1440px]:grid-cols-none min-[1440px]:auto-cols-fr min-[1440px]:grid-flow-col min-[1440px]:[&>:nth-child(odd):last-child]:col-span-1";
+  "grid min-w-0 items-start gap-5 min-[1200px]:grid-cols-2";
 
-// The overview's tiles: four across a wide window, two below 1200px and one
-// on phones.
-export const tileRow =
-  "grid min-w-0 animate-ov-rise grid-cols-4 gap-[18px] [--rise-delay:80ms] max-[1199px]:grid-cols-2 max-[700px]:gap-4 max-[599px]:grid-cols-1";
-export const tileCard =
-  "flex min-w-0 flex-col gap-2.5 rounded-[22px] px-5 pb-4 pt-[18px]";
+// What is owed today across the width, then the period's figures, three
+// across and one on phones, all as large as the Reports page's cards.
+export const receivablesCard = `${financeCard("peach")} animate-ov-rise`;
+export const figureRow = `${financeCards} animate-ov-rise [--rise-delay:80ms]`;
 
-// A list with a bar in each row, such as Spending, while it loads: its
-// title, the figure or words under it, then five rows.
+// A list with a bar in each row, such as the top clients, while it loads:
+// its title, the words under it, then five rows.
 const BarListLoading = ({ lead, className = "" }) => (
   <div className={`${overviewPanel} ${className}`}>
     <Skeleton className="h-6 w-[120px] rounded-md" />
@@ -214,17 +223,22 @@ export const DashboardLoading = () => (
     aria-label="Loading your business overview"
   >
     <span className="sr-only">Loading your business overview…</span>
-    <div className={tileRow} aria-hidden="true">
-      {["bg-card-blue", "bg-card-lilac", "bg-card-sage", "bg-card-peach"].map(
-        (tone) => (
-          <div className={`${tileCard} ${tone}`} key={tone}>
-            <Skeleton className="h-[27px] w-[92px] rounded-full" />
-            <Skeleton className="h-10 w-[70%] rounded-md" />
-            <Skeleton className="h-[22px] w-1/2 rounded-md" />
-            <Skeleton className="mt-auto h-10 w-full rounded-md" />
-          </div>
-        ),
-      )}
+    <div aria-hidden="true">
+      <div className={receivablesCard}>
+        <Skeleton className="h-[37px] w-[170px] rounded-full" />
+        <Skeleton className="h-14 w-[40%] rounded-md" />
+        <Skeleton className="h-4 w-full rounded-full" />
+        <Skeleton className="h-[52px] w-[60%] rounded-md" />
+      </div>
+    </div>
+    <div className={figureRow} aria-hidden="true">
+      {["blue", "lilac", "sage"].map((tone) => (
+        <div className={financeCard(tone)} key={tone}>
+          <Skeleton className="h-[37px] w-[92px] rounded-full" />
+          <Skeleton className="h-14 w-[70%] rounded-md" />
+          <Skeleton className="mt-auto h-[66px] w-full rounded-md" />
+        </div>
+      ))}
     </div>
     <div aria-hidden="true">
       <div className={overviewPanel}>
@@ -250,10 +264,6 @@ export const DashboardLoading = () => (
       />
     </div>
     <div className={listRow} aria-hidden="true">
-      <BarListLoading
-        lead={<Skeleton className="h-[30px] w-[45%] rounded-md" />}
-        className="[--rise-delay:320ms]"
-      />
       <BarListLoading
         lead={<Skeleton className="h-[13px] w-[55%] rounded-md" />}
         className="[--rise-delay:320ms]"

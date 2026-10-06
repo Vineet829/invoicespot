@@ -7,6 +7,18 @@ export const itemsApiSlice = baseApiSlice.injectEndpoints({
       query: () => "/item?size=500",
       providesTags: ["Item"],
     }),
+    // What each item sold in a period and a currency, or the default one,
+    // from the lines of what was billed, a page at a time. See
+    // itemSalesQuery.
+    getItemSales: builder.query({
+      query: (params = {}) => `/item/sales?${new URLSearchParams(params)}`,
+      providesTags: ["Document"],
+    }),
+    // One item's sales: its totals, who bought it, and its latest lines.
+    getItemSalesDetail: builder.query({
+      query: (params) => `/item/sales/detail?${new URLSearchParams(params)}`,
+      providesTags: ["Document"],
+    }),
     createItem: builder.mutation({
       query: (item) => ({ url: "/item", method: "POST", body: item }),
       invalidatesTags: ["Item"],
@@ -28,6 +40,8 @@ export const itemsApiSlice = baseApiSlice.injectEndpoints({
 
 export const {
   useGetItemsQuery,
+  useGetItemSalesQuery,
+  useGetItemSalesDetailQuery,
   useCreateItemMutation,
   useUpdateItemMutation,
   useDeleteItemMutation,

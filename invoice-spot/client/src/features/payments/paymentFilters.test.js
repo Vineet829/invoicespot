@@ -7,6 +7,7 @@ import {
   paymentListSearch,
   paymentQuery,
   paymentResults,
+  paymentSummaryQuery,
   readPaymentList,
 } from "./paymentFilters";
 
@@ -232,5 +233,17 @@ describe("the line above a filtered list", () => {
         }),
       ).at(-1),
     ).toBe("3 of them on receipts");
+  });
+});
+
+describe("the summary above the list", () => {
+  it("asks for the list's period by name and its currency, whatever it searches or the method", () => {
+    expect(
+      paymentSummaryQuery(
+        read("q=quill&method=receipt&period=this-year&currency=EUR&page=2"),
+      ),
+    ).toEqual({ period: "this-year", currency: "EUR" });
+    expect(paymentSummaryQuery(read("period=90d"))).toEqual({ period: "90d" });
+    expect(paymentSummaryQuery(read("method=PayPal"))).toEqual({});
   });
 });

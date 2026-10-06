@@ -2,7 +2,12 @@ import { Link } from "react-router-dom";
 import { FiChevronRight } from "react-icons/fi";
 import { Amount } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
-import { findPeriod, formatMoney, topItemRows } from "../dashboardModel";
+import {
+  findPeriod,
+  formatMoney,
+  salesByItemLink,
+  topItemRows,
+} from "../dashboardModel";
 import { overviewPanel, panelLink } from "./DashboardPanels";
 
 // A row: the item, its bar, how many were sold and its share of income,
@@ -15,13 +20,20 @@ const sold = (quantity) =>
 
 // What sold the most in the period shown, in the overview's currency, as
 // income counts it: before tax, after discounts, less what credit notes
-// took back. Each row opens the Items list searched for its name, which
-// need not be a saved item's, and All items the whole list. The rest of the
-// lines aren't shown, so the shares add up to less than all the income.
-const TopItemsPanel = ({ snapshot }) => {
+// took back. Each row opens that item's sales for the same period, and
+// Sales by item every item's, in the same currency when one was chosen.
+// The rest of the lines aren't shown, so the shares add up to less than
+// all the income.
+const TopItemsPanel = ({ snapshot, currencyChosen }) => {
   const { currency } = snapshot;
+  const chosen = currencyChosen ? currency : undefined;
   const period = findPeriod(snapshot.period.key);
-  const rows = topItemRows(snapshot.topItems, snapshot.itemsTotal);
+  const rows = topItemRows(
+    snapshot.topItems,
+    snapshot.itemsTotal,
+    period.key,
+    chosen,
+  );
   return (
     <section
       className={`${overviewPanel} [--rise-delay:320ms]`}
@@ -31,8 +43,8 @@ const TopItemsPanel = ({ snapshot }) => {
         <h2 id="top-items-title" className={sectionTitle}>
           Top items
         </h2>
-        <Link to="/items" className={panelLink}>
-          All items
+        <Link to={salesByItemLink(period.key, chosen)} className={panelLink}>
+          Sales by item
           <FiChevronRight aria-hidden="true" />
         </Link>
       </div>
@@ -48,58 +60,44 @@ const TopItemsPanel = ({ snapshot }) => {
                 entry.share && `${entry.share} of income`,
               ].filter(Boolean);
               const label = `${entry.name}: ${formatMoney(entry.amount, currency)}, ${facts.join(", ")}`;
-              const content = (
-                <>
-                  <span className="flex min-w-0 flex-col gap-1">
-                    <span
-                      className={`truncate text-[13.5px] ${entry.to ? "" : "text-spot-muted"}`}
-                    >
-                      {entry.name}
-                    </span>
-                    <span className="block h-1.5 overflow-hidden rounded-full bg-card-sage-bar/[.16]">
-                      <span
-                        className="block h-full origin-left animate-ov-bar rounded-[inherit] bg-card-sage-bar"
-                        style={{ width: `${entry.bar * 100}%` }}
-                      />
-                    </span>
-                    <span className="text-[11.5px] text-spot-muted">
-                      {facts.join(" · ")}
-                    </span>
-                  </span>
-                  <Amount
-                    value={entry.amount}
-                    currency={currency}
-                    hideCode
-                    className="justify-self-end text-[15px] font-light tracking-[-0.03em]"
-                  />
-                </>
-              );
               return (
                 <li
                   className={index ? "border-t border-[#23273512]" : ""}
                   key={`${index}-${entry.name}`}
                 >
-                  {entry.to ? (
-                    <Link
-                      to={entry.to}
-                      className={`${row} -mx-2 rounded-xl px-2 transition-colors hover:bg-white/50`}
-                      aria-label={`${label}. Search Items for it`}
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className={row} role="img" aria-label={label}>
-                      {content}
-                    </div>
-                  )}
+                  <Link
+                    to={entry.to}
+                    className={`${row} -mx-2 rounded-xl px-2 transition-colors hover:bg-white/50`}
+                    aria-label={`${label}. View its sales`}
+                  >
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="truncate text-[13.5px]">
+                        {entry.name}
+                      </span>
+                      <span className="block h-1.5 overflow-hidden rounded-full bg-card-sage-bar/[.16]">
+                        <span
+                          className="block h-full origin-left animate-ov-bar rounded-[inherit] bg-card-sage-bar"
+                          style={{ width: `${entry.bar * 100}%` }}
+                        />
+                      </span>
+                      <span className="text-[11.5px] text-spot-muted">
+                        {facts.join(" · ")}
+                      </span>
+                    </span>
+                    <Amount
+                      value={entry.amount}
+                      currency={currency}
+                      hideCode
+                      className="justify-self-end text-[15px] font-light tracking-[-0.03em]"
+                    />
+                  </Link>
                 </li>
               );
             })}
           </ol>
           <p className="mt-auto border-t border-[#23273512] pt-2 text-[12px] text-spot-muted">
-            Everything sold adds up to the income behind Profit.
-            {rows.some((entry) => entry.to) &&
-              " Each row searches Items for it."}
+            Everything sold adds up to the income behind Profit. Each row opens
+            what it sold.
           </p>
         </>
       ) : (

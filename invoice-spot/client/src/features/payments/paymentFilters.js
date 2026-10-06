@@ -81,6 +81,14 @@ export const paymentQuery = (
   ...(currency && { currency }),
 });
 
+// What the summary above the list asks the server: the list's period by
+// name, which the server works out in the business's time zone, and its
+// currency. The search and the method narrow the list, not the summary.
+export const paymentSummaryQuery = ({ period, currency }) => ({
+  ...(period && { period }),
+  ...(currency && { currency }),
+});
+
 // The methods to filter by: those the business has had payments by, one an
 // old link names, then receipts.
 export const methodOptions = (methods = [], chosen = "") => [

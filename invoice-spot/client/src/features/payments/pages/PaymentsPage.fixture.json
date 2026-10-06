@@ -1,0 +1,147 @@
+{
+  "summary": {
+    "success": true,
+    "currency": "USD",
+    "currencies": ["USD"],
+    "period": {
+      "key": "90d",
+      "from": "2026-07-07",
+      "to": "2026-10-04",
+      "previousFrom": "2026-04-08",
+      "previousTo": "2026-07-06"
+    },
+    "total": 44562.29,
+    "previousTotal": 59864.82,
+    "payments": 18,
+    "methods": [
+      {
+        "method": "Bank Transfer",
+        "payments": 6,
+        "amount": 17342.7
+      },
+      {
+        "method": "On a receipt",
+        "payments": 2,
+        "amount": 12011.28
+      },
+      {
+        "method": "Credit Card",
+        "payments": 5,
+        "amount": 8960.11
+      },
+      {
+        "method": "PayPal",
+        "payments": 3,
+        "amount": 4248.2
+      },
+      {
+        "method": "Mobile Money",
+        "payments": 2,
+        "amount": 2000.0
+      }
+    ],
+    "payers": [
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c107",
+        "client": "Quill & Co. Publishing",
+        "payments": 3,
+        "amount": 11490.77
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c109",
+        "client": "Kestrel Outdoor",
+        "payments": 2,
+        "amount": 10317.45
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c101",
+        "client": "Atlas Robotics",
+        "payments": 2,
+        "amount": 4331.1
+      },
+      {
+        "clientId": null,
+        "client": "Verdant Farms",
+        "payments": 2,
+        "amount": 3278.96
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c103",
+        "client": "Bluefin Analytics",
+        "payments": 1,
+        "amount": 2500.0
+      }
+    ]
+  },
+  "payments": {
+    "success": true,
+    "total": 18,
+    "numberOfPages": 2,
+    "page": 1,
+    "size": 10,
+    "from": null,
+    "to": null,
+    "payments": [
+      {
+        "kind": "payment",
+        "id": "p-1",
+        "date": "2026-10-04",
+        "client": "Harbor & Pine Architects",
+        "document": {
+          "id": "doc-1038",
+          "number": "INV-1038",
+          "type": "Invoice"
+        },
+        "method": "Bank Transfer",
+        "note": "Deposit",
+        "amount": 262.76,
+        "currency": "USD"
+      },
+      {
+        "kind": "receipt",
+        "id": "doc-304",
+        "date": "2026-10-02",
+        "client": "Quill & Co. Publishing",
+        "document": {
+          "id": "doc-304",
+          "number": "REC-0304",
+          "type": "Receipt"
+        },
+        "method": null,
+        "note": null,
+        "amount": 9598.88,
+        "currency": "USD"
+      },
+      {
+        "kind": "refund",
+        "id": "r-7",
+        "date": "2026-09-20",
+        "client": "Tidewater Logistics",
+        "document": {
+          "id": "doc-1019",
+          "number": "INV-1019",
+          "type": "Invoice"
+        },
+        "method": "Credit Card",
+        "note": "REF-0042",
+        "amount": -150,
+        "currency": "USD"
+      }
+    ],
+    "totals": [
+      {
+        "currency": "USD",
+        "payments": 18,
+        "received": 44562.29,
+        "receipts": 2
+      }
+    ],
+    "methods": [
+      "Bank Transfer",
+      "Credit Card",
+      "Mobile Money",
+      "PayPal",
+      "Others"
+    ]
+  }
+}

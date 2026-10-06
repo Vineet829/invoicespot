@@ -28,6 +28,13 @@ export const customersApiSlice = baseApiSlice.injectEndpoints({
       query: (custId) => `/customer/${custId}`,
       providesTags: ["Customer"],
     }),
+    // Every client billed in a period, in a currency or the default one,
+    // with what they paid and still owe, a page at a time, and the totals.
+    // See customerSalesQuery.
+    getCustomerSales: builder.query({
+      query: (params = {}) => `/customer/sales?${new URLSearchParams(params)}`,
+      providesTags: ["Customer", "Document"],
+    }),
     // What a client was billed, has paid and still owes, per currency.
     getCustomerSummary: builder.query({
       query: (custId) => `/customer/${custId}/summary`,
@@ -133,6 +140,7 @@ export const {
   useImportClientsMutation,
   usePreviewClientImportMutation,
   useGetSingleCustomerQuery,
+  useGetCustomerSalesQuery,
   useGetCustomerSummaryQuery,
   useGetStatementPdfMutation,
   useGetStatementEmailDraftQuery,

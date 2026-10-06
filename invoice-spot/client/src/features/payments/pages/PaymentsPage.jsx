@@ -13,7 +13,10 @@ import ResultLine from "../../documents/components/ResultLine";
 import { PERIODS } from "../../documents/documentFilters";
 import { useGetDocumentSummaryQuery } from "../../documents/documentsApiSlice";
 import { useBusiness } from "../../business/permissions";
-import { useGetPaymentsQuery } from "../paymentsApiSlice";
+import {
+  useGetPaymentsQuery,
+  useGetPaymentsSummaryQuery,
+} from "../paymentsApiSlice";
 import {
   SORT_FIELDS,
   SORT_OPTIONS,
@@ -23,8 +26,10 @@ import {
   paymentListSearch,
   paymentQuery,
   paymentResults,
+  paymentSummaryQuery,
   readPaymentList,
 } from "../paymentFilters";
+import PaymentsSummary from "../components/PaymentsSummary";
 import {
   WorkspacePage,
   PageHeader,
@@ -55,7 +60,8 @@ const DESCRIPTION =
 
 // Money in and out on issued documents, one row each: payments on invoices,
 // receipts, and refunds as minus amounts. A view of the Documents page, so
-// it has the same header and money bar.
+// it has the same header and money bar. Above the list, what came in over
+// its period is summed up by method and by who paid.
 const PaymentsPage = () => {
   useTitle("Payments — Invoice Spot");
   const [list, update] = useListState(readPaymentList, paymentListSearch);
@@ -68,6 +74,10 @@ const PaymentsPage = () => {
     refetchOnMountOrArgChange: 60,
   });
   const summary = summaryQuery.data;
+  const paymentsSummary = useGetPaymentsSummaryQuery(
+    paymentSummaryQuery(list),
+    { refetchOnMountOrArgChange: 60 },
+  );
   // What the result line says comes from the last answer and the filters
   // it answered.
   const answered = useLastAnswer(query.currentData, list);
@@ -172,7 +182,6 @@ const PaymentsPage = () => {
         columns={columns}
         rows={pagination.rows}
         rowKey={(row) => `${row.kind}-${row.id}`}
-        fillRows={pagination.fullPage}
         label="Payments"
         sort={{ field: list.sort, dir: list.dir }}
         onSort={(field) =>
@@ -205,8 +214,10 @@ const PaymentsPage = () => {
     />
   );
 
+  // With the summary above it, the list keeps its rows' own height and the
+  // page scrolls, rather than the list stretching to the window's foot.
   return (
-    <WorkspacePage section="Documents" fill>
+    <WorkspacePage section="Documents">
       <PageHeader
         title="Documents"
         description="Invoices, quotations, and receipts. All your paperwork in one place."
@@ -223,13 +234,13 @@ const PaymentsPage = () => {
         query={summaryQuery}
         shows={(link) => opensList(link, "/payments", readPaymentList, list)}
       />
+      <PaymentsSummary query={paymentsSummary} />
       {query.isLoading ? (
         <LoadingState />
       ) : (
         <Panel
           title={showTools ? undefined : "Payments"}
           description={showTools ? undefined : DESCRIPTION}
-          fill={rows.length > 0 && !query.isError}
         >
           {showTools && (
             <div ref={tools} className="mb-5 flex flex-col gap-3 compact:mb-4">

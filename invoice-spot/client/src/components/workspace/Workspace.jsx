@@ -93,11 +93,15 @@ export const WorkspacePage = ({ children, section, fill = false }) => (
   </DashboardShell>
 );
 
+// The title keeps room for a word as long as "Documents." beside the
+// actions; when the actions need more of the row, such as a long row of
+// tabs, they go under the title, and wrap within the width, rather than
+// squeezing it.
 export const PageHeader = ({ title, description, actions, back }) => {
   const navigate = useNavigate();
   return (
-    <header className="flex items-end justify-between gap-8 max-[1359px]:gap-5 max-[700px]:flex-col max-[700px]:items-stretch">
-      <div className="min-w-0">
+    <header className="flex flex-wrap items-end justify-between gap-8 max-[1359px]:gap-5 max-[700px]:flex-col max-[700px]:items-stretch">
+      <div className="min-w-0 flex-[1_1_300px] max-[1359px]:flex-[1_1_220px] max-[700px]:flex-initial">
         {back && (
           <button
             type="button"
@@ -114,7 +118,7 @@ export const PageHeader = ({ title, description, actions, back }) => {
         {description && <p className={pageSubtitle}>{description}</p>}
       </div>
       {actions && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2.5 max-[700px]:[&>*]:flex-1">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2.5 max-[700px]:[&>*]:flex-1">
           {actions}
         </div>
       )}
@@ -267,6 +271,20 @@ export const Amount = ({
     </span>
   );
 };
+
+// A row's share of the largest row, from 0 to 1, drawn under its name in a
+// table that sums something up. The figures are in the row's other cells.
+export const ShareBar = ({ ratio, tone }) => (
+  <span
+    className="mt-2 block h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-[#23273510]"
+    aria-hidden="true"
+  >
+    <span
+      className={`block h-full origin-left animate-ov-bar rounded-[inherit] ${tone}`}
+      style={{ width: `${ratio * 100}%` }}
+    />
+  </span>
+);
 
 // A labelled control with its hint or error below. `as="select"` draws the
 // styled dropdown, which reports its choice as a change event, so a form

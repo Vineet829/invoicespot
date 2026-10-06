@@ -17,6 +17,25 @@ export const documentsApiSlice = baseApiSlice.injectEndpoints({
         `/document/summary${currency ? `?${new URLSearchParams({ currency })}` : ""}`,
       providesTags: ["Document"],
     }),
+    // What is owed today in a currency, or the default one, as the
+    // overview's Total receivables counts it: what is not due yet and what
+    // is overdue, each by how soon it falls due or how late it is, with the
+    // clients who owe the most of it.
+    getReceivables: builder.query({
+      query: (currency) =>
+        `/document/receivables${currency ? `?${new URLSearchParams({ currency })}` : ""}`,
+      providesTags: ["Document"],
+    }),
+    // What was billed in a period and a currency, or the default one, as
+    // the overview's Billed figure counts it: against the period before,
+    // by type and by tax rate. See salesQuery.
+    getSales: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams(params).toString();
+        return `/document/sales${search ? `?${search}` : ""}`;
+      },
+      providesTags: ["Document"],
+    }),
     // The rates and units the business uses, most used first, to suggest
     // on each line.
     getTaxRates: builder.query({
@@ -270,6 +289,8 @@ export const {
   useDeleteRefundMutation,
   useGetAllMyDocsQuery,
   useGetDocumentSummaryQuery,
+  useGetReceivablesQuery,
+  useGetSalesQuery,
   useIssueDocMutation,
   useUpdateDocMutation,
   useVoidDocMutation,

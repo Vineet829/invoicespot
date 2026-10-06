@@ -1,0 +1,191 @@
+{
+  "sales": {
+    "success": true,
+    "currency": "USD",
+    "currencies": ["USD"],
+    "period": {
+      "key": "90d",
+      "from": "2026-07-07",
+      "to": "2026-10-04",
+      "previousFrom": "2026-04-08",
+      "previousTo": "2026-07-06"
+    },
+    "total": 64194.0,
+    "totalItems": 10,
+    "page": 1,
+    "size": 10,
+    "numberOfPages": 1,
+    "items": [
+      {
+        "item": "Motion graphics (per 15 seconds)",
+        "quantity": 28,
+        "amount": 18200.0,
+        "share": 0.2835,
+        "documents": 6
+      },
+      {
+        "item": "Logo and identity system",
+        "quantity": 3,
+        "amount": 9280.0,
+        "share": 0.1446,
+        "documents": 3
+      },
+      {
+        "item": "Consulting (hourly)",
+        "quantity": 52,
+        "amount": 7140.0,
+        "share": 0.1112,
+        "documents": 5
+      },
+      {
+        "item": "Front-end build (per page)",
+        "quantity": 17,
+        "amount": 6460.0,
+        "share": 0.1006,
+        "documents": 3
+      },
+      {
+        "item": "Brand strategy workshop",
+        "quantity": 3,
+        "amount": 5400.0,
+        "share": 0.0841,
+        "documents": 3
+      },
+      {
+        "item": "Website maintenance (monthly)",
+        "quantity": 6,
+        "amount": 5100.0,
+        "share": 0.0794,
+        "documents": 6
+      },
+      {
+        "item": "Photography (half day)",
+        "quantity": 4,
+        "amount": 4800.0,
+        "share": 0.0748,
+        "documents": 4
+      },
+      {
+        "item": "Copywriting (per page)",
+        "quantity": 22,
+        "amount": 3960.0,
+        "share": 0.0617,
+        "documents": 3
+      },
+      {
+        "item": "Social media kit",
+        "quantity": 2,
+        "amount": 2400.0,
+        "share": 0.0374,
+        "documents": 2
+      },
+      {
+        "item": "Other lines",
+        "quantity": 5,
+        "amount": 1454.0,
+        "share": 0.0227,
+        "documents": 3
+      }
+    ]
+  },
+  "detail": {
+    "success": true,
+    "item": "Motion graphics (per 15 seconds)",
+    "currency": "USD",
+    "currencies": ["USD"],
+    "period": {
+      "key": "90d",
+      "from": "2026-07-07",
+      "to": "2026-10-04",
+      "previousFrom": "2026-04-08",
+      "previousTo": "2026-07-06"
+    },
+    "quantity": 28,
+    "amount": 18200.0,
+    "share": 0.2835,
+    "documents": 6,
+    "clients": [
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c107",
+        "client": "Quill & Co. Publishing",
+        "quantity": 12,
+        "amount": 7800.0
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c109",
+        "client": "Kestrel Outdoor",
+        "quantity": 8,
+        "amount": 5200.0
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c101",
+        "client": "Atlas Robotics",
+        "quantity": 4,
+        "amount": 2600.0
+      },
+      {
+        "clientId": "00000000-0000-0000-0000-00000000c110",
+        "client": "Oak Street Bakery",
+        "quantity": 4,
+        "amount": 2600.0
+      }
+    ],
+    "lines": [
+      {
+        "documentId": "00000000-0000-0000-0000-000000000304",
+        "documentNumber": "REC-0304",
+        "documentType": "Receipt",
+        "issueDate": "2026-10-02",
+        "client": "Quill & Co. Publishing",
+        "quantity": 8,
+        "amount": 5200.0
+      },
+      {
+        "documentId": "00000000-0000-0000-0000-000000001035",
+        "documentNumber": "INV-1035",
+        "documentType": "Invoice",
+        "issueDate": "2026-10-01",
+        "client": "Oak Street Bakery",
+        "quantity": 4,
+        "amount": 2600.0
+      },
+      {
+        "documentId": "00000000-0000-0000-0000-000000001034",
+        "documentNumber": "INV-1034",
+        "documentType": "Invoice",
+        "issueDate": "2026-09-28",
+        "client": "Atlas Robotics",
+        "quantity": 4,
+        "amount": 2600.0
+      },
+      {
+        "documentId": "00000000-0000-0000-0000-000000000303",
+        "documentNumber": "REC-0303",
+        "documentType": "Receipt",
+        "issueDate": "2026-09-15",
+        "client": "Kestrel Outdoor",
+        "quantity": 4,
+        "amount": 2600.0
+      },
+      {
+        "documentId": "00000000-0000-0000-0000-000000001022",
+        "documentNumber": "INV-1022",
+        "documentType": "Invoice",
+        "issueDate": "2026-08-18",
+        "client": "Quill & Co. Publishing",
+        "quantity": 4,
+        "amount": 2600.0
+      },
+      {
+        "documentId": "00000000-0000-0000-0000-000000001017",
+        "documentNumber": "INV-1017",
+        "documentType": "Invoice",
+        "issueDate": "2026-07-20",
+        "client": "Kestrel Outdoor",
+        "quantity": 4,
+        "amount": 2600.0
+      }
+    ],
+    "linesTotal": 6
+  }
+}

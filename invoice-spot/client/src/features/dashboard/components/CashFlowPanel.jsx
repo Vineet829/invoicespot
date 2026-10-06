@@ -1,13 +1,17 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import useWidth from "../../../hooks/useWidth";
+import { money } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
 import {
   axisLabel,
   bucketLabel,
   bucketRange,
   cashFlowScale,
+  findPeriod,
   formatMoney,
   labelStep,
+  moneyOutLink,
   showsLabel,
 } from "../dashboardModel";
 import { overviewPanel } from "./DashboardPanels";
@@ -59,7 +63,7 @@ const FiguresTable = memo(({ parts, part, partName, currency }) => (
 
 // Money in and out of the business in each part of the period: money in
 // rises above the zero line, money out hangs below it, and the dark line is
-// what was left. Hovering a column, or moving through them with the arrow
+// what was left. The total money out opens the period's expenses. Hovering a column, or moving through them with the arrow
 // keys, shows its figures, until Escape hides them; a table gives screen
 // readers the same figures.
 const CashFlowPanel = ({ snapshot }) => {
@@ -175,16 +179,28 @@ const CashFlowPanel = ({ snapshot }) => {
         </ul>
       </div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-[18px] gap-y-1">
+        {/* Money out opens the period's expenses, in the overview's
+            currency, as its figure counts them. */}
         <dl className="flex flex-wrap items-baseline gap-x-[18px] gap-y-1 text-[13px] text-spot-body">
           {[
             ["In", moneyIn],
-            ["Out", moneyOut],
+            ["Out", moneyOut, moneyOutLink(snapshot.period.key, currency)],
             ["Net", moneyIn - moneyOut],
-          ].map(([term, value]) => (
+          ].map(([term, value, to]) => (
             <div className="flex items-baseline gap-1.5" key={term}>
               <dt>{term}</dt>
               <dd className="font-display text-[20px] font-light tracking-[-0.02em] text-spot-ink">
-                {amount(value)}
+                {to ? (
+                  <Link
+                    to={to}
+                    className="underline decoration-spot-night/30 underline-offset-[3px] transition-colors hover:text-spot-violet hover:decoration-current"
+                    aria-label={`Money out ${findPeriod(snapshot.period.key).during}: ${money(value, currency)}. View the expenses`}
+                  >
+                    {amount(value)}
+                  </Link>
+                ) : (
+                  amount(value)
+                )}
               </dd>
             </div>
           ))}

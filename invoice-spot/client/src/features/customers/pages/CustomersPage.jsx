@@ -28,6 +28,7 @@ import {
   readClientList,
 } from "../clientFilters";
 import ImportClientsDialog from "../components/ImportClientsDialog";
+import ClientsTabs from "../components/ClientsTabs";
 import {
   WorkspacePage,
   PageHeader,
@@ -223,6 +224,7 @@ const CustomersPage = () => {
         description="The people behind your work. Keep their details close at hand."
         actions={
           <>
+            <ClientsTabs />
             <button
               type="button"
               className={secondaryButton}

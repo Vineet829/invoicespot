@@ -119,6 +119,8 @@ const tiles = (page) =>
   [...page.querySelectorAll('[aria-labelledby="figures-title"] a')].map(
     (link) => [link.getAttribute("href"), link.getAttribute("aria-label")],
   );
+const receivables = (page) =>
+  page.querySelector('[aria-labelledby="receivables-title"]');
 const pills = (page) =>
   [...page.querySelectorAll('nav[aria-label="Period"] a')].map((link) => [
     link.textContent,
@@ -182,8 +184,8 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   ]);
   expect(tiles(page)).toEqual([
     [
-      "/documents?type=billed&period=90d",
-      "Billed in the last 90 days: USD 68,848.08, up 29.1% vs previous 90 days. View the invoices, receipts and credit notes",
+      "/sales?period=90d",
+      "Billed in the last 90 days: USD 68,848.08, including USD 4,654.08 tax, up 29.1% vs previous 90 days. View the sales",
     ],
     [
       "/payments?period=90d",
@@ -193,37 +195,32 @@ it("draws the last 90 days from the server's figures, against the 90 days before
       "/reports?period=90d#profit",
       "Profit in the last 90 days: USD 64,194.00, up 29.1% vs previous 90 days. View the profit and loss report",
     ],
-    [
-      "/documents?status=outstanding&sort=dueDate&dir=asc",
-      "Outstanding now: USD 24,285.79 on 10 invoices, USD 6,326.03 of it overdue on 3 invoices. View the invoices owed, soonest due first",
-    ],
   ]);
   for (const text of [
     "68,848.08",
+    "includes 4,654.08 tax",
     "44,562.29",
     "64,194.00",
     "24,285.79",
     "29.1%",
     "25.6%",
     "vs previous 90 days",
-    "10 invoices · 3 overdue",
-    "Not due 17,959.76",
-    "Overdue 6,326.03",
   ]) {
     expect(page.textContent).toContain(text);
   }
   // One currency, so there is nothing to switch.
   expect(page.textContent).not.toContain("Currency");
-  // The panels in their rows, in reading order, right under the header:
-  // the figures, the cash flow across the width, what needs attention beside
-  // the top clients, then Spending, the top items and what is coming up side
-  // by side. Nothing else on the page has a title.
+  // The panels in their rows, in reading order, right under the header: what
+  // is owed today across the width, the period's figures, the cash flow
+  // across the width, what needs attention beside the top clients, then the
+  // top items beside what is coming up. Nothing else on the page has a title.
   expect(page.querySelector("header").nextElementSibling).toBe(content(page));
   expect(layout(page)).toEqual([
+    ["Total receivables"],
     ["Figures in the last 90 days"],
     ["Cash flow"],
     ["Needs your attention", "Top clients"],
-    ["Spending", "Top items", "Coming up"],
+    ["Top items", "Coming up"],
   ]);
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
@@ -354,7 +351,7 @@ it("leaves every comparison out when nothing came before the period", async () =
   rest.querySelector('[aria-labelledby="top-items-title"]').remove();
   expect(rest.textContent).not.toMatch(/\d%/);
   expect(tiles(page)[0][1]).toBe(
-    "Billed in the last 90 days: USD 68,848.08. View the invoices, receipts and credit notes",
+    "Billed in the last 90 days: USD 68,848.08, including USD 4,654.08 tax. View the sales",
   );
 });
 
@@ -364,7 +361,7 @@ it("compares only figures that were not zero before", async () => {
     withTotals({ billed: { current: 68848.08, previous: 0 } }),
   );
   expect(tiles(page)[0][1]).toBe(
-    "Billed in the last 90 days: USD 68,848.08. View the invoices, receipts and credit notes",
+    "Billed in the last 90 days: USD 68,848.08, including USD 4,654.08 tax. View the sales",
   );
   expect(tiles(page)[1][1]).toContain("down 25.6% vs previous 90 days");
   expect(page.textContent.match(/vs previous 90 days/g)).toHaveLength(2);
@@ -391,7 +388,7 @@ it("keeps the chosen period in the address and asks for it", async () => {
     "Last 12 months, Nov 1, 2025 – Oct 4, 2026 · compared with Nov 1, 2024 – Oct 31, 2025",
   );
   expect(tiles(page)[0]).toEqual([
-    "/documents?type=billed&period=12m",
+    "/sales?period=12m",
     expect.stringContaining("Billed in the last 12 months: USD 68,848.08"),
   ]);
   // The last 12 months is Reports' own default.
@@ -558,7 +555,7 @@ it("keeps the period when the first currency is picked again", async () => {
   );
 });
 
-it("opens each figure's records for the same period and the chosen currency", async () => {
+it("opens each figure's view for the same period and the chosen currency", async () => {
   const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
     ...overview,
     currencies: ["USD", "EUR"],
@@ -573,30 +570,81 @@ it("opens each figure's records for the same period and the chosen currency", as
     },
   }));
   expect(tiles(page).map(([href]) => href)).toEqual([
-    "/documents?type=billed&period=this-year&currency=EUR",
+    "/sales?period=this-year&currency=EUR",
     "/payments?period=this-year&currency=EUR",
     "/reports?period=ytd&currency=EUR#profit",
-    "/documents?status=outstanding&currency=EUR&sort=dueDate&dir=asc",
   ]);
+  // What is owed is as of today, so its links name no period.
+  expect(links(receivables(page)).map(([href]) => href)).toEqual([
+    "/receivables?currency=EUR",
+    "/receivables?mode=overdue&currency=EUR",
+  ]);
+  // What needs attention opens only its invoices, in any currency.
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
-  expect(attention.querySelector("a").getAttribute("href")).toBe(
-    "/documents?status=overdue&currency=EUR",
+  expect(
+    [...attention.querySelectorAll("a")].every((link) =>
+      link.getAttribute("href").startsWith("/document/"),
+    ),
+  ).toBe(true);
+});
+
+it("opens the views for the last 30 days, and Reports at the same days", async () => {
+  const page = await open("/dashboard?period=30d", lastThirtyDays);
+  expect(tiles(page).map(([href]) => href)).toEqual([
+    "/sales?period=30d",
+    "/payments?period=30d",
+    "/reports?period=30d#profit",
+  ]);
+  expect(links(receivables(page)).map(([href]) => href)).toEqual([
+    "/receivables",
+    "/receivables?mode=overdue",
+  ]);
+});
+
+it("shows billed, received and profit as large cards, billed with the tax it includes", async () => {
+  const page = await open("/dashboard");
+  const cards = [
+    ...page.querySelectorAll('[aria-labelledby="figures-title"] a'),
+  ];
+  // As large as the Reports page's cards, each in its tone.
+  expect(cards.map((card) => card.className.match(/bg-card-\w+/)[0])).toEqual([
+    "bg-card-blue",
+    "bg-card-lilac",
+    "bg-card-sage",
+  ]);
+  for (const card of cards) {
+    expect(card.className).toContain("[container-name:finance-card]");
+    expect(card.querySelector(".font-display").className).toContain("min(56px");
+  }
+  // Only Billed has a line under its figure.
+  expect(cards.map((card) => card.textContent.includes("includes"))).toEqual([
+    true,
+    false,
+    false,
+  ]);
+  expect(cards[0].textContent).toContain("68,848.08includes 4,654.08 tax");
+  // Billed opens the Sales view, Received the Payments list with its
+  // summary, and Profit the profit and loss report.
+  expect(cards.map((card) => card.getAttribute("href"))).toEqual([
+    "/sales?period=90d",
+    "/payments?period=90d",
+    "/reports?period=90d#profit",
+  ]);
+});
+
+it("leaves the tax out when the server sends none", async () => {
+  const { tax, previousTax, ...older } = overview.totals;
+  const page = await open("/dashboard", { ...overview, totals: older });
+  expect(page.textContent).not.toContain("includes");
+  expect(tiles(page)[0][1]).toBe(
+    "Billed in the last 90 days: USD 68,848.08, up 29.1% vs previous 90 days. View the sales",
   );
 });
 
-it("opens the last 30 days' records, and Reports at the same days", async () => {
-  const page = await open("/dashboard?period=30d", lastThirtyDays);
-  expect(tiles(page).map(([href]) => href)).toEqual([
-    "/documents?type=billed&period=30d",
-    "/payments?period=30d",
-    "/reports?period=30d#profit",
-    "/documents?status=outstanding&sort=dueDate&dir=asc",
-  ]);
-});
-
-it("shows what needs attention, each opening its list", async () => {
+it("shows the invoices that need attention, each opening its invoice and nothing else", async () => {
   const page = await open("/dashboard");
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
+  // Overdue and due soon; the quotation is Coming up's.
   expect(
     [...attention.querySelectorAll("ol > li")].map((item) => item.textContent),
   ).toEqual([
@@ -604,30 +652,22 @@ it("shows what needs attention, each opening its list", async () => {
     "OverdueINV-1030Quill & Co. Publishing21 days lateDue Sep 131,969.11",
     "OverdueINV-1031Verdant Farms10 days lateDue Sep 24965.25",
     "Due soonINV-1032Bluefin AnalyticsDue in 2 daysDue Oct 62,664.09",
-    "QuotationQUO-0206Kestrel OutdoorAwaiting an answerValid until Oct 91,201.20",
   ]);
+  // Each row opens its invoice; client names are words, and no link opens
+  // the overdue invoices, as the Overdue figure above does.
   expect(
     [...attention.querySelectorAll("a")].map((link) => [
       link.getAttribute("href"),
-      link.getAttribute("aria-label") || link.textContent,
+      link.getAttribute("aria-label"),
     ]),
   ).toEqual([
-    ["/documents?status=overdue", "Overdue invoices"],
     [
       "/document/00000000-0000-0000-0000-000000001026",
       "Overdue INV-1026, Sable Fitness, 54 days late, Due Aug 11, 3,391.67",
     ],
     [
-      "/single-customer/00000000-0000-0000-0000-00000000c105",
-      "Sable Fitness. View the client",
-    ],
-    [
       "/document/00000000-0000-0000-0000-000000001030",
       "Overdue INV-1030, Quill & Co. Publishing, 21 days late, Due Sep 13, 1,969.11",
-    ],
-    [
-      "/single-customer/00000000-0000-0000-0000-00000000c107",
-      "Quill & Co. Publishing. View the client",
     ],
     [
       "/document/00000000-0000-0000-0000-000000001031",
@@ -637,21 +677,70 @@ it("shows what needs attention, each opening its list", async () => {
       "/document/00000000-0000-0000-0000-000000001032",
       "Due soon INV-1032, Bluefin Analytics, Due in 2 days, Due Oct 6, 2,664.09",
     ],
-    [
-      "/single-customer/00000000-0000-0000-0000-00000000c103",
-      "Bluefin Analytics. View the client",
-    ],
-    [
-      "/document/00000000-0000-0000-0000-000000000206",
-      "Quotation QUO-0206, Kestrel Outdoor, Awaiting an answer, Valid until Oct 9, 1,201.20",
-    ],
-    [
-      "/single-customer/00000000-0000-0000-0000-00000000c109",
-      "Kestrel Outdoor. View the client",
-    ],
   ]);
-  expect(attention.textContent).toContain(
-    "No payment reports to confirm, drafts to issue or recurring invoices due this week.",
+  expect(attention.textContent).not.toContain("Overdue invoices");
+  expect(attention.lastElementChild.textContent).toBe(
+    "No payment reports to confirm or drafts to issue.",
+  );
+});
+
+it("opens a document listed twice from its first row only", async () => {
+  const [late] = overview.attention.items;
+  const page = await open("/dashboard", {
+    ...overview,
+    attention: {
+      items: [
+        {
+          ...late,
+          kind: "paymentReport",
+          date: "2026-10-03",
+          days: null,
+        },
+        late,
+      ],
+      counts: { paymentReports: 1, overdue: 1, dueSoon: 0, drafts: 0 },
+    },
+  });
+  const [reported, overdue] = page.querySelectorAll(
+    '[aria-labelledby="attention-title"] ol > li',
+  );
+  expect(reported.querySelector("a").getAttribute("href")).toBe(
+    "/document/00000000-0000-0000-0000-000000001026",
+  );
+  // The second row is still read, whole, but opens nothing.
+  expect(overdue.querySelector("a")).toBeNull();
+  const row = overdue.firstElementChild;
+  expect(row.getAttribute("role")).toBe("img");
+  expect(row.getAttribute("aria-label")).toBe(
+    "Overdue INV-1026, Sable Fitness, 54 days late, Due Aug 11, 3,391.67",
+  );
+  expect(row.className).not.toContain("hover:");
+});
+
+it("leaves out the quotations and recurring invoices an older server lists", async () => {
+  const [late] = overview.attention.items;
+  const page = await open("/dashboard", {
+    ...overview,
+    attention: {
+      items: [
+        late,
+        { ...late, kind: "quotation", documentId: "q-1" },
+        { ...late, kind: "recurring", documentId: "t-1" },
+      ],
+      counts: {
+        paymentReports: 0,
+        overdue: 1,
+        dueSoon: 0,
+        quotations: 1,
+        recurring: 1,
+        drafts: 0,
+      },
+    },
+  });
+  const attention = page.querySelector('[aria-labelledby="attention-title"]');
+  expect(attention.querySelectorAll("ol > li")).toHaveLength(1);
+  expect(attention.lastElementChild.textContent).toBe(
+    "No payment reports to confirm, invoices due this week or drafts to issue.",
   );
 });
 
@@ -660,14 +749,7 @@ it("says when nothing needs attention", async () => {
     ...overview,
     attention: {
       items: [],
-      counts: {
-        paymentReports: 0,
-        overdue: 0,
-        dueSoon: 0,
-        quotations: 0,
-        recurring: 0,
-        drafts: 0,
-      },
+      counts: { paymentReports: 0, overdue: 0, dueSoon: 0, drafts: 0 },
     },
   });
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
@@ -675,6 +757,93 @@ it("says when nothing needs attention", async () => {
     "Needs your attentionNothing needs your attention right now.",
   );
   expect(attention.querySelector("a")).toBeNull();
+});
+
+// The receivables card's bar, each part's colour and the amount it grows by,
+// and its legend of overdue bands.
+const bar = (card) =>
+  [...card.querySelector(".h-4").children].map((part) => [
+    part.className.match(/bg-owed-[\w-]+/)[0],
+    parseFloat(part.style.flexGrow),
+  ]);
+const legend = (card) =>
+  [...card.querySelectorAll('ul[aria-label="Overdue by days late"] > li')].map(
+    (band) => band.textContent,
+  );
+
+it("shows what is owed today across the width, split into current and overdue by days late", async () => {
+  const page = await open("/dashboard");
+  const card = receivables(page);
+  // Right under the header, above the period's figures.
+  expect(content(page).firstElementChild).toBe(card);
+  expect(card.querySelector("h2").textContent).toBe("Total receivables");
+  expect(card.textContent).toContain("Total receivablesas of today");
+  expect(card.textContent).toContain("24,285.79across 10 unpaid invoices");
+  // Not due yet, then each overdue band in a rust that deepens with age; a
+  // band with nothing in it is left out of the bar.
+  expect(bar(card)).toEqual([
+    ["bg-owed-due", 17959.76],
+    ["bg-owed-age-1", 965.25],
+    ["bg-owed-age-2", 1969.11],
+    ["bg-owed-age-4", 3391.67],
+  ]);
+  expect(card.querySelector(".h-4").getAttribute("aria-hidden")).toBe("true");
+  // The overdue bands, each with its amount and count, the empty one too.
+  expect(legend(card)).toEqual([
+    "1–15 days965.25· 1 late: USD 965.25 on 1 invoice",
+    "16–30 days1,969.11· 1 late: USD 1,969.11 on 1 invoice",
+    "31–45 days0.00· 0 late: USD 0.00 on 0 invoices",
+    "Over 45 days3,391.67· 1 late: USD 3,391.67 on 1 invoice",
+  ]);
+  expect(
+    [...card.querySelectorAll("li .rounded-\\[3px\\]")].map(
+      (swatch) => swatch.className.match(/bg-owed-[\w-]+/)[0],
+    ),
+  ).toEqual([
+    "bg-owed-age-1",
+    "bg-owed-age-2",
+    "bg-owed-age-3",
+    "bg-owed-age-4",
+  ]);
+  // Current opens what is coming in on the Receivables view, and Overdue
+  // what is overdue there. There is no link to the age table any more.
+  expect(links(card)).toEqual([
+    [
+      "/receivables",
+      "Current, not due yet: USD 17,959.76 on 7 invoices. View what is coming in",
+    ],
+    [
+      "/receivables?mode=overdue",
+      "Overdue: USD 6,326.03 on 3 invoices. View the overdue invoices",
+    ],
+  ]);
+  expect(card.textContent).not.toContain("Aging details");
+  const [current, late] = card.querySelectorAll("a");
+  expect(current.textContent).toContain("Current");
+  expect(current.textContent).toContain("17,959.76");
+  expect(current.textContent).toContain("· 7 invoices");
+  expect(late.textContent).toContain("Overdue");
+  expect(late.textContent).toContain("6,326.03");
+  expect(late.textContent).toContain("· 3 invoices");
+});
+
+// Every link's address but the period tabs', which show the overview again
+// rather than open a view.
+const opened = (page) =>
+  [...page.querySelectorAll("a")]
+    .filter((link) => !link.closest('nav[aria-label="Period"]'))
+    .map((link) => link.getAttribute("href"));
+// The addresses more than one link opens.
+const repeated = (hrefs) => [
+  ...new Set(hrefs.filter((href, index) => hrefs.indexOf(href) !== index)),
+];
+
+it("opens a view or record of its own from every link", async () => {
+  const page = await open("/dashboard");
+  const hrefs = opened(page);
+  expect(hrefs).toContain("/receivables");
+  expect(hrefs).toContain("/receivables?mode=overdue");
+  expect(repeated(hrefs)).toEqual([]);
 });
 
 it("says when nothing is owed", async () => {
@@ -686,11 +855,38 @@ it("says when nothing is owed", async () => {
       overdue: 0,
       invoices: 0,
       overdueInvoices: 0,
+      bands: ["current", "days1to15", "days16to30", "days31to45", "over45"].map(
+        (key) => ({ key, amount: 0, invoices: 0 }),
+      ),
     },
   });
-  expect(tiles(page)[3][1]).toBe(
-    "Outstanding now: USD 0.00, no unpaid invoices. View the invoices owed, soonest due first",
-  );
+  const card = receivables(page);
+  expect(card.textContent).toContain("0.00No unpaid invoices");
+  // The bar is an empty track.
+  expect(bar(card)).toEqual([]);
+  expect(card.querySelector(".h-4").className).toContain("bg-white/50");
+  expect(legend(card)).toEqual([
+    "1–15 days0.00· 0 late: USD 0.00 on 0 invoices",
+    "16–30 days0.00· 0 late: USD 0.00 on 0 invoices",
+    "31–45 days0.00· 0 late: USD 0.00 on 0 invoices",
+    "Over 45 days0.00· 0 late: USD 0.00 on 0 invoices",
+  ]);
+  expect(links(card).map(([, label]) => label)).toEqual([
+    "Current, not due yet: USD 0.00 on 0 invoices. View what is coming in",
+    "Overdue: USD 0.00 on 0 invoices. View the overdue invoices",
+  ]);
+});
+
+it("splits what is owed only into current and overdue when the server sends no bands", async () => {
+  const { bands, ...older } = overview.owedNow;
+  const page = await open("/dashboard", { ...overview, owedNow: older });
+  const card = receivables(page);
+  expect(bar(card)).toEqual([
+    ["bg-owed-due", 17959.76],
+    ["bg-owed-overdue", 6326.03],
+  ]);
+  expect(legend(card)).toEqual([]);
+  expect(links(card)).toHaveLength(2);
 });
 
 it("names what the attention list leaves out", async () => {
@@ -702,173 +898,21 @@ it("names what the attention list leaves out", async () => {
         ...late,
         documentId: `${late.documentId}-${index}`,
       })),
-      counts: {
-        paymentReports: 0,
-        overdue: 9,
-        dueSoon: 4,
-        quotations: 2,
-        recurring: 1,
-        drafts: 7,
-      },
+      counts: { paymentReports: 0, overdue: 9, dueSoon: 4, drafts: 7 },
     },
   });
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
   expect(attention.querySelectorAll("ol > li")).toHaveLength(6);
   expect(attention.textContent).toContain(
-    "No payment reports to confirm. Also 3 more overdue invoices, 4 due this week, 2 quotations, 1 recurring invoice and 7 drafts.",
+    "No payment reports to confirm. Also 3 more overdue invoices, 4 due this week and 7 drafts.",
   );
 });
 
-// What was spent in the last 90 days: the five largest categories, then
-// three more added up.
-const spent = {
-  total: 7610.15,
-  categories: [
-    { category: "Contractors", amount: 3600, expenses: 2 },
-    { category: "Software and subscriptions", amount: 1240, expenses: 4 },
-    { category: "Marketing", amount: 980, expenses: 2 },
-    { category: "Travel", amount: 865.4, expenses: 3 },
-    { category: "Office", amount: 412.75, expenses: 5 },
-  ],
-  others: { amount: 512, expenses: 6, categories: 3 },
-};
-const spendingPanel = (page) =>
-  page.querySelector('[aria-labelledby="spending-title"]');
 const links = (element) =>
   [...element.querySelectorAll("a")].map((link) => [
     link.getAttribute("href"),
     link.getAttribute("aria-label") || link.textContent,
   ]);
-
-it("lists what was spent in the period by category, each opening its expenses", async () => {
-  const page = await open("/dashboard", { ...overview, spending: spent });
-  const spending = spendingPanel(page);
-  expect(spending.querySelector("p").textContent).toBe(
-    "7,610.15spent in these 90 days",
-  );
-  expect(links(spending)).toEqual([
-    ["/expenses?period=90d&currency=USD", "All expenses"],
-    [
-      "/expenses?category=Contractors&period=90d&currency=USD",
-      "Contractors: 3,600.00 on 2 expenses, 47% of spending. Open these expenses",
-    ],
-    [
-      "/expenses?category=Software+and+subscriptions&period=90d&currency=USD",
-      "Software and subscriptions: 1,240.00 on 4 expenses, 16% of spending. Open these expenses",
-    ],
-    [
-      "/expenses?category=Marketing&period=90d&currency=USD",
-      "Marketing: 980.00 on 2 expenses, 13% of spending. Open these expenses",
-    ],
-    [
-      "/expenses?category=Travel&period=90d&currency=USD",
-      "Travel: 865.40 on 3 expenses, 11% of spending. Open these expenses",
-    ],
-    [
-      "/expenses?category=Office&period=90d&currency=USD",
-      "Office: 412.75 on 5 expenses, 5% of spending. Open these expenses",
-    ],
-  ]);
-  const rows = [...spending.querySelectorAll("ol > li")];
-  expect(rows.map((row) => row.textContent)).toEqual([
-    "Contractors · 23,600.0047%",
-    "Software and subscriptions · 41,240.0016%",
-    "Marketing · 2980.0013%",
-    "Travel · 3865.4011%",
-    "Office · 5412.755%",
-    "3 other categories · 6512.007%",
-  ]);
-  // Each bar is against the largest row.
-  expect(
-    rows.map((row) =>
-      Math.round(parseFloat(row.querySelector("[style]").style.width)),
-    ),
-  ).toEqual([100, 34, 27, 24, 11, 14]);
-  // The rest of the categories open nothing, and are read as one figure.
-  const others = rows[5].firstElementChild;
-  expect(others.tagName).toBe("DIV");
-  expect(others.getAttribute("role")).toBe("img");
-  expect(others.getAttribute("aria-label")).toBe(
-    "3 other categories: 512.00 on 6 expenses, 7% of spending",
-  );
-  expect(spending.lastElementChild.textContent).toBe(
-    "Each category opens its expenses for these 90 days.",
-  );
-});
-
-it("opens the expenses of the period shown, in the chosen currency", async () => {
-  const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
-    ...overview,
-    currencies: ["USD", "EUR"],
-    currency: url.searchParams.get("currency") || "USD",
-    period: {
-      key: "ytd",
-      from: "2026-01-01",
-      to: "2026-10-04",
-      previousFrom: "2025-01-01",
-      previousTo: "2025-10-04",
-      step: "month",
-    },
-    spending: spent,
-  }));
-  const spending = spendingPanel(page);
-  expect(links(spending).map(([href]) => href)).toEqual([
-    "/expenses?period=this-year&currency=EUR",
-    "/expenses?category=Contractors&period=this-year&currency=EUR",
-    "/expenses?category=Software+and+subscriptions&period=this-year&currency=EUR",
-    "/expenses?category=Marketing&period=this-year&currency=EUR",
-    "/expenses?category=Travel&period=this-year&currency=EUR",
-    "/expenses?category=Office&period=this-year&currency=EUR",
-  ]);
-  expect(spending.querySelector("p").textContent).toBe(
-    "7,610.15spent this year",
-  );
-  expect(spending.lastElementChild.textContent).toBe(
-    "Each category opens its expenses for this year.",
-  );
-});
-
-it.each([
-  ["30d", "in these 30 days", "30d"],
-  ["90d", "in these 90 days", "90d"],
-  ["12m", "in these 12 months", "12m"],
-  ["ytd", "this year", "this-year"],
-])(
-  "says when nothing was spent over %s, with a way to record an expense",
-  async (key, words, list) => {
-    const page = await open(`/dashboard?period=${key}`, {
-      ...overview,
-      period: { ...overview.period, key },
-    });
-    const spending = spendingPanel(page);
-    expect(spending.textContent).toBe(
-      `SpendingAll expenses0.00spent ${words}No expenses recorded ${words}.Record an expenseExpenses by category, each opening its expenses.`,
-    );
-    expect(links(spending)).toEqual([
-      [`/expenses?period=${list}&currency=USD`, "All expenses"],
-      ["/expenses?new=1&currency=USD", "Record an expense"],
-    ]);
-  },
-);
-
-it("shows a viewer the way to record an expense disabled, with the reason", async () => {
-  const page = await open("/dashboard", overview, loaded, viewer);
-  const spending = spendingPanel(page);
-  await act(() =>
-    vi.waitFor(() => expect(spending.querySelector("button")).not.toBeNull()),
-  );
-  const record = spending.querySelector("button");
-  expect(record.textContent).toBe("Record an expense");
-  expect(record.disabled).toBe(true);
-  expect(record.title).toBe("Viewers can't change anything in this business");
-  expect(
-    document.getElementById(record.getAttribute("aria-describedby"))
-      .textContent,
-  ).toBe("Viewers can't change anything in this business");
-  expect(links(spending)).toEqual([
-    ["/expenses?period=90d&currency=USD", "All expenses"],
-  ]);
-});
 
 it("keeps each panel's place in its row while the overview loads", async () => {
   let respond;
@@ -880,109 +924,57 @@ it("keeps each panel's place in its row while the overview loads", async () => {
   const loading = page.querySelector(
     '[aria-label="Loading your business overview"]',
   );
-  // After the words for screen readers: the four tiles, the cash flow
-  // across the width, what needs attention and the top clients, then
-  // Spending, the top items and what is coming up.
+  // After the words for screen readers: what is owed across the width, the
+  // three cards, the cash flow across the width, what needs attention and
+  // the top clients, then the top items and what is coming up.
   expect(
     [...loading.children].slice(1).map((row) => row.children.length),
-  ).toEqual([4, 1, 2, 3]);
-  expect(spendingPanel(page)).toBeNull();
-  await act(async () => respond({ ...overview, spending: spent }));
+  ).toEqual([1, 3, 1, 2, 2]);
+  expect(loading.children[1].firstElementChild.className).toContain(
+    "bg-card-peach",
+  );
+  // The three cards as large as they will be, each in its tone.
+  expect(
+    [...loading.children[2].children].map((card) => [
+      card.className.match(/bg-card-\w+/)[0],
+      card.className.includes("[container-name:finance-card]"),
+    ]),
+  ).toEqual([
+    ["bg-card-blue", true],
+    ["bg-card-lilac", true],
+    ["bg-card-sage", true],
+  ]);
+  expect(receivables(page)).toBeNull();
+  await act(async () => respond(overview));
   await act(() => loaded(page));
   expect(
     page.querySelector('[aria-label="Loading your business overview"]'),
   ).toBeNull();
-  expect(spendingPanel(page).querySelector("p").textContent).toBe(
-    "7,610.15spent in these 90 days",
+  expect(layout(page).map((row) => row.length)).toEqual([1, 1, 1, 2, 2]);
+  expect(receivables(page).textContent).toContain(
+    "24,285.79across 10 unpaid invoices",
   );
 });
 
-it("keeps the last period's spending, dimmed, when the chosen period's can't be loaded", async () => {
-  const page = await open("/dashboard", (url) =>
-    url.searchParams.get("period") === "30d"
-      ? json({ message: "Try later" }, 500)
-      : { ...overview, spending: spent },
-  );
-  await click(pill(page, "30 days"));
-  await act(() =>
-    vi.waitFor(() =>
-      expect(page.querySelector('[role="alert"]')).not.toBeNull(),
-    ),
-  );
-  expect(page.querySelector('[role="alert"]').textContent).toContain(
-    "We couldn’t load the last 30 days.Showing the last 90 days.",
-  );
-  const spending = spendingPanel(page);
-  expect(spending.closest("[aria-busy]").getAttribute("aria-busy")).toBe(
-    "true",
-  );
-  expect(spending.querySelector("p").textContent).toBe(
-    "7,610.15spent in these 90 days",
-  );
-  expect(links(spending)[1][0]).toBe(
-    "/expenses?category=Contractors&period=90d&currency=USD",
-  );
-});
-
-it("leaves Spending out when the server sends no spending", async () => {
-  const { spending, ...older } = overview;
-  const page = await open("/dashboard", older);
-  expect(spendingPanel(page)).toBeNull();
+it("shows no Spending, even when the server still sends it", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    spending: {
+      total: 7610.15,
+      categories: [{ category: "Contractors", amount: 3600, expenses: 2 }],
+      others: null,
+    },
+  });
+  expect(page.querySelector('[aria-labelledby="spending-title"]')).toBeNull();
+  expect(page.textContent).not.toContain("Spending");
+  expect(page.textContent).not.toContain("Contractors");
   expect(layout(page)).toEqual([
+    ["Total receivables"],
     ["Figures in the last 90 days"],
     ["Cash flow"],
     ["Needs your attention", "Top clients"],
     ["Top items", "Coming up"],
   ]);
-});
-
-it.each([
-  ["30d", "30d"],
-  ["90d", "90d"],
-  ["12m", "12m"],
-  ["ytd", "this-year"],
-])(
-  "keeps every Spending link over %s to the currency its figures count, though the address names none",
-  async (key, list) => {
-    const page = await open(`/dashboard?period=${key}`, {
-      ...overview,
-      period: { ...overview.period, key },
-      spending: spent,
-    });
-    expect(links(spendingPanel(page)).map(([href]) => href)).toEqual([
-      `/expenses?period=${list}&currency=USD`,
-      ...spent.categories.map(
-        ({ category }) =>
-          `/expenses?${new URLSearchParams({ category, period: list, currency: "USD" })}`,
-      ),
-    ]);
-    // The other figures keep to no currency while none was chosen.
-    expect(tiles(page)[1][0]).toBe(`/payments?period=${list}`);
-  },
-);
-
-it("keeps a category named others apart from the row that adds up the rest", async () => {
-  const warnings = vi.spyOn(console, "error").mockImplementation(() => {});
-  try {
-    const page = await open("/dashboard", {
-      ...overview,
-      spending: {
-        ...spent,
-        categories: [
-          ...spent.categories.slice(0, 4),
-          { category: "others", amount: 412.75, expenses: 5 },
-        ],
-      },
-    });
-    expect(
-      [...spendingPanel(page).querySelectorAll("ol > li")]
-        .slice(-2)
-        .map((row) => row.textContent),
-    ).toEqual(["others · 5412.755%", "3 other categories · 6512.007%"]);
-    expect(warnings.mock.calls.flat().join(" ")).not.toContain("same key");
-  } finally {
-    warnings.mockRestore();
-  }
 });
 
 const shortcuts = (page) => page.querySelector('nav[aria-label="Shortcuts"]');
@@ -1035,81 +1027,68 @@ it("shows a viewer the shortcuts disabled, with the reason given once", async ()
   expect(nav.querySelector("a")).toBeNull();
 });
 
-it("opens a client from the attention list in a link of its own beside the document's", async () => {
+it("names each row's client in words, the row reading once as its invoice's link", async () => {
   const page = await open("/dashboard");
   const rows = [
     ...page.querySelectorAll('[aria-labelledby="attention-title"] ol > li'),
   ];
-  // With a client: the document and the client, each its own link, neither
-  // inside the other, both reached with Tab in reading order.
-  const links = [...rows[0].querySelectorAll("a")];
-  expect(links.map((link) => link.getAttribute("href"))).toEqual([
-    "/document/00000000-0000-0000-0000-000000001026",
-    "/single-customer/00000000-0000-0000-0000-00000000c105",
-  ]);
-  expect(links[1].textContent).toBe("Sable Fitness");
-  for (const link of links) {
-    expect(link.querySelector("a")).toBeNull();
-    expect(link.parentElement.closest("a")).toBeNull();
-    expect(link.tabIndex).toBe(0);
-  }
-  expect(
-    links[0].compareDocumentPosition(links[1]) &
-      Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
-  // Without one, the name is only words, and the row opens its document.
-  const unlinked = [...rows[2].querySelectorAll("a")];
-  expect(unlinked.map((link) => link.getAttribute("href"))).toEqual([
-    "/document/00000000-0000-0000-0000-000000001031",
-  ]);
-  expect(rows[2].querySelector('[class*="grid-area:client"]').tagName).toBe(
-    "SPAN",
-  );
-  expect(rows[2].textContent).toContain("Verdant Farms");
-  // Each row is read once: the document's link reads it whole, so the words
-  // beside it are hidden from screen readers.
   for (const row of rows) {
+    expect(row.querySelectorAll("a")).toHaveLength(1);
+    const client = row.querySelector('[class*="grid-area:client"]');
+    expect(client.tagName).toBe("SPAN");
+    expect(client.getAttribute("aria-hidden")).toBe("true");
+    // The document's link reads the row whole, so the words beside it are
+    // hidden from screen readers rather than read twice.
     const read = row.cloneNode(true);
     read
       .querySelectorAll('a, [aria-hidden="true"]')
       .forEach((node) => node.remove());
     expect(read.textContent).toBe("");
   }
+  expect(rows[0].textContent).toContain("Sable Fitness");
   expect(
-    page.querySelector('[aria-labelledby="attention-title"]').lastElementChild
-      .textContent,
-  ).toBe(
-    "No payment reports to confirm, drafts to issue or recurring invoices due this week. A client’s name opens the client.",
-  );
+    page.querySelector(
+      '[aria-labelledby="attention-title"] a[href^="/single-customer/"]',
+    ),
+  ).toBeNull();
 });
 
-it("says nothing of clients when no row in the attention list links one", async () => {
-  const page = await open("/dashboard", {
-    ...overview,
-    attention: {
-      ...overview.attention,
-      items: overview.attention.items.map((item) => ({
-        ...item,
-        clientId: null,
-      })),
-    },
-  });
-  const attention = page.querySelector('[aria-labelledby="attention-title"]');
-  expect(
-    [...attention.querySelectorAll("ol a")].map((link) =>
-      link.getAttribute("href"),
-    ),
-  ).toEqual([
-    "/document/00000000-0000-0000-0000-000000001026",
-    "/document/00000000-0000-0000-0000-000000001030",
-    "/document/00000000-0000-0000-0000-000000001031",
-    "/document/00000000-0000-0000-0000-000000001032",
-    "/document/00000000-0000-0000-0000-000000000206",
-  ]);
-  expect(attention.lastElementChild.textContent).toBe(
-    "No payment reports to confirm, drafts to issue or recurring invoices due this week.",
-  );
-});
+it.each([
+  ["30d", "the last 30 days", "30d", ""],
+  ["90d", "the last 90 days", "90d", ""],
+  ["ytd", "this year", "this-year", "EUR"],
+])(
+  "opens the expenses of the period shown over %s from the money out, in the overview's currency",
+  async (key, words, list, chosen) => {
+    const page = await open(
+      `/dashboard?period=${key}${chosen ? `&currency=${chosen}` : ""}`,
+      (url) => ({
+        ...overview,
+        currencies: ["USD", "EUR"],
+        currency: url.searchParams.get("currency") || "USD",
+        period: { ...overview.period, key },
+      }),
+    );
+    const flow = page.querySelector('[aria-labelledby="cash-flow-title"]');
+    const out = [...flow.querySelectorAll("dl > div")].find(
+      (figure) => figure.querySelector("dt").textContent === "Out",
+    );
+    // Only the money out opens anything, and always in the currency its
+    // figure counts, even when the address names none.
+    expect(
+      [...flow.querySelectorAll("a")].map((link) => [
+        link.getAttribute("href"),
+        link.getAttribute("aria-label"),
+      ]),
+    ).toEqual([
+      [
+        `/expenses?period=${list}&currency=${chosen || "USD"}`,
+        `Money out ${key === "ytd" ? words : `in ${words}`}: ${chosen || "USD"} 0.00. View the expenses`,
+      ],
+    ]);
+    expect(out.querySelector("dd a").textContent).toBe("0.00");
+  },
+);
 
 it("hides the cash flow's table for screen readers inside a box that clips it", async () => {
   const page = await open("/dashboard");
@@ -1140,8 +1119,9 @@ it("lists the clients billed the most beside what needs attention, each linked n
   expect(panel.querySelector("p").textContent).toBe(
     "Billed in these 90 days, largest first",
   );
+  // Sales by customer opens every client's sales, for the same days.
   expect(links(panel)).toEqual([
-    ["/customers", "All clients"],
+    ["/customers/sales?period=90d", "Sales by customer"],
     [
       `/single-customer/${C}107`,
       "Quill & Co. Publishing: 13,459.88 billed on 2 documents, owes 1,969.11. View the client",
@@ -1212,7 +1192,7 @@ it("lists the clients billed the most beside what needs attention, each linked n
   );
 });
 
-it("opens every client the same way in any currency and period", async () => {
+it("opens every client the same way in any currency and period, and sales by customer for them", async () => {
   const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
     ...overview,
     currencies: ["USD", "EUR"],
@@ -1224,7 +1204,7 @@ it("opens every client the same way in any currency and period", async () => {
     "Billed this year, largest first",
   );
   expect(links(panel).map(([href]) => href)).toEqual([
-    "/customers",
+    "/customers/sales?period=this-year&currency=EUR",
     `/single-customer/${C}107`,
     `/single-customer/${C}109`,
     `/single-customer/${C}110`,
@@ -1241,17 +1221,19 @@ it("says nothing of names opening clients when no client is linked", async () =>
     })),
   });
   const panel = topClients(page);
-  expect(links(panel)).toEqual([["/customers", "All clients"]]);
+  expect(links(panel)).toEqual([
+    ["/customers/sales?period=90d", "Sales by customer"],
+  ]);
   expect(panel.querySelectorAll('ol > li > [role="img"]')).toHaveLength(5);
   expect(panel.lastElementChild.tagName).toBe("OL");
 });
 
 it.each([
-  ["30d", "in these 30 days"],
-  ["90d", "in these 90 days"],
-  ["12m", "in these 12 months"],
-  ["ytd", "this year"],
-])("says when no one was billed over %s", async (key, words) => {
+  ["30d", "in these 30 days", "/customers/sales?period=30d"],
+  ["90d", "in these 90 days", "/customers/sales?period=90d"],
+  ["12m", "in these 12 months", "/customers/sales?period=12m"],
+  ["ytd", "this year", "/customers/sales?period=this-year"],
+])("says when no one was billed over %s", async (key, words, sales) => {
   const page = await open(`/dashboard?period=${key}`, {
     ...overview,
     period: { ...overview.period, key },
@@ -1259,9 +1241,9 @@ it.each([
   });
   const panel = topClients(page);
   expect(panel.textContent).toBe(
-    `Top clientsAll clientsNo one billed ${words}.`,
+    `Top clientsSales by customerNo one billed ${words}.`,
   );
-  expect(links(panel)).toEqual([["/customers", "All clients"]]);
+  expect(links(panel)).toEqual([[sales, "Sales by customer"]]);
 });
 
 it("leaves what needs attention its whole row when the server sends no top clients", async () => {
@@ -1269,10 +1251,11 @@ it("leaves what needs attention its whole row when the server sends no top clien
   const page = await open("/dashboard", older);
   expect(topClients(page)).toBeNull();
   expect(layout(page)).toEqual([
+    ["Total receivables"],
     ["Figures in the last 90 days"],
     ["Cash flow"],
     ["Needs your attention"],
-    ["Spending", "Top items", "Coming up"],
+    ["Top items", "Coming up"],
   ]);
   expect(
     page.querySelector('[aria-labelledby="attention-title"]').parentElement
@@ -1303,38 +1286,40 @@ it("keeps the last period's top clients, dimmed, when the chosen period's can't 
 const topItems = (page) =>
   page.querySelector('[aria-labelledby="top-items-title"]');
 
-it("lists the items that brought in the most beside Spending, each opening Items searched for it", async () => {
+it("lists the items that brought in the most beside what is coming up, each opening its sales for the same days", async () => {
   const page = await open("/dashboard");
   const panel = topItems(page);
   expect(
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
     ),
-  ).toEqual(["spending-title", "top-items-title", "coming-up-title"]);
+  ).toEqual(["top-items-title", "coming-up-title"]);
   expect(panel.querySelector("p").textContent).toBe(
     "What you sold in these 90 days, before tax",
   );
+  // Sales by item opens every item's sales, and each row its own, for the
+  // same days.
   expect(links(panel)).toEqual([
-    ["/items", "All items"],
+    ["/items/sales?period=90d", "Sales by item"],
     [
-      "/items?q=Motion+graphics+%28per+15+seconds%29",
-      "Motion graphics (per 15 seconds): 18,200.00, 28 sold, 28% of income. Search Items for it",
+      "/items/sales/item?name=Motion+graphics+%28per+15+seconds%29&period=90d",
+      "Motion graphics (per 15 seconds): 18,200.00, 28 sold, 28% of income. View its sales",
     ],
     [
-      "/items?q=Logo+and+identity+system",
-      "Logo and identity system: 9,280.00, 3 sold, 14% of income. Search Items for it",
+      "/items/sales/item?name=Logo+and+identity+system&period=90d",
+      "Logo and identity system: 9,280.00, 3 sold, 14% of income. View its sales",
     ],
     [
-      "/items?q=Consulting+%28hourly%29",
-      "Consulting (hourly): 7,140.00, 52 sold, 11% of income. Search Items for it",
+      "/items/sales/item?name=Consulting+%28hourly%29&period=90d",
+      "Consulting (hourly): 7,140.00, 52 sold, 11% of income. View its sales",
     ],
     [
-      "/items?q=Front-end+build+%28per+page%29",
-      "Front-end build (per page): 6,460.00, 17 sold, 10% of income. Search Items for it",
+      "/items/sales/item?name=Front-end+build+%28per+page%29&period=90d",
+      "Front-end build (per page): 6,460.00, 17 sold, 10% of income. View its sales",
     ],
     [
-      "/items?q=Brand+strategy+workshop",
-      "Brand strategy workshop: 5,400.00, 3 sold, 8% of income. Search Items for it",
+      "/items/sales/item?name=Brand+strategy+workshop&period=90d",
+      "Brand strategy workshop: 5,400.00, 3 sold, 8% of income. View its sales",
     ],
   ]);
   const rows = [...panel.querySelectorAll("ol > li")];
@@ -1352,11 +1337,11 @@ it("lists the items that brought in the most beside Spending, each opening Items
     ),
   ).toEqual([100, 51, 39, 35, 30]);
   expect(panel.lastElementChild.textContent).toBe(
-    "Everything sold adds up to the income behind Profit. Each row searches Items for it.",
+    "Everything sold adds up to the income behind Profit. Each row opens what it sold.",
   );
 });
 
-it("adds up lines without a name as other lines, which open nothing", async () => {
+it("adds up lines without a name as other lines, which open their own page too", async () => {
   const page = await open("/dashboard", {
     ...overview,
     topItems: [
@@ -1373,18 +1358,33 @@ it("adds up lines without a name as other lines, which open nothing", async () =
     "Other lines4 sold · 1% of income650.50",
     "Stickers40 sold · <1% of income12.00",
   ]);
-  const other = rows[3].firstElementChild;
-  expect(other.tagName).toBe("DIV");
-  expect(other.getAttribute("role")).toBe("img");
-  expect(other.getAttribute("aria-label")).toBe(
-    "Other lines: 650.50, 4 sold, 1% of income",
+  expect(rows[3].firstElementChild.getAttribute("aria-label")).toBe(
+    "Other lines: 650.50, 4 sold, 1% of income. View its sales",
   );
   expect(links(topItems(page)).map(([href]) => href)).toEqual([
-    "/items",
-    "/items?q=Motion+graphics+%28per+15+seconds%29",
-    "/items?q=Logo+and+identity+system",
-    "/items?q=Consulting+%28hourly%29",
-    "/items?q=Stickers",
+    "/items/sales?period=90d",
+    "/items/sales/item?name=Motion+graphics+%28per+15+seconds%29&period=90d",
+    "/items/sales/item?name=Logo+and+identity+system&period=90d",
+    "/items/sales/item?name=Consulting+%28hourly%29&period=90d",
+    "/items/sales/item?name=Other+lines&period=90d",
+    "/items/sales/item?name=Stickers&period=90d",
+  ]);
+});
+
+it("opens the items' sales for the year to date in the chosen currency", async () => {
+  const page = await open("/dashboard?period=ytd&currency=EUR", (url) => ({
+    ...overview,
+    currencies: ["USD", "EUR"],
+    currency: url.searchParams.get("currency") || "USD",
+    period: { ...overview.period, key: "ytd" },
+  }));
+  expect(
+    links(topItems(page))
+      .map(([href]) => href)
+      .slice(0, 2),
+  ).toEqual([
+    "/items/sales?period=this-year&currency=EUR",
+    "/items/sales/item?name=Motion+graphics+%28per+15+seconds%29&period=this-year&currency=EUR",
   ]);
 });
 
@@ -1399,17 +1399,17 @@ it("leaves the shares out when there was no income to share", async () => {
     "Refunded work2 sold0.00",
   );
   expect(links(panel)[1]).toEqual([
-    "/items?q=Refunded+work",
-    "Refunded work: 0.00, 2 sold. Search Items for it",
+    "/items/sales/item?name=Refunded+work&period=90d",
+    "Refunded work: 0.00, 2 sold. View its sales",
   ]);
 });
 
 it.each([
-  ["30d", "in these 30 days"],
-  ["90d", "in these 90 days"],
-  ["12m", "in these 12 months"],
-  ["ytd", "this year"],
-])("says when nothing was sold over %s", async (key, words) => {
+  ["30d", "in these 30 days", "30d"],
+  ["90d", "in these 90 days", "90d"],
+  ["12m", "in these 12 months", "12m"],
+  ["ytd", "this year", "this-year"],
+])("says when nothing was sold over %s", async (key, words, list) => {
   const page = await open(`/dashboard?period=${key}`, {
     ...overview,
     period: { ...overview.period, key },
@@ -1417,15 +1417,19 @@ it.each([
     itemsTotal: 0,
   });
   const panel = topItems(page);
-  expect(panel.textContent).toBe(`Top itemsAll itemsNothing sold ${words}.`);
-  expect(links(panel)).toEqual([["/items", "All items"]]);
+  expect(panel.textContent).toBe(
+    `Top itemsSales by itemNothing sold ${words}.`,
+  );
+  expect(links(panel)).toEqual([
+    [`/items/sales?period=${list}`, "Sales by item"],
+  ]);
 });
 
 it("leaves the rest of its row when the server sends no top items", async () => {
   const { topItems: left, itemsTotal, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(topItems(page)).toBeNull();
-  expect(layout(page)[3]).toEqual(["Spending", "Coming up"]);
+  expect(layout(page)[4]).toEqual(["Coming up"]);
 });
 
 const comingUp = (page) =>
@@ -1438,39 +1442,33 @@ const withComingUp = (changes) => ({
   comingUp: { ...overview.comingUp, ...changes },
 });
 
-it("shows what is coming up beside the top items: the next recurring invoices and the quotations waiting for an answer", async () => {
+it("shows what is coming up beside the top items: each schedule's next invoice, the quotations waiting for an answer and the latest that expired", async () => {
   const page = await open("/dashboard");
   const panel = comingUp(page);
   expect(
     [...panel.parentElement.children].map((section) =>
       section.getAttribute("aria-labelledby"),
     ),
-  ).toEqual(["spending-title", "top-items-title", "coming-up-title"]);
+  ).toEqual(["top-items-title", "coming-up-title"]);
   expect(
     [...panel.querySelectorAll("h3")].map((heading) => heading.textContent),
   ).toEqual(["Recurring invoices", "Quotations"]);
   expect(panel.textContent).toContain("Next 90 days: 7 invoices · 10,650.00");
+  // Each schedule once, at its next run, opening the invoice it repeats,
+  // whose page shows its schedule.
   expect(links(panel)).toEqual([
     ["/recurring", "Recurring"],
     [
-      "/recurring",
-      "Oct 12: Harbor & Pine Architects, INV-1012, 450.00. Open the recurring invoices",
+      "/document/00000000-0000-0000-0000-000000001012",
+      "Oct 12: Harbor & Pine Architects, INV-1012, 450.00. Open the invoice it repeats",
     ],
     [
-      "/recurring",
-      "Oct 20: Bluefin Analytics, INV-1020, 2,500.00. Open the recurring invoices",
+      "/document/00000000-0000-0000-0000-000000001020",
+      "Oct 20: Bluefin Analytics, INV-1020, 2,500.00. Open the invoice it repeats",
     ],
     [
-      "/recurring",
-      "Nov 3: Oak Street Bakery, INV-1027, 1,800.00. Open the recurring invoices",
-    ],
-    [
-      "/recurring",
-      "Nov 12: Harbor & Pine Architects, INV-1012, 450.00. Open the recurring invoices",
-    ],
-    [
-      "/recurring",
-      "Nov 20: Bluefin Analytics, INV-1020, 2,500.00. Open the recurring invoices",
+      "/document/00000000-0000-0000-0000-000000001027",
+      "Nov 3: Oak Street Bakery, INV-1027, 1,800.00. Open the invoice it repeats",
     ],
     ["/documents?type=quotation", "All quotations"],
     [
@@ -1478,17 +1476,23 @@ it("shows what is coming up beside the top items: the next recurring invoices an
       "QUO-0206, Kestrel Outdoor, valid until Oct 9, 1,201.20. Open the quotation",
     ],
     [
-      "/documents?type=quotation&sort=dueDate&dir=asc",
-      "Expired without an answer: 5 quotations, 25,343.18. Open the quotations, sorted by their last valid day",
+      "/document/00000000-0000-0000-0000-000000000205",
+      "QUO-0205, Atlas Robotics, valid until Aug 24, 5,362.50. Open the quotation",
+    ],
+    [
+      "/document/00000000-0000-0000-0000-000000000204",
+      "QUO-0204, Lumen Health, valid until Jul 2, 8,558.55. Open the quotation",
+    ],
+    [
+      "/document/00000000-0000-0000-0000-000000000203",
+      "QUO-0203, Tidewater Logistics, valid until May 15, 321.75. Open the quotation",
     ],
   ]);
-  const [runs, awaiting] = panel.querySelectorAll("ol");
+  const [runs, awaiting, expired] = panel.querySelectorAll("ol");
   expect([...runs.children].map((run) => run.textContent)).toEqual([
     "Oct 12Harbor & Pine ArchitectsINV-1012450.00",
     "Oct 20Bluefin AnalyticsINV-10202,500.00",
     "Nov 3Oak Street BakeryINV-10271,800.00",
-    "Nov 12Harbor & Pine ArchitectsINV-1012450.00",
-    "Nov 20Bluefin AnalyticsINV-10202,500.00",
   ]);
   expect(awaiting.previousElementSibling.textContent).toBe(
     "Awaiting an answer · 1",
@@ -1502,12 +1506,20 @@ it("shows what is coming up beside the top items: the next recurring invoices an
       (detail) => detail.className,
     ),
   ).toEqual(["whitespace-nowrap", "", "whitespace-nowrap"]);
-  expect(panel.lastElementChild.lastElementChild.textContent).toBe(
-    "Expired without an answer · 5Worth following up, or letting go25,343.18",
+  // The latest three that expired, most recent first, then how many more.
+  expect(expired.previousElementSibling.textContent).toBe(
+    "Expired without an answer · 5",
   );
+  expect([...expired.children].map((quote) => quote.textContent)).toEqual([
+    `QUO-0205${DOT}Atlas Robotics${DOT}valid until Aug 245,362.50`,
+    `QUO-0204${DOT}Lumen Health${DOT}valid until Jul 28,558.55`,
+    `QUO-0203${DOT}Tidewater Logistics${DOT}valid until May 15321.75`,
+  ]);
+  expect(expired.nextElementSibling.textContent).toBe("and 2 more");
+  expect(panel.lastElementChild.lastElementChild).toBe(expired.parentElement);
 });
 
-it("keeps the quotations' lists to the chosen currency", async () => {
+it("keeps the quotations' list to the chosen currency", async () => {
   const page = await open("/dashboard?currency=EUR", (url) => ({
     ...overview,
     currencies: ["USD", "EUR"],
@@ -1516,11 +1528,13 @@ it("keeps the quotations' lists to the chosen currency", async () => {
   expect(
     links(comingUp(page))
       .map(([href]) => href)
-      .filter((href) => !href.startsWith("/recurring")),
+      .filter((href) => !/^\/(recurring|document\/.*10\d\d$)/.test(href)),
   ).toEqual([
     "/documents?type=quotation&currency=EUR",
     "/document/00000000-0000-0000-0000-000000000206",
-    "/documents?type=quotation&currency=EUR&sort=dueDate&dir=asc",
+    "/document/00000000-0000-0000-0000-000000000205",
+    "/document/00000000-0000-0000-0000-000000000204",
+    "/document/00000000-0000-0000-0000-000000000203",
   ]);
 });
 
@@ -1536,12 +1550,12 @@ it("offers to set up a recurring invoice while there is none", async () => {
     withComingUp({ recurring: noSchedules }),
   );
   const panel = comingUp(page);
+  // Setting one up opens the recurring list, so it is the one link there.
   expect(panel.textContent).toContain(
-    "Recurring invoicesRecurringNone yet. Bill a client every week, month or year without lifting a finger.Set one upQuotations",
+    "Recurring invoicesNone yet. Bill a client every week, month or year without lifting a finger.Set one upQuotations",
   );
   expect(panel.textContent).not.toContain("Next 90 days");
-  expect(links(panel).slice(0, 3)).toEqual([
-    ["/recurring", "Recurring"],
+  expect(links(panel).slice(0, 2)).toEqual([
     ["/recurring", "Set one up"],
     ["/documents?type=quotation", "All quotations"],
   ]);
@@ -1602,9 +1616,80 @@ it("names a schedule's draft template and a run without a client", async () => {
     "Oct 12No clientDraft invoice450.00",
   );
   expect(links(panel)[1]).toEqual([
-    "/recurring",
-    "Oct 12: No client, Draft invoice, 450.00. Open the recurring invoices",
+    "/document/00000000-0000-0000-0000-000000001012",
+    "Oct 12: No client, Draft invoice, 450.00. Open the invoice it repeats",
   ]);
+});
+
+it("lists each schedule once, at its next run, whatever order the runs come in", async () => {
+  const [harbor, bluefin] = overview.comingUp.recurring.nextRuns;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      recurring: {
+        active: 2,
+        next90Days: { invoices: 4, amount: 5900 },
+        nextRuns: [
+          { ...bluefin, date: "2026-11-20" },
+          harbor,
+          bluefin,
+          { ...harbor, date: "2026-11-12" },
+        ],
+      },
+    }),
+  );
+  expect(
+    [...comingUp(page).querySelector("ol").children].map(
+      (run) => run.textContent,
+    ),
+  ).toEqual([
+    "Oct 12Harbor & Pine ArchitectsINV-1012450.00",
+    "Oct 20Bluefin AnalyticsINV-10202,500.00",
+  ]);
+});
+
+it("doesn't open an invoice that needs attention a second time from Coming up", async () => {
+  const [harbor, bluefin] = overview.comingUp.recurring.nextRuns;
+  const page = await open("/dashboard", {
+    ...overview,
+    attention: {
+      ...overview.attention,
+      items: [
+        {
+          kind: "overdue",
+          documentId: harbor.templateId,
+          documentNumber: "INV-1012",
+          client: "Harbor & Pine Architects",
+          clientId: null,
+          amount: 450,
+          date: "2026-09-20",
+          days: 14,
+        },
+      ],
+    },
+    comingUp: {
+      ...overview.comingUp,
+      recurring: {
+        ...overview.comingUp.recurring,
+        nextRuns: [harbor, bluefin],
+      },
+    },
+  });
+  // The schedule is still listed, and its invoice opens from what needs
+  // attention.
+  const [first, second] = comingUp(page).querySelector("ol").children;
+  expect(first.textContent).toBe(
+    "Oct 12Harbor & Pine ArchitectsINV-1012450.00",
+  );
+  expect(first.querySelector("a")).toBeNull();
+  expect(second.querySelector("a").getAttribute("href")).toBe(
+    "/document/00000000-0000-0000-0000-000000001020",
+  );
+  expect(
+    opened(page).filter(
+      (href) => href === "/document/00000000-0000-0000-0000-000000001012",
+    ),
+  ).toHaveLength(1);
 });
 
 it("says when no quotation is waiting for an answer", async () => {
@@ -1676,7 +1761,7 @@ it("leaves the rest of its row when the server sends nothing coming up", async (
   const { comingUp: left, ...older } = overview;
   const page = await open("/dashboard", older);
   expect(comingUp(page)).toBeNull();
-  expect(layout(page)[3]).toEqual(["Spending", "Top items"]);
+  expect(layout(page)[4]).toEqual(["Top items"]);
 });
 
 it("names a quotation with no last valid day as having no expiry", async () => {
@@ -1702,4 +1787,48 @@ it("names a quotation with no last valid day as having no expiry", async () => {
     "/document/00000000-0000-0000-0000-000000000206",
     "QUO-0206, Kestrel Outdoor, No expiry, 1,201.20. Open the quotation",
   ]);
+});
+
+it("says no more expired quotations when it lists them all", async () => {
+  const { awaiting, expired } = overview.comingUp.quotations;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      quotations: {
+        awaiting,
+        expired: {
+          count: 2,
+          amount: 13921.05,
+          items: expired.items.slice(0, 2),
+        },
+      },
+    }),
+  );
+  const listed = comingUp(page).querySelectorAll("ol")[2];
+  expect(listed.previousElementSibling.textContent).toBe(
+    "Expired without an answer · 2",
+  );
+  expect(listed.children).toHaveLength(2);
+  expect(listed.nextElementSibling).toBeNull();
+  expect(comingUp(page).textContent).not.toContain("more");
+});
+
+it("counts the expired quotations without listing them when the server sends none", async () => {
+  const { awaiting, expired } = overview.comingUp.quotations;
+  const page = await open(
+    "/dashboard",
+    withComingUp({
+      quotations: {
+        awaiting,
+        expired: { count: expired.count, amount: expired.amount },
+      },
+    }),
+  );
+  const panel = comingUp(page);
+  const listed = panel.querySelectorAll("ol")[2];
+  expect(listed.previousElementSibling.textContent).toBe(
+    "Expired without an answer · 5",
+  );
+  expect(listed.children).toHaveLength(0);
+  expect(panel.textContent).not.toContain("more");
 });
