@@ -75,16 +75,22 @@ const render = (doc) => {
   return container;
 };
 
-// A field by the start of its label, and what it says under it.
+// A field by the start of its label, and what it says under it. A date
+// field's calendar keeps the native field the form checks beside its
+// button.
 const field = (container, label) => {
   const element = [...container.querySelectorAll("label")].find((candidate) =>
     candidate.textContent.startsWith(label),
   );
-  const input = [...container.querySelectorAll("input")].find(
+  const control = [...container.querySelectorAll("[id]")].find(
     (candidate) => candidate.id === element.htmlFor,
   );
+  const input =
+    control.tagName === "INPUT"
+      ? control
+      : control.parentElement.querySelector("input");
   const hint = [...container.querySelectorAll("p")].find(
-    (candidate) => candidate.id === `${input.id}-hint`,
+    (candidate) => candidate.id === `${control.id}-hint`,
   );
   return { input, hint: hint?.textContent };
 };

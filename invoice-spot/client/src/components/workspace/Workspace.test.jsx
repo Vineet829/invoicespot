@@ -76,3 +76,93 @@ it("draws a select field as the styled dropdown and reports choices as changes",
   act(() => root.unmount());
   container.remove();
 });
+
+// A date field draws the calendar, named by its label and the day it
+// shows, described by its hint, and reports a day as a change event.
+it("draws a date field as the calendar and reports days as changes", async () => {
+  window.IS_REACT_ACT_ENVIRONMENT = true;
+  const { createRoot } = await import("react-dom/client");
+  const { act } = await import("react-dom/test-utils");
+  const { Field } = await import("./Workspace");
+  const container = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(container);
+  const changes = [];
+  await act(async () =>
+    root.render(
+      <Field
+        label="Due date"
+        type="date"
+        name="dueDate"
+        value="2026-10-15"
+        required
+        hint="When it falls due."
+        onChange={(event) => changes.push(event.target)}
+      />,
+    ),
+  );
+  const label = container.querySelector("label");
+  const button = container.querySelector('[role="combobox"]');
+  expect(label.htmlFor).toBe(button.id);
+  expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+  expect(button.getAttribute("aria-labelledby")).toBe(
+    `${label.id} ${button.id}-value`,
+  );
+  expect(document.getElementById(`${button.id}-value`).textContent).toBe(
+    "Thu, Oct 15, 2026",
+  );
+  expect(
+    document.getElementById(button.getAttribute("aria-describedby"))
+      .textContent,
+  ).toBe("When it falls due.");
+  const input = container.querySelector('input[type="date"]');
+  expect([input.name, input.value, input.required]).toEqual([
+    "dueDate",
+    "2026-10-15",
+    true,
+  ]);
+  await act(async () => button.click());
+  await act(async () =>
+    document.querySelector('[data-day="2026-10-20"]').click(),
+  );
+  expect(changes).toEqual([{ value: "2026-10-20", name: "dueDate" }]);
+  act(() => root.unmount());
+  container.remove();
+});
+
+// A month field draws the calendar's months, and reports a month as a
+// change event.
+it("draws a month field as the calendar's months and reports months as changes", async () => {
+  window.IS_REACT_ACT_ENVIRONMENT = true;
+  const { createRoot } = await import("react-dom/client");
+  const { act } = await import("react-dom/test-utils");
+  const { Field } = await import("./Workspace");
+  const container = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(container);
+  const changes = [];
+  await act(async () =>
+    root.render(
+      <Field
+        label="From"
+        type="month"
+        name="from"
+        value="2026-09"
+        max="2026-10"
+        required
+        onChange={(event) => changes.push(event.target)}
+      />,
+    ),
+  );
+  const button = container.querySelector('[role="combobox"]');
+  expect(document.getElementById(`${button.id}-value`).textContent).toBe(
+    "September 2026",
+  );
+  expect(container.querySelector('input[type="month"]').max).toBe("2026-10");
+  await act(async () => button.click());
+  expect(
+    document.querySelector('[aria-label="Choose a month"]'),
+  ).not.toBeNull();
+  await act(async () => document.querySelector('[data-day="2026-08"]').click());
+  expect(changes).toEqual([{ value: "2026-08", name: "from" }]);
+  act(() => root.unmount());
+  container.remove();
+});

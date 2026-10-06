@@ -11,8 +11,8 @@ import {
 import DashboardShell from "../components/DashboardShell";
 import {
   DashboardLoading,
-  attentionPair,
   listRow,
+  owedRow,
 } from "../components/DashboardPanels";
 import ReceivablesCard from "../components/ReceivablesCard";
 import OverviewTiles from "../components/OverviewTiles";
@@ -92,6 +92,30 @@ const DashboardPage = () => {
     setParams(search({ currency }), { replace: true });
 
   const refresh = () => overviewQuery.refetch();
+  // The lists under the cash flow, in their order.
+  const lists = [
+    snapshot?.topClients && (
+      <TopClientsPanel
+        key="top-clients"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+    snapshot?.topItems && (
+      <TopItemsPanel
+        key="top-items"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+    snapshot?.comingUp && (
+      <ComingUpPanel
+        key="coming-up"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+  ].filter(Boolean);
 
   return (
     <DashboardShell>
@@ -170,41 +194,22 @@ const DashboardPage = () => {
               className={`flex min-w-0 flex-col gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
               aria-busy={stale || undefined}
             >
-              <ReceivablesCard
-                snapshot={snapshot}
-                currencyChosen={Boolean(params.get("currency"))}
-              />
               <OverviewTiles
                 snapshot={snapshot}
                 currencyChosen={Boolean(params.get("currency"))}
               />
-              <CashFlowPanel snapshot={snapshot} />
-              {/* A panel an older server's answer has no figures for is
-                  left out, and the rest of its row takes its room. */}
-              <div className={snapshot.topClients ? attentionPair : "contents"}>
+              <div className={owedRow}>
+                <ReceivablesCard
+                  snapshot={snapshot}
+                  currencyChosen={Boolean(params.get("currency"))}
+                />
                 <AttentionPanel snapshot={snapshot} />
-                {snapshot.topClients && (
-                  <TopClientsPanel
-                    snapshot={snapshot}
-                    currencyChosen={Boolean(params.get("currency"))}
-                  />
-                )}
               </div>
-              {(snapshot.topItems || snapshot.comingUp) && (
-                <div className={listRow}>
-                  {snapshot.topItems && (
-                    <TopItemsPanel
-                      snapshot={snapshot}
-                      currencyChosen={Boolean(params.get("currency"))}
-                    />
-                  )}
-                  {snapshot.comingUp && (
-                    <ComingUpPanel
-                      snapshot={snapshot}
-                      currencyChosen={Boolean(params.get("currency"))}
-                    />
-                  )}
-                </div>
+              <CashFlowPanel snapshot={snapshot} />
+              {/* A list an older server's answer has no figures for is left
+                  out, and the rest share its row. */}
+              {lists.length > 0 && (
+                <div className={listRow(lists.length)}>{lists}</div>
               )}
             </div>
           )

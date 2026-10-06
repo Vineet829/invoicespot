@@ -184,19 +184,31 @@ export const panelLink =
 export const panelAction =
   "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[13px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
-// The overview's rows below the figures: the cash flow across the width,
-// what needs attention beside the top clients from 1200px, then the top
-// items beside what is coming up from 1200px, as wide as each other and each
-// as tall as its own list. Narrower, the lists would shorten most names.
-export const attentionPair =
-  "grid min-w-0 gap-5 min-[1200px]:grid-cols-[minmax(0,1fr)_480px]";
-export const listRow =
-  "grid min-w-0 items-start gap-5 min-[1200px]:grid-cols-2";
+// The rows under the figures keep to their three columns from 1200px, so
+// the gaps line up down the page: what is owed in the first column beside
+// what needs attention across the other two, then the cash flow across all
+// three. Stacked, the rows keep the page's spacing.
+export const owedRow =
+  "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3 min-[1200px]:grid-cols-3 min-[1200px]:[&>:last-child]:col-span-2";
+// The lists under the cash flow, as tall as each other: the top clients,
+// the top items and what is coming up, a column each from 1440px. Narrower,
+// three would cut most names short, so the first two share a row and the
+// third goes under them across both. Two lists share the row equally.
+export const listRow = (count) =>
+  [
+    "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3",
+    count > 1 && "min-[1200px]:grid-cols-2",
+    count > 2 &&
+      "min-[1440px]:grid-cols-3 min-[1200px]:max-[1439px]:[&>:last-child]:col-span-2",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-// What is owed today across the width, then the period's figures, three
-// across and one on phones, all as large as the Reports page's cards.
-export const receivablesCard = `${financeCard("peach")} animate-ov-rise`;
+// The period's figures, three across and one on phones, all as large as the
+// Reports page's cards, then what is owed today, as tall as what needs
+// attention beside it.
 export const figureRow = `${financeCards} animate-ov-rise [--rise-delay:80ms]`;
+export const receivablesCard = `${financeCard("peach")} animate-ov-rise [--rise-delay:160ms]`;
 
 // A list with a bar in each row, such as the top clients, while it loads:
 // its title, the words under it, then five rows.
@@ -223,14 +235,6 @@ export const DashboardLoading = () => (
     aria-label="Loading your business overview"
   >
     <span className="sr-only">Loading your business overview…</span>
-    <div aria-hidden="true">
-      <div className={receivablesCard}>
-        <Skeleton className="h-[37px] w-[170px] rounded-full" />
-        <Skeleton className="h-14 w-[40%] rounded-md" />
-        <Skeleton className="h-4 w-full rounded-full" />
-        <Skeleton className="h-[52px] w-[60%] rounded-md" />
-      </div>
-    </div>
     <div className={figureRow} aria-hidden="true">
       {["blue", "lilac", "sage"].map((tone) => (
         <div className={financeCard(tone)} key={tone}>
@@ -240,14 +244,14 @@ export const DashboardLoading = () => (
         </div>
       ))}
     </div>
-    <div aria-hidden="true">
-      <div className={overviewPanel}>
-        <Skeleton className="h-6 w-[120px] rounded-md" />
-        <Skeleton className="h-[26px] w-[45%] rounded-md" />
-        <Skeleton className="h-[294px] w-full rounded-2xl max-[700px]:h-[222px]" />
+    <div className={owedRow} aria-hidden="true">
+      <div className={receivablesCard}>
+        <Skeleton className="h-[37px] w-[170px] rounded-full" />
+        <Skeleton className="h-14 w-[70%] rounded-md" />
+        <Skeleton className="h-4 w-full rounded-full" />
+        <Skeleton className="h-[84px] w-full rounded-md" />
+        <Skeleton className="h-[104px] w-full rounded-md" />
       </div>
-    </div>
-    <div className={attentionPair} aria-hidden="true">
       <div className={overviewPanel}>
         <Skeleton className="h-6 w-[200px] rounded-md" />
         {Array.from({ length: 4 }, (_, index) => (
@@ -258,12 +262,19 @@ export const DashboardLoading = () => (
           </div>
         ))}
       </div>
+    </div>
+    <div aria-hidden="true">
+      <div className={overviewPanel}>
+        <Skeleton className="h-6 w-[120px] rounded-md" />
+        <Skeleton className="h-[26px] w-[45%] rounded-md" />
+        <Skeleton className="h-[294px] w-full rounded-2xl max-[700px]:h-[222px]" />
+      </div>
+    </div>
+    <div className={listRow(3)} aria-hidden="true">
       <BarListLoading
         lead={<Skeleton className="h-[13px] w-[55%] rounded-md" />}
         className="[--rise-delay:240ms]"
       />
-    </div>
-    <div className={listRow} aria-hidden="true">
       <BarListLoading
         lead={<Skeleton className="h-[13px] w-[55%] rounded-md" />}
         className="[--rise-delay:320ms]"
