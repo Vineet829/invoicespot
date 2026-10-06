@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import usePageVisible from "../../hooks/usePageVisible";
 
 // Whether the visitor asked for less motion, read as the page mounts. The
 // stylesheet stills every animation for them; the page also leaves its
@@ -10,20 +11,6 @@ export const usePrefersReducedMotion = () => {
   );
   return reduced;
 };
-
-// Entrances by their delay. Tailwind needs each class written out.
-const RISE = {
-  0: "animate-ov-rise",
-  120: "animate-ov-rise [--rise-delay:120ms]",
-  240: "animate-ov-rise [--rise-delay:240ms]",
-  320: "animate-ov-rise [--rise-delay:320ms]",
-  400: "animate-ov-rise [--rise-delay:400ms]",
-};
-
-// The classes that make an element rise in after `delay` milliseconds, or
-// none when motion is off. A delay not listed rises straight away.
-export const rise = (motion, delay = 0) =>
-  motion ? (RISE[delay] ?? RISE[0]) : "";
 
 // A section rises in the first time it comes into view, and is kept out of
 // sight until then: [ref for the section, its classes]. Without an
@@ -55,4 +42,43 @@ export const useReveal = (motion) => {
         ? "animate-ov-rise print:animate-none"
         : "opacity-0 print:opacity-100",
   ];
+};
+
+// Whether the element at `ref` is on screen, kept current as the visitor
+// scrolls. Without an observer it counts as on screen.
+export const useOnScreen = (ref) => {
+  const [onScreen, setOnScreen] = useState(
+    () => typeof IntersectionObserver === "undefined",
+  );
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) =>
+      setOnScreen(entry.isIntersecting),
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [ref]);
+  return onScreen;
+};
+
+// Whether something that plays on its own should be playing: the visitor
+// is fine with motion, the element at `ref` is on screen and its tab is
+// the one being looked at.
+export const useRunning = (ref, motion) => {
+  const onScreen = useOnScreen(ref);
+  const visible = usePageVisible();
+  return motion && onScreen && visible;
+};
+
+// Calls the latest `tick` every `ms` milliseconds while `running`.
+export const useInterval = (tick, ms, running) => {
+  const latest = useRef(tick);
+  useEffect(() => {
+    latest.current = tick;
+  });
+  useEffect(() => {
+    if (!running) return undefined;
+    const id = setInterval(() => latest.current(), ms);
+    return () => clearInterval(id);
+  }, [ms, running]);
 };
