@@ -69,7 +69,7 @@ const SampleInvoice = ({ look, step, motion }) => (
   <div className={look.invoice} data-template={look.key}>
     <div className={look.head}>
       <div>
-        <p className={`text-[11.5px] tracking-[.14em] ${look.headLabel}`}>
+        <p className={`text-[12.5px] tracking-[.14em] ${look.headLabel}`}>
           TAX INVOICE
         </p>
         <p
@@ -145,7 +145,7 @@ const SampleInvoice = ({ look, step, motion }) => (
         aria-hidden="true"
       >
         <span className="text-[14px]">
-          <span className="block text-[12.5px] text-spot-muted">
+          <span className="block text-[13px] text-spot-muted">
             Payment reported · just now
           </span>
           <span className="font-medium">
@@ -275,7 +275,7 @@ const GetPaid = ({ motion }) => {
           step={step}
           motion={motion}
         />
-        <p className="mt-2.5 text-right text-[12.5px] text-spot-muted">
+        <p className="mt-2.5 text-right text-[13px] text-spot-muted">
           Sample invoice
         </p>
       </div>

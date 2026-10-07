@@ -198,7 +198,7 @@ const ExpensesPage = () => {
           <span className="inline-flex flex-col items-end gap-0.5 stacked:items-start">
             <Amount value={row.taxAmount} currency={row.currency} hideCode />
             {row.taxReclaimable && (
-              <span className="text-[12px] text-spot-muted">Reclaimable</span>
+              <span className="text-[13px] text-spot-muted">Reclaimable</span>
             )}
           </span>
         ) : (

@@ -87,7 +87,7 @@ const RecurringPage = () => {
           <Link className={textLink} to={`/document/${schedule.documentId}`}>
             {templateName(schedule)}
           </Link>
-          <span className="text-[12.5px] font-normal text-spot-muted">
+          <span className="text-[13px] font-normal text-spot-muted">
             {schedule.clientName}
           </span>
         </span>

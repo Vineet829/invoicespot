@@ -195,7 +195,7 @@ const Palette = ({ isAdmin, onClose }) => {
           }}
           onKeyDown={onKeyDown}
         />
-        <kbd className="shrink-0 rounded-md border border-[#23273524] px-1.5 py-0.5 font-ui text-[11px] text-spot-muted max-[700px]:hidden">
+        <kbd className="shrink-0 rounded-md border border-[#23273524] px-1.5 py-0.5 font-ui text-[12px] text-spot-muted max-[700px]:hidden">
           Esc
         </kbd>
       </div>
@@ -209,7 +209,7 @@ const Palette = ({ isAdmin, onClose }) => {
         {groups.map((group) => (
           <li key={group.label} role="presentation">
             <p
-              className="px-3 pb-1.5 pt-3 text-[11.5px] uppercase tracking-[0.06em] text-spot-muted"
+              className="px-3 pb-1.5 pt-3 text-[12.5px] uppercase tracking-[0.06em] text-spot-muted"
               aria-hidden="true"
             >
               {group.label}
@@ -241,12 +241,12 @@ const Palette = ({ isAdmin, onClose }) => {
                         {option.label}
                       </span>
                       {option.hint && (
-                        <span className="block truncate text-[12.5px] text-spot-muted">
+                        <span className="block truncate text-[13px] text-spot-muted">
                           {option.hint}
                         </span>
                       )}
                     </span>
-                    <span className="shrink-0 text-[12px] text-spot-faint">
+                    <span className="shrink-0 text-[13px] text-spot-faint">
                       {option.meta}
                     </span>
                   </li>
@@ -257,7 +257,7 @@ const Palette = ({ isAdmin, onClose }) => {
         ))}
       </ul>
       <p
-        className="border-t border-[#23273512] px-5 py-3 text-[12.5px] text-spot-muted"
+        className="border-t border-[#23273512] px-5 py-3 text-[13px] text-spot-muted"
         role="status"
       >
         {searching

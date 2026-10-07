@@ -134,7 +134,7 @@ const IssueForm = ({
         />
         <span>
           Email it to the client next
-          <span className="mt-0.5 block text-[12.5px] text-spot-muted">
+          <span className="mt-0.5 block text-[13px] text-spot-muted">
             {canEmail
               ? "You can check the message before it is sent."
               : emailNote}

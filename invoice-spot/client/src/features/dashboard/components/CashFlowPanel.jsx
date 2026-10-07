@@ -155,7 +155,7 @@ const CashFlowPanel = ({ snapshot }) => {
         <h2 id="cash-flow-title" className={sectionTitle}>
           Cash flow
         </h2>
-        <ul className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[12.5px] text-spot-body">
+        <ul className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[13px] text-spot-body">
           <li className="flex items-center gap-[7px]">
             <span
               className="size-3 rounded-[3px] bg-spot-violet"
@@ -206,7 +206,7 @@ const CashFlowPanel = ({ snapshot }) => {
           ))}
         </dl>
         {scale && !moneyOut && (
-          <p className="text-[12.5px] text-spot-muted">
+          <p className="text-[13px] text-spot-muted">
             No expenses recorded in this period
           </p>
         )}
@@ -220,7 +220,7 @@ const CashFlowPanel = ({ snapshot }) => {
             className="grid grid-cols-[52px_minmax(0,1fr)] grid-rows-[272px_22px] max-[700px]:grid-rows-[200px_22px]"
           >
             <div
-              className="relative text-[11.5px] tabular-nums text-spot-muted"
+              className="relative text-[12.5px] tabular-nums text-spot-muted"
               aria-hidden="true"
             >
               {scale.ticks.map((tick) => (
@@ -328,7 +328,7 @@ const CashFlowPanel = ({ snapshot }) => {
               </div>
               {carded != null && (
                 <div
-                  className="pointer-events-none absolute top-1 z-[2] w-[190px] rounded-[14px] bg-white px-3 py-2.5 text-[12.5px] leading-[1.45] text-spot-ink shadow-float"
+                  className="pointer-events-none absolute top-1 z-[2] w-[190px] rounded-[14px] bg-white px-3 py-2.5 text-[13px] leading-[1.45] text-spot-ink shadow-float"
                   style={{ left: cardLeft(carded) }}
                   aria-hidden="true"
                 >
@@ -365,7 +365,7 @@ const CashFlowPanel = ({ snapshot }) => {
             >
               {parts.map((figures, index) => (
                 <span
-                  className="flex justify-center whitespace-nowrap text-[11.5px] text-spot-muted"
+                  className="flex justify-center whitespace-nowrap text-[12.5px] text-spot-muted"
                   key={figures.from}
                 >
                   {showsLabel(index, trend.length, every) && figures.label}

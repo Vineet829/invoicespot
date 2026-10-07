@@ -54,7 +54,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
       </div>
       {rows.length ? (
         <>
-          <p className="text-[12.5px] text-spot-muted">
+          <p className="text-[15px] text-spot-muted">
             Billed {period.inThese}, largest first
           </p>
           <ol className="m-0 list-none p-0">
@@ -82,7 +82,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
                     aria-label={entry.to ? undefined : label}
                   >
                     <span className="flex min-w-0 flex-col gap-1">
-                      <span className="flex min-w-0 text-[13.5px]">
+                      <span className="flex min-w-0 text-[17px]">
                         {entry.to ? (
                           <Link
                             to={entry.to}
@@ -105,7 +105,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
                         />
                       </span>
                       <span
-                        className={`text-[11.5px] ${Number(entry.owed) > 0 ? "text-spot-ink" : "text-spot-muted"}`}
+                        className={`text-[15px] ${Number(entry.owed) > 0 ? "text-spot-ink" : "text-spot-muted"}`}
                         aria-hidden={hidden}
                       >
                         {owes}{" "}
@@ -117,7 +117,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
                         value={entry.billed}
                         currency={currency}
                         hideCode
-                        className="text-[15px] font-light tracking-[-0.03em]"
+                        className="text-[20px] font-light tracking-[-0.03em]"
                       />
                     </span>
                   </div>
@@ -126,7 +126,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
             })}
           </ol>
           {rows.some((entry) => entry.to) && (
-            <p className="mt-auto border-t border-[#23273512] pt-2 text-[12px] text-spot-muted">
+            <p className="mt-auto border-t border-[#23273512] pt-2 text-[15px] text-spot-muted">
               A name opens the client: their documents, balance and statement.
             </p>
           )}
@@ -137,7 +137,7 @@ const TopClientsPanel = ({ snapshot, currencyChosen }) => {
             className="size-11 rounded-full border-[7px] border-dashed border-[#23273524]"
             aria-hidden="true"
           />
-          <p className="text-[13.5px] text-spot-body">
+          <p className="text-[17px] text-spot-body">
             No one billed {period.inThese}.
           </p>
         </div>

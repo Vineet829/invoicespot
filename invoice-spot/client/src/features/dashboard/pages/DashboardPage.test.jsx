@@ -224,11 +224,13 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
   ).toEqual(layout(page).flat());
-  // From 1200px the rows keep to the figures' three columns: what needs
-  // attention takes two of them, and from 1440px each list takes one.
+  // From 1200px what is owed takes five parts of its row to what needs
+  // attention's six, and from 1440px each list takes a third of its row.
   const [, owed, , lists] = content(page).children;
-  expect(owed.className).toContain("min-[1200px]:grid-cols-3");
-  expect(owed.className).toContain("min-[1200px]:[&>:last-child]:col-span-2");
+  expect(owed.className).toContain(
+    "min-[1200px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]",
+  );
+  expect(owed.className).not.toContain("col-span");
   expect(lists.className).toContain("min-[1440px]:grid-cols-3");
 });
 
@@ -649,15 +651,29 @@ it("leaves the tax out when the server sends none", async () => {
 it("shows the invoices that need attention, each opening its invoice and nothing else", async () => {
   const page = await open("/dashboard");
   const attention = page.querySelector('[aria-labelledby="attention-title"]');
-  // Overdue and due soon; the quotation is Coming up's.
+  // Overdue and due soon, each kind named once above its rows; the
+  // quotation is Coming up's.
   expect(
-    [...attention.querySelectorAll("ol > li")].map((item) => item.textContent),
+    [...attention.querySelectorAll("h3")].map((heading) => [
+      heading.textContent,
+      heading.nextElementSibling.querySelectorAll("li").length,
+    ]),
   ).toEqual([
-    "OverdueINV-1026Sable Fitness54 days lateDue Aug 113,391.67",
-    "OverdueINV-1030Quill & Co. Publishing21 days lateDue Sep 131,969.11",
-    "OverdueINV-1031Verdant Farms10 days lateDue Sep 24965.25",
-    "Due soonINV-1032Bluefin AnalyticsDue in 2 daysDue Oct 62,664.09",
+    ["Overdue", 3],
+    ["Due soon", 1],
   ]);
+  const rows = [...attention.querySelectorAll("ol > li")];
+  expect(rows.map((item) => item.textContent)).toEqual([
+    "Sable FitnessINV-1026 · Due Aug 11 · 54 days late3,391.67",
+    "Quill & Co. PublishingINV-1030 · Due Sep 13 · 21 days late1,969.11",
+    "Verdant FarmsINV-1031 · Due Sep 24 · 10 days late965.25",
+    "Bluefin AnalyticsINV-1032 · Due Oct 6 · Due in 2 days2,664.09",
+  ]);
+  // An overdue row's bar is as long as it is late beside the most overdue
+  // one; the invoice due soon has none.
+  expect(
+    rows.map((item) => item.querySelector("[style]")?.style.width ?? null),
+  ).toEqual(["100%", `${(21 / 54) * 100}%`, `${(10 / 54) * 100}%`, null]);
   // Each row opens its invoice; client names are words, and no link opens
   // the overdue invoices, as the Overdue figure above does.
   expect(
@@ -765,16 +781,16 @@ it("says when nothing needs attention", async () => {
 });
 
 // The receivables card's bar, each part's colour and the amount it grows by,
-// and its legend of overdue bands.
+// and the overdue bands in the panel named by its heading.
 const bar = (card) =>
   [...card.querySelector(".h-4").children].map((part) => [
     part.className.match(/bg-owed-[\w-]+/)[0],
     parseFloat(part.style.flexGrow),
   ]);
 const legend = (card) =>
-  [...card.querySelectorAll('ul[aria-label="Overdue by days late"] > li')].map(
-    (band) => band.textContent,
-  );
+  [
+    ...card.querySelectorAll('ul[aria-labelledby="receivables-bands"] > li'),
+  ].map((band) => band.textContent);
 
 it("shows what is owed today beside what needs attention, split into current and overdue by days late", async () => {
   const page = await open("/dashboard");
@@ -797,15 +813,19 @@ it("shows what is owed today beside what needs attention, split into current and
     ["bg-owed-age-4", 3391.67],
   ]);
   expect(card.querySelector(".h-4").getAttribute("aria-hidden")).toBe("true");
-  // The overdue bands, each with its amount and count, the empty one too.
+  // The overdue bands under their heading, each with its amount and count,
+  // the empty one too.
+  expect(card.querySelector("#receivables-bands").textContent).toBe(
+    "Overdue by days late",
+  );
   expect(legend(card)).toEqual([
-    "1–15 days965.25· 1 late: USD 965.25 on 1 invoice",
-    "16–30 days1,969.11· 1 late: USD 1,969.11 on 1 invoice",
-    "31–45 days0.00· 0 late: USD 0.00 on 0 invoices",
-    "Over 45 days3,391.67· 1 late: USD 3,391.67 on 1 invoice",
+    "1–15 days965.251 invoice late: USD 965.25 on 1 invoice",
+    "16–30 days1,969.111 invoice late: USD 1,969.11 on 1 invoice",
+    "31–45 days0.000 invoices late: USD 0.00 on 0 invoices",
+    "Over 45 days3,391.671 invoice late: USD 3,391.67 on 1 invoice",
   ]);
   expect(
-    [...card.querySelectorAll("li .rounded-\\[3px\\]")].map(
+    [...card.querySelectorAll("li .size-2")].map(
       (swatch) => swatch.className.match(/bg-owed-[\w-]+/)[0],
     ),
   ).toEqual([
@@ -875,10 +895,10 @@ it("says when nothing is owed", async () => {
   expect(bar(card)).toEqual([]);
   expect(card.querySelector(".h-4").className).toContain("bg-white/50");
   expect(legend(card)).toEqual([
-    "1–15 days0.00· 0 late: USD 0.00 on 0 invoices",
-    "16–30 days0.00· 0 late: USD 0.00 on 0 invoices",
-    "31–45 days0.00· 0 late: USD 0.00 on 0 invoices",
-    "Over 45 days0.00· 0 late: USD 0.00 on 0 invoices",
+    "1–15 days0.000 invoices late: USD 0.00 on 0 invoices",
+    "16–30 days0.000 invoices late: USD 0.00 on 0 invoices",
+    "31–45 days0.000 invoices late: USD 0.00 on 0 invoices",
+    "Over 45 days0.000 invoices late: USD 0.00 on 0 invoices",
   ]);
   expect(links(card).map(([, label]) => label)).toEqual([
     "Current, not due yet: USD 0.00 on 0 invoices. View what is coming in",
@@ -1042,18 +1062,21 @@ it("names each row's client in words, the row reading once as its invoice's link
   ];
   for (const row of rows) {
     expect(row.querySelectorAll("a")).toHaveLength(1);
-    const client = row.querySelector('[class*="grid-area:client"]');
-    expect(client.tagName).toBe("SPAN");
-    expect(client.getAttribute("aria-hidden")).toBe("true");
-    // The document's link reads the row whole, so the words beside it are
-    // hidden from screen readers rather than read twice.
+    // The client's name is the row's link to its document, which reads the
+    // row whole, so the words beside it are hidden from screen readers
+    // rather than read twice.
     const read = row.cloneNode(true);
     read
       .querySelectorAll('a, [aria-hidden="true"]')
       .forEach((node) => node.remove());
     expect(read.textContent).toBe("");
   }
-  expect(rows[0].textContent).toContain("Sable Fitness");
+  expect(rows.map((row) => row.querySelector("a").textContent)).toEqual([
+    "Sable Fitness",
+    "Quill & Co. Publishing",
+    "Verdant Farms",
+    "Bluefin Analytics",
+  ]);
   expect(
     page.querySelector(
       '[aria-labelledby="attention-title"] a[href^="/single-customer/"]',

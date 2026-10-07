@@ -71,7 +71,7 @@ const SharedDocumentPage = () => {
           report={(payment) => report({ token, ...payment }).unwrap()}
         />
       )}
-      <p className="text-[12.5px] text-spot-muted">
+      <p className="text-[13px] text-spot-muted">
         Shared with <span className="text-spot-text">Invoice Spot</span>
       </p>
     </div>

@@ -588,7 +588,7 @@ const ReportsPage = () => {
                       className={`flex items-center gap-2 ${panelNote}`}
                     >
                       <span
-                        className={`size-2.5 rounded-full ${series.dot}`}
+                        className={`size-3 rounded-[3px] ${series.column}`}
                         aria-hidden="true"
                       />
                       {series.label}

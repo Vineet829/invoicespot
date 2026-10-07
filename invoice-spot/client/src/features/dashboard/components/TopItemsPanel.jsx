@@ -50,7 +50,7 @@ const TopItemsPanel = ({ snapshot, currencyChosen }) => {
       </div>
       {rows.length ? (
         <>
-          <p className="text-[12.5px] text-spot-muted">
+          <p className="text-[15px] text-spot-muted">
             What you sold {period.inThese}, before tax
           </p>
           <ol className="m-0 list-none p-0">
@@ -71,7 +71,7 @@ const TopItemsPanel = ({ snapshot, currencyChosen }) => {
                     aria-label={`${label}. View its sales`}
                   >
                     <span className="flex min-w-0 flex-col gap-1">
-                      <span className="truncate text-[13.5px]">
+                      <span className="line-clamp-2 text-[17px] [overflow-wrap:anywhere]">
                         {entry.name}
                       </span>
                       <span className="block h-1.5 overflow-hidden rounded-full bg-card-sage-bar/[.16]">
@@ -80,7 +80,7 @@ const TopItemsPanel = ({ snapshot, currencyChosen }) => {
                           style={{ width: `${entry.bar * 100}%` }}
                         />
                       </span>
-                      <span className="text-[11.5px] text-spot-muted">
+                      <span className="text-[15px] text-spot-muted">
                         {facts.join(" · ")}
                       </span>
                     </span>
@@ -88,14 +88,14 @@ const TopItemsPanel = ({ snapshot, currencyChosen }) => {
                       value={entry.amount}
                       currency={currency}
                       hideCode
-                      className="justify-self-end text-[15px] font-light tracking-[-0.03em]"
+                      className="justify-self-end text-[20px] font-light tracking-[-0.03em]"
                     />
                   </Link>
                 </li>
               );
             })}
           </ol>
-          <p className="mt-auto border-t border-[#23273512] pt-2 text-[12px] text-spot-muted">
+          <p className="mt-auto border-t border-[#23273512] pt-2 text-[15px] text-spot-muted">
             Everything sold adds up to the income behind Profit. Each row opens
             what it sold.
           </p>
@@ -106,7 +106,7 @@ const TopItemsPanel = ({ snapshot, currencyChosen }) => {
             className="size-11 rounded-full border-[7px] border-dashed border-[#23273524]"
             aria-hidden="true"
           />
-          <p className="text-[13.5px] text-spot-body">
+          <p className="text-[17px] text-spot-body">
             Nothing sold {period.inThese}.
           </p>
         </div>

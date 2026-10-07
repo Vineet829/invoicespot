@@ -185,7 +185,7 @@ const ActivityTimeline = ({ documentId }) => {
               <p className="text-[14px] text-spot-ink [overflow-wrap:anywhere]">
                 {text(event.detail)}
               </p>
-              <p className="mt-0.5 text-[12.5px] text-spot-muted [overflow-wrap:anywhere]">
+              <p className="mt-0.5 text-[13px] text-spot-muted [overflow-wrap:anywhere]">
                 <time dateTime={event.at}>{moment(event.at)}</time>
                 {byline(event) && ` · ${byline(event)}`}
               </p>

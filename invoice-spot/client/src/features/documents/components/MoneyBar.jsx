@@ -105,7 +105,7 @@ const MoneyBar = ({ query, shows = () => false }) => {
               hideCode={!several}
               className="text-[22px] font-light tracking-[-0.03em] text-spot-ink"
             />
-            <span className="text-[12.5px] text-spot-muted">
+            <span className="text-[13px] text-spot-muted">
               {outstanding.invoices
                 ? `on ${invoiceCount(outstanding.invoices)}`
                 : "No unpaid invoices"}
@@ -135,7 +135,7 @@ const MoneyBar = ({ query, shows = () => false }) => {
           />
         )}
         {outstanding.invoices > 0 && (
-          <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-[12.5px] text-spot-text">
+          <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-[13px] text-spot-text">
             {late > 0 ? (
               <Link
                 to={overdueTo}
@@ -184,7 +184,7 @@ const MoneyBar = ({ query, shows = () => false }) => {
             hideCode={!several}
             className="text-[26px] font-light tracking-[-0.03em] text-spot-ink"
           />
-          <span className="inline-flex items-center gap-1 text-[12.5px] text-spot-night [&>svg]:size-[13px] [&>svg]:stroke-[1.5]">
+          <span className="inline-flex items-center gap-1 text-[13px] text-spot-night [&>svg]:size-[13px] [&>svg]:stroke-[1.5]">
             {countOf(received.payments, "payment", "payments")}
             <FiChevronRight aria-hidden="true" />
           </span>

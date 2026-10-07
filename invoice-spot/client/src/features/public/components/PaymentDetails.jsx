@@ -48,7 +48,7 @@ const UpiCode = ({ upi }) => {
           className="rounded-xl"
         />
       )}
-      <figcaption className="text-center text-[12.5px] leading-[1.5] text-spot-muted">
+      <figcaption className="text-center text-[13px] leading-[1.5] text-spot-muted">
         {upi.amountIncluded
           ? `Scan to pay ${money(upi.amount, "INR")} with any UPI app.`
           : "Scan with any UPI app and enter the amount. UPI limits apply."}
@@ -82,7 +82,7 @@ const PaymentDetails = ({ payment }) => {
     >
       <h2
         id="how-to-pay"
-        className="mb-3 text-[12.5px] font-normal text-spot-muted"
+        className="mb-3 text-[13px] font-normal text-spot-muted"
       >
         How to pay
       </h2>

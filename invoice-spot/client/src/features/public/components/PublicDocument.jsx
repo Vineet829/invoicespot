@@ -33,7 +33,7 @@ import ReportPayment from "./ReportPayment";
 
 export const cardBase = `${surface} w-full animate-ov-rise p-9 max-[700px]:rounded-3xl max-[700px]:p-6`;
 export const card = `${cardBase} max-w-[1000px]`;
-const heading = "mb-2 text-[12.5px] font-normal text-spot-muted";
+const heading = "mb-2 text-[13px] font-normal text-spot-muted";
 const line =
   "text-[13.5px] leading-[1.7] text-spot-body [overflow-wrap:anywhere]";
 

@@ -86,13 +86,13 @@ const Change = ({ change, compared }) => {
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <span
-        className={`inline-flex items-center gap-[3px] rounded-full bg-white/80 py-[3px] pl-[5px] pr-2 text-[12.5px] font-medium leading-[1.3] ${color}`}
+        className={`inline-flex items-center gap-[3px] rounded-full bg-white/80 py-[3px] pl-[5px] pr-2 text-[13px] font-medium leading-[1.3] ${color}`}
       >
         <Icon aria-hidden="true" className="size-3.5 stroke-[2.2]" />
         <span className="sr-only">{words} </span>
         {percentLabel(change.percent)}
       </span>
-      <span className="text-[12px]">{compared}</span>
+      <span className="text-[13px]">{compared}</span>
     </span>
   );
 };
@@ -171,7 +171,7 @@ export const TrendColumns = ({ values, className = "h-10" }) => {
 export const OwedSplit = ({
   owed,
   currency,
-  className = "gap-[7px] text-[12px]",
+  className = "gap-[7px] text-[13px]",
 }) => {
   const parts = [
     ["notDue", "bg-owed-due"],

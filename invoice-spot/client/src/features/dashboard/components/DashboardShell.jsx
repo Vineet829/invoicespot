@@ -29,7 +29,7 @@ import BusinessSwitcher, {
 import { useGetBusinessesQuery } from "../../business/businessApiSlice";
 
 const navLink =
-  "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
+  "relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[18px] transition-[color,background-color] duration-150 hover:bg-white/70 hover:text-spot-night [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:stroke-[1.5]";
 
 const content =
   "block min-h-dvh w-full px-8 pb-12 pt-[30px] outline-none compact:px-6 compact:pt-5 max-[1359px]:px-7 max-[1359px]:pt-7 max-[960px]:min-h-[calc(100dvh_-_68px)] max-[960px]:px-6 max-[960px]:pt-6 max-[700px]:px-4 max-[700px]:pb-10 max-[700px]:pt-5";
@@ -48,23 +48,23 @@ const ui = {
   brandRow: "flex items-center justify-between px-3",
   brand: brandMark,
   search:
-    "mt-8 flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/85 bg-white/50 px-3.5 text-left text-[14.5px] text-spot-muted transition-colors hover:bg-white/80 hover:text-spot-night [&>svg]:size-[18px] [&>svg]:shrink-0 [&>svg]:stroke-[1.6]",
+    "mt-8 flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/85 bg-white/50 px-3.5 text-left text-[16px] text-spot-muted transition-colors hover:bg-white/80 hover:text-spot-night [&>svg]:size-[19px] [&>svg]:shrink-0 [&>svg]:stroke-[1.6]",
   shortcut:
-    "ml-auto rounded-md border border-[#23273524] px-1.5 py-0.5 font-ui text-[11px] text-spot-muted",
+    "ml-auto rounded-md border border-[#23273524] px-1.5 py-0.5 font-ui text-[13px] text-spot-muted",
   navigation: "mt-4 flex flex-col gap-1.5",
   navLink: `${navLink} text-spot-nav`,
   navLinkActive: `${navLink} bg-white font-medium text-spot-ink shadow-nav [&>svg]:text-spot-violet`,
   sidebarBottom: "mt-auto flex flex-col gap-2 pt-6",
   homeLink:
-    "flex min-h-11 items-center justify-between gap-3 rounded-[14px] px-3.5 text-[14.5px] text-spot-nav hover:bg-white/[.34] hover:text-spot-night [&>svg]:size-[17px]",
+    "flex min-h-11 items-center justify-between gap-3 rounded-[14px] px-3.5 text-[16px] text-spot-nav hover:bg-white/[.34] hover:text-spot-night [&>svg]:size-[18px]",
   account:
     "flex items-center gap-2 rounded-[18px] border border-white/85 bg-white/[.62] py-2.5 pl-2.5 pr-1 coarse:flex-wrap",
   accountLink: "flex min-w-0 flex-1 items-center gap-2 coarse:basis-[145px]",
   accountText: "flex min-w-0 flex-col items-start",
   accountName:
-    "block max-w-full truncate text-[15px] font-medium text-spot-ink coarse:py-[13px]",
+    "block max-w-full truncate text-[16.5px] font-medium text-spot-ink coarse:py-[13px]",
   avatar:
-    "grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac font-ui text-[12.5px] font-normal leading-none text-[#3f2f6e]",
+    "grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac font-ui text-[14px] font-normal leading-none text-[#3f2f6e]",
   iconButton: `${iconButton} size-9`,
   signOutButton: `${iconButton} h-10 w-9`,
   dialog:

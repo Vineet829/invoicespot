@@ -1,10 +1,5 @@
 import { Link } from "react-router-dom";
-import {
-  FiAlertCircle,
-  FiCalendar,
-  FiCheckCircle,
-  FiEdit3,
-} from "react-icons/fi";
+import { FiCheckCircle } from "react-icons/fi";
 import { Amount } from "../../../components/workspace/Workspace";
 import { sectionTitle } from "../../../components/workspace/pastel";
 import {
@@ -15,27 +10,39 @@ import {
 } from "../dashboardModel";
 import { overviewPanel } from "./DashboardPanels";
 
-// Each kind's icon and tint; the words beside them carry the meaning.
-const KINDS = {
-  paymentReport: [FiCheckCircle, "bg-avatar-sage text-avatar-sage-ink"],
-  overdue: [FiAlertCircle, "bg-overdue text-overdue-icon"],
-  dueSoon: [FiCalendar, "bg-avatar-blue text-card-blue-icon"],
-  draft: [FiEdit3, "bg-[#2327350d] text-spot-body"],
+// Each kind's colour, for its heading and its state.
+const TINTS = {
+  paymentReport: "text-avatar-sage-ink",
+  overdue: "text-overdue-strong",
+  dueSoon: "text-avatar-blue-ink",
+  draft: "text-spot-muted",
 };
 
-// A row is one line on a wide panel. Below 600px the kind is left to the
-// icon and the state (and to screen readers), and the state goes under the
-// number and client; below 340px the client gets a line of its own. The
-// container ranges meet without overlapping, since their order in the
-// stylesheet is not fixed, and without a gap, since a container can be a
-// fraction of a pixel wide.
+// A row reads as Top clients' rows do: the client, a bar of how late an
+// overdue invoice is beside the most overdue one listed, then the
+// document's number, its day and its state, with the amount on the right.
+// Names and numbers wrap rather than push the amount out.
 const row =
-  "relative -mx-2 grid items-center gap-x-3.5 gap-y-0.5 rounded-xl px-2 py-[9px] text-spot-ink transition-colors [grid-template-areas:'icon_kind_client_state_amount'] [grid-template-columns:34px_120px_minmax(0,1fr)_minmax(150px,0.6fr)_minmax(84px,auto)] [@container_attention_(340px<=width<600px)]:[grid-template-areas:'icon_kind_client_amount'_'icon_state_state_amount'] [@container_attention_(340px<=width<600px)]:[grid-template-columns:34px_auto_minmax(0,1fr)_auto] [@container_attention_(width<340px)]:[grid-template-areas:'icon_kind_amount'_'icon_client_client'_'icon_state_state'] [@container_attention_(width<340px)]:[grid-template-columns:34px_minmax(0,1fr)_auto]";
+  "relative -mx-2 grid grid-cols-[minmax(0,1fr)_minmax(96px,auto)] items-center gap-2.5 rounded-xl px-2 py-[7px] text-spot-ink transition-colors";
 // The row's own link, to its document, covers the whole row and shows its
 // focus around it. Its name reads the whole row, so the words beside it are
 // hidden from screen readers rather than read twice.
 const documentLink =
-  "flex min-w-0 flex-col [grid-area:kind] after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[#5b47a0]";
+  "line-clamp-2 text-[17px] font-medium [overflow-wrap:anywhere] after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[#5b47a0]";
+
+// How late an overdue invoice is, in days, or nothing for the other kinds.
+const daysLate = (item) =>
+  item.kind === "overdue" && Number(item.days) > 0 ? Number(item.days) : 0;
+
+// The rows in runs of one kind, in the order the list gives them, so each
+// kind is named once, above its rows.
+const kindGroups = (items) =>
+  items.reduce((groups, item) => {
+    const last = groups.at(-1);
+    if (last?.[0].kind === item.kind) last.push(item);
+    else groups.push([item]);
+    return groups;
+  }, []);
 
 // The few invoices that need doing now, and drafts to issue, most urgent
 // first, each opening its document. Quotations and recurring invoices are
@@ -61,93 +68,118 @@ const AttentionPanel = ({ snapshot }) => {
       </div>
       {items.length ? (
         <>
-          <ol className="m-0 list-none p-0 [container-name:attention] [container-type:inline-size]">
-            {items.map((item, index) => {
-              const { label, state, when, to } = attentionRow(item);
-              const [Icon, tint] = KINDS[item.kind];
-              const number = item.documentNumber || "No number yet";
-              const client = item.client || "No client";
-              const name = [
-                `${label} ${number}`.trim(),
-                client,
-                state,
-                when,
-                formatMoney(item.amount, currency),
-              ]
-                .filter(Boolean)
-                .join(", ");
-              const opens = !opened.has(item.documentId);
-              opened.add(item.documentId);
-              const kind = (
-                <>
-                  <span className="text-[12px] text-spot-muted [@container_attention_(width<600px)]:sr-only">
-                    {label}
-                  </span>
-                  <span className="truncate text-[14px] font-medium">
-                    {number}
-                  </span>
-                </>
-              );
+          <div className="flex flex-col gap-3">
+            {kindGroups(items).map((group, run) => {
+              const mostLate = Math.max(...group.map(daysLate));
               return (
-                <li
-                  className={index ? "border-t border-[#23273512]" : ""}
-                  key={`${item.kind}-${item.documentId}-${index}`}
-                >
-                  <div
-                    className={`${row} ${opens ? "hover:bg-white/50" : ""}`}
-                    role={opens ? undefined : "img"}
-                    aria-label={opens ? undefined : name}
+                <div key={`${group[0].kind}-${run}`}>
+                  <h3
+                    className={`m-0 text-[15px] font-medium ${TINTS[group[0].kind]}`}
                   >
-                    <span
-                      className={`grid size-[34px] place-items-center rounded-xl [grid-area:icon] [&>svg]:size-4 [&>svg]:stroke-[1.6] ${tint}`}
-                      aria-hidden="true"
-                    >
-                      <Icon />
-                    </span>
-                    {opens ? (
-                      <Link to={to} className={documentLink} aria-label={name}>
-                        {kind}
-                      </Link>
-                    ) : (
-                      <span className="flex min-w-0 flex-col [grid-area:kind]">
-                        {kind}
-                      </span>
-                    )}
-                    <span
-                      className="min-w-0 truncate text-[14px] [grid-area:client]"
-                      aria-hidden="true"
-                    >
-                      {client}
-                    </span>
-                    <span
-                      className="flex min-w-0 flex-col [grid-area:state] [@container_attention_(width<600px)]:flex-row [@container_attention_(width<600px)]:flex-wrap [@container_attention_(width<600px)]:items-baseline [@container_attention_(width<600px)]:gap-x-2"
-                      aria-hidden="true"
-                    >
-                      {state && <span className="text-[13px]">{state}</span>}
-                      {when && (
-                        <span className="text-[12px] text-spot-muted">
-                          {when}
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className="justify-self-end [grid-area:amount]"
-                      aria-hidden="true"
-                    >
-                      <Amount
-                        value={item.amount}
-                        currency={currency}
-                        hideCode
-                        className="text-[17px] font-light tracking-[-0.03em]"
-                      />
-                    </span>
-                  </div>
-                </li>
+                    {attentionRow(group[0]).label}
+                  </h3>
+                  <ol className="m-0 list-none p-0">
+                    {group.map((item, index) => {
+                      const { label, state, when, to } = attentionRow(item);
+                      const late = daysLate(item);
+                      const number = item.documentNumber || "No number yet";
+                      const client = item.client || "No client";
+                      const name = [
+                        `${label} ${number}`.trim(),
+                        client,
+                        state,
+                        when,
+                        formatMoney(item.amount, currency),
+                      ]
+                        .filter(Boolean)
+                        .join(", ");
+                      const opens = !opened.has(item.documentId);
+                      opened.add(item.documentId);
+                      return (
+                        <li
+                          className={index ? "border-t border-[#23273512]" : ""}
+                          key={`${item.documentId}-${index}`}
+                        >
+                          <div
+                            className={`${row} ${opens ? "hover:bg-white/50" : ""}`}
+                            role={opens ? undefined : "img"}
+                            aria-label={opens ? undefined : name}
+                          >
+                            <span className="flex min-w-0 flex-col gap-1">
+                              {opens ? (
+                                <Link
+                                  to={to}
+                                  className={documentLink}
+                                  aria-label={name}
+                                >
+                                  {client}
+                                </Link>
+                              ) : (
+                                <span className="line-clamp-2 text-[17px] font-medium [overflow-wrap:anywhere]">
+                                  {client}
+                                </span>
+                              )}
+                              {late > 0 && (
+                                <span
+                                  className="block h-1.5 overflow-hidden rounded-full bg-owed-overdue/[.14]"
+                                  aria-hidden="true"
+                                >
+                                  <span
+                                    className="block h-full origin-left animate-ov-bar rounded-[inherit] bg-owed-overdue"
+                                    style={{
+                                      // The least late still shows a sliver.
+                                      width: `${Math.max(late / mostLate, 0.03) * 100}%`,
+                                    }}
+                                  />
+                                </span>
+                              )}
+                              <span
+                                className="text-[15px] text-spot-muted"
+                                aria-hidden="true"
+                              >
+                                <span className="text-spot-ink">{number}</span>
+                                {when && (
+                                  <>
+                                    {" · "}
+                                    <span className="whitespace-nowrap">
+                                      {when}
+                                    </span>
+                                  </>
+                                )}
+                                {state && (
+                                  <>
+                                    {" · "}
+                                    <span
+                                      className={`whitespace-nowrap ${TINTS[item.kind]}`}
+                                    >
+                                      {state}
+                                    </span>
+                                  </>
+                                )}
+                              </span>
+                            </span>
+                            <span
+                              className="justify-self-end"
+                              aria-hidden="true"
+                            >
+                              <Amount
+                                value={item.amount}
+                                currency={currency}
+                                hideCode
+                                className="text-[20px] font-light leading-tight tracking-[-0.03em] tabular-nums"
+                              />
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
               );
             })}
-          </ol>
+          </div>
           {footer && (
-            <p className="mt-auto border-t border-[#23273512] pt-2 text-[12px] text-spot-muted">
+            <p className="mt-auto border-t border-[#23273512] pt-2 text-[15px] text-spot-muted">
               {footer}
             </p>
           )}
@@ -160,7 +192,7 @@ const AttentionPanel = ({ snapshot }) => {
           >
             <FiCheckCircle />
           </span>
-          <p className="font-display text-[17px] font-light">
+          <p className="font-display text-[20px] font-light">
             Nothing needs your attention right now.
           </p>
         </div>

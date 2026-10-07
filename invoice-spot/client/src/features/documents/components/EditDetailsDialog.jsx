@@ -92,7 +92,7 @@ const DetailsForm = ({ document, onClose }) => {
           />
           <span>
             Show how to pay
-            <span className="block text-[12.5px] text-spot-muted">
+            <span className="block text-[13px] text-spot-muted">
               Your details from Settings → Getting paid, while the invoice is
               unpaid.
             </span>

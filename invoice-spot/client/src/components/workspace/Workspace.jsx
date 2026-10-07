@@ -225,7 +225,7 @@ const BADGE_DOTS = {
 };
 export const Badge = ({ children, tone = "neutral" }) => (
   <span
-    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12.5px] leading-[1.3] ${BADGE_TONES[tone] || BADGE_TONES.neutral}`}
+    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] leading-[1.3] ${BADGE_TONES[tone] || BADGE_TONES.neutral}`}
   >
     {BADGE_DOTS[tone] && (
       <span
@@ -263,12 +263,14 @@ export const Amount = ({
   return (
     <span className={`whitespace-nowrap font-display ${className}`}>
       {currency && !hideCode && (
-        <span className="mr-1.5 font-ui text-[0.6em] tracking-normal text-spot-muted">
+        <span className="mr-1.5 font-ui text-[max(0.72em,11.5px)] tracking-normal text-spot-muted">
           {currency}
         </span>
       )}
       {text.slice(0, -3)}
-      <span className="text-[0.7em] text-spot-faint">{text.slice(-3)}</span>
+      <span className="text-[max(0.8em,12px)] text-spot-faint">
+        {text.slice(-3)}
+      </span>
     </span>
   );
 };
@@ -358,7 +360,7 @@ export const Field = ({
       {(error || hint) && (
         <p
           id={`${id}-hint`}
-          className={`text-[12px] leading-[1.5] ${error ? "text-overdue-strong" : "text-spot-muted"}`}
+          className={`text-[13px] leading-[1.5] ${error ? "text-overdue-strong" : "text-spot-muted"}`}
         >
           {error || hint}
         </p>
@@ -505,7 +507,7 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
   const { page, size, last, start, count, rows, setPage, setSize } = pagination;
   return (
     <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#23273512] pt-3 max-[700px]:flex-wrap">
-      <label className="flex items-center gap-2 text-[12.5px] text-spot-muted">
+      <label className="flex items-center gap-2 text-[13px] text-spot-muted">
         Rows per page
         <Select
           size="mini"
@@ -521,7 +523,7 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
       </label>
       <div className="flex items-center gap-1.5 max-[700px]:ml-auto max-[700px]:flex-wrap">
         <span
-          className="mr-2 text-[12.5px] text-spot-text max-[700px]:mr-0.5"
+          className="mr-2 text-[13px] text-spot-text max-[700px]:mr-0.5"
           role="status"
         >
           {count ? start + 1 : 0}–{start + rows.length} of {count}
@@ -574,7 +576,7 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
 // card: the main value first, whichever column it is, then labelled fields
 // in as many columns as fit, then the actions on a line of their own.
 const CARD_LABEL =
-  "stacked:before:mb-1 stacked:before:block stacked:before:text-[11px] stacked:before:text-spot-muted stacked:before:content-[attr(data-label)]";
+  "stacked:before:mb-1 stacked:before:block stacked:before:text-[12px] stacked:before:text-spot-muted stacked:before:content-[attr(data-label)]";
 const COLUMN_TYPES = {
   text: {
     th: "pr-3.5 text-left",
@@ -590,7 +592,7 @@ const COLUMN_TYPES = {
   },
   index: {
     th: "w-10 pr-3.5 text-left",
-    td: "w-10 pr-3.5 text-[12px] tabular-nums text-spot-faint stacked:absolute stacked:right-0 stacked:top-[18px] stacked:w-auto stacked:pr-0",
+    td: "w-10 pr-3.5 text-[13px] tabular-nums text-spot-faint stacked:absolute stacked:right-0 stacked:top-[18px] stacked:w-auto stacked:pr-0",
   },
   amount: {
     th: "pr-8 text-right",
@@ -663,7 +665,7 @@ export const DataTable = ({
                         : "descending"
                       : undefined
                   }
-                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[12px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th}`}
+                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[13px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th}`}
                 >
                   {sortBy && onSort ? (
                     <>

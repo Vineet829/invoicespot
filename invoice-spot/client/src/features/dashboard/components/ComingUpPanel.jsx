@@ -18,11 +18,11 @@ import { overviewPanel, panelAction, panelLink } from "./DashboardPanels";
 // Each part's title, beside its icon on the tint the attention list gives
 // the same kind, then the link to its list.
 const partHeading = "flex items-center justify-between gap-3";
-const partTitle = "flex min-w-0 items-center gap-2 text-[14px] font-medium";
+const partTitle = "flex min-w-0 items-center gap-2 text-[17px] font-medium";
 const partIcon =
   "grid size-7 shrink-0 place-items-center rounded-[10px] [&>svg]:size-[15px] [&>svg]:stroke-[1.6]";
 const card = "rounded-[14px] bg-white/55";
-const amount = "text-[15px] font-light tracking-[-0.03em]";
+const amount = "text-[20px] font-light tracking-[-0.03em]";
 // A detail's dot, kept on the line of the word after it.
 const dot = "·\u00a0";
 // A row that opens something, as tall on a touch screen as the overview's
@@ -48,7 +48,7 @@ const QuotationRow = ({ quote, currency, hover = "hover:bg-white" }) => {
         className={`${rowBase} grid-cols-[minmax(0,1fr)_auto] ${hover}`}
         aria-label={`${details.join(", ")}, ${formatMoney(quote.amount, currency)}. Open the quotation`}
       >
-        <span className="min-w-0 text-[13.5px] [overflow-wrap:anywhere]">
+        <span className="min-w-0 text-[17px] [overflow-wrap:anywhere]">
           {details.map((detail, index) => (
             <Fragment key={index}>
               {index > 0 && " "}
@@ -120,7 +120,7 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
         </div>
         {runs.length ? (
           <>
-            <p className="text-[12.5px] text-spot-muted">
+            <p className="text-[15px] text-spot-muted">
               Next 90 days: {countOf(next.invoices, "invoice", "invoices")} ·{" "}
               {formatMoney(next.amount, currency)}
             </p>
@@ -128,14 +128,14 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
               {runs.map((run) => {
                 const content = (
                   <>
-                    <span className="text-[12.5px] text-spot-muted">
+                    <span className="text-[15px] text-spot-muted">
                       {run.day}
                     </span>
                     <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-[13.5px]">
+                      <span className="truncate text-[17px]">
                         {run.client || "No client"}
                       </span>
-                      <span className="truncate text-[12px] text-spot-muted">
+                      <span className="truncate text-[15px] text-spot-muted">
                         {run.number}
                       </span>
                     </span>
@@ -167,14 +167,14 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
             </ol>
           </>
         ) : recurring.active > 0 ? (
-          <p className={`${card} p-3 text-[13px] text-spot-body`}>
+          <p className={`${card} p-3 text-[15px] text-spot-body`}>
             Nothing runs in the next 90 days.
           </p>
         ) : (
           <div
             className={`${card} flex flex-wrap items-center gap-x-3 gap-y-2 p-3`}
           >
-            <p className="min-w-[180px] flex-1 text-[13px] text-spot-body">
+            <p className="min-w-[180px] flex-1 text-[15px] text-spot-body">
               None yet. Bill a client every week, month or year without lifting
               a finger.
             </p>
@@ -207,7 +207,7 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
         </div>
         {waiting > 0 && (
           <div className="rounded-[14px] bg-white p-1">
-            <p className="px-3 pt-1.5 text-[12px] text-spot-muted">
+            <p className="px-3 pt-1.5 text-[15px] text-spot-muted">
               Awaiting an answer · {waiting.toLocaleString("en")}
             </p>
             <ol className="m-0 list-none p-0">
@@ -221,7 +221,7 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
               ))}
             </ol>
             {waiting > quotes.length && (
-              <p className="px-3 pb-1.5 text-[12px] text-spot-muted">
+              <p className="px-3 pb-1.5 text-[15px] text-spot-muted">
                 Also{" "}
                 {countOf(
                   waiting - quotes.length,
@@ -234,7 +234,7 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
         )}
         {lapsed > 0 && (
           <div className={`${card} p-1`}>
-            <p className="px-3 pt-1.5 text-[12px] text-spot-muted">
+            <p className="px-3 pt-1.5 text-[15px] text-spot-muted">
               Expired without an answer · {lapsed.toLocaleString("en")}
             </p>
             <ol className="m-0 list-none p-0">
@@ -247,14 +247,14 @@ const ComingUpPanel = ({ snapshot, currencyChosen }) => {
               ))}
             </ol>
             {lapsedQuotes.length > 0 && lapsed > lapsedQuotes.length && (
-              <p className="px-3 pb-1.5 text-[12px] text-spot-muted">
+              <p className="px-3 pb-1.5 text-[15px] text-spot-muted">
                 and {(lapsed - lapsedQuotes.length).toLocaleString("en")} more
               </p>
             )}
           </div>
         )}
         {!waiting && !lapsed && (
-          <p className={`${card} p-3 text-[13px] text-spot-body`}>
+          <p className={`${card} p-3 text-[15px] text-spot-body`}>
             No quotations are waiting for an answer.
           </p>
         )}

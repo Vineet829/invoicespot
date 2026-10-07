@@ -58,20 +58,20 @@ export const auth = {
   divider: "flex items-center gap-3",
   dividerLine:
     "h-px flex-1 animate-auth-divider bg-[linear-gradient(90deg,transparent,#5b47a040,transparent,#5b47a040,transparent)] bg-[length:200%_100%]",
-  dividerText: "whitespace-nowrap text-[12px] leading-none text-spot-muted",
+  dividerText: "whitespace-nowrap text-[13px] leading-none text-spot-muted",
   foot: "flex flex-col gap-3.5",
   cta: "group flex items-center justify-between gap-3 rounded-xl border border-spot-violet/[.12] bg-[linear-gradient(135deg,#7c62d614,#7c62d605)] px-3.5 py-[11px] transition-colors duration-200 hover:border-spot-violet/30 hover:bg-[linear-gradient(135deg,#7c62d626,#7c62d60a)] max-[379px]:flex-col max-[379px]:items-start max-[379px]:gap-2",
   ctaText: "text-[13px] leading-[1.3] text-spot-sub",
   ctaAction:
     "inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium leading-[1.3] text-spot-violet [&>svg]:size-3.5 [&>svg]:transition-transform [&>svg]:duration-200 [&>svg]:group-hover:translate-x-[3px]",
-  note: `flex items-center justify-center gap-1.5 text-[12px] leading-[1.4] text-spot-muted max-[560px]:items-start [&>svg]:size-3.5 [&>svg]:shrink-0 max-[560px]:[&>svg]:mt-0.5 ${underlinedLinks}`,
+  note: `flex items-center justify-center gap-1.5 text-[13px] leading-[1.4] text-spot-muted max-[560px]:items-start [&>svg]:size-3.5 [&>svg]:shrink-0 max-[560px]:[&>svg]:mt-0.5 ${underlinedLinks}`,
 };
 
 // Content rises in on load; each element sets its delay with --d.
 export const rise = "animate-auth-rise";
 
 // Shared with the password pages.
-export const fieldError = "text-[12px] leading-[1.5] text-overdue-strong";
+export const fieldError = "text-[13px] leading-[1.5] text-overdue-strong";
 export const passwordToggle = `${iconButton} absolute right-1 top-1/2 size-9 -translate-y-1/2`;
 
 // Weak to strong, in the pastel palette: the filled segments take the
@@ -89,7 +89,7 @@ export const PasswordStrength = ({ password, className = "", ...props }) => {
       aria-live="polite"
       {...props}
     >
-      <span className="whitespace-nowrap text-[12px] leading-none text-spot-muted">
+      <span className="whitespace-nowrap text-[13px] leading-none text-spot-muted">
         Password strength
       </span>
       <div
@@ -104,7 +104,7 @@ export const PasswordStrength = ({ password, className = "", ...props }) => {
           />
         ))}
       </div>
-      <span className="min-w-14 text-right text-[12px] font-medium leading-none text-spot-text">
+      <span className="min-w-14 text-right text-[13px] font-medium leading-none text-spot-text">
         {password ? strengthColor(score).label : ""}
       </span>
     </div>

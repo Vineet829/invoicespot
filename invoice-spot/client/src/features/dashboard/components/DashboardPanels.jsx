@@ -1,39 +1,4 @@
-import { useRef, useState } from "react";
 import { skeleton, surface } from "../../../components/workspace/pastel";
-
-// A small card that follows the pointer inside a positioned container. It
-// adds detail for mouse users; the same facts stay readable as text or as
-// screen-reader text, so touch and keyboard users lose nothing.
-export const useHoverCard = () => {
-  const containerRef = useRef(null);
-  const [card, setCard] = useState(null);
-  const show = (event, content) => {
-    const box = containerRef.current?.getBoundingClientRect();
-    if (!box || !window.matchMedia("(hover: hover)").matches) return;
-    const x = event.clientX - box.left;
-    const y = event.clientY - box.top;
-    setCard({
-      x,
-      y,
-      flipX: x > box.width - 260,
-      flipY: y > box.height - 150,
-      content,
-    });
-  };
-  const hide = () => setCard(null);
-  return { containerRef, card, show, hide };
-};
-
-export const HoverCard = ({ card }) =>
-  card ? (
-    <div
-      className={`pointer-events-none absolute z-[5] w-max max-w-[240px] animate-ov-fade rounded-[14px] border border-[#23273514] bg-white px-3.5 py-3 text-[13px] leading-[1.45] text-spot-ink shadow-float ${card.flipX ? "-translate-x-[calc(100%+14px)]" : "translate-x-3.5"} ${card.flipY ? "-translate-y-[calc(100%+14px)]" : "translate-y-3.5"}`}
-      role="tooltip"
-      style={{ left: card.x, top: card.y }}
-    >
-      {card.content}
-    </div>
-  ) : null;
 
 // Each digit rolls into place once. The digits keep their final width from
 // the start, so nothing around a figure moves while it animates.
@@ -77,7 +42,9 @@ export const DashboardNumber = ({
       <span className="whitespace-nowrap" aria-hidden="true" key={text}>
         <NumberCharacters text={hasDecimals ? text.slice(0, -3) : text} />
         {hasDecimals && (
-          <span className={`text-[0.56em] tracking-[-0.02em] ${decimalClass}`}>
+          <span
+            className={`text-[max(0.56em,14px)] tracking-[-0.02em] ${decimalClass}`}
+          >
             <NumberCharacters text={text.slice(-3)} offset={text.length - 3} />
           </span>
         )}
@@ -178,18 +145,17 @@ export const FinancialCard = ({ label, value, detail, icon: Icon, tone }) => {
 // small links to the full lists beside their titles.
 export const overviewPanel = `${surface} relative flex min-w-0 animate-ov-rise flex-col gap-2.5 px-6 pb-4 pt-5 max-[700px]:rounded-3xl max-[700px]:p-[18px]`;
 export const panelLink =
-  "inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12.5px] text-spot-night underline-offset-4 transition-colors hover:text-spot-violet hover:underline coarse:min-h-11 [&>svg]:size-[13px] [&>svg]:stroke-[1.5]";
+  "inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] text-spot-night underline-offset-4 transition-colors hover:text-spot-violet hover:underline coarse:min-h-11 [&>svg]:size-[13px] [&>svg]:stroke-[1.5]";
 // A panel's way to start what it has none of yet, such as recording an
 // expense: a white key, greyed out when the role can't use it.
 export const panelAction =
-  "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[13px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
+  "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[15px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
-// The rows under the figures keep to their three columns from 1200px, so
-// the gaps line up down the page: what is owed in the first column beside
-// what needs attention across the other two, then the cash flow across all
-// three. Stacked, the rows keep the page's spacing.
+// The rows under the figures: what is owed beside what needs attention,
+// five parts of the row to six from 1200px, then the cash flow across the
+// width. Stacked, the rows keep the page's spacing.
 export const owedRow =
-  "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3 min-[1200px]:grid-cols-3 min-[1200px]:[&>:last-child]:col-span-2";
+  "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3 min-[1200px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]";
 // The lists under the cash flow, as tall as each other: the top clients,
 // the top items and what is coming up, a column each from 1440px. Narrower,
 // three would cut most names short, so the first two share a row and the
@@ -250,7 +216,7 @@ export const DashboardLoading = () => (
         <Skeleton className="h-14 w-[70%] rounded-md" />
         <Skeleton className="h-4 w-full rounded-full" />
         <Skeleton className="h-[84px] w-full rounded-md" />
-        <Skeleton className="h-[104px] w-full rounded-md" />
+        <Skeleton className="h-[196px] w-full rounded-2xl [@container_finance-card_(min-width:560px)]:h-[118px]" />
       </div>
       <div className={overviewPanel}>
         <Skeleton className="h-6 w-[200px] rounded-md" />

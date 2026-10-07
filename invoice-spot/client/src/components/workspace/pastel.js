@@ -10,12 +10,7 @@ export const pageSubtitle =
 // Panel headings and the short muted notes beside them.
 export const sectionTitle =
   "font-display text-[22px] font-light leading-[normal] tracking-[-0.035em] max-[700px]:text-[21px]";
-export const panelNote = "text-[12.5px] text-spot-muted";
-
-// Hover card content.
-export const hoverLabel = "flex items-center gap-2 text-[12px] text-spot-muted";
-export const hoverValue =
-  "mt-1 block font-display text-[17px] font-light leading-[1.25] tracking-[-0.02em]";
+export const panelNote = "text-[13px] text-spot-muted";
 
 // Loading placeholder blocks; size them per use.
 export const skeleton =
@@ -58,7 +53,7 @@ export const secondaryIconButton =
 
 // Small actions inside tables and forms, such as View and Delete.
 const rowActionBase =
-  "inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 text-[12.5px] transition-colors disabled:cursor-default disabled:opacity-100 coarse:min-h-11 [&>svg]:size-[15px] [&>svg]:shrink-0 [&>svg]:stroke-[1.7]";
+  "inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 text-[13px] transition-colors disabled:cursor-default disabled:opacity-100 coarse:min-h-11 [&>svg]:size-[15px] [&>svg]:shrink-0 [&>svg]:stroke-[1.7]";
 export const rowAction = `${rowActionBase} bg-spot-violet/[.07] text-spot-violet hover:bg-spot-violet/[.13] disabled:bg-spot-violet/[.04] disabled:text-spot-disabled`;
 export const rowActionDanger = `${rowActionBase} bg-overdue/70 text-overdue-strong hover:enabled:bg-overdue disabled:bg-overdue/30 disabled:text-overdue-muted`;
 
@@ -90,7 +85,7 @@ const selectSurface =
 export const selectTrigger = {
   toolbar: `${selectSurface} h-11 pl-3 pr-2.5 text-[13.5px] [&>svg]:size-[15px]`,
   form: `${selectSurface} h-11 pl-3 pr-2.5 text-[14px] [&>svg]:size-[15px]`,
-  mini: `${selectSurface} h-[30px] rounded-[9px] pl-2 pr-1.5 text-[12.5px] coarse:min-h-11 [&>svg]:size-3.5`,
+  mini: `${selectSurface} h-[30px] rounded-[9px] pl-2 pr-1.5 text-[13px] coarse:min-h-11 [&>svg]:size-3.5`,
 };
 // The floating menu, and the rows inside it: options (40px, taller with a
 // description, 32px under a mini trigger, 44px in the phone sheet), tinted
@@ -105,11 +100,11 @@ export const selectOptionChosen = "bg-card-lilac font-medium text-[#3b2d78]";
 export const selectOptionChosenActive =
   "bg-[#dad3f5] font-medium text-[#3b2d78]";
 export const selectGroup =
-  "px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-spot-muted";
+  "px-2.5 pb-1 pt-2.5 text-[12px] font-medium uppercase tracking-[0.06em] text-spot-muted";
 export const selectSearch =
   "mx-0.5 mb-1.5 mt-0.5 flex h-[38px] shrink-0 items-center gap-2 rounded-[10px] bg-[#2327350d] px-2.5 text-[13.5px] text-spot-muted [&>svg]:size-[15px] [&>svg]:shrink-0";
 export const selectFooter =
-  "mx-0.5 mt-1.5 shrink-0 border-t border-[#23273512] px-2.5 pb-1 pt-2 text-[11.5px] text-spot-muted";
+  "mx-0.5 mt-1.5 shrink-0 border-t border-[#23273512] px-2.5 pb-1 pt-2 text-[12.5px] text-spot-muted";
 // On a phone the menu is a sheet at the bottom of the window, with a
 // larger search row.
 export const selectSheet =
@@ -124,7 +119,7 @@ export const selectSheetSearch =
 export const calendarPanel =
   "flex flex-col gap-1.5 rounded-[20px] border border-[#2327350f] bg-white p-3.5 text-spot-ink shadow-menu";
 export const calendarToday =
-  "mr-1 h-8 rounded-full bg-transparent px-2.5 text-[12.5px] text-spot-violet transition-colors hover:bg-card-lilac disabled:cursor-default disabled:text-spot-disabled disabled:hover:bg-transparent coarse:h-11";
+  "mr-1 h-8 rounded-full bg-transparent px-2.5 text-[13px] text-spot-violet transition-colors hover:bg-card-lilac disabled:cursor-default disabled:text-spot-disabled disabled:hover:bg-transparent coarse:h-11";
 export const calendarNav =
   "grid size-8 place-items-center rounded-full bg-transparent text-spot-nav transition-colors hover:bg-card-lilac hover:text-spot-violet coarse:size-11 [&>svg]:size-[17px]";
 export const calendarCell = ({ chosen, now, ok, outside, big, monthly }) =>
@@ -148,6 +143,6 @@ export const calendarCell = ({ chosen, now, ok, outside, big, monthly }) =>
 export const errorBanner =
   "m-0 flex items-center gap-3.5 rounded-xl border border-white/90 bg-overdue/85 px-5 py-[18px] text-overdue-ink max-[600px]:flex-wrap max-[600px]:items-start [&>svg]:size-5 [&>svg]:shrink-0";
 export const errorTitle = "block text-[14px] font-medium";
-export const errorDetail = "mt-1 block text-[12px] text-overdue-muted";
+export const errorDetail = "mt-1 block text-[13px] text-overdue-muted";
 export const retryButton =
   "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-spot-violet/15 bg-white/70 px-4 py-[11px] text-[13px] font-medium leading-[1.4] text-spot-night transition-colors hover:enabled:bg-white max-[600px]:ml-[34px]";
