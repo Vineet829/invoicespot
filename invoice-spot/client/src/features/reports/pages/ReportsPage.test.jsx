@@ -207,6 +207,22 @@ it.each(["/reports#%", "/reports#nowhere", "/reports"])(
   },
 );
 
+it("charts what was billed and received side by side, with the figures a click away", () => {
+  withFigures();
+  const income = render().querySelector("#income");
+  expect(
+    [...income.querySelectorAll("li")].map((item) => item.textContent),
+  ).toEqual(["Billed", "Received"]);
+  const chart = income.querySelector('[role="group"]');
+  expect(chart.getAttribute("aria-label")).toBe("Billed and received by month");
+  expect(
+    [...chart.querySelectorAll('[role="img"]')].map((month) =>
+      month.getAttribute("aria-label"),
+    ),
+  ).toEqual(["September 2026: billed 1,000.00, received 600.00"]);
+  expect(income.querySelector("caption").closest("details").open).toBe(false);
+});
+
 it("reports on the overview's last 90 days when its profit opens the page", async () => {
   withFigures();
   const scrolled = [];

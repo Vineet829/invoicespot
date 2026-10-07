@@ -42,10 +42,12 @@ const BandAmount = ({ value, currency }) => {
   const text = formatMoney(value, currency);
   return (
     <span
-      className={`font-display text-[18px] font-light tracking-[-0.03em] ${colors.ink}`}
+      className={`whitespace-nowrap font-display text-[20px] font-light tracking-[-0.03em] tabular-nums ${colors.ink}`}
     >
       {text.slice(0, -3)}
-      <span className={`text-[0.7em] ${colors.decimal}`}>{text.slice(-3)}</span>
+      <span className={`text-[max(0.8em,12px)] ${colors.decimal}`}>
+        {text.slice(-3)}
+      </span>
     </span>
   );
 };
@@ -143,9 +145,9 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
           />
         ))}
       </div>
-      {/* Current and Overdue side by side, then the overdue bands, two
-          across in the card's column and four across when it has the
-          whole width. */}
+      {/* Current and Overdue side by side, then the overdue bands in one
+          panel split into cells by hairlines, four across when the card is
+          wide enough and two across when not. */}
       <div className="flex flex-col gap-5">
         <div className="grid grid-cols-2 gap-4">
           <Split
@@ -168,41 +170,52 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
           />
         </div>
         {bands && (
-          <ul
-            className="m-0 grid list-none grid-cols-2 gap-x-6 gap-y-3.5 p-0 [@container_finance-card_(min-width:760px)]:grid-cols-4"
-            aria-label="Overdue by days late"
-          >
-            {AGE_BANDS.map((band) => {
-              const { amount = 0, invoices = 0 } = bands[band.key] || {};
-              return (
-                <li
-                  className="flex min-w-0 flex-col justify-between gap-1.5"
-                  key={band.key}
-                >
-                  <span
-                    className={`flex items-center gap-2 whitespace-nowrap text-[13px] ${colors.muted}`}
+          <div className="overflow-hidden rounded-2xl bg-[#fcede6] shadow-[0_1px_2px_rgba(58,34,24,0.06)]">
+            <h3
+              id="receivables-bands"
+              className={`m-0 border-b border-[#3a221814] px-4 py-2.5 text-[14px] font-normal ${colors.label}`}
+            >
+              Overdue by days late
+            </h3>
+            <ul
+              className="m-0 grid list-none grid-cols-2 gap-px bg-[#3a221814] p-0 [@container_finance-card_(min-width:560px)]:grid-cols-4"
+              aria-labelledby="receivables-bands"
+            >
+              {AGE_BANDS.map((band) => {
+                const { amount = 0, invoices = 0 } = bands[band.key] || {};
+                return (
+                  <li
+                    className="flex min-w-0 flex-col gap-1 bg-[#fcede6] px-4 pb-3 pt-2.5"
+                    key={band.key}
                   >
                     <span
-                      className={`size-2.5 shrink-0 rounded-[3px] ${band.color}`}
+                      className={`flex items-center gap-2 whitespace-nowrap text-[14px] ${colors.label}`}
+                    >
+                      <span
+                        className={`size-2 shrink-0 rounded-full ${band.color}`}
+                        aria-hidden="true"
+                      />
+                      {band.label}
+                    </span>
+                    <span aria-hidden="true">
+                      <BandAmount value={amount} currency={currency} />
+                    </span>
+                    <span
+                      className={`text-[13px] ${colors.muted}`}
                       aria-hidden="true"
-                    />
-                    {band.label}
-                  </span>
-                  <span
-                    className={`flex items-baseline gap-1.5 whitespace-nowrap text-[13px] ${colors.muted}`}
-                    aria-hidden="true"
-                  >
-                    <BandAmount value={amount} currency={currency} />·{" "}
-                    {Number(invoices).toLocaleString("en")}
-                  </span>
-                  <span className="sr-only">
-                    {" "}
-                    late: {money(amount, currency)} on {invoiceCount(invoices)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+                    >
+                      {invoiceCount(invoices)}
+                    </span>
+                    <span className="sr-only">
+                      {" "}
+                      late: {money(amount, currency)} on{" "}
+                      {invoiceCount(invoices)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
       </div>
     </section>

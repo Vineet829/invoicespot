@@ -44,7 +44,7 @@ const SummaryFigure = ({
         )}
       </p>
       {compared && (
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-spot-muted">
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-spot-muted">
           {change && (
             <span
               className={`inline-flex items-center gap-[3px] rounded-full bg-[#2327350d] py-[3px] pl-[5px] pr-2 font-medium leading-[1.3] ${color}`}

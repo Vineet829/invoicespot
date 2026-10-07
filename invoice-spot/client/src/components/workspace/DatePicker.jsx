@@ -410,7 +410,7 @@ export const DatePicker = ({
                 key={short}
                 scope="col"
                 abbr={day}
-                className="pb-1 pt-0.5 text-center text-[11.5px] font-medium tracking-[0.04em] text-spot-muted"
+                className="pb-1 pt-0.5 text-center text-[12.5px] font-medium tracking-[0.04em] text-spot-muted"
               >
                 {short}
               </th>

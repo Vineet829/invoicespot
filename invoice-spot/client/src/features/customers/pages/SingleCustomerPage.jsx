@@ -190,7 +190,7 @@ const AccountTotals = ({ totals }) => (
             <dt className="text-[13px] opacity-80">{label}</dt>
             <dd className="mt-1.5 text-[26px] leading-tight max-[700px]:text-[23px]">
               <Amount value={row[key]} currency={row.currency} />
-              <span className="mt-1 block text-[12px] opacity-75">{note}</span>
+              <span className="mt-1 block text-[13px] opacity-75">{note}</span>
             </dd>
           </div>
         ))}

@@ -211,7 +211,7 @@ const ScheduleForm = ({
         />
         <span>
           Email each new invoice to the client
-          <span className="mt-0.5 block text-[12.5px] text-spot-muted">
+          <span className="mt-0.5 block text-[13px] text-spot-muted">
             {demo
               ? "Emailing is turned off for the shared demo account."
               : values.issueAutomatically

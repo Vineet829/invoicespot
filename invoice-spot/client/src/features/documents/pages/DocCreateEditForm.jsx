@@ -457,7 +457,7 @@ const DocumentFields = ({
                                     <span className="text-[14px] font-medium text-spot-ink [overflow-wrap:anywhere]">
                                       {client.name}
                                     </span>
-                                    <span className="text-[12.5px] text-spot-muted [overflow-wrap:anywhere]">
+                                    <span className="text-[13px] text-spot-muted [overflow-wrap:anywhere]">
                                       {client.email}
                                     </span>
                                   </button>
@@ -870,7 +870,7 @@ const DocumentFields = ({
                               />
                               <span>
                                 {label}
-                                <span className="block text-[12.5px] text-spot-muted">
+                                <span className="block text-[13px] text-spot-muted">
                                   {note}
                                 </span>
                               </span>
@@ -890,7 +890,7 @@ const DocumentFields = ({
                           />
                           <span>
                             Reverse charge
-                            <span className="block text-[12.5px] text-spot-muted">
+                            <span className="block text-[13px] text-spot-muted">
                               The recipient pays the GST, so it isn’t billed.
                             </span>
                           </span>
@@ -937,7 +937,7 @@ const DocumentFields = ({
                   />
                   <span>
                     Show how to pay
-                    <span className="block text-[12.5px] text-spot-muted">
+                    <span className="block text-[13px] text-spot-muted">
                       Your details from Settings → Getting paid, while the
                       invoice is unpaid.
                     </span>

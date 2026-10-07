@@ -458,7 +458,7 @@ export const Select = ({
       {!sheet && (
         <kbd
           aria-hidden="true"
-          className="rounded-md border border-[#23273524] px-1.5 py-px font-ui text-[10.5px]"
+          className="rounded-md border border-[#23273524] px-1.5 py-px font-ui text-[11.5px]"
         >
           Esc
         </kbd>
@@ -531,14 +531,14 @@ export const Select = ({
                 {option.description && (
                   <span
                     id={`${optionId(option)}-note`}
-                    className="text-[12px] font-normal text-spot-muted"
+                    className="text-[13px] font-normal text-spot-muted"
                   >
                     {option.description}
                   </span>
                 )}
               </span>
               {(option.meta || selected) && (
-                <span className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap text-[12px] font-normal text-spot-muted">
+                <span className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px] font-normal text-spot-muted">
                   {option.meta && (
                     <span id={`${optionId(option)}-meta`}>{option.meta}</span>
                   )}
@@ -566,7 +566,7 @@ export const Select = ({
       {options.map((option) => (
         <li key={option.index} className={`${selectOption} h-0 min-h-0`}>
           <span className="whitespace-nowrap">{option.label}</span>
-          <span className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap text-[12px]">
+          <span className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px]">
             {option.meta}
             <span className="size-[15px]" />
           </span>

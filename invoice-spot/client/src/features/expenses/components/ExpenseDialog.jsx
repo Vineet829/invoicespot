@@ -122,7 +122,7 @@ const ExpenseForm = ({ expense, settings, busy, onSave, onClose }) => {
         />
         <span>
           This tax can be claimed back
-          <span className="block text-[12.5px] text-spot-muted">
+          <span className="block text-[13px] text-spot-muted">
             Such as GST input tax credit. Tax you claim back isn’t counted as a
             cost.
           </span>

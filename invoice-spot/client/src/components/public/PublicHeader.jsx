@@ -131,7 +131,7 @@ const PublicHeader = ({
                 title={name}
               >
                 <span
-                  className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-avatar-lilac text-[12px] leading-none text-[#3f2f6e]"
+                  className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-avatar-lilac text-[13px] leading-none text-[#3f2f6e]"
                   aria-hidden="true"
                 >
                   {initials}

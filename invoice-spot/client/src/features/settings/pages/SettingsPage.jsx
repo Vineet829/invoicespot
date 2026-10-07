@@ -461,7 +461,7 @@ const SettingsForm = ({ settings }) => {
                 />
                 <span>
                   India GST mode
-                  <span className="block text-[12.5px] text-spot-muted">
+                  <span className="block text-[13px] text-spot-muted">
                     Prefixes can then use only letters, digits, / and -.
                   </span>
                 </span>

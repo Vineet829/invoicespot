@@ -122,7 +122,7 @@ const NotificationBell = ({ className = "" }) => {
                         >
                           {notification.message}
                         </span>
-                        <span className="mt-0.5 block text-[12.5px] text-spot-muted">
+                        <span className="mt-0.5 block text-[13px] text-spot-muted">
                           <time dateTime={notification.createdAt}>
                             {timeAgo(notification.createdAt)}
                           </time>

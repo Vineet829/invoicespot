@@ -137,7 +137,7 @@ const Legend = ({ view, byKey, currency }) => (
         return (
           <li className="flex min-w-0 flex-col gap-1" key={band.key}>
             <span
-              className="flex items-center gap-2 whitespace-nowrap text-[12.5px] text-spot-muted"
+              className="flex items-center gap-2 whitespace-nowrap text-[13px] text-spot-muted"
               aria-hidden="true"
             >
               <span
@@ -146,7 +146,7 @@ const Legend = ({ view, byKey, currency }) => (
               {band.label}
             </span>
             <span
-              className="flex items-baseline gap-1.5 whitespace-nowrap text-[12.5px] text-spot-muted"
+              className="flex items-baseline gap-1.5 whitespace-nowrap text-[13px] text-spot-muted"
               aria-hidden="true"
             >
               <Amount

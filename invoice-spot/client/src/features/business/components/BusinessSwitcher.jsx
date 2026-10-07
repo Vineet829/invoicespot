@@ -40,7 +40,7 @@ const row = (active) =>
   `flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${active ? "border-white bg-white shadow-panel-soft" : "border-transparent bg-transparent hover:bg-[#5b47a00a]"}`;
 
 const trigger =
-  "flex max-w-full items-center gap-1 rounded-md border-0 bg-transparent p-0 text-left text-[12.5px] text-spot-muted transition-colors hover:text-spot-night coarse:min-h-11 [&>svg]:size-3 [&>svg]:shrink-0";
+  "flex max-w-full items-center gap-1 rounded-md border-0 bg-transparent p-0 text-left text-[14.5px] text-spot-muted transition-colors hover:text-spot-night coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:shrink-0";
 
 // The businesses someone works in, as a list to switch between, with a way
 // to start another. The shell opens it from the line under the account's
@@ -144,7 +144,7 @@ const BusinessSwitcher = ({ label }) => {
                   />
                 ) : (
                   <span
-                    className="grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac text-[12.5px] text-[#3f2f6e]"
+                    className="grid size-9 shrink-0 place-items-center rounded-xl bg-avatar-lilac text-[13px] text-[#3f2f6e]"
                     aria-hidden="true"
                   >
                     {initialsOf(business.name)}
@@ -154,7 +154,7 @@ const BusinessSwitcher = ({ label }) => {
                   <strong className="block truncate text-[14.5px] font-medium text-spot-ink">
                     {business.name}
                   </strong>
-                  <small className="block text-[12.5px] text-spot-muted">
+                  <small className="block text-[13px] text-spot-muted">
                     {ROLE_LABELS[business.role] || business.role}
                   </small>
                 </span>
@@ -165,7 +165,7 @@ const BusinessSwitcher = ({ label }) => {
                   />
                 ) : (
                   business.unread > 0 && (
-                    <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-spot-violet/[.12] px-1.5 text-[12px] text-spot-violet">
+                    <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-spot-violet/[.12] px-1.5 text-[13px] text-spot-violet">
                       {business.unread}
                       <span className="sr-only"> unread</span>
                     </span>

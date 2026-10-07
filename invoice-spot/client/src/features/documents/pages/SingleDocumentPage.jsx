@@ -72,7 +72,7 @@ import PaymentsLedger from "../components/PaymentsLedger";
 import LineName from "../../gst/LineName";
 
 const DEMO_EMAIL_NOTE = "Emailing is turned off for the shared demo account.";
-const partyHeading = "mb-3 text-[12.5px] font-normal text-spot-muted";
+const partyHeading = "mb-3 text-[13px] font-normal text-spot-muted";
 const partyName = "mb-1.5 block text-[15px] font-medium text-spot-ink";
 const partyLine =
   "text-[13.5px] leading-[1.7] text-spot-body [overflow-wrap:anywhere]";
