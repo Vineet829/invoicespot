@@ -139,6 +139,8 @@ const ui = {
 
 const delay = (d, extra) => ({ "--d": `${d}s`, ...extra });
 
+// The sign-in pages' picture of the app. Its address bar shows the address
+// the app is served from, as the visitor's own bar does.
 const AuthVisual = ({ headline, subtext, loaderLabel }) => {
   const panelRef = useRef(null);
 
@@ -239,7 +241,7 @@ const AuthVisual = ({ headline, subtext, loaderLabel }) => {
                   style={{ background: "#94bf87" }}
                 />
               </div>
-              <div className={ui.url}>invoicespot.com/dashboard</div>
+              <div className={ui.url}>{window.location.host}/dashboard</div>
             </div>
             <div className={ui.body}>
               <div className={ui.stats}>

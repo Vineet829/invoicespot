@@ -41,6 +41,7 @@ import { taxRows } from "../gstRows";
 import NewClientDialog from "../../customers/components/NewClientDialog";
 import { matchClients } from "./documentEditorModel";
 import { useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   useCreateItemMutation,
   useGetItemsQuery,
@@ -132,14 +133,24 @@ const DocumentFields = ({
   );
   const foreign = currency !== base;
   const [issueDate, setIssueDate] = useState(doc?.issueDate || "");
+  // Today by the business's calendar: the server dates a document left
+  // undated on it, and refuses one dated after it.
+  const businessToday = useBusinessToday();
+  const today = dateInput(businessToday);
   // A credit note keeps its invoice's client and currency; its lines, date,
   // notes and reason change, up to what is left to credit.
   const creditNote = doc?.documentType === "Credit Note";
   const credited = doc?.creditedDocument;
   const [creditReason, setCreditReason] = useState(doc?.creditReason || "");
+  // A new document is due the payment terms after today.
   const [dueDate, setDueDate] = useState(
     dateInput(
-      doc?.dueDate || Date.now() + (settings?.paymentTermsDays ?? 7) * 86400000,
+      doc?.dueDate ||
+        new Date(
+          businessToday.getFullYear(),
+          businessToday.getMonth(),
+          businessToday.getDate() + (settings?.paymentTermsDays ?? 7),
+        ),
     ),
   );
   // A due date comes no earlier than the issue date, today until one is
@@ -148,7 +159,7 @@ const DocumentFields = ({
   const earliestDue =
     doc?.dueDate === dueDate && (doc?.issueDate || "") === issueDate
       ? undefined
-      : issueDate || dateInput();
+      : issueDate || today;
   // The rate new lines start at, which every line can be set to at once.
   const [everyRate, setEveryRate] = useState(
     doc?.rates ?? String(settings?.defaultTaxRate ?? "0"),
@@ -371,7 +382,7 @@ const DocumentFields = ({
                       type="date"
                       value={issueDate}
                       min={credited.issueDate || undefined}
-                      max={dateInput()}
+                      max={today}
                       onChange={(event) => setIssueDate(event.target.value)}
                       hint={`Leave it empty to date it the day it’s issued. It can’t be before ${credited.documentNumber} or later than today.`}
                       disabled={busy}
@@ -491,7 +502,7 @@ const DocumentFields = ({
                       type="date"
                       required={Boolean(doc?.issueDate)}
                       value={issueDate}
-                      max={dateInput()}
+                      max={today}
                       onChange={(event) => setIssueDate(event.target.value)}
                       hint={
                         doc?.issueDate

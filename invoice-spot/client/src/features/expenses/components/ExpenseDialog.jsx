@@ -14,6 +14,7 @@ import {
 } from "../../../components/workspace/pastel";
 import { PAYMENT_METHODS } from "../../documents/paymentMethods";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   useCreateExpenseMutation,
   useGetExpenseCategoriesQuery,
@@ -25,9 +26,12 @@ const NO_CATEGORIES = [];
 
 const ExpenseForm = ({ expense, settings, busy, onSave, onClose }) => {
   const base = settings.baseCurrency || settings.defaultCurrency;
+  // A new expense is dated today by the business's calendar, the one the
+  // server counts its days by, and none later.
+  const today = dateInput(useBusinessToday());
   const [values, setValues] = useState(() =>
     expenseForm(expense, {
-      today: dateInput(),
+      today,
       currency: settings.defaultCurrency,
       base,
     }),
@@ -53,7 +57,7 @@ const ExpenseForm = ({ expense, settings, busy, onSave, onClose }) => {
           label="Date paid"
           type="date"
           required
-          max={dateInput()}
+          max={today}
           value={values.date}
           onChange={change("date")}
           disabled={busy}

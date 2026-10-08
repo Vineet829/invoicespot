@@ -1,11 +1,12 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import IssueDialog from "./IssueDialog";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
 
-// The dialog reads the business's settings from this hook, so it needs no
-// store or server; the browser's modal is left out.
+// The dialog reads the business's settings, and the business it works in,
+// from these hooks, so it needs no store or server; the browser's modal is
+// left out.
 vi.mock("../documentsApiSlice", () => ({
   useIssueDocMutation: () => [vi.fn(), { isLoading: false }],
 }));
@@ -15,8 +16,17 @@ vi.mock("../../settings/settingsApiSlice", () => ({
 vi.mock("../../../components/workspace/Dialog", () => ({
   Dialog: ({ open, children }) => (open ? children : null),
 }));
+const active = vi.hoisted(() => ({ business: undefined }));
+vi.mock("../../business/permissions", () => ({
+  useBusiness: () => ({ business: active.business }),
+}));
 
 window.IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+  vi.useRealTimers();
+  active.business = undefined;
+});
 
 const inRegime = (taxRegime) =>
   useGetSettingsQuery.mockReturnValue({
@@ -87,6 +97,27 @@ it("doesn't offer to change a credit note's rate, which stays its invoice's", ()
       }),
     ),
   ).toBeNull();
+});
+
+// The server refuses a document dated after the business's today. At 5 in
+// the morning of Oct 8 in Kolkata it is still Oct 7 in Los Angeles.
+it("dates a draft on the business's today, due the payment terms after it", () => {
+  inRegime("STANDARD");
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  try {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T05:00:00+05:30"));
+    active.business = { _id: "b-1", timeZone: "America/Los_Angeles" };
+    const [issued, due] = render({ documentType: "Invoice" }).querySelectorAll(
+      'input[type="date"]',
+    );
+    expect([issued.value, issued.max]).toEqual(["2026-10-07", "2026-10-07"]);
+    expect([due.value, due.min]).toEqual(["2026-10-22", "2026-10-07"]);
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
 });
 
 it("takes a rate with up to the 10 decimals the server keeps", () => {

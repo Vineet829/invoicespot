@@ -162,17 +162,23 @@ it("lists what each item sold in the period, its share of income and the totals,
   // without a name, and the totals: everything sold is the income.
   expect(table(page)).toEqual([
     ["Motion graphics (per 15 seconds)", "28", "18,200.00", "28%"],
-    ["Logo and identity system", "3", "9,280.00", "14%"],
+    ["Logo and identity system", "3", "9,280.00", "15%"],
     ["Consulting (hourly)", "52", "7,140.00", "11%"],
     ["Front-end build (per page)", "17", "6,460.00", "10%"],
     ["Brand strategy workshop", "3", "5,400.00", "8%"],
     ["Website maintenance (monthly)", "6", "5,100.00", "8%"],
-    ["Photography (half day)", "4", "4,800.00", "7%"],
+    ["Photography (half day)", "4", "4,800.00", "8%"],
     ["Copywriting (per page)", "22", "3,960.00", "6%"],
     ["Social media kit", "2", "2,400.00", "4%"],
     ["Other lines", "5", "1,454.00", "2%"],
     ["All 10 items", "", "64,194.00", "100%"],
   ]);
+  // The shares add up to the totals' 100%.
+  expect(
+    table(page)
+      .slice(0, -1)
+      .reduce((sum, row) => sum + parseInt(row[3], 10), 0),
+  ).toBe(100);
   // Each item opens its own sales for the same period, the lines saved
   // without a name too; the totals open nothing.
   expect(links(page)).toHaveLength(10);

@@ -271,11 +271,11 @@ it("keeps the period and the currency in the address, and follows them below", a
   await choose(select(page, "Issued"), "this-year");
   expect(address).toBe("?period=this-year");
   // The summary takes the period's name; the list, as the Documents list
-  // does, its days.
+  // does, its days, up to today.
   await act(() =>
     vi.waitFor(() =>
       expect(documents()).toContain(
-        "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&from=2026-01-01&to=2026-12-31&currency=USD",
+        "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&from=2026-01-01&to=2026-10-04&currency=USD",
       ),
     ),
   );
@@ -292,10 +292,42 @@ it("keeps the period and the currency in the address, and follows them below", a
     ),
   );
   expect(documents()).toContain(
-    "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&from=2026-01-01&to=2026-12-31&currency=EUR",
+    "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&from=2026-01-01&to=2026-10-04&currency=EUR",
   );
   await choose(select(page, "Currency"), "USD");
   expect(address).toBe("?period=this-year");
+});
+
+// At 5 in the morning of Jan 1, 2027 in Kolkata it is still Dec 31, 2026 in
+// Los Angeles, where the business is: this year is still 2026 there.
+it("runs this year to the business's today, not the viewer's", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  try {
+    vi.setSystemTime(new Date("2027-01-01T05:00:00+05:30"));
+    await open("/sales?period=this-year", {
+      "/businesses": {
+        businesses: [
+          {
+            _id: "b-1",
+            name: "Studio Demo",
+            active: true,
+            timeZone: "America/Los_Angeles",
+          },
+        ],
+      },
+    });
+    await act(() =>
+      vi.waitFor(() =>
+        expect(documents()).toContain(
+          "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&billed=true&from=2026-01-01&to=2026-12-31&currency=USD",
+        ),
+      ),
+    );
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
 });
 
 it("names the currency of every amount when the business bills in several", async () => {

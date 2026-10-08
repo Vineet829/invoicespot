@@ -17,6 +17,7 @@ import {
   useUpdateScheduleMutation,
 } from "../recurringApiSlice";
 import { FREQUENCIES, afterOnePeriod } from "../frequencies";
+import useBusinessToday from "../../business/useBusinessToday";
 
 const ENDS = [
   { value: "never", label: "Never" },
@@ -29,8 +30,7 @@ const EACH = [
   { value: false, label: "Leave it as a draft to review and issue" },
 ];
 
-const initial = (schedule) => {
-  const today = dateInput();
+const initial = (schedule, today) => {
   if (!schedule) {
     return {
       frequency: "MONTHLY",
@@ -63,7 +63,10 @@ const ScheduleForm = ({
   demo,
   onClose,
 }) => {
-  const [values, setValues] = useState(() => initial(schedule));
+  // The next invoice comes no earlier than today by the business's
+  // calendar, which the server checks it against.
+  const today = dateInput(useBusinessToday());
+  const [values, setValues] = useState(() => initial(schedule, today));
   const [create, { isLoading: creating }] = useCreateScheduleMutation();
   const [update, { isLoading: updating }] = useUpdateScheduleMutation();
   const busy = creating || updating;
@@ -119,7 +122,7 @@ const ScheduleForm = ({
           label="Next invoice on"
           type="date"
           required
-          min={dateInput()}
+          min={today}
           value={values.startDate}
           onChange={change("startDate")}
           disabled={busy}

@@ -19,6 +19,7 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import { useGetDocumentActivityQuery } from "../documentsApiSlice";
+import { useBusiness } from "../../business/permissions";
 import { panelNote, retryButton } from "../../../components/workspace/pastel";
 
 // How each event reads. The server words the detail when the event happens,
@@ -123,14 +124,34 @@ const EVENTS = {
   },
 };
 
-const moment = (value) =>
-  new Date(value).toLocaleString("en", {
+// A time zone as the browser names it, or none when it is missing or one
+// the browser doesn't know.
+const knownZone = (timeZone) => {
+  if (!timeZone) return undefined;
+  try {
+    return new Intl.DateTimeFormat("en", { timeZone }).resolvedOptions()
+      .timeZone;
+  } catch {
+    return undefined;
+  }
+};
+
+// When something happened, in the business's time zone, as every other date
+// on the page is, with the zone's short name, such as "PDT", when the
+// viewer's own zone is another. Without a zone it is the viewer's.
+export const moment = (value, timeZone) => {
+  const zone = knownZone(timeZone);
+  const viewer = new Intl.DateTimeFormat("en").resolvedOptions().timeZone;
+  return new Date(value).toLocaleString("en", {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: zone,
+    ...(zone && zone !== viewer && { timeZoneName: "short" }),
   });
+};
 
 // Who did it, when a member did. The client's views, automatic runs and
 // events from before this was kept name no one rather than a guess.
@@ -139,6 +160,7 @@ const byline = (event) =>
 
 const ActivityTimeline = ({ documentId }) => {
   const query = useGetDocumentActivityQuery(documentId);
+  const timeZone = useBusiness().business?.timeZone;
   const events = query.data?.events || [];
   if (query.isLoading) {
     return (
@@ -186,7 +208,7 @@ const ActivityTimeline = ({ documentId }) => {
                 {text(event.detail)}
               </p>
               <p className="mt-0.5 text-[13px] text-spot-muted [overflow-wrap:anywhere]">
-                <time dateTime={event.at}>{moment(event.at)}</time>
+                <time dateTime={event.at}>{moment(event.at, timeZone)}</time>
                 {byline(event) && ` · ${byline(event)}`}
               </p>
             </div>

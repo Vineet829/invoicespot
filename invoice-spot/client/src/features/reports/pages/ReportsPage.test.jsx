@@ -250,6 +250,121 @@ const withFigures = () => {
   );
 };
 
+// The last 30 days to Oct 7 hold Sep 8–30 and Oct 1–7, which the server
+// sends as the months 2026-09 and 2026-10, with the period's days.
+it("names the part months of the last 30 days by their days, in every table and on the chart", () => {
+  const days = { period: "30d", from: "2026-09-08", to: "2026-10-07" };
+  const halfTaxed = { taxable: 500, tax: 35, cgst: 0, sgst: 0, igst: 0 };
+  withFigures();
+  const { data: report } = useGetReportQuery();
+  useGetReportQuery.mockReturnValue(
+    loaded({
+      ...report,
+      ...days,
+      currencies: report.currencies.map((entry) => ({
+        ...entry,
+        months: [
+          { month: "2026-09", billed: 600, received: 300 },
+          { month: "2026-10", billed: 400, received: 300 },
+        ],
+      })),
+    }),
+  );
+  useGetProfitReportQuery.mockReturnValue(
+    loaded({
+      ...days,
+      currencies: [
+        {
+          currency: "USD",
+          income: 900,
+          expenses: 0,
+          profit: 900,
+          months: [
+            { month: "2026-09", income: 500, expenses: 0, profit: 500 },
+            { month: "2026-10", income: 400, expenses: 0, profit: 400 },
+          ],
+          categories: [],
+        },
+      ],
+    }),
+  );
+  useGetTaxReportQuery.mockReturnValue(
+    loaded({
+      ...days,
+      currencies: [
+        {
+          currency: "USD",
+          tax: 70,
+          taxable: 1000,
+          documents: 2,
+          gst: false,
+          reverseChargeTaxable: 0,
+          rates: [
+            { rate: 7, documents: 2, ...halfTaxed, taxable: 1000, tax: 70 },
+          ],
+          months: [
+            { month: "2026-09", rate: 7, documents: 1, ...halfTaxed },
+            { month: "2026-10", rate: 7, documents: 1, ...halfTaxed },
+          ],
+        },
+      ],
+    }),
+  );
+  useGetTdsReportQuery.mockReturnValue(
+    loaded({
+      ...days,
+      currencies: [
+        {
+          currency: "USD",
+          withheld: 10,
+          clients: [
+            {
+              customerId: "c1",
+              name: "Northwind",
+              payments: 1,
+              received: 90,
+              withheld: 10,
+            },
+          ],
+          months: [{ month: "2026-10", payments: 1, withheld: 10 }],
+          payments: [
+            {
+              documentId: "d1",
+              documentNumber: "INV-1001",
+              datePaid: "2026-10-02",
+              client: "Northwind",
+              received: 90,
+              withheld: 10,
+            },
+          ],
+        },
+      ],
+    }),
+  );
+  const page = render("/reports?period=30d");
+  const months = (caption) =>
+    [
+      ...[...page.querySelectorAll("table")]
+        .find((table) =>
+          table.querySelector("caption").textContent.startsWith(caption),
+        )
+        .querySelectorAll('tbody td[data-label="Month"]'),
+    ].map((cell) => cell.textContent);
+  const both = ["Sep 8–30, 2026", "Oct 1–7, 2026"];
+  expect(months("Billed and received by month")).toEqual(both);
+  expect(months("Profit and loss by month")).toEqual(both);
+  expect(months("Tax charged by month and rate")).toEqual(both);
+  expect(months("Tax withheld by month")).toEqual(["Oct 1–7, 2026"]);
+  expect(
+    [...page.querySelectorAll('#income [role="img"]')].map((month) =>
+      month.getAttribute("aria-label"),
+    ),
+  ).toEqual([
+    "Sep 8–30, 2026: billed 600.00, received 300.00",
+    "Oct 1–7, 2026: billed 400.00, received 300.00",
+  ]);
+});
+
 it("opens at the section the overview links to, with focus there", () => {
   withFigures();
   const scrolled = [];
@@ -262,7 +377,7 @@ it("opens at the section the overview links to, with focus there", () => {
       (id) => page.querySelector(`#${id}`)?.querySelector("h2").textContent,
     ),
   ).toEqual([
-    "Income by month",
+    "Billed and received by month",
     "Profit and loss",
     "Unpaid invoices by age",
     "Top clients",
@@ -296,6 +411,47 @@ it("charts what was billed and received side by side, with the figures a click a
     ),
   ).toEqual(["September 2026: billed 1,000.00, received 600.00"]);
   expect(income.querySelector("caption").closest("details").open).toBe(false);
+});
+
+// Billed counts tax, so the chart isn't called income, which the profit and
+// loss counts before tax; its file is named as the server names it.
+it("names the chart and its file for what they hold: billed and received", async () => {
+  withFigures();
+  const fetchFile = vi.fn(() => ({
+    unwrap: () => Promise.resolve("blob:report"),
+  }));
+  useGetReportCsvMutation.mockReturnValue([fetchFile, { isLoading: false }]);
+  const { revokeObjectURL } = URL;
+  URL.revokeObjectURL = vi.fn();
+  const saved = [];
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(function save() {
+      saved.push(this.download);
+    });
+  try {
+    const income = render().querySelector("#income");
+    expect(income.querySelector("h2").textContent).toBe(
+      "Billed and received by month",
+    );
+    await act(async () =>
+      income
+        .querySelector(
+          'button[aria-label="Download billed and received by month as CSV"]',
+        )
+        .click(),
+    );
+    expect(fetchFile).toHaveBeenCalledWith({
+      section: "income",
+      period: "12m",
+    });
+    expect(saved).toEqual([
+      "invoice-spot-billed-and-received-2025-11-01-to-2026-10-02.csv",
+    ]);
+  } finally {
+    click.mockRestore();
+    URL.revokeObjectURL = revokeObjectURL;
+  }
 });
 
 it("spaces every table's columns evenly, a count right-aligned and a bar given room", () => {
@@ -430,4 +586,58 @@ it("reports on the overview's last 90 days when its profit opens the page", asyn
       .map((option) => option.textContent),
   ).toEqual(["Last 30 days", "Last 90 days", "Last 3 months"]);
   await act(async () => period.click());
+});
+
+// The tax report's dollars, from documents taxed at the given rates.
+const taxedAt = (rates) => {
+  const sum = (key) => rates.reduce((total, row) => total + row[key], 0);
+  useGetTaxReportQuery.mockReturnValue(
+    loaded({
+      period: "12m",
+      from: "2025-11-01",
+      to: "2026-10-02",
+      currencies: [
+        {
+          currency: "USD",
+          tax: sum("tax"),
+          taxable: sum("taxable"),
+          documents: sum("documents"),
+          gst: false,
+          reverseChargeTaxable: 0,
+          rates: rates.map((row) => ({ cgst: 0, sgst: 0, igst: 0, ...row })),
+          months: [],
+        },
+      ],
+    }),
+  );
+};
+
+it("says what tax was charged on the taxed sales alone, and what else had no tax", () => {
+  withFigures();
+  taxedAt([
+    { rate: 0, documents: 2, taxable: 500, tax: 0 },
+    { rate: 5, documents: 1, taxable: 400, tax: 20 },
+    { rate: 10, documents: 1, taxable: 600, tax: 60 },
+  ]);
+  expect(render().textContent).toContain(
+    "USD 80.00 charged on USD 1,000.00 of taxed sales. USD 500.00 more had no tax.",
+  );
+});
+
+it("says nothing about untaxed sales when every sale was taxed", () => {
+  withFigures();
+  taxedAt([{ rate: 10, documents: 1, taxable: 600, tax: 60 }]);
+  const text = render().textContent;
+  expect(text).toContain("USD 60.00 charged on USD 600.00 of taxed sales.");
+  expect(text).not.toContain("had no tax");
+});
+
+it("says no tax was charged when no sale was taxed", () => {
+  withFigures();
+  taxedAt([{ rate: 0, documents: 2, taxable: 500, tax: 0 }]);
+  const text = render().textContent;
+  expect(text).toContain(
+    "No tax was charged on the USD 500.00 of sales, from 2 documents.",
+  );
+  expect(text).not.toContain("of taxed sales");
 });

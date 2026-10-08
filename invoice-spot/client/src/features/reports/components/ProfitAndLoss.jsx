@@ -9,7 +9,7 @@ import {
   money,
 } from "../../../components/workspace/Workspace";
 import {
-  monthYear,
+  monthSpan,
   percentLabel,
   percentOf,
   profitMonths,
@@ -25,7 +25,8 @@ const amountColumn = (label, key, currency) => ({
 // Profit and loss for the period, in each currency it has: income before tax
 // less credit notes, and what expenses cost, by month, with each month's
 // margin and the profit made so far; then what each expense category cost,
-// and its share of all the expenses.
+// and its share of all the expenses. A month the period holds only part of
+// is named by its days.
 const ProfitAndLoss = ({ report, periodName, busy }) => {
   const currencies = report?.currencies || [];
   return (
@@ -71,7 +72,8 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
                     {
                       label: "Month",
                       type: "main",
-                      render: (row) => monthYear(row.month),
+                      render: (row) =>
+                        monthSpan(row.month, report.from, report.to),
                     },
                     amountColumn("Income", "income", entry.currency),
                     amountColumn("Expenses", "expenses", entry.currency),

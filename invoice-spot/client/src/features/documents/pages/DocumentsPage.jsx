@@ -23,6 +23,7 @@ import ResultLine from "../components/ResultLine";
 import WaitingPayments from "../components/WaitingPayments";
 import { DocumentStatusBadge, documentName, isDraft } from "../documentState";
 import { RefusalNote, useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   useDeleteDocMutation,
   useGetAllMyDocsQuery,
@@ -85,7 +86,9 @@ const DocumentsPage = () => {
   const [list, update] = useListState(readListState, listSearch);
   const [downloadCsv, exporting] = useFileDownload(useGetDocumentsCsvMutation);
   const search = useCallback((q) => update({ q, page: 1 }), [update]);
-  const query = useGetAllMyDocsQuery(documentQuery(list), {
+  // The calendar's periods are days of the business's calendar.
+  const today = useBusinessToday();
+  const query = useGetAllMyDocsQuery(documentQuery(list, today), {
     refetchOnMountOrArgChange: 60,
   });
   const summaryQuery = useGetDocumentSummaryQuery(list.currency || undefined, {
@@ -303,7 +306,7 @@ const DocumentsPage = () => {
               className={`${secondaryIconButton} max-[700px]:!flex-none`}
               onClick={() =>
                 downloadCsv(
-                  documentFilterQuery(list),
+                  documentFilterQuery(list, today),
                   `invoice-spot-documents-${dateInput()}.csv`,
                 )
               }

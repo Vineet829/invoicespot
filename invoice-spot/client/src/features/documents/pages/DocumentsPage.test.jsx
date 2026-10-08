@@ -319,6 +319,72 @@ it("downloads the list as it is filtered", async () => {
   }
 });
 
+// At 5 in the morning of Jan 1, 2027 in Kolkata it is still Dec 31, 2026 in
+// Los Angeles, where the business is: this year is still 2026 there. The
+// line above the list names the days the server took.
+it("lists this year up to the business's today, and downloads the same days", async () => {
+  const { createObjectURL, revokeObjectURL } = URL;
+  URL.createObjectURL = vi.fn(() => "blob:documents");
+  URL.revokeObjectURL = vi.fn();
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => {});
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2027-01-01T05:00:00+05:30"));
+  try {
+    const page = await open("/documents?period=this-year", {
+      "/businesses": {
+        businesses: [
+          {
+            _id: "b-1",
+            name: "Studio Demo",
+            active: true,
+            timeZone: "America/Los_Angeles",
+          },
+        ],
+      },
+      "/document/all": (url) => ({
+        ...documents,
+        issuedFrom: url.searchParams.get("from"),
+        issuedTo: url.searchParams.get("to"),
+      }),
+      "/document/csv": () =>
+        new Response("Number\n", {
+          headers: { "content-type": "text/csv" },
+        }),
+    });
+    await act(() =>
+      vi.waitFor(() =>
+        expect(page.textContent).toContain(
+          "2 documents issued Jan 1 – Dec 31, 2026",
+        ),
+      ),
+    );
+    expect(listRequests().at(-1)).toBe(
+      "/api/v1/document/all?page=1&size=10&sort=createdAt&dir=desc&from=2026-01-01&to=2026-12-31",
+    );
+    await act(async () =>
+      page
+        .querySelector('button[aria-label="Download these documents as CSV"]')
+        .click(),
+    );
+    await act(() => vi.waitFor(() => expect(click).toHaveBeenCalled()));
+    expect(
+      requests.filter((request) => request.includes("/document/csv")),
+    ).toEqual([
+      "/api/v1/document/csv?sort=createdAt&dir=desc&from=2026-01-01&to=2026-12-31",
+    ]);
+  } finally {
+    vi.useRealTimers();
+    click.mockRestore();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 it("keeps showing a currency the address names when the currencies can't be loaded", async () => {
   const page = await open("/documents?currency=EUR", {
     "/document/summary": () => json({ message: "Try later" }, 500),

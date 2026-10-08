@@ -69,7 +69,8 @@ describe("what the view asks for", () => {
       period: "90d",
       currency: "USD",
     });
-    // The Documents list sends the calendar's periods as days.
+    // The Documents list sends the calendar's periods as days, this year's
+    // up to today.
     expect(billedQuery(read("period=this-year&page=2"), "EUR", OCT_4)).toEqual({
       page: 2,
       size: 10,
@@ -77,7 +78,7 @@ describe("what the view asks for", () => {
       dir: "desc",
       billed: "true",
       from: "2026-01-01",
-      to: "2026-12-31",
+      to: "2026-10-04",
       currency: "EUR",
     });
     expect(billedQuery(read(""), undefined, OCT_4)).toEqual({

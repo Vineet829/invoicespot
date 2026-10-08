@@ -25,15 +25,25 @@ import {
   useUpdateRefundMutation,
 } from "../documentsApiSlice";
 import { PAYMENT_METHODS } from "../paymentMethods";
+import useBusinessToday from "../../business/useBusinessToday";
 
-// The fields of a refund, new or changed; the amount is at most `limit`.
-const RefundFields = ({ values, update, limit, currency, busy, columns }) => (
+// The fields of a refund, new or changed; the amount is at most `limit`,
+// and the day no later than `today`.
+const RefundFields = ({
+  values,
+  update,
+  limit,
+  today,
+  currency,
+  busy,
+  columns,
+}) => (
   <div className={`grid gap-5 ${columns} max-[700px]:grid-cols-1`}>
     <Field
       label="Date refunded"
       type="date"
       required
-      max={dateInput()}
+      max={today}
       value={values.dateRefunded}
       onChange={update("dateRefunded")}
       disabled={busy}
@@ -80,15 +90,15 @@ const useValues = (initial) => {
   return [values, update, setValues];
 };
 
-const blank = () => ({
-  dateRefunded: dateInput(),
+const blank = (today) => ({
+  dateRefunded: today,
   amount: "",
   paymentMethod: "",
   reference: "",
 });
 
-const RefundForm = ({ document, due }) => {
-  const [values, update, setValues] = useValues(blank());
+const RefundForm = ({ document, due, today }) => {
+  const [values, update, setValues] = useValues(blank(today));
   const [create, { isLoading: busy }] = useCreateRefundMutation();
   const submit = async (event) => {
     event.preventDefault();
@@ -99,7 +109,7 @@ const RefundForm = ({ document, due }) => {
         amount: Number(values.amount),
       }).unwrap();
       toast.success("The refund was recorded.");
-      setValues(blank());
+      setValues(blank(today));
     } catch (error) {
       toast.error(errorMessage(error, "The refund could not be recorded."));
     }
@@ -110,6 +120,7 @@ const RefundForm = ({ document, due }) => {
         values={values}
         update={update}
         limit={due}
+        today={today}
         currency={document.currency}
         busy={busy}
         columns="grid-cols-4 max-[1359px]:grid-cols-2"
@@ -128,7 +139,15 @@ const RefundForm = ({ document, due }) => {
   );
 };
 
-const EditRefundForm = ({ document, refund, due, busy, onSave, onClose }) => {
+const EditRefundForm = ({
+  document,
+  refund,
+  due,
+  today,
+  busy,
+  onSave,
+  onClose,
+}) => {
   const [values, update] = useValues({
     dateRefunded: refund.dateRefunded || "",
     amount: String(refund.amount ?? ""),
@@ -147,6 +166,7 @@ const EditRefundForm = ({ document, refund, due, busy, onSave, onClose }) => {
         values={values}
         update={update}
         limit={Math.round((due + Number(refund.amount)) * 100) / 100}
+        today={today}
         currency={document.currency}
         busy={busy}
         columns="grid-cols-2"
@@ -175,6 +195,9 @@ const EditRefundForm = ({ document, refund, due, busy, onSave, onClose }) => {
 const RefundsPanel = ({ document, refusal }) => {
   const due = Number(document.ledger?.refundDue || 0);
   const refunds = document.refunds || [];
+  // A new refund is dated today by the business's calendar, the one the
+  // server counts its days by, and none later.
+  const today = dateInput(useBusinessToday());
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [update, { isLoading: saving }] = useUpdateRefundMutation();
@@ -270,7 +293,9 @@ const RefundsPanel = ({ document, refusal }) => {
             label="Refunds"
           />
         )}
-        {due > 0 && !refusal && <RefundForm document={document} due={due} />}
+        {due > 0 && !refusal && (
+          <RefundForm document={document} due={due} today={today} />
+        )}
       </div>
       <Dialog
         open={Boolean(editing)}
@@ -286,6 +311,7 @@ const RefundsPanel = ({ document, refusal }) => {
             document={document}
             refund={editing}
             due={due}
+            today={today}
             busy={saving}
             onSave={save}
             onClose={() => setEditing(null)}

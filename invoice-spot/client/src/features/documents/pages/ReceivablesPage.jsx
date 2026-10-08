@@ -27,6 +27,7 @@ import {
 } from "../receivablesModel";
 import { share } from "../../reports/reportModel";
 import { RefusalNote, useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 import {
   WorkspacePage,
@@ -365,7 +366,9 @@ const ReceivablesPage = () => {
   const demo = useGetUserProfileQuery().data?.userProfile?.demo;
   const sendNote = editRefusal || (demo ? DEMO_EMAIL_NOTE : undefined);
   const [reminding, setReminding] = useState(null);
-  const today = new Date();
+  // Days late and days to go count from the business's today, as the
+  // server's bands above do.
+  const today = useBusinessToday();
 
   const columns = [
     {

@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -29,8 +29,9 @@ vi.mock("../../business/businessApiSlice", () => ({
 vi.mock("../../gst/gstApiSlice", () => ({
   useGetGstStatesQuery: () => ({ data: { states: [] } }),
 }));
+const active = vi.hoisted(() => ({ business: undefined }));
 vi.mock("../../business/permissions", () => ({
-  useBusiness: () => ({ reason: () => undefined }),
+  useBusiness: () => ({ business: active.business, reason: () => undefined }),
 }));
 vi.mock("../../items/itemsApiSlice", () => ({
   useCreateItemMutation: () => idle(),
@@ -44,6 +45,11 @@ vi.mock("../../dashboard/components/DashboardShell", () => ({
 }));
 
 window.IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+  vi.useRealTimers();
+  active.business = undefined;
+});
 
 const inRegime = (taxRegime) =>
   useGetSettingsQuery.mockReturnValue({
@@ -120,6 +126,27 @@ it("takes a due date no earlier than the issue date, which is today unless chose
   expect(due.min).toBe("2026-01-15");
   pick(due, "2026-01-10");
   expect(due.validity.rangeUnderflow).toBe(true);
+});
+
+// The server dates and checks documents by the business's calendar. At 5 in
+// the morning of Oct 8 in Kolkata it is still Oct 7 in Los Angeles.
+it("dates a new document by the business's calendar, due the payment terms after it", () => {
+  inRegime("STANDARD");
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  try {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T05:00:00+05:30"));
+    active.business = { _id: "b-1", timeZone: "America/Los_Angeles" };
+    const container = render();
+    const { input: issued } = field(container, "Issue date");
+    const { input: due } = field(container, "Due date");
+    expect([issued.value, issued.max]).toEqual(["", "2026-10-07"]);
+    expect([due.value, due.min]).toEqual(["2026-10-22", "2026-10-07"]);
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
 });
 
 it("keeps a draft's due date saved before its issue date until either date changes", () => {

@@ -25,6 +25,7 @@ import {
   errorMessage,
 } from "../../../components/workspace/Workspace";
 import {
+  panelNote,
   primaryButton,
   rowAction,
   rowActionDanger,
@@ -41,6 +42,16 @@ const ItemsPage = () => {
   const [list, update] = useListState(readItemList, itemListSearch);
   const query = useGetItemsQuery();
   const items = query.data?.items || NO_ITEMS;
+  // The list holds the first 500 items, by name; the server says how many
+  // there are in all. Its search looks through those it holds.
+  const total = query.data?.totalItems ?? items.length;
+  const cut =
+    total > items.length ? (
+      <p className={`mt-3 ${panelNote}`}>
+        Showing the first {items.length.toLocaleString("en")} of{" "}
+        {countOf(total, "item", "items")}.
+      </p>
+    ) : null;
   const rows = useMemo(() => matchingItems(items, list.q), [items, list.q]);
   const pagination = usePagination(rows, 10);
   // A search shows its first page.
@@ -215,22 +226,26 @@ const ItemsPage = () => {
                 evenGaps
               />
               <Pagination pagination={pagination} />
+              {cut}
             </>
           ) : list.q ? (
-            <EmptyState
-              title="No items match."
-              text="Try another name or unit, or clear the search to see every item."
-              icon={FiSearch}
-              action={
-                <button
-                  type="button"
-                  className={secondaryButton}
-                  onClick={clearSearch}
-                >
-                  Clear search
-                </button>
-              }
-            />
+            <>
+              <EmptyState
+                title="No items match."
+                text="Try another name or unit, or clear the search to see every item."
+                icon={FiSearch}
+                action={
+                  <button
+                    type="button"
+                    className={secondaryButton}
+                    onClick={clearSearch}
+                  >
+                    Clear search
+                  </button>
+                }
+              />
+              {cut}
+            </>
           ) : (
             <EmptyState
               title="Price it once, reuse it everywhere."

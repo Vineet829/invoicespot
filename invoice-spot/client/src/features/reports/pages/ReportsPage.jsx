@@ -47,9 +47,10 @@ import {
 } from "../reportsApiSlice";
 import {
   DEFAULT_PERIOD,
-  monthYear,
+  monthSpan,
   periodOptions,
   share,
+  taxedSales,
 } from "../reportModel";
 import IncomeChart, { SERIES } from "../components/IncomeChart";
 import GstHelpers from "../components/GstHelpers";
@@ -111,6 +112,33 @@ const taxColumns = (currency, gst) => [
   amountColumn("Tax", "tax", currency),
 ];
 
+const documentCount = (count) =>
+  `${count.toLocaleString("en")} ${count === 1 ? "document" : "documents"}`;
+
+// What the tax was charged on: only the sales taxed at a rate above nothing,
+// and in a sentence of its own what else was sold with no tax. The taxed
+// sales name no count of documents: the rates count a document taxed at two
+// of them twice, and the table below counts each rate's.
+const TaxSentence = ({ entry, currency }) => {
+  const sales = taxedSales(entry);
+  if (!sales.documents) {
+    return (
+      <p className="mb-5 text-[16px] text-spot-body">
+        No tax was charged on the {money(entry.taxable, currency)} of sales,
+        from {documentCount(entry.documents)}.
+      </p>
+    );
+  }
+  return (
+    <p className="mb-5 text-[16px] text-spot-body">
+      <span className="text-spot-ink">{money(entry.tax, currency)}</span>{" "}
+      charged on {money(sales.taxable, currency)} of taxed sales.
+      {sales.untaxed !== 0 &&
+        ` ${money(sales.untaxed, currency)} more had no tax.`}
+    </p>
+  );
+};
+
 // The tax charged in the period at each rate, less credit notes, with each
 // month's figures behind a disclosure. Supplies under reverse charge carry no
 // tax the business charged, so they are only mentioned.
@@ -139,12 +167,7 @@ const TaxCharged = ({
         className={`transition-opacity ${busy ? "opacity-60" : ""}`}
         aria-busy={busy || undefined}
       >
-        <p className="mb-5 text-[16px] text-spot-body">
-          <span className="text-spot-ink">{money(entry.tax, currency)}</span>{" "}
-          charged on {money(entry.taxable, currency)}, from{" "}
-          {entry.documents.toLocaleString("en")}{" "}
-          {entry.documents === 1 ? "document" : "documents"}.
-        </p>
+        <TaxSentence entry={entry} currency={currency} />
         <DataTable
           evenGaps
           large
@@ -189,7 +212,7 @@ const TaxCharged = ({
                 {
                   label: "Month",
                   type: "main",
-                  render: (row) => monthYear(row.month),
+                  render: (row) => monthSpan(row.month, report.from, report.to),
                 },
                 { label: "Rate", render: (row) => `${row.rate}%` },
                 ...taxColumns(currency, entry.gst),
@@ -310,7 +333,7 @@ const TaxWithheld = ({
                 {
                   label: "Month",
                   type: "main",
-                  render: (row) => monthYear(row.month),
+                  render: (row) => monthSpan(row.month, report.from, report.to),
                 },
                 {
                   label: "Payments",
@@ -635,9 +658,12 @@ const ReportsPage = () => {
               tone="peach"
             />
           </section>
+          {/* What was billed, tax included, as the Billed figure counts it,
+              and received: not the profit and loss's income, which is before
+              tax. Links still open it at #income. */}
           <Panel
             id="income"
-            title="Income by month"
+            title="Billed and received by month"
             description={`${periodName}. Invoices and receipts count on the day they were issued, payments on the day they were paid.`}
             aside={
               <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2">
@@ -658,13 +684,18 @@ const ReportsPage = () => {
                 <CsvButton
                   section="income"
                   report={report}
-                  name="income by month"
-                  fileName={`income-${periodFile}`}
+                  name="billed and received by month"
+                  fileName={`billed-and-received-${periodFile}`}
                 />
               </div>
             }
           >
-            <IncomeChart months={shown.months} currency={currency} />
+            <IncomeChart
+              months={shown.months}
+              currency={currency}
+              from={report.from}
+              to={report.to}
+            />
             <details className="group mt-4">
               <summary
                 className={`w-max cursor-pointer text-[15px] ${textLink}`}
@@ -683,7 +714,8 @@ const ReportsPage = () => {
                     {
                       label: "Month",
                       type: "main",
-                      render: (row) => monthYear(row.month),
+                      render: (row) =>
+                        monthSpan(row.month, report.from, report.to),
                     },
                     amountColumn("Billed", "billed", currency),
                     amountColumn("Received", "received", currency),

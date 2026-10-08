@@ -252,6 +252,51 @@ it("says how many payments the filters found and what came in, with receipts cou
   );
 });
 
+// At 5 in the morning of Jan 1, 2027 in Kolkata it is still Dec 31, 2026 in
+// Los Angeles, where the business is: this year is still 2026 there. The
+// line above the list names the days the server took.
+it("lists this year's payments up to the business's today", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2027-01-01T05:00:00+05:30"));
+  try {
+    const page = await open("/payments?period=this-year", {
+      "/businesses": {
+        businesses: [
+          {
+            _id: "b-1",
+            name: "Studio Demo",
+            active: true,
+            timeZone: "America/Los_Angeles",
+          },
+        ],
+      },
+      "/payments": (url) => ({
+        ...payments,
+        from: url.searchParams.get("from"),
+        to: url.searchParams.get("to"),
+      }),
+    });
+    await act(() =>
+      vi.waitFor(() =>
+        expect(line(page)).toMatch(/^18 payments from Jan 1 – Dec 31, 2026,/),
+      ),
+    );
+    expect(
+      requests
+        .filter((request) => request.startsWith("/api/v1/payments?"))
+        .at(-1),
+    ).toBe(
+      "/api/v1/payments?page=1&size=10&sort=date&dir=desc&from=2026-01-01&to=2026-12-31",
+    );
+  } finally {
+    vi.useRealTimers();
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 it("says only what the next method's answer counts", async () => {
   const page = await open("/payments?period=90d", {
     "/payments": (url) =>

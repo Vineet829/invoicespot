@@ -692,6 +692,8 @@ const SingleDocumentPage = () => {
                   </p>
                 </Panel>
               </div>
+              {/* A quotation is an offer: nothing is paid or owed on it, so
+                  it ends at its total, as its PDF does. */}
               <Panel title="Cost summary">
                 <dl className="m-0">
                   {[
@@ -699,27 +701,29 @@ const SingleDocumentPage = () => {
                     ...taxRows(document.taxes || [], document.gst, taxLabel),
                     ...(creditNote
                       ? [["Total credit", document.total]]
-                      : [
-                          ["Cumulative total", document.total],
-                          ["Amount paid", totalAmountReceived],
-                          ...(Number(document.ledger?.totalTds) > 0
-                            ? [["Tax withheld", document.ledger.totalTds]]
-                            : []),
-                          ...(Number(document.ledger?.totalCredited) > 0
-                            ? [["Credited", document.ledger.totalCredited]]
-                            : []),
-                          ...(Number(document.ledger?.totalRefunded) > 0
-                            ? [["Refunded", document.ledger.totalRefunded]]
-                            : []),
-                          !voided && Number(document.ledger?.refundDue) > 0
-                            ? ["Refund due", document.ledger.refundDue]
-                            : [
-                                "Balance",
-                                voided
-                                  ? 0
-                                  : Number(document.ledger?.balanceDue || 0),
-                              ],
-                        ]),
+                      : document.documentType === "Quotation"
+                        ? [["Total", document.total]]
+                        : [
+                            ["Total", document.total],
+                            ["Amount paid", totalAmountReceived],
+                            ...(Number(document.ledger?.totalTds) > 0
+                              ? [["Tax withheld", document.ledger.totalTds]]
+                              : []),
+                            ...(Number(document.ledger?.totalCredited) > 0
+                              ? [["Credited", document.ledger.totalCredited]]
+                              : []),
+                            ...(Number(document.ledger?.totalRefunded) > 0
+                              ? [["Refunded", document.ledger.totalRefunded]]
+                              : []),
+                            !voided && Number(document.ledger?.refundDue) > 0
+                              ? ["Refund due", document.ledger.refundDue]
+                              : [
+                                  "Balance",
+                                  voided
+                                    ? 0
+                                    : Number(document.ledger?.balanceDue || 0),
+                                ],
+                          ]),
                   ].map(([label, value], index, rows) => {
                     const balance = index === rows.length - 1;
                     return (

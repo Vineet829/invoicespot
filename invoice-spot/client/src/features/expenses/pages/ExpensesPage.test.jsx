@@ -266,6 +266,40 @@ it("asks for the overview's periods by name and the others as dates, in the list
   ]);
 });
 
+// At 5 in the morning of Jan 1, 2027 in Kolkata it is still Dec 31, 2026 in
+// Los Angeles, where the business is: this year is still 2026 there.
+it("runs this year to the business's today, in the list and its CSV", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2027-01-01T05:00:00+05:30"));
+  try {
+    const page = await open("/expenses?period=this-year", {
+      "/businesses": {
+        businesses: owner.businesses.map((entry) => ({
+          ...entry,
+          timeZone: "America/Los_Angeles",
+        })),
+      },
+    });
+    await act(() =>
+      vi.waitFor(() =>
+        expect(listRequests().at(-1)).toBe(
+          "/api/v1/expense?page=1&size=10&from=2026-01-01&to=2026-12-31",
+        ),
+      ),
+    );
+    await download(page);
+    expect(csvRequests()).toEqual([
+      "/api/v1/expense/csv?from=2026-01-01&to=2026-12-31",
+    ]);
+  } finally {
+    vi.useRealTimers();
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 it("offers no currency when the business bills in only one", async () => {
   const page = await open("/expenses");
   expect(requests).toContain("/api/v1/document/summary");

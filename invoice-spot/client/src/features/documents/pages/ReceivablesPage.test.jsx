@@ -417,6 +417,51 @@ it("switches between coming in and overdue with the pills, keeping the mode in t
   ).toHaveLength(1);
 });
 
+// At 5 in the morning of Oct 5 in Kolkata it is still the afternoon of Oct 4
+// in Los Angeles, where the business is and the server counts its days.
+it("counts days late and due from the business's today, not the viewer's", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  try {
+    vi.setSystemTime(new Date("2026-10-05T05:00:00+05:30"));
+    const page = await open("/receivables", {
+      "/businesses": {
+        businesses: owner.businesses.map((entry) => ({
+          ...entry,
+          timeZone: "America/Los_Angeles",
+        })),
+      },
+    });
+    const days = () => table(list(page)).map((row) => row[3]);
+    await act(() =>
+      vi.waitFor(() =>
+        expect(days()).toEqual([
+          "Due in 2 days",
+          "Due in 8 days",
+          "Due in 11 days",
+          "Due in 20 days",
+          "Due in 27 days",
+          "Due in 43 days",
+          "No due date",
+        ]),
+      ),
+    );
+    await click(pill(page, "Overdue"));
+    await act(() =>
+      vi.waitFor(() =>
+        expect(days()).toEqual([
+          "54 days late",
+          "21 days late",
+          "10 days late",
+        ]),
+      ),
+    );
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 // Twelve overdue invoices, ten to a page; the second page has two.
 const twoPages = (url) => ({
   ...fixture.overdue,

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { useCreatePaymentMutation } from "../documentsApiSlice";
 import { PAYMENT_METHODS } from "../paymentMethods";
 import { TAX_WITHHELD_HINT, TAX_WITHHELD_LABEL, cents } from "../taxWithheld";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   Field,
   dateInput,
@@ -14,7 +15,10 @@ import { primaryButton, textLink } from "../../../components/workspace/pastel";
 
 const PaymentForm = ({ document }) => {
   const balance = Number(document.ledger?.balanceDue || 0);
-  const [datePaid, setDatePaid] = useState(dateInput());
+  // A payment is dated today by the business's calendar, the one the server
+  // counts its days by, and no later.
+  const today = dateInput(useBusinessToday());
+  const [datePaid, setDatePaid] = useState(today);
   const [amountPaid, setAmountPaid] = useState("");
   // The tax the client withheld, or null while its field is hidden.
   const [tdsAmount, setTdsAmount] = useState(null);
@@ -50,7 +54,7 @@ const PaymentForm = ({ document }) => {
           label="Date paid"
           type="date"
           required
-          max={dateInput()}
+          max={today}
           value={datePaid}
           onChange={(event) => setDatePaid(event.target.value)}
           disabled={busy}

@@ -21,6 +21,7 @@ import {
 } from "../salesModel";
 import { share } from "../../reports/reportModel";
 import { useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   WorkspacePage,
   PageHeader,
@@ -219,7 +220,10 @@ const SalesPage = () => {
   // The documents are in the total's currency: the one the address names,
   // or else the one the server answered in.
   const currency = list.currency || sales?.currency;
-  const query = useGetAllMyDocsQuery(billedQuery(list, currency), {
+  // The calendar's periods are days of the business's calendar, as the
+  // summary's are.
+  const today = useBusinessToday();
+  const query = useGetAllMyDocsQuery(billedQuery(list, currency, today), {
     skip: !list.currency && !sales,
     refetchOnMountOrArgChange: 60,
   });

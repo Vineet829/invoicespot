@@ -74,11 +74,13 @@ const TOTALS = [
     tone: "bg-card-blue text-card-blue-ink",
     note: "Invoices and receipts",
   },
+  // Payments and receipts, as the overview, payments and reports call
+  // money in "Received".
   {
     key: "paid",
-    label: "Paid",
+    label: "Received",
     tone: "bg-card-lilac text-card-lilac-ink",
-    note: "Received so far",
+    note: "Payments and receipts",
   },
   {
     key: "outstanding",
@@ -381,7 +383,7 @@ const SingleCustomerPage = () => {
             </Panel>
             <Panel
               title="Account summary"
-              description="What this client was billed, has paid and still owes."
+              description="What this client was billed, what was received from them and what they still owe."
               aside={
                 <StatementActions
                   customer={customer}

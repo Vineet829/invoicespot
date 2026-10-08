@@ -80,10 +80,10 @@ export const receivablesQuery = ({ mode, page, size }, currency) => ({
   ...(currency && { currency }),
 });
 
-// Whole days from today to a due date, by the reader's calendar: below zero
-// once it has passed.
+// Whole days from today to a due date: below zero once it has passed.
+// `today` is the business's, the day the server counts its days from.
 const DAY = 24 * 60 * 60 * 1000;
-export const daysUntil = (dueDate, today = new Date()) => {
+export const daysUntil = (dueDate, today) => {
   const start = new Date(
     today.getFullYear(),
     today.getMonth(),
