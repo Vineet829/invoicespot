@@ -223,7 +223,18 @@ public class DemoDataSeeder {
 
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Random random = new Random(20260930L);
-        List<Plan> plans = plans(today, random, clients.size());
+        List<Plan> plans = new ArrayList<>(plans(today, random, clients.size()));
+        // The invoices the sample schedules last made, one period before their
+        // next, for the schedules to repeat. They take nothing from the random
+        // numbers, so the rest of the sample data comes out the same.
+        for (DemoData.SampleSchedule schedule : DemoData.SCHEDULES) {
+            plans.add(new Plan(
+                    lastRun(schedule, today),
+                    DocumentType.INVOICE,
+                    DemoData.CLIENTS.stream().map(DemoData.Client::name).toList().indexOf(schedule.client()),
+                    line(schedule)));
+        }
+        plans.sort(Comparator.comparing(Plan::issued));
         int payments = 0;
         for (Plan plan : plans) {
             payments += create(owner, plan, clients.get(plan.client()), today, zone, random);
@@ -258,12 +269,13 @@ public class DemoDataSeeder {
     }
 
     // Each sample schedule repeats an issued invoice in dollars that bills its
-    // item: the one with the fewest lines, the latest of those, that no other
-    // sample schedule repeats. The item is matched by name whatever its letter
-    // case and the spaces around it, so an account seeded when it was spelled
-    // another way still has it. Its next invoice is made the given number of
-    // days after today, issued as it is made and not emailed. A schedule whose
-    // item no invoice bills is left out.
+    // item and nothing else, as many of it as the schedule bills, so that a
+    // monthly invoice bills one month of a monthly item: the latest of those
+    // that no other sample schedule repeats. The item is matched by name
+    // whatever its letter case and the spaces around it, so an account seeded
+    // when it was spelled another way still has it. Its next invoice is made
+    // the given number of days after today, issued as it is made and not
+    // emailed. A schedule with no such invoice to repeat is left out.
     private int schedules(BusinessAccess owner) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneId.of(ZONE)));
         List<UUID> repeated = new ArrayList<>();
@@ -273,14 +285,16 @@ public class DemoDataSeeder {
                             """
                             select d.id from documents d
                             where d.business_pkid = ? and %s and d.document_type = 'Invoice' and d.currency = 'USD'
+                              and (select count(*) from document_billing_items i where i.document_pkid = d.pkid) = 1
                               and exists (select 1 from document_billing_items i
-                                          where i.document_pkid = d.pkid and lower(btrim(i.item_name)) = ?)
-                            order by (select count(*) from document_billing_items i where i.document_pkid = d.pkid),
-                                     d.issue_date desc, d.pkid desc
+                                          where i.document_pkid = d.pkid and lower(btrim(i.item_name)) = ?
+                                            and i.quantity = ?)
+                            order by d.issue_date desc, d.pkid desc
                             """.formatted(DocumentLedger.COUNTED),
                             UUID.class,
                             owner.businessPkid(),
-                            schedule.item().toLowerCase(Locale.ROOT))
+                            schedule.item().toLowerCase(Locale.ROOT),
+                            schedule.quantity())
                     .stream()
                     .filter(id -> !repeated.contains(id))
                     .findFirst();
@@ -299,7 +313,36 @@ public class DemoDataSeeder {
         return repeated.size();
     }
 
-    private record Plan(LocalDate issued, DocumentType type, int client) {}
+    // A document to add: dated the given day for one of the clients, with
+    // lines drawn at random, or with the one line given.
+    private record Plan(LocalDate issued, DocumentType type, int client, BillingItemDto line) {
+
+        Plan(LocalDate issued, DocumentType type, int client) {
+            this(issued, type, client, null);
+        }
+    }
+
+    // The day a sample schedule last made its invoice: one period before the
+    // next.
+    private static LocalDate lastRun(DemoData.SampleSchedule schedule, LocalDate today) {
+        LocalDate next = today.plusDays(schedule.daysAhead());
+        return switch (schedule.frequency()) {
+            case WEEKLY -> next.minusWeeks(1);
+            case MONTHLY -> next.minusMonths(1);
+            case QUARTERLY -> next.minusMonths(3);
+            case YEARLY -> next.minusYears(1);
+        };
+    }
+
+    // The one line a sample schedule's invoice bills, at the item's price.
+    private static BillingItemDto line(DemoData.SampleSchedule schedule) {
+        DemoData.Item item = DemoData.ITEMS.stream()
+                .filter(found -> found.name().equals(schedule.item()))
+                .findFirst()
+                .orElseThrow();
+        return new BillingItemDto(
+                item.name(), item.price(), BigDecimal.valueOf(schedule.quantity()), "0", null, null, null);
+    }
 
     private static List<Plan> plans(LocalDate today, Random random, int clientCount) {
         List<Plan> plans = new ArrayList<>();
@@ -333,7 +376,7 @@ public class DemoDataSeeder {
                 DemoData.TERMS,
                 TAX_RATE.toPlainString(),
                 "USD",
-                lines(random),
+                plan.line() == null ? lines(random) : List.of(plan.line()),
                 plan.issued(),
                 null,
                 null,
@@ -342,7 +385,9 @@ public class DemoDataSeeder {
                 null,
                 null));
         List<LocalDate> paymentDates = new ArrayList<>();
-        if (plan.type() == DocumentType.INVOICE) {
+        if (plan.line() != null) {
+            paymentDates.add(paidInFull(owner, document, plan.issued(), today));
+        } else if (plan.type() == DocumentType.INVOICE) {
             paymentDates.addAll(pay(owner, document, plan.issued(), today, random));
         }
         entityManager.flush();
@@ -396,6 +441,15 @@ public class DemoDataSeeder {
             }
         }
         return dates;
+    }
+
+    // A schedule's invoice was paid in full by bank transfer a week after it
+    // was made.
+    private LocalDate paidInFull(BusinessAccess owner, DocumentResponse document, LocalDate issued, LocalDate today) {
+        LocalDate date = earliest(issued.plusDays(7), today);
+        documentService.addPayment(owner, document.id().toString(), new CreatePaymentRequest(
+                date.toString(), document.total(), PaymentMethod.BANK_TRANSFER.getValue(), "Paid in full", null));
+        return date;
     }
 
     private void recordPayment(

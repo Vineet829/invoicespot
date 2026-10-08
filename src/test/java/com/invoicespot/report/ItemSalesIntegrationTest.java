@@ -285,7 +285,7 @@ class ItemSalesIntegrationTest extends IntegrationTest {
     void addsUpToTheOverview(ZoneId zone) throws Exception {
         inZone(zone);
         String birch = client("Birch Studio");
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         LocalDate january = today.withDayOfYear(1);
         // Documents on the first day of each period and the day before it,
         // with fractions of a cent to round, discounts and tax.

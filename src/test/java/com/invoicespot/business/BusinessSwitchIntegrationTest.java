@@ -1,5 +1,6 @@
 package com.invoicespot.business;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -75,6 +76,33 @@ class BusinessSwitchIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/customer/" + secondClient).header(HttpHeaders.AUTHORIZATION, session))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("each business says the time zone its days are counted in, UTC until it chooses one")
+    void timeZones() throws Exception {
+        User user = createUser();
+        String session = bearer(user);
+        String first = businessOf(user).getId().toString();
+        send(put("/api/v1/settings"), session, """
+                {"defaultCurrency": "USD", "paymentTermsDays": 15, "defaultTaxRate": 0,
+                 "taxLabel": "Tax", "timeZone": "America/Los_Angeles"}
+                """)
+                .andExpect(status().isOk());
+
+        String body = send(post("/api/v1/businesses"), session, "{\"name\": \"Side Studio\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.timeZone").value("UTC"))
+                .andReturn().getResponse().getContentAsString();
+        String second = JsonPath.read(body, "$._id");
+        mockMvc.perform(get("/api/v1/businesses").header(HttpHeaders.AUTHORIZATION, session))
+                .andExpect(jsonPath("$.businesses[?(@._id == '%s')].timeZone".formatted(first))
+                        .value(contains("America/Los_Angeles")))
+                .andExpect(jsonPath("$.businesses[?(@._id == '%s')].timeZone".formatted(second))
+                        .value(contains("UTC")));
+        send(put("/api/v1/businesses/active"), session, "{\"businessId\": \"" + first + "\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeZone").value("America/Los_Angeles"));
     }
 
     @Test

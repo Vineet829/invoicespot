@@ -272,6 +272,55 @@ class PaymentListIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("the payments file holds the list's rows, newest first, receipts among them, and adds up to what"
+            + " the list received")
+    void file() throws Exception {
+        Books books = books();
+        // A payment saved on a receipt, as some older records have it. A
+        // receipt counts at its total, so the list leaves that payment out.
+        String columns = String.join(", ", jdbcTemplate.queryForList("""
+                select column_name from information_schema.columns
+                where table_schema = current_schema() and table_name = 'payments'
+                  and column_name not in ('pkid', 'id', 'document_pkid')
+                order by ordinal_position
+                """, String.class));
+        jdbcTemplate.update(
+                """
+                insert into payments (id, document_pkid, %1$s)
+                select gen_random_uuid(), (select pkid from documents where id = ?), %1$s
+                from payments where id = ?
+                """.formatted(columns),
+                UUID.fromString(books.receipt()),
+                UUID.fromString(books.firstPart()));
+
+        String list = body(payments("size", "100").andExpect(jsonPath("$.total").value(7)));
+        List<String> file = body(send(get("/api/v1/document/payments/csv"), "").andExpect(status().isOk()))
+                .lines()
+                .toList();
+        assertThat(file).containsExactly(
+                "\uFEFFDate,Document,Type,Client,Currency,Amount,Method,Paid by,Notes,Tax withheld,Kind",
+                today + ",INV-0002,Invoice,Birch Studio,USD,-150.00,Cheque,,Card reversal,,Refund",
+                today + ",REC-0001,Receipt,Acme,USD,90.00,,,,,Receipt",
+                today + ",INV-0003,Invoice,Acme,EUR,100.00,UPI,Acme,,0.00,Payment",
+                today.minusDays(5) + ",INV-0001,Invoice,Acme,USD,100.00,Cash,Acme,,50.00,Payment",
+                today.minusDays(29) + ",INV-0001,Invoice,Acme,USD,400.00,Bank Transfer,Acme,First part,0.00,Payment",
+                today.minusDays(30)
+                        + ",INV-0002,Invoice,Birch Studio,USD,600.00,Credit Card,Birch Studio,,0.00,Payment",
+                today.minusDays(100) + ",REC-0002,Receipt,Birch Studio,USD,40.00,,,,,Receipt");
+        // Each currency's amounts add up to what the list received in it.
+        for (String currency : List.of("USD", "EUR")) {
+            BigDecimal total = file.stream()
+                    .skip(1)
+                    .map(row -> row.split(","))
+                    .filter(cells -> cells[4].equals(currency))
+                    .map(cells -> new BigDecimal(cells[5]))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<Object> received = JsonPath.read(list, "$.totals[?(@.currency == '%s')].received".formatted(currency));
+            assertThat(total).as(currency).isEqualByComparingTo(received.get(0).toString());
+        }
+    }
+
+    @Test
     @DisplayName("search, method, period, dates and currency narrow the rows and their totals")
     void filters() throws Exception {
         Books books = books();
@@ -420,7 +469,7 @@ class PaymentListIntegrationTest extends IntegrationTest {
     @DisplayName("over each of the overview's periods, the rows add up to what the overview received")
     void addUpToTheOverview(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         // Paid on the first day of each period and the day before it.
         String invoice = issue(acme, "Invoice", "USD", "10000", year.minusDays(5));
         pay(invoice, "100", "0", "Cash", null, today);

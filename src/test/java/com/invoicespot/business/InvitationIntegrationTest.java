@@ -104,7 +104,8 @@ class InvitationIntegrationTest extends IntegrationTest {
         send(post("/api/v1/invitations/" + token + "/accept"), session, "")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._id").value(business.getId().toString()))
-                .andExpect(jsonPath("$.role").value("MEMBER"));
+                .andExpect(jsonPath("$.role").value("MEMBER"))
+                .andExpect(jsonPath("$.timeZone").value("UTC"));
         send(get("/api/v1/business"), session, "")
                 .andExpect(jsonPath("$.business._id").value(business.getId().toString()));
         preview(token).andExpect(jsonPath("$.status").value("ACCEPTED"));

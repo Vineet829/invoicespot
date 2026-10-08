@@ -22,6 +22,9 @@ import lombok.Setter;
 @Setter
 public class BusinessSettings extends BaseEntity {
 
+    // The zone a business's days are counted in until it chooses one.
+    public static final String DEFAULT_TIME_ZONE = "UTC";
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "business_pkid", nullable = false, unique = true, updatable = false)
     private Business business;
@@ -63,7 +66,7 @@ public class BusinessSettings extends BaseEntity {
     private String defaultTerms;
 
     @Column(name = "time_zone", nullable = false, length = 64)
-    private String timeZone = "UTC";
+    private String timeZone = DEFAULT_TIME_ZONE;
 
     @Column(name = "invoice_prefix", nullable = false, length = 20)
     private String invoicePrefix = "INV-";

@@ -42,7 +42,7 @@ class UserServiceTest {
     void setUp() {
         service = new UserService(
                 userRepository,
-                new DemoAccountGuard(new DemoProperties("demo@example.test")),
+                new DemoAccountGuard(new DemoProperties("demo@example.test", false)),
                 sessionService,
                 auditLog,
                 adminStats,

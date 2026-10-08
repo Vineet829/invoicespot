@@ -101,6 +101,13 @@ class ReportIntegrationTest extends IntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner)));
     }
 
+    // Where this month is among the months the last 3 months touch: they go
+    // back to the same day, so they touch 4 calendar months unless they begin
+    // on a 1st.
+    private static int thisMonth(LocalDate today) {
+        return today.minusMonths(3).plusDays(1).getDayOfMonth() == 1 ? 2 : 3;
+    }
+
     @Test
     @DisplayName("billed and received are summed per month and currency; receipts count as received when issued")
     void months() throws Exception {
@@ -116,21 +123,28 @@ class ReportIntegrationTest extends IntegrationTest {
         document(owner, client, "Quotation", "USD", "500", today.plusDays(10));
         document(owner, client, "Invoice", "EUR", "80", today.plusDays(10));
 
+        // The last 3 months go back to the same day.
+        LocalDate from = today.minusMonths(3).plusDays(1);
+        int last = thisMonth(today);
         report("3m")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period").value("3m"))
-                .andExpect(jsonPath("$.from").value(thisMonth.minusMonths(2).toString()))
+                .andExpect(jsonPath("$.from").value(from.toString()))
                 .andExpect(jsonPath("$.to").value(today.toString()))
                 .andExpect(jsonPath("$.today").value(today.toString()))
                 .andExpect(jsonPath("$.currencies.length()").value(2))
                 .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
-                .andExpect(jsonPath("$.currencies[0].months[0].month")
-                        .value(YearMonth.from(thisMonth.minusMonths(2)).toString()))
+                .andExpect(jsonPath("$.currencies[0].months.length()").value(last + 1))
+                .andExpect(jsonPath("$.currencies[0].months[0].month").value(YearMonth.from(from).toString()))
                 .andExpect(jsonPath("$.currencies[0].months[0].billed").value(0.0))
-                .andExpect(jsonPath("$.currencies[0].months[1].billed").value(200.0))
-                .andExpect(jsonPath("$.currencies[0].months[1].received").value(50.0))
-                .andExpect(jsonPath("$.currencies[0].months[2].billed").value(170.0))
-                .andExpect(jsonPath("$.currencies[0].months[2].received").value(140.0))
+                .andExpect(jsonPath("$.currencies[0].months[%d].month".formatted(last - 1))
+                        .value(YearMonth.from(lastMonth).toString()))
+                .andExpect(jsonPath("$.currencies[0].months[%d].billed".formatted(last - 1)).value(200.0))
+                .andExpect(jsonPath("$.currencies[0].months[%d].received".formatted(last - 1)).value(50.0))
+                .andExpect(jsonPath("$.currencies[0].months[%d].month".formatted(last))
+                        .value(YearMonth.from(thisMonth).toString()))
+                .andExpect(jsonPath("$.currencies[0].months[%d].billed".formatted(last)).value(170.0))
+                .andExpect(jsonPath("$.currencies[0].months[%d].received".formatted(last)).value(140.0))
                 .andExpect(jsonPath("$.currencies[0].billed").value(370.0))
                 .andExpect(jsonPath("$.currencies[0].received").value(190.0))
                 .andExpect(jsonPath("$.currencies[0].methods[0].method").value("Bank Transfer"))
@@ -160,11 +174,12 @@ class ReportIntegrationTest extends IntegrationTest {
         issuedOn(invoice(client, "10", local.plusDays(10)), local.withDayOfMonth(1).minusDays(1));
         invoice(client, "20", local.plusDays(10));
 
+        int last = thisMonth(local);
         report("3m")
                 .andExpect(jsonPath("$.today").value(local.toString()))
                 .andExpect(jsonPath("$.to").value(local.toString()))
-                .andExpect(jsonPath("$.currencies[0].months[1].billed").value(10.0))
-                .andExpect(jsonPath("$.currencies[0].months[2].billed").value(20.0));
+                .andExpect(jsonPath("$.currencies[0].months[%d].billed".formatted(last - 1)).value(10.0))
+                .andExpect(jsonPath("$.currencies[0].months[%d].billed".formatted(last)).value(20.0));
     }
 
     @Test
@@ -257,6 +272,7 @@ class ReportIntegrationTest extends IntegrationTest {
         String eur = client(owner, "=cmd|' /C calc'!A0");
         pay(document(owner, eur, "Invoice", "EUR", "80", today.plusDays(10)), "30", today, "Bank Transfer");
         String month = YearMonth.from(today).toString();
+        LocalDate from = today.minusMonths(3).plusDays(1);
 
         String income = mockMvc.perform(get("/api/v1/report/csv/income")
                         .param("period", "3m")
@@ -265,15 +281,23 @@ class ReportIntegrationTest extends IntegrationTest {
                 .andExpect(header().string("Content-Type", "text/csv;charset=UTF-8"))
                 .andExpect(header().string(
                         "Content-Disposition",
-                        "attachment; filename=\"invoice-spot-income-%s-to-%s.csv\""
-                                .formatted(today.withDayOfMonth(1).minusMonths(2), today)))
+                        "attachment; filename=\"invoice-spot-billed-and-received-%s-to-%s.csv\""
+                                .formatted(from, today)))
                 .andReturn()
                 .getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
+        // A row for each currency in each month the period touches, with the
+        // days of it the period covers: the first month from the period's
+        // first day, and this one to today.
         assertThat(income.lines().toList())
-                .startsWith("\uFEFFCurrency,Month,Billed,Received")
-                .contains("USD," + month + ",210.00,0.00", "EUR," + month + ",80.00,30.00")
-                .hasSize(7);
+                .startsWith(
+                        "\uFEFFCurrency,Month,From,To,Billed,Received",
+                        "USD,%s,%s,%s,0.00,0.00".formatted(
+                                YearMonth.from(from), from, YearMonth.from(from).atEndOfMonth()))
+                .contains(
+                        "USD,%s,%s,%s,210.00,0.00".formatted(month, today.withDayOfMonth(1), today),
+                        "EUR,%s,%s,%s,80.00,30.00".formatted(month, today.withDayOfMonth(1), today))
+                .hasSize(1 + 2 * (thisMonth(today) + 1));
 
         String clients = mockMvc.perform(get("/api/v1/report/csv/clients")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))

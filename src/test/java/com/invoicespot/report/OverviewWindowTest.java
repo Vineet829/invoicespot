@@ -7,6 +7,7 @@ import com.invoicespot.common.ApiException;
 import com.invoicespot.report.OverviewWindow.Bucket;
 import com.invoicespot.report.OverviewWindow.Step;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,13 +38,54 @@ class OverviewWindowTest {
     }
 
     @Test
-    @DisplayName("12 months start on the first of a month and go a month at a time, beside the 12 months before")
+    @DisplayName("12 months go back to the same day a year ago and a month at a time, beside the 12 months before")
     void twelveMonths() {
         assertThat(OverviewWindow.of("12m", TODAY))
                 .isEqualTo(new OverviewWindow(
-                        "12m", LocalDate.of(2025, 11, 1), TODAY, LocalDate.of(2024, 11, 1),
-                        LocalDate.of(2025, 10, 31), Step.MONTH));
-        assertThat(OverviewWindow.of("12m", LocalDate.of(2026, 12, 31)).from()).isEqualTo(LocalDate.of(2026, 1, 1));
+                        "12m", LocalDate.of(2025, 10, 5), TODAY, LocalDate.of(2024, 10, 5),
+                        LocalDate.of(2025, 10, 4), Step.MONTH));
+        // At a month's end they are whole months.
+        assertThat(OverviewWindow.of("12m", LocalDate.of(2026, 3, 31)))
+                .isEqualTo(new OverviewWindow(
+                        "12m", LocalDate.of(2025, 4, 1), LocalDate.of(2026, 3, 31), LocalDate.of(2024, 4, 1),
+                        LocalDate.of(2025, 3, 31), Step.MONTH));
+        assertThat(OverviewWindow.of("12m", LocalDate.of(2026, 12, 31)))
+                .isEqualTo(new OverviewWindow(
+                        "12m", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), LocalDate.of(2025, 1, 1),
+                        LocalDate.of(2025, 12, 31), Step.MONTH));
+        // 28 February 2025 ends its month: 12 whole months from March, with
+        // no one-day 29 February before them, beside the 12 before those.
+        assertThat(OverviewWindow.of("12m", LocalDate.of(2025, 2, 28)))
+                .isEqualTo(new OverviewWindow(
+                        "12m", LocalDate.of(2024, 3, 1), LocalDate.of(2025, 2, 28), LocalDate.of(2023, 3, 1),
+                        LocalDate.of(2024, 2, 29), Step.MONTH));
+        // A year before 29 February had no 29th: the 12 months begin on 1 March.
+        assertThat(OverviewWindow.of("12m", LocalDate.of(2028, 2, 29)))
+                .isEqualTo(new OverviewWindow(
+                        "12m", LocalDate.of(2027, 3, 1), LocalDate.of(2028, 2, 29), LocalDate.of(2026, 3, 1),
+                        LocalDate.of(2027, 2, 28), Step.MONTH));
+    }
+
+    @Test
+    @DisplayName("the 12 months before are as long as the 12 months, but for a 29 February in only one of them")
+    void twelveMonthsBefore() {
+        for (LocalDate today : List.of(
+                TODAY, LocalDate.of(2027, 1, 1), LocalDate.of(2026, 3, 31), LocalDate.of(2026, 5, 31),
+                LocalDate.of(2026, 12, 31))) {
+            OverviewWindow window = OverviewWindow.of("12m", today);
+            assertThat(window.previousTo()).isEqualTo(window.from().minusDays(1));
+            assertThat(ChronoUnit.DAYS.between(window.previousFrom(), window.previousTo()))
+                    .as(today.toString())
+                    .isEqualTo(ChronoUnit.DAYS.between(window.from(), window.to()));
+        }
+        OverviewWindow leapDay = OverviewWindow.of("12m", LocalDate.of(2028, 2, 29));
+        assertThat(ChronoUnit.DAYS.between(leapDay.from(), leapDay.to()))
+                .isEqualTo(ChronoUnit.DAYS.between(leapDay.previousFrom(), leapDay.previousTo()) + 1);
+        // The 12 whole months to 28 February 2025 are a day shorter than the
+        // 12 before them, which hold 29 February 2024.
+        OverviewWindow afterLeapYear = OverviewWindow.of("12m", LocalDate.of(2025, 2, 28));
+        assertThat(ChronoUnit.DAYS.between(afterLeapYear.from(), afterLeapYear.to()) + 1)
+                .isEqualTo(ChronoUnit.DAYS.between(afterLeapYear.previousFrom(), afterLeapYear.previousTo()));
     }
 
     @Test
@@ -78,13 +120,20 @@ class OverviewWindowTest {
     }
 
     @Test
-    @DisplayName("12 months and this year go a calendar month at a time, this month to date")
+    @DisplayName("12 months and this year go a calendar month at a time, the first from the period's first day and"
+            + " this month to date")
     void months() {
         List<Bucket> months = OverviewWindow.of("12m", TODAY).buckets();
-        assertThat(months).hasSize(12);
-        assertThat(months.get(0)).isEqualTo(new Bucket(LocalDate.of(2025, 11, 1), LocalDate.of(2025, 11, 30)));
-        assertThat(months.get(3)).isEqualTo(new Bucket(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28)));
-        assertThat(months.get(11)).isEqualTo(new Bucket(LocalDate.of(2026, 10, 1), TODAY));
+        assertThat(months).hasSize(13);
+        assertThat(months.get(0)).isEqualTo(new Bucket(LocalDate.of(2025, 10, 5), LocalDate.of(2025, 10, 31)));
+        assertThat(months.get(1)).isEqualTo(new Bucket(LocalDate.of(2025, 11, 1), LocalDate.of(2025, 11, 30)));
+        assertThat(months.get(4)).isEqualTo(new Bucket(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28)));
+        assertThat(months.get(12)).isEqualTo(new Bucket(LocalDate.of(2026, 10, 1), TODAY));
+        // At a month's end, 12 whole months.
+        List<Bucket> whole = OverviewWindow.of("12m", LocalDate.of(2026, 3, 31)).buckets();
+        assertThat(whole).hasSize(12);
+        assertThat(whole.get(0)).isEqualTo(new Bucket(LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30)));
+        assertThat(whole.get(11)).isEqualTo(new Bucket(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)));
         List<Bucket> thisYear = OverviewWindow.of("ytd", TODAY).buckets();
         assertThat(thisYear).hasSize(10);
         assertThat(thisYear.get(0)).isEqualTo(new Bucket(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)));

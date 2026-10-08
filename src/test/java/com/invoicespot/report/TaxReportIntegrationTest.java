@@ -125,7 +125,7 @@ class TaxReportIntegrationTest extends IntegrationTest {
         report("3m", null)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period").value("3m"))
-                .andExpect(jsonPath("$.from").value(today.withDayOfMonth(1).minusMonths(2).toString()))
+                .andExpect(jsonPath("$.from").value(today.minusMonths(3).plusDays(1).toString()))
                 .andExpect(jsonPath("$.view").value("currency"))
                 .andExpect(jsonPath("$.notConverted.length()").value(0))
                 .andExpect(jsonPath("$.currencies.length()").value(3))
@@ -162,6 +162,51 @@ class TaxReportIntegrationTest extends IntegrationTest {
 
         report("12m", null).andExpect(jsonPath("$.currencies[0].tax").value(419.05));
         report("next year", null).andExpect(status().isBadRequest());
+    }
+
+    // The tax file's lines for the period.
+    private List<String> taxFile(String period) throws Exception {
+        return new String(
+                        mockMvc.perform(get("/api/v1/report/csv/tax")
+                                        .param("period", period)
+                                        .header(HttpHeaders.AUTHORIZATION, session))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsByteArray(),
+                        StandardCharsets.UTF_8)
+                .lines()
+                .toList();
+    }
+
+    @Test
+    @DisplayName("the tax file has GST's columns only in GST mode, or for a period with documents taxed under GST")
+    void gstColumns() throws Exception {
+        standardBusiness();
+        String fivePercent = "USD,%s,%s,%s,5,1,101.00,5.05"
+                .formatted(YearMonth.from(lastMonth), lastMonth, YearMonth.from(lastMonth).atEndOfMonth());
+        List<String> standard = taxFile("3m");
+        assertThat(standard.get(0)).isEqualTo("\uFEFFCurrency,Month,From,To,Rate %,Documents,Taxable,Tax");
+        assertThat(standard).contains(fivePercent).hasSizeGreaterThan(4);
+        assertThat(standard).allMatch(line -> line.split(",", -1).length == 8);
+
+        // The same documents in GST mode, as the reports page then shows its
+        // GST helpers.
+        send(patch("/api/v1/business"), "{\"taxId\": \"27AAPFU0939F1ZV\"}").andExpect(status().isOk());
+        business("USD", "GST_INDIA");
+        List<String> inGstMode = taxFile("3m");
+        assertThat(inGstMode.get(0))
+                .isEqualTo("\uFEFFCurrency,Month,From,To,Rate %,Documents,Taxable,Tax,CGST,SGST,IGST,"
+                        + "Reverse-charge taxable");
+        assertThat(inGstMode).contains(fivePercent + ",0.00,0.00,0.00,0.00").hasSameSizeAs(standard);
+
+        // Back in standard mode, a period with an invoice taxed under GST still
+        // has them, and one without has not.
+        document(client(", \"gstin\": \"27AAACB1234C1ZF\""), "Invoice", "INR", today, "", "1000@18");
+        business("USD", "STANDARD");
+        assertThat(taxFile("3m").get(0)).endsWith(",Tax,CGST,SGST,IGST,Reverse-charge taxable");
+        assertThat(taxFile(String.valueOf(today.getYear() - 1)).get(0))
+                .isEqualTo("\uFEFFCurrency,Month,From,To,Rate %,Documents,Taxable,Tax");
     }
 
     @Test
@@ -228,13 +273,15 @@ class TaxReportIntegrationTest extends IntegrationTest {
                         .andExpect(header().string(
                                 HttpHeaders.CONTENT_DISPOSITION,
                                 "attachment; filename=\"invoice-spot-tax-by-rate-%s-to-%s.csv\"".formatted(
-                                        today.withDayOfMonth(1).minusMonths(2), today)))
+                                        today.minusMonths(3).plusDays(1), today)))
                         .andReturn()
                         .getResponse()
                         .getContentAsByteArray(),
                 StandardCharsets.UTF_8);
+        // This month's rows give the days of it the period covers: up to today.
         assertThat(csv.lines().toList()).containsExactly(
-                "﻿Currency,Month,Rate %,Documents,Taxable,Tax,CGST,SGST,IGST,Reverse-charge taxable",
-                "INR,%s,18,4,2900.00,522.00,81.00,81.00,360.00,500.00".formatted(YearMonth.from(today)));
+                "﻿Currency,Month,From,To,Rate %,Documents,Taxable,Tax,CGST,SGST,IGST,Reverse-charge taxable",
+                "INR,%s,%s,%s,18,4,2900.00,522.00,81.00,81.00,360.00,500.00"
+                        .formatted(YearMonth.from(today), today.withDayOfMonth(1), today));
     }
 }

@@ -208,10 +208,11 @@ class SalesIntegrationTest extends IntegrationTest {
                 .andExpect(content().string(containsString(
                         "\"tax\":{\"total\":133.00,\"rates\":[{\"rate\":0,\"taxable\":50.00,\"tax\":0.00,"
                                 + "\"documents\":1},")));
+        // The euros begin today, so there is nothing to compare them with.
         sales("period", "30d", "currency", "EUR")
                 .andExpect(jsonPath("$.currency").value("EUR"))
                 .andExpect(jsonPath("$.total").value(300.0))
-                .andExpect(jsonPath("$.previousTotal").value(0.0))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()))
                 .andExpect(jsonPath("$.byType[*].amount", contains(300.0, 0.0, 0.0)))
                 .andExpect(jsonPath("$.tax.rates[*].rate", contains(20)));
     }
@@ -222,7 +223,7 @@ class SalesIntegrationTest extends IntegrationTest {
             + " tax is the tax report's, and the documents are the documents list's billed ones")
     void addsUpToTheOverview(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         LocalDate january = today.withDayOfYear(1);
         // Documents on the first day of each period and the day before it,
         // and on the first and last days of the periods before them, at
@@ -282,6 +283,7 @@ class SalesIntegrationTest extends IntegrationTest {
                     .isEqualByComparingTo(amount(overview, "$.totals.tax"))
                     .isEqualByComparingTo(sum(sold, "$.tax.rates[*].tax"));
             assertThat(date(sold, "$.period.from")).as(key).isEqualTo(date(overview, "$.period.from"));
+            assertThat(date(sold, "$.period.to")).as(key).isEqualTo(date(overview, "$.period.to"));
             assertThat(date(sold, "$.period.previousFrom")).as(key).isEqualTo(date(overview, "$.period.previousFrom"));
             assertThat(date(sold, "$.period.previousTo")).as(key).isEqualTo(date(overview, "$.period.previousTo"));
             // The tax report's dollars over the same days, rate for rate.
@@ -308,9 +310,44 @@ class SalesIntegrationTest extends IntegrationTest {
         }
     }
 
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the period before is compared only when the currency's records reach back to its first day, as"
+            + " the overview compares it")
+    void previousWhenCovered(ZoneId zone) throws Exception {
+        inZone(zone);
+        // The 30 days before the last 30 begin 59 days ago; records from the
+        // day after cover only part of them.
+        issue("Invoice", "100", "0", today.minusDays(58));
+        issue("Invoice", "200", "0", today);
+        sales("period", "30d")
+                .andExpect(jsonPath("$.total").value(200.0))
+                .andExpect(jsonPath("$.period.previousFrom").value(today.minusDays(59).toString()))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()));
+        hasPrevious("30d", false);
+
+        // A receipt dated on their first day.
+        issue("Receipt", "50", "0", today.minusDays(59));
+        sales("period", "30d").andExpect(jsonPath("$.previousTotal").value(150.0));
+        hasPrevious("30d", true);
+        sales("period", "90d").andExpect(jsonPath("$.previousTotal").value(nullValue()));
+        hasPrevious("90d", false);
+
+        // Older records cover the 90 days before the last 90 as well.
+        issue("Invoice", "70", "0", today.minusDays(400));
+        sales("period", "90d").andExpect(jsonPath("$.previousTotal").value(0.0));
+        hasPrevious("90d", true);
+    }
+
+    // Whether the overview compares the period with the one before.
+    private void hasPrevious(String period, boolean compared) throws Exception {
+        send(get("/api/v1/report/overview").param("currency", "USD").param("period", period), "")
+                .andExpect(jsonPath("$.totals.hasPrevious").value(compared));
+    }
+
     @Test
-    @DisplayName("a calendar month, quarter or year runs to its last day, compared with the one before; all dates"
-            + " have nothing to compare with")
+    @DisplayName("a calendar month, quarter or year runs to today while it lasts and to its last day once gone by,"
+            + " compared with the one before; all dates have nothing to compare with")
     void calendarPeriods() throws Exception {
         LocalDate month = today.withDayOfMonth(1);
         LocalDate quarter = today.with(IsoFields.DAY_OF_QUARTER, 1);
@@ -337,14 +374,11 @@ class SalesIntegrationTest extends IntegrationTest {
         }
 
         List<List<Object>> periods = List.of(
-                List.of("this-month", month, month.plusMonths(1).minusDays(1), month.minusMonths(1),
-                        today.minusMonths(1)),
+                List.of("this-month", month, today, month.minusMonths(1), today.minusMonths(1)),
                 List.of("last-month", month.minusMonths(1), month.minusDays(1), month.minusMonths(2),
                         month.minusMonths(1).minusDays(1)),
-                List.of("this-quarter", quarter, quarter.plusMonths(3).minusDays(1), quarter.minusMonths(3),
-                        today.minusMonths(3)),
-                List.of("this-year", year, year.plusYears(1).minusDays(1), year.minusYears(1),
-                        today.minusYears(1)),
+                List.of("this-quarter", quarter, today, quarter.minusMonths(3), today.minusMonths(3)),
+                List.of("this-year", year, today, year.minusYears(1), today.minusYears(1)),
                 List.of("last-year", year.minusYears(1), year.minusDays(1), year.minusYears(2),
                         year.minusYears(1).minusDays(1)));
         for (List<Object> period : periods) {
@@ -393,7 +427,7 @@ class SalesIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.currencies").isEmpty())
                 .andExpect(jsonPath("$.total").value(0.0))
-                .andExpect(jsonPath("$.previousTotal").value(0.0))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()))
                 .andExpect(jsonPath("$.documents").value(0))
                 .andExpect(jsonPath("$.byType[*].type", contains("Invoice", "Receipt", "Credit Note")))
                 .andExpect(jsonPath("$.byType[*].documents", contains(0, 0, 0)))

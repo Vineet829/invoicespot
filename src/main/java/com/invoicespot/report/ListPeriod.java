@@ -13,10 +13,10 @@ import org.springframework.http.HttpStatus;
 // them to compare with. The last 30 or 90 days, the last 12 months and this
 // year to date are the overview's own, compared as it compares them, so that
 // a view agrees with the figure that opened it. A calendar month, quarter or
-// year runs from its first day to its last, as the lists read it: one still
-// running is compared with the one before up to the same day, as this year
-// to date is, and one gone by with the whole one before it. No period at all
-// is all dates, with nothing to compare with.
+// year still running runs from its first day to today, as this year to date
+// does, and is compared with the one before up to the same day; one gone by
+// runs from its first day to its last, and is compared with the whole one
+// before it. No period at all is all dates, with nothing to compare with.
 record ListPeriod(String key, LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo) {
 
     // What all dates are read between: any day something can be dated.
@@ -40,10 +40,10 @@ record ListPeriod(String key, LocalDate from, LocalDate to, LocalDate previousFr
         };
     }
 
-    // To its last day, beside the one before up to today's day in it; a day
-    // that one doesn't have, such as 31 March's in February, is its last.
+    // To today, beside the one before up to today's day in it; a day that one
+    // doesn't have, such as 31 March's in February, is its last.
     private static ListPeriod running(String key, LocalDate first, Period length, LocalDate today) {
-        return new ListPeriod(key, first, first.plus(length).minusDays(1), first.minus(length), today.minus(length));
+        return new ListPeriod(key, first, today, first.minus(length), today.minus(length));
     }
 
     private static ListPeriod past(String key, LocalDate first, Period length) {

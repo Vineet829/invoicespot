@@ -46,7 +46,8 @@ public record DocumentResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) GstResponse gst,
         BigDecimal totalAmountReceived,
         // What a list shows as owed: there only on an issued invoice. The
-        // ledger's balanceDue is worked out for every document.
+        // ledger's balanceDue is worked out for every document but a
+        // quotation.
         BigDecimal balanceDue,
         LedgerResponse ledger,
         List<BillingItemResponse> billingItems,

@@ -43,7 +43,9 @@ public class Sales {
         this.clock = clock;
     }
 
-    // Today is the business's, in its time zone.
+    // Today is the business's, in its time zone. The period before is
+    // compared, as on the overview, only when the currency's records cover
+    // all of it.
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public SalesResponse summary(BusinessAccess access, String periodKey, String requested) {
         Long businessPkid = access.businessPkid();
@@ -74,7 +76,7 @@ public class Sales {
                 currencies,
                 period.view(),
                 byType.stream().map(SalesResponse.TypeTotals::amount).reduce(ZERO, BigDecimal::add),
-                period.compared()
+                period.compared() && queries.covers(businessPkid, currency, period.previousFrom())
                         ? queries.billedByType(businessPkid, currency, period.previousFrom(), period.previousTo())
                                 .stream()
                                 .map(ReportQueries.BilledByType::amount)

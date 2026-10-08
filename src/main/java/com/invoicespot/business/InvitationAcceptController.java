@@ -31,6 +31,7 @@ public class InvitationAcceptController {
                 businessService.require(access.businessPkid()),
                 access.role(),
                 true,
-                activeBusinesses.unread(principal.getPkid(), access.businessPkid()));
+                activeBusinesses.unread(principal.getPkid(), access.businessPkid()),
+                activeBusinesses.timeZone(access.businessPkid()));
     }
 }

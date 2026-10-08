@@ -244,5 +244,9 @@ The backend's settings are in `src/main/resources/application.yml`. Besides the 
   can't be turned on, and a share link is shown only once, when it is made.
 - `JOBS_ENABLED`, `JOBS_CRON` and `JOBS_ZONE`: the daily run that makes recurring invoices, sends automatic
   reminders, raises overdue alerts and removes expired sign-ins. It is on by default, at 07:00 UTC.
+- `DEMO_EMAIL`, `DEMO_SEED` and `DEMO_RESET`: the shared demo account. With `DEMO_SEED=true` it gets sample
+  data at startup. With `DEMO_RESET=true` as well, its business is cleared and the sample data added afresh,
+  dated from today, at startup and every day at the daily run's time, while the daily run is on. Both are off
+  by default.
 
 `JWT_REFRESH_SECRET_KEY` is no longer used: each sign-in is kept as a session.

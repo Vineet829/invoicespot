@@ -5,8 +5,11 @@ import com.invoicespot.business.dto.BusinessSummaryResponse;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.notification.NotificationRepository;
 import com.invoicespot.notification.NotificationRepository.UnreadCount;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.BusinessSettingsRepository;
 import com.invoicespot.user.User;
 import java.time.Clock;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +30,19 @@ public class ActiveBusinesses {
     private final BusinessMemberRepository memberRepository;
     private final UserSessionRepository sessionRepository;
     private final NotificationRepository notificationRepository;
+    private final BusinessSettingsRepository settingsRepository;
     private final Clock clock;
 
     public ActiveBusinesses(
             BusinessMemberRepository memberRepository,
             UserSessionRepository sessionRepository,
             NotificationRepository notificationRepository,
+            BusinessSettingsRepository settingsRepository,
             Clock clock) {
         this.memberRepository = memberRepository;
         this.sessionRepository = sessionRepository;
         this.notificationRepository = notificationRepository;
+        this.settingsRepository = settingsRepository;
         this.clock = clock;
     }
 
@@ -54,19 +60,27 @@ public class ActiveBusinesses {
     }
 
     // Every business the user works in, by name, marking the session's, with
-    // how many of the user's notifications wait unread in each.
+    // how many of the user's notifications wait unread in each and its time
+    // zone, each read for all of them at once.
     @Transactional
     public List<BusinessSummaryResponse> list(User user, UUID sessionId, Long preferred) {
         Long active = resolve(user, sessionId, preferred).map(BusinessAccess::businessPkid).orElse(null);
         Map<Long, Long> unread = notificationRepository.countUnreadByBusiness(user.getPkid()).stream()
                 .collect(Collectors.toMap(UnreadCount::getBusinessPkid, UnreadCount::getUnread));
-        return memberRepository.findByUserInUseOrder(user.getPkid()).stream()
+        List<BusinessMember> members = memberRepository.findByUserInUseOrder(user.getPkid());
+        Map<Long, String> zones = timeZones(
+                members.stream().map(member -> member.getBusiness().getPkid()).toList());
+        return members.stream()
                 .sorted(Comparator.comparing((BusinessMember member) -> member.getBusiness().getName(),
                         String.CASE_INSENSITIVE_ORDER))
                 .map(member -> {
                     Long pkid = member.getBusiness().getPkid();
                     return BusinessSummaryResponse.from(
-                            member.getBusiness(), member.getRole(), pkid.equals(active), unread.getOrDefault(pkid, 0L));
+                            member.getBusiness(),
+                            member.getRole(),
+                            pkid.equals(active),
+                            unread.getOrDefault(pkid, 0L),
+                            zones.get(pkid));
                 })
                 .toList();
     }
@@ -74,6 +88,23 @@ public class ActiveBusinesses {
     @Transactional(readOnly = true)
     public long unread(Long userPkid, Long businessPkid) {
         return notificationRepository.countByUserPkidAndBusinessPkidAndReadAtIsNull(userPkid, businessPkid);
+    }
+
+    // The time zone the server counts a business's days in, as the overview
+    // and the receivables read it from its settings, or the settings'
+    // default while it has none yet.
+    @Transactional(readOnly = true)
+    public String timeZone(Long businessPkid) {
+        return timeZones(List.of(businessPkid)).get(businessPkid);
+    }
+
+    private Map<Long, String> timeZones(Collection<Long> businessPkids) {
+        Map<Long, String> zones = settingsRepository.findTimeZones(businessPkids).stream()
+                .collect(Collectors.toMap(
+                        BusinessSettingsRepository.Zone::getBusinessPkid,
+                        BusinessSettingsRepository.Zone::getTimeZone));
+        businessPkids.forEach(pkid -> zones.putIfAbsent(pkid, BusinessSettings.DEFAULT_TIME_ZONE));
+        return zones;
     }
 
     // Switching business is per session, so two browsers can work in two

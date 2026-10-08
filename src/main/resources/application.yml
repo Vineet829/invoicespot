@@ -97,9 +97,14 @@ app:
     token-ttl: PT15M
   upload:
     dir: ${UPLOAD_DIR:uploads}
+  # The shared demo account. With seed on, it gets sample data at startup;
+  # with reset on too, its business is cleared and the sample data added
+  # afresh, dated from today, at startup and every day at the jobs' time
+  # (while the jobs are on).
   demo:
     email: ${DEMO_EMAIL:guest@demo.invoicespot.local}
     seed: ${DEMO_SEED:false}
+    reset: ${DEMO_RESET:false}
   # Google sign-in, offered once both its client ID and secret are set. The
   # provider sends people back to {redirect-base}/api/v1/auth/oauth2/callback/
   # {provider}: the origin the browser reaches the API through, registered

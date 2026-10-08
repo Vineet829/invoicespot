@@ -92,6 +92,14 @@ class ExpenseListIntegrationTest extends IntegrationTest {
         return new BigDecimal((found instanceof List<?> list ? list.get(0) : found).toString());
     }
 
+    // The amounts the path finds added up, or nothing when it finds none.
+    private static BigDecimal sum(String body, String path) {
+        List<Object> amounts = JsonPath.read(body, path);
+        return amounts.stream()
+                .map(amount -> new BigDecimal(amount.toString()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     // The expenses list, every match on one page, with the given filters.
     private ResultActions list(String... params) throws Exception {
         return send(with(get("/api/v1/expense").param("size", "100"), params), "");
@@ -122,7 +130,7 @@ class ExpenseListIntegrationTest extends IntegrationTest {
     @DisplayName("a period is the overview's last 30 or 90 days or 12 months, by the business's calendar")
     void periods(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         // Paid today, and on the first day of each period and the day before it.
         expense(today, "Today", "Office", "10");
         expense(today.minusDays(29), "Day 29", "Office", "20");
@@ -208,9 +216,11 @@ class ExpenseListIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("the totals add up every listed expense in each currency, on every page, as profit counts its cost")
+    @DisplayName("the totals add up what was paid for every listed expense in each currency, on every page, tax that"
+            + " can be claimed back and all")
     void totals() throws Exception {
-        // Tax that can't be claimed back is part of what an expense cost, and tax that can isn't.
+        // Tax that can't be claimed back is part of what an expense cost, and
+        // tax that can isn't, but both were paid.
         expense(today, "Staples", "Office", "USD", "100", "18", false);
         expense(today.minusDays(1), "Hostinger", "Software", "USD", "50", "9", true);
         expense(today.minusDays(2), "Uber", "Travel", "USD", "20.50", "0", false);
@@ -223,7 +233,7 @@ class ExpenseListIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.numberOfPages").value(1))
                 .andExpect(jsonPath("$.totals[*].currency", contains("EUR", "GBP", "USD")))
                 .andExpect(jsonPath("$.totals[*].expenses", contains(1, 1, 3)))
-                .andExpect(jsonPath("$.totals[*].spent", contains(238.0, 12.0, 188.5)))
+                .andExpect(jsonPath("$.totals[*].spent", contains(238.0, 14.4, 197.5)))
                 // Written to the cent.
                 .andExpect(content().string(containsString(
                         "\"totals\":[{\"currency\":\"EUR\",\"expenses\":1,\"spent\":238.00},"))));
@@ -240,20 +250,24 @@ class ExpenseListIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totals[*].spent", contains(238.0, 20.5)));
         list("period", "30d")
                 .andExpect(jsonPath("$.totals[*].currency", contains("GBP", "USD")))
-                .andExpect(jsonPath("$.totals[*].spent", contains(12.0, 188.5)));
+                .andExpect(jsonPath("$.totals[*].spent", contains(14.4, 197.5)));
         list("currency", "USD", "q", "o")
                 .andExpect(jsonPath("$.expenses[*].vendor", contains("Staples", "Hostinger")))
-                .andExpect(jsonPath("$.totals[*].spent", contains(168.0)));
+                .andExpect(jsonPath("$.totals[*].spent", contains(177.0)));
         list("currency", "CHF")
                 .andExpect(jsonPath("$.totals").isEmpty())
                 .andExpect(jsonPath("$.totalExpenses").value(0))
                 .andExpect(jsonPath("$.numberOfPages").value(0));
-        // What each currency's expenses cost is what profit takes off its income for the same days.
+        // What was paid in each currency is what its rows' totals add up to,
+        // and less the tax that can be claimed back, what profit takes off its
+        // income for the same days.
         String profit = body(send(get("/api/v1/report/profit").param("period", "90d"), "")
                 .andExpect(status().isOk()));
         for (String currency : List.of("USD", "EUR", "GBP")) {
             String listed = body(list("period", "90d", "currency", currency));
-            assertThat(amount(listed, "$.totals[0].spent"))
+            BigDecimal spent = amount(listed, "$.totals[0].spent");
+            assertThat(spent).as(currency).isEqualByComparingTo(sum(listed, "$.expenses[*].total"));
+            assertThat(spent.subtract(sum(listed, "$.expenses[?(@.taxReclaimable == true)].taxAmount")))
                     .as(currency)
                     .isEqualByComparingTo(amount(
                             profit, "$.currencies[?(@.currency == '%s')].expenses".formatted(currency)));

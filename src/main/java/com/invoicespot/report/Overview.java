@@ -119,7 +119,7 @@ public class Overview {
                         byDay,
                         queries.taxBilled(businessPkid, currency, window),
                         window,
-                        activeBefore(businessPkid, currency, window.from())),
+                        queries.covers(businessPkid, currency, window.previousFrom())),
                 owedNow(owed, zone, today),
                 trend(byDay, window),
                 needsAttention.list(businessPkid, currency, zone, today),
@@ -171,7 +171,8 @@ public class Overview {
                 .single();
     }
 
-    // The period's totals beside those of the period before it.
+    // The period's totals beside those of the period before it, which are
+    // compared only when the currency's records cover all of that one.
     private static OverviewTotals totals(
             MoneyByDay money, ReportQueries.TaxBilled tax, OverviewWindow window, boolean hasPrevious) {
         MoneyByDay.Sums current = money.between(window.from(), window.to());
@@ -253,32 +254,6 @@ public class Overview {
                         OverviewClient::billed, client -> Objects.requireNonNullElse(client.client(), "")))
                 .limit(TOP_CLIENTS)
                 .toList();
-    }
-
-    // Whether the currency had money dated before the period: an invoice or
-    // receipt, a payment on an invoice, or an expense.
-    private boolean activeBefore(Long businessPkid, String currency, LocalDate from) {
-        return jdbc.sql("""
-                        select exists (
-                                   select 1 from documents d
-                                   where d.business_pkid = :business and %1$s
-                                     and d.document_type in ('Invoice', 'Receipt')
-                                     and coalesce(d.currency, '') = :currency and d.issue_date < :from)
-                               or exists (
-                                   select 1 from payments p
-                                   join documents d on d.pkid = p.document_pkid
-                                   where d.business_pkid = :business and %1$s and d.document_type = 'Invoice'
-                                     and coalesce(d.currency, '') = :currency and p.date_paid < :from)
-                               or exists (
-                                   select 1 from expenses e
-                                   where e.business_pkid = :business and e.currency = :currency
-                                     and e.expense_date < :from)
-                        """.formatted(DocumentLedger.COUNTED))
-                .param("business", businessPkid)
-                .param("currency", currency)
-                .param("from", from)
-                .query(Boolean.class)
-                .single();
     }
 
     // Overdue as the documents list has it: due before today began, by days

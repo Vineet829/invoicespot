@@ -51,28 +51,32 @@ class ListPeriodTest {
         assertThat(ListPeriod.of("30d", TODAY))
                 .isEqualTo(period("30d", "2026-09-07", "2026-10-06", "2026-08-08", "2026-09-06"));
         assertThat(ListPeriod.of("12m", TODAY))
-                .isEqualTo(period("12m", "2025-11-01", "2026-10-06", "2024-11-01", "2025-10-31"));
+                .isEqualTo(period("12m", "2025-10-07", "2026-10-06", "2024-10-07", "2025-10-06"));
         assertThat(ListPeriod.of("ytd", TODAY))
                 .isEqualTo(period("ytd", "2026-01-01", "2026-10-06", "2025-01-01", "2025-10-06"));
     }
 
     @Test
-    @DisplayName("a month, quarter or year runs from its first day to its last; one still running is compared"
-            + " with the one before up to the same day, and one gone by with the whole one before it")
+    @DisplayName("a month, quarter or year still running runs from its first day to today, beside the one before up"
+            + " to the same day; one gone by runs to its last day, beside the whole one before it")
     void calendarPeriods() {
         assertThat(ListPeriod.of("this-month", TODAY))
-                .isEqualTo(period("this-month", "2026-10-01", "2026-10-31", "2026-09-01", "2026-09-06"));
+                .isEqualTo(period("this-month", "2026-10-01", "2026-10-06", "2026-09-01", "2026-09-06"));
         assertThat(ListPeriod.of("Last-Month", TODAY))
                 .isEqualTo(period("last-month", "2026-09-01", "2026-09-30", "2026-08-01", "2026-08-31"));
         assertThat(ListPeriod.of("this-quarter", TODAY))
-                .isEqualTo(period("this-quarter", "2026-10-01", "2026-12-31", "2026-07-01", "2026-07-06"));
+                .isEqualTo(period("this-quarter", "2026-10-01", "2026-10-06", "2026-07-01", "2026-07-06"));
         assertThat(ListPeriod.of("this-year", TODAY))
-                .isEqualTo(period("this-year", "2026-01-01", "2026-12-31", "2025-01-01", "2025-10-06"));
+                .isEqualTo(period("this-year", "2026-01-01", "2026-10-06", "2025-01-01", "2025-10-06"));
         assertThat(ListPeriod.of("last-year", TODAY))
                 .isEqualTo(period("last-year", "2025-01-01", "2025-12-31", "2024-01-01", "2024-12-31"));
         assertThat(ListPeriod.of("this-month", TODAY).compared()).isTrue();
         assertThat(ListPeriod.of("this-month", TODAY).firstDay()).isEqualTo(LocalDate.of(2026, 10, 1));
-        assertThat(ListPeriod.of("this-month", TODAY).lastDay()).isEqualTo(LocalDate.of(2026, 10, 31));
+        assertThat(ListPeriod.of("this-month", TODAY).lastDay()).isEqualTo(TODAY);
+        // This year is the overview's this year to date.
+        OverviewWindow year = OverviewWindow.of("ytd", TODAY);
+        assertThat(ListPeriod.of("this-year", TODAY))
+                .isEqualTo(new ListPeriod("this-year", year.from(), year.to(), year.previousFrom(), year.previousTo()));
     }
 
     @Test
@@ -86,12 +90,12 @@ class ListPeriodTest {
         assertThat(ListPeriod.of("this-quarter", march))
                 .isEqualTo(period("this-quarter", "2026-01-01", "2026-03-31", "2025-10-01", "2025-12-31"));
         assertThat(ListPeriod.of("this-quarter", LocalDate.of(2026, 5, 31)))
-                .isEqualTo(period("this-quarter", "2026-04-01", "2026-06-30", "2026-01-01", "2026-02-28"));
+                .isEqualTo(period("this-quarter", "2026-04-01", "2026-05-31", "2026-01-01", "2026-02-28"));
         LocalDate leapDay = LocalDate.of(2028, 2, 29);
         assertThat(ListPeriod.of("this-month", leapDay))
                 .isEqualTo(period("this-month", "2028-02-01", "2028-02-29", "2028-01-01", "2028-01-29"));
         assertThat(ListPeriod.of("this-year", leapDay))
-                .isEqualTo(period("this-year", "2028-01-01", "2028-12-31", "2027-01-01", "2027-02-28"));
+                .isEqualTo(period("this-year", "2028-01-01", "2028-02-29", "2027-01-01", "2027-02-28"));
         assertThat(ListPeriod.of("last-month", LocalDate.of(2028, 3, 15)))
                 .isEqualTo(period("last-month", "2028-02-01", "2028-02-29", "2028-01-01", "2028-01-31"));
     }

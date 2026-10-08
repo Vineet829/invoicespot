@@ -153,10 +153,12 @@ class DocumentExportIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("payments export newest first, and each owner gets only their own")
+    @DisplayName("payments and receipts export newest first, and each owner gets only their own")
     void paymentsCsv() throws Exception {
+        // A receipt is money in on the day it is dated, with no method of its own.
         assertThat(csv(owner, "/api/v1/document/payments/csv")).containsExactly(
                 "﻿Date,Document,Type,Client,Currency,Amount,Method,Paid by,Notes,Tax withheld,Kind",
+                today + ",REC-0001,Receipt,Acme,USD,20.00,,,,,Receipt",
                 today + ",INV-0002,Invoice,Acme,USD,50.00,Cash,Acme,,0.00,Payment",
                 today + ",INV-0001,Invoice,Acme,USD,40.00,Bank Transfer,Acme,First part,0.00,Payment");
         assertThat(csv(createUser(), "/api/v1/document/payments/csv")).hasSize(1);

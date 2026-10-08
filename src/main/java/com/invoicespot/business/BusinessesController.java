@@ -46,7 +46,8 @@ public class BusinessesController {
         Business business = businessService.create(principal, request.name());
         activeBusinesses.use(principal, session(), business.getId());
         // A business just started has no news yet.
-        return BusinessSummaryResponse.from(business, BusinessRole.OWNER, true, 0);
+        return BusinessSummaryResponse.from(
+                business, BusinessRole.OWNER, true, 0, activeBusinesses.timeZone(business.getPkid()));
     }
 
     @PutMapping("/active")
@@ -55,7 +56,11 @@ public class BusinessesController {
         BusinessAccess access = activeBusinesses.use(principal, session(), request.businessId());
         Business business = businessService.require(access.businessPkid());
         return BusinessSummaryResponse.from(
-                business, access.role(), true, activeBusinesses.unread(principal.getPkid(), access.businessPkid()));
+                business,
+                access.role(),
+                true,
+                activeBusinesses.unread(principal.getPkid(), access.businessPkid()),
+                activeBusinesses.timeZone(access.businessPkid()));
     }
 
     private static UUID session() {

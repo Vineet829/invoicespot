@@ -1,7 +1,9 @@
 package com.invoicespot.document;
 
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,6 +16,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -161,5 +164,42 @@ class QuotationAnswerIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.updatedDocument.expired").value(false));
         answer(quotation[1], "accept", "").andExpect(status().isOk()).andExpect(jsonPath("$.expired").value(false));
+    }
+
+    @Test
+    @DisplayName("a quotation is an offer, so nothing is owed on it, open, accepted or expired; an invoice is owed")
+    void nothingOwed() throws Exception {
+        LocalDate today = LocalDate.now(ZONE);
+        String[] open = quotation(today.plusDays(10));
+        String[] accepted = quotation(today.plusDays(10));
+        answer(accepted[1], "accept", "").andExpect(status().isOk());
+        String[] expired = quotation(today.minusDays(1));
+
+        for (String[] quotation : List.of(open, accepted, expired)) {
+            send(get("/api/v1/document/{id}", quotation[0]), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.document.total").value(900.0))
+                    .andExpect(jsonPath("$.document.balanceDue").value(nullValue()))
+                    .andExpect(jsonPath("$.document.ledger.balanceDue").value(nullValue()))
+                    .andExpect(jsonPath("$.document.ledger.refundDue").value(0.0));
+            // The share page shows its total, with nothing to pay.
+            mockMvc.perform(get("/api/v1/public/share/{token}", quotation[1]))
+                    .andExpect(jsonPath("$.total").value(900.0))
+                    .andExpect(jsonPath("$.payment").doesNotExist())
+                    .andExpect(jsonPath("$.canReportPayment").value(false));
+        }
+        send(get("/api/v1/document/all").param("type", "Quotation"), "")
+                .andExpect(jsonPath("$.myDocuments.length()").value(3))
+                .andExpect(jsonPath("$.myDocuments[*].balanceDue", everyItem(nullValue())))
+                .andExpect(jsonPath("$.myDocuments[*].ledger.balanceDue", everyItem(nullValue())));
+
+        String invoice = JsonPath.read(
+                body(send(post("/api/v1/document/create"), """
+                        {"customerId": "%s", "billingItems": [{"itemName": "Work", "unitPrice": 900, "quantity": 1}]}
+                        """.formatted(client))),
+                "$.newDocument._id");
+        send(get("/api/v1/document/{id}", invoice), "")
+                .andExpect(jsonPath("$.document.balanceDue").value(900.0))
+                .andExpect(jsonPath("$.document.ledger.balanceDue").value(900.0));
     }
 }

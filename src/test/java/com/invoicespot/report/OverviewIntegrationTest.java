@@ -309,7 +309,9 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.period.previousFrom").value(day.minusDays(59).toString()))
                 .andExpect(jsonPath("$.period.previousTo").value(day.minusDays(30).toString()))
                 .andExpect(jsonPath("$.period.step").value("day"));
-        LocalDate first = day.withDayOfMonth(1).minusMonths(11);
+        // The last 12 months go back to the same day a year ago, beside the
+        // 12 months before them.
+        LocalDate first = day.minusMonths(12).plusDays(1);
         overview(null, "12m")
                 .andExpect(jsonPath("$.period.key").value("12m"))
                 .andExpect(jsonPath("$.period.from").value(first.toString()))
@@ -392,31 +394,51 @@ class OverviewIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("there is a period before to compare with once money was billed, paid or spent before this one")
+    @DisplayName("the period is compared with the one before only when money was billed, paid or spent on that one's"
+            + " first day or earlier")
     void previous(ZoneId zone) throws Exception {
         LocalDate day = inZone(zone);
+        // The last 90 days are compared with the 90 before them, which begin
+        // 179 days ago. Money from the day after that covers only part of
+        // them: a deposit the day before the period, on an invoice dated in
+        // it, and an expense.
         String invoice = issue("Invoice", "USD", "100", day.minusDays(89), day.plusDays(10));
-        expense("USD", "20", "0", false, day.minusDays(5));
+        pay(invoice, "40", "0", day.minusDays(90));
+        expense("USD", "20", "0", false, day.minusDays(178));
         // Earlier, but none of it counts: a quotation, a draft, a void
         // invoice, and money in another currency.
-        issue("Quotation", "USD", "50", day.minusDays(120), day.minusDays(100));
-        create("Invoice", "USD", "60", "0", day.minusDays(120), null, true);
-        voided(issue("Invoice", "USD", "70", day.minusDays(120), day.minusDays(100)));
-        issue("Invoice", "EUR", "80", day.minusDays(120), day.minusDays(100));
-        expense("EUR", "90", "0", false, day.minusDays(120));
+        issue("Quotation", "USD", "50", day.minusDays(400), day.minusDays(380));
+        create("Invoice", "USD", "60", "0", day.minusDays(400), null, true);
+        voided(issue("Invoice", "USD", "70", day.minusDays(400), day.minusDays(380)));
+        issue("Invoice", "EUR", "80", day.minusDays(400), day.minusDays(380));
+        expense("EUR", "90", "0", false, day.minusDays(400));
 
         overview("USD", null)
                 .andExpect(jsonPath("$.totals.hasPrevious").value(false))
                 .andExpect(jsonPath("$.totals.billed.current").value(100.0))
-                .andExpect(jsonPath("$.totals.billed.previous").value(0.0))
-                .andExpect(jsonPath("$.totals.profit.current").value(80.0));
+                .andExpect(jsonPath("$.totals.received.previous").value(40.0))
+                .andExpect(jsonPath("$.totals.profit.previous").value(-20.0));
+        // The 30 days before the last 30 are all covered.
+        overview("USD", "30d").andExpect(jsonPath("$.totals.hasPrevious").value(true));
 
-        // A deposit paid the day before the period, on the invoice dated in it.
-        pay(invoice, "40", "0", day.minusDays(90));
-        overview("USD", null)
-                .andExpect(jsonPath("$.totals.hasPrevious").value(true))
-                .andExpect(jsonPath("$.totals.received.current").value(0.0))
-                .andExpect(jsonPath("$.totals.received.previous").value(40.0));
+        // Money of any kind on the first of the 90 days before is enough: an
+        // invoice or a receipt dated then, a payment made then on a later
+        // invoice, or an expense paid then.
+        for (String kind : List.of("Invoice", "Receipt", "Payment", "Expense")) {
+            owner();
+            LocalDate first = inZone(zone).minusDays(179);
+            switch (kind) {
+                case "Invoice" -> issue(kind, "USD", "100", first, first.plusDays(30));
+                case "Receipt" -> create(kind, "USD", "100", "0", first, null, false);
+                case "Payment" -> {
+                    String paid = issue("Invoice", "USD", "100", first.plusDays(1), first.plusDays(30));
+                    pay(paid, "100", "0", first);
+                }
+                default -> expense("USD", "100", "0", false, first);
+            }
+            overview("USD", null).andExpect(jsonPath("$.totals.hasPrevious").value(true));
+            overview("USD", "30d").andExpect(jsonPath("$.totals.hasPrevious").value(true));
+        }
 
         // A business whose only money is an old expense.
         owner = createUser();
@@ -494,11 +516,16 @@ class OverviewIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.trend[12].billed").value(1440.0))
                 .andExpect(jsonPath("$.trend[12].moneyIn").value(900.0))
                 .andExpect(jsonPath("$.trend[12].moneyOut").value(168.0));
+        // By calendar month, the first from the day after today's date a year
+        // ago, which is a part month unless it is the 1st.
+        LocalDate first = day.minusMonths(12).plusDays(1);
+        int months = first.getDayOfMonth() == 1 ? 12 : 13;
         overview(null, "12m")
-                .andExpect(jsonPath("$.trend.length()").value(12))
-                .andExpect(jsonPath("$.trend[0].from").value(day.withDayOfMonth(1).minusMonths(11).toString()))
-                .andExpect(jsonPath("$.trend[11].from").value(day.withDayOfMonth(1).toString()))
-                .andExpect(jsonPath("$.trend[11].to").value(day.toString()));
+                .andExpect(jsonPath("$.trend.length()").value(months))
+                .andExpect(jsonPath("$.trend[0].from").value(first.toString()))
+                .andExpect(jsonPath("$.trend[0].to").value(YearMonth.from(first).atEndOfMonth().toString()))
+                .andExpect(jsonPath("$.trend[%d].from".formatted(months - 1)).value(day.withDayOfMonth(1).toString()))
+                .andExpect(jsonPath("$.trend[%d].to".formatted(months - 1)).value(day.toString()));
         overview(null, "ytd")
                 .andExpect(jsonPath("$.trend.length()").value(day.getMonthValue()))
                 .andExpect(jsonPath("$.trend[0].from").value(day.withDayOfYear(1).toString()));
@@ -510,10 +537,36 @@ class OverviewIntegrationTest extends IntegrationTest {
             assertThat(trendSum(body, "income").subtract(trendSum(body, "expenses")))
                     .isEqualByComparingTo(amount(body, "$.totals.profit.current"));
             // Received is the money in less what was paid back, and money out
-            // is the expenses and what was paid back.
+            // is what was paid for expenses, here with no tax to claim back,
+            // and what was paid back.
             assertThat(trendSum(body, "moneyIn").subtract(trendSum(body, "received")))
                     .isEqualByComparingTo(trendSum(body, "moneyOut").subtract(trendSum(body, "expenses")));
         }
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("money out is what was paid for expenses, tax that can be claimed back and all, as the expenses"
+            + " list's Spent adds it up, while profit takes off only what they cost")
+    void reclaimableTax(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        create("Receipt", "USD", "1000", "0", day, null, false);
+        // Yesterday: an expense with tax that can be claimed back, and one
+        // with tax that can't.
+        expense("USD", "100", "18", true, day.minusDays(1));
+        expense("USD", "50", "9", false, day.minusDays(1));
+
+        overview("USD", "30d")
+                .andExpect(jsonPath("$.trend[28].expenses").value(159.0))
+                .andExpect(jsonPath("$.trend[28].moneyOut").value(177.0))
+                .andExpect(jsonPath("$.trend[29].moneyIn").value(1000.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(841.0));
+        send(get("/api/v1/expense").param("period", "30d").param("currency", "USD"), "")
+                .andExpect(jsonPath("$.expenses[*].total", contains(59.0, 118.0)))
+                .andExpect(jsonPath("$.totals[0].spent").value(177.0));
+        send(get("/api/v1/report/profit").param("period", "30d"), "")
+                .andExpect(jsonPath("$.currencies[0].expenses").value(159.0))
+                .andExpect(jsonPath("$.currencies[0].profit").value(841.0));
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -691,9 +744,15 @@ class OverviewIntegrationTest extends IntegrationTest {
                     .andExpect(jsonPath("$.from").value(day.minusDays(29).toString()))
                     .andExpect(jsonPath("$.to").value(day.toString()));
         }
+        // The CSV gives each month the days of it the period covers, the
+        // first from the period's first day and the last to today.
+        LocalDate first = day.minusDays(89);
         send(get("/api/v1/report/csv/income").param("period", "90d"), "")
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("USD," + YearMonth.from(day) + ",")));
+                .andExpect(content().string(containsString("USD,%s,%s,%s,".formatted(
+                        YearMonth.from(first), first, YearMonth.from(first).atEndOfMonth()))))
+                .andExpect(content().string(containsString(
+                        "USD,%s,%s,%s,".formatted(YearMonth.from(day), day.withDayOfMonth(1), day))));
     }
 
     @ParameterizedTest(name = "in {0}")

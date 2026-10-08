@@ -279,6 +279,32 @@ class DocumentListIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a payment status lists the invoices and receipts that have it, never a quotation or a credit note,"
+            + " in the list and its CSV file")
+    void statuses() throws Exception {
+        books();
+
+        list("status", "Not Paid")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDocuments").value(3))
+                .andExpect(jsonPath(
+                        "$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0001", "INV-0002", "INV-0005")))
+                .andExpect(jsonPath("$.totals[0].documents").value(3))
+                .andExpect(jsonPath("$.totals[0].billed").value(700.0));
+        list("status", "Not Fully Paid")
+                .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0003")));
+        list("status", "Paid")
+                .andExpect(jsonPath(
+                        "$.myDocuments[*].documentNumber",
+                        containsInAnyOrder("INV-0004", "INV-0006", "INV-0007", "REC-0001")));
+        list("status", "Not Paid", "type", "Quotation").andExpect(jsonPath("$.totalDocuments").value(0));
+        assertThat(csv("status", "Not Paid", "sort", "number", "dir", "asc"))
+                .containsExactly("INV-0001", "INV-0002", "INV-0005");
+        // The quotation is still listed by its kind.
+        assertThat(csv("type", "Quotation")).containsExactly("QUO-0001");
+    }
+
+    @Test
     @DisplayName("billed lists the issued invoices, receipts and credit notes, which add up to what the overview billed")
     void billed() throws Exception {
         books();
@@ -318,7 +344,7 @@ class DocumentListIntegrationTest extends IntegrationTest {
     @DisplayName("a period is the overview's last 30 or 90 days or 12 months, by the business's calendar")
     void periods(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         // Dated today, and on the first day of each period and the day before it.
         issue("Invoice", "10", today, today);
         issue("Invoice", "20", today.minusDays(29), today);
@@ -630,7 +656,7 @@ class DocumentListIntegrationTest extends IntegrationTest {
     @DisplayName("what was billed in each of the overview's periods, and what is owed now, total as the overview's do")
     void addUpToTheOverview(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         // Billed on the first day of each period and the day before it, with
         // tax withheld, credit notes, a refund and a receipt.
         pay(issue("Invoice", "1000", today.minusDays(29), today.minusDays(1)), "400", "50", today);

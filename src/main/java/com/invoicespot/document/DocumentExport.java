@@ -93,8 +93,11 @@ public class DocumentExport {
                         .toList());
     }
 
-    // Every payment recorded on the owner's documents, and every refund as a
-    // negative amount, newest first.
+    // The money the payments page counts, newest first: every payment on an
+    // issued invoice, every issued receipt at its total on the day it is
+    // dated, and every refund on an issued document as a negative amount, so
+    // that the file adds up to what the page received. A receipt has no
+    // method, payer, note or tax withheld of its own.
     @Transactional(readOnly = true)
     public CsvFile payments(BusinessAccess access) {
         return CsvFile.of(
@@ -107,16 +110,21 @@ public class DocumentExport {
                                        p.paid_by, p.additional_info as notes, p.tds_amount, 'Payment' as kind
                                 from payments p
                                 join documents d on d.pkid = p.document_pkid
-                                where d.business_pkid = :business
+                                where d.business_pkid = :business and %1$s and d.document_type = 'Invoice'
+                                union all
+                                select d.issue_date, d.pkid, d.document_number, d.document_type,
+                                       d.customer_name, d.currency, d.total, null, null, null, null, 'Receipt'
+                                from documents d
+                                where d.business_pkid = :business and %1$s and d.document_type = 'Receipt'
                                 union all
                                 select r.date_refunded, r.pkid, d.document_number, d.document_type,
                                        d.customer_name, d.currency, -r.amount, r.payment_method,
                                        null, r.reference, null, 'Refund'
                                 from refunds r
                                 join documents d on d.pkid = r.document_pkid
-                                where d.business_pkid = :business
+                                where d.business_pkid = :business and %1$s
                                 order by day desc, kind desc, sequence desc
-                                """)
+                                """.formatted(DocumentLedger.COUNTED))
                         .param("business", access.businessPkid())
                         .query((result, rowNumber) -> Arrays.<Object>asList(
                                 result.getObject("day", LocalDate.class),

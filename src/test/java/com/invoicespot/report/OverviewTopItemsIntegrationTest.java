@@ -208,7 +208,7 @@ class OverviewTopItemsIntegrationTest extends IntegrationTest {
             + " total rounds it")
     void addsUpToIncome(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         LocalDate january = today.withDayOfYear(1);
         // Documents on the first day of each period and the day before it,
         // with fractions of a cent to round, discounts and tax.

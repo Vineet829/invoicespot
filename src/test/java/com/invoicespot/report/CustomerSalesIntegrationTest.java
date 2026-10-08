@@ -211,13 +211,63 @@ class CustomerSalesIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totals.owed").value(8000.0));
     }
 
+    @Test
+    @DisplayName("what a client owes is what is still owed on its invoices dated in the period, less their credit"
+            + " notes whenever dated, payments and tax withheld, as the reports' top clients say")
+    void owedOnThePeriodsInvoices() throws Exception {
+        String acme = client("Acme");
+        // 40 days ago: an invoice paid in part with tax withheld, and credited
+        // in the last 30 days. In the last 30 days: another, paid in part
+        // with tax withheld.
+        String older = issue("Invoice", acme, "1000", today.minusDays(40));
+        pay(older, "400", "50", today.minusDays(35));
+        credit(older, "200", today.minusDays(3));
+        pay(issue("Invoice", acme, "600", today.minusDays(10)), "100", "20", today.minusDays(2));
+
+        // Over the last 30 days the credit note takes 200 off what was billed,
+        // but only the newer invoice is owed on: 600 less 100 and 20.
+        sales("period", "30d")
+                .andExpect(jsonPath("$.clients[*].billed", contains(400.0)))
+                .andExpect(jsonPath("$.clients[*].paid", contains(100.0)))
+                .andExpect(jsonPath("$.clients[*].owed", contains(480.0)));
+        // Over the last 90 days the older one is too: 1000 less 200, 400 and 50.
+        sales("period", "90d")
+                .andExpect(jsonPath("$.clients[*].billed", contains(1400.0)))
+                .andExpect(jsonPath("$.clients[*].paid", contains(500.0)))
+                .andExpect(jsonPath("$.clients[*].owed", contains(830.0)))
+                .andExpect(jsonPath("$.totals.owed").value(830.0));
+        send(get("/api/v1/report").param("period", "30d"), "")
+                .andExpect(jsonPath("$.currencies[0].clients[0].outstanding").value(480.0));
+        send(get("/api/v1/report").param("period", "90d"), "")
+                .andExpect(jsonPath("$.currencies[0].clients[0].outstanding").value(830.0));
+    }
+
+    @Test
+    @DisplayName("what a client owes on last year's invoices is less the credit notes dated this year")
+    void owedAfterTheYear() throws Exception {
+        String acme = client("Acme");
+        LocalDate lastYear = today.withDayOfYear(1).minusDays(10);
+        String invoice = issue("Invoice", acme, "1000", lastYear);
+        pay(invoice, "300", "100", lastYear);
+        credit(invoice, "250", today);
+
+        sales("period", "last-year")
+                .andExpect(jsonPath("$.clients[*].billed", contains(1000.0)))
+                .andExpect(jsonPath("$.clients[*].owed", contains(350.0)));
+        send(get("/api/v1/report").param("period", String.valueOf(lastYear.getYear())), "")
+                .andExpect(jsonPath("$.currencies[0].clients[0].billed").value(1000.0))
+                .andExpect(jsonPath("$.currencies[0].clients[0].outstanding").value(350.0));
+        // Owed on its own invoice, as the documents list has it.
+        send(get("/api/v1/document/{id}", invoice), "").andExpect(jsonPath("$.document.balanceDue").value(350.0));
+    }
+
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
     @DisplayName("over each of the reports' periods the first five are the reports' top clients and the rest add"
             + " up to their other clients")
     void addsUpToTheReports(ZoneId zone) throws Exception {
         inZone(zone);
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         LocalDate january = today.withDayOfYear(1);
         List<LocalDate> days = List.of(
                 today,

@@ -135,7 +135,7 @@ class ProfitReportIntegrationTest extends IntegrationTest {
         report("3m")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period").value("3m"))
-                .andExpect(jsonPath("$.from").value(today.withDayOfMonth(1).minusMonths(2).toString()))
+                .andExpect(jsonPath("$.from").value(today.minusMonths(3).plusDays(1).toString()))
                 .andExpect(jsonPath("$.to").value(today.toString()))
                 .andExpect(jsonPath("$.currencies.length()").value(2))
                 .andExpect(jsonPath("$.currencies[0].currency").value("USD"))

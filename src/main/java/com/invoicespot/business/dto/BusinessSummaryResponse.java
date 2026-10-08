@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.UUID;
 
 // A business someone works in, with what their role lets them do there, so
-// the app never keeps its own copy of the rules, and how many of their
-// notifications there are unread.
+// the app never keeps its own copy of the rules, how many of their
+// notifications there are unread, and the time zone the server counts the
+// business's days in, so the app's today is the business's.
 public record BusinessSummaryResponse(
         @JsonProperty("_id") UUID id,
         String name,
@@ -17,9 +18,11 @@ public record BusinessSummaryResponse(
         BusinessRole role,
         List<Permission> permissions,
         boolean active,
-        long unread) {
+        long unread,
+        String timeZone) {
 
-    public static BusinessSummaryResponse from(Business business, BusinessRole role, boolean active, long unread) {
+    public static BusinessSummaryResponse from(
+            Business business, BusinessRole role, boolean active, long unread, String timeZone) {
         return new BusinessSummaryResponse(
                 business.getId(),
                 business.getName(),
@@ -27,6 +30,7 @@ public record BusinessSummaryResponse(
                 role,
                 List.copyOf(role.permissions()),
                 active,
-                unread);
+                unread,
+                timeZone);
     }
 }

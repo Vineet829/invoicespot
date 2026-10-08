@@ -73,7 +73,8 @@ class ExpenseDirectory {
     }
 
     // What every expense the search matches comes to in each currency: how
-    // many there are, and what they cost the business, as profit counts it.
+    // many there are, and what was paid for them, tax and all, as their rows'
+    // totals add up.
     List<ExpenseListTotals> totals(Long businessPkid, ExpenseSearch search) {
         Filter filter = filter(businessPkid, search);
         return jdbc.sql("""
@@ -82,7 +83,7 @@ class ExpenseDirectory {
                         where %s
                         group by 1
                         order by 1
-                        """.formatted(ExpenseLedger.SPENT, filter.where()))
+                        """.formatted(ExpenseLedger.PAID, filter.where()))
                 .params(filter.params())
                 .query((result, rowNumber) -> new ExpenseListTotals(
                         result.getString("currency"),

@@ -25,13 +25,19 @@ public class PaymentSummary {
     private static final int TOP_PAYERS = 5;
 
     private final PaymentQueries queries;
+    private final ReportQueries reportQueries;
     private final BilledCurrencies billedCurrencies;
     private final SettingsService settingsService;
     private final Clock clock;
 
     public PaymentSummary(
-            PaymentQueries queries, BilledCurrencies billedCurrencies, SettingsService settingsService, Clock clock) {
+            PaymentQueries queries,
+            ReportQueries reportQueries,
+            BilledCurrencies billedCurrencies,
+            SettingsService settingsService,
+            Clock clock) {
         this.queries = queries;
+        this.reportQueries = reportQueries;
         this.billedCurrencies = billedCurrencies;
         this.settingsService = settingsService;
         this.clock = clock;
@@ -39,7 +45,8 @@ public class PaymentSummary {
 
     // Every method is listed, largest first, and the five clients who paid
     // most, each by name when two came to the same; clients named alike stay
-    // in the order they were added.
+    // in the order they were added. The period before is compared, as on the
+    // overview, only when the currency's records cover all of it.
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentSummaryResponse summary(BusinessAccess access, String periodKey, String requested) {
         Long businessPkid = access.businessPkid();
@@ -57,7 +64,7 @@ public class PaymentSummary {
                 currencies,
                 period.view(),
                 received.total(),
-                period.compared()
+                period.compared() && reportQueries.covers(businessPkid, currency, period.previousFrom())
                         ? queries.received(businessPkid, currency, period.previousFrom(), period.previousTo())
                                 .total()
                         : null,

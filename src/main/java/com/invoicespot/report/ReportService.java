@@ -78,7 +78,8 @@ public class ReportService {
     }
 
     // One section of the report for every currency, with every client ranked
-    // rather than the top few. The amounts are plain numbers.
+    // rather than the top few. The amounts are plain numbers, and a month's
+    // row gives the days of it the period covers.
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CsvFile csv(BusinessAccess access, String periodKey, String viewKey, String section) {
         if (!SECTIONS.contains(section)) {
@@ -88,12 +89,19 @@ public class ReportService {
         String period = report.from() + "-to-" + report.to();
         List<CurrencyReport> currencies = report.currencies();
         return switch (section) {
+            // What was billed, tax and all, and received, by month. The file is
+            // named for those, as profit and loss counts income before tax.
             case "income" -> CsvFile.of(
-                    "invoice-spot-income-" + period + ".csv",
-                    List.of("Currency", "Month", "Billed", "Received"),
+                    "invoice-spot-billed-and-received-" + period + ".csv",
+                    List.of("Currency", "Month", "From", "To", "Billed", "Received"),
                     rows(currencies, currency -> currency.months().stream()
                             .map(month -> List.<Object>of(
-                                    currency.currency(), month.month(), month.billed(), month.received()))));
+                                    currency.currency(),
+                                    month.month(),
+                                    ReportPeriod.firstDay(month.month(), report.from()),
+                                    ReportPeriod.lastDay(month.month(), report.to()),
+                                    month.billed(),
+                                    month.received()))));
             case "ageing" -> CsvFile.of(
                     "invoice-spot-unpaid-by-age-" + report.today() + ".csv",
                     List.of("Currency", "Age", "Invoices", "Owed"),
@@ -281,10 +289,11 @@ public class ReportService {
                 outstanding(client));
     }
 
-    // What a client still owes on the period's documents: tax they withheld
-    // counts as settled, though it isn't money paid.
+    // What a client still owes on the period's invoices, whenever their
+    // credit notes are dated: tax they withheld counts as settled, though it
+    // isn't money paid.
     private static BigDecimal outstanding(ReportQueries.Client client) {
-        return client.billed().subtract(client.paid()).subtract(client.withheld());
+        return client.owed();
     }
 
     // The years before this one, back to the first invoice, receipt or

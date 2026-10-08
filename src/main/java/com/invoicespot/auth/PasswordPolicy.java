@@ -2,9 +2,9 @@ package com.invoicespot.auth;
 
 public final class PasswordPolicy {
 
-    public static final String REQUIREMENTS =
-            "Password must be at least 8 characters long, with at least 1 uppercase and"
-                    + " lowercase letters and at least 1 symbol";
+    // What isStrong asks for, every kind of character named.
+    public static final String REQUIREMENTS = "Password must be at least 8 characters long, with at least 1"
+            + " uppercase letter, 1 lowercase letter, 1 number and 1 symbol";
 
     private PasswordPolicy() {}
 

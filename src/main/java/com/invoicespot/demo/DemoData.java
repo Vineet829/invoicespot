@@ -22,10 +22,10 @@ final class DemoData {
             boolean taxReclaimable,
             PaymentMethod method) {}
 
-    // A sample invoice repeated on a schedule: the item it bills, how often it
-    // repeats, and how many days after the sample data is added the next one
-    // is made.
-    record SampleSchedule(String item, RecurringFrequency frequency, int daysAhead) {}
+    // A sample invoice repeated on a schedule: the item it bills and how many
+    // of it, the client it bills, how often it repeats, and how many days
+    // after the sample data is added the next one is made.
+    record SampleSchedule(String item, int quantity, String client, RecurringFrequency frequency, int daysAhead) {}
 
     static final String MARKER_EMAIL = "accounts@harborandpine.example";
 
@@ -68,10 +68,11 @@ final class DemoData {
 
     private static final String SOFTWARE = "Software and subscriptions";
 
-    // A year of what the studio spent, in dollars, as its documents are.
+    // A year of what the studio spent, in dollars, as its documents are. US
+    // sales tax isn't claimed back, so none of the tax paid can be.
     static final List<SampleExpense> EXPENSES = List.of(
             expense(3, "Mission Street Office Supply", "Office", "86.25", "6.25", false, PaymentMethod.CASH),
-            expense(9, "Canvasly", SOFTWARE, "599.88", "43.49", true, PaymentMethod.CREDIT_CARD),
+            expense(9, "Canvasly", SOFTWARE, "599.88", "43.49", false, PaymentMethod.CREDIT_CARD),
             expense(15, "Harborview Hotel", "Travel", "412.00", "49.44", false, PaymentMethod.CREDIT_CARD),
             expense(16, "Pacific Coast Air", "Travel", "386.40", "0", false, PaymentMethod.CREDIT_CARD),
             expense(24, "Rivera Front-End Studio", "Contractors", "2400.00", "0", false, PaymentMethod.BANK_TRANSFER),
@@ -89,12 +90,14 @@ final class DemoData {
     // account's own.
     static final List<String> EXPENSE_VENDORS = EXPENSES.stream().map(SampleExpense::vendor).toList();
 
-    // Hosting billed every month, a monthly retainer of consulting hours, and
-    // a strategy workshop every quarter, each next made in the coming weeks.
+    // One month of hosting billed every month, a monthly retainer of ten
+    // consulting hours, and a strategy workshop every quarter, each next made
+    // in the coming weeks.
     static final List<SampleSchedule> SCHEDULES = List.of(
-            new SampleSchedule("Hosting and maintenance (monthly)", RecurringFrequency.MONTHLY, 5),
-            new SampleSchedule("Consulting (hourly)", RecurringFrequency.MONTHLY, 12),
-            new SampleSchedule("Brand strategy workshop", RecurringFrequency.QUARTERLY, 26));
+            new SampleSchedule(
+                    "Hosting and maintenance (monthly)", 1, "Oak Street Bakery", RecurringFrequency.MONTHLY, 5),
+            new SampleSchedule("Consulting (hourly)", 10, "Bluefin Analytics", RecurringFrequency.MONTHLY, 12),
+            new SampleSchedule("Brand strategy workshop", 1, "Lumen Health", RecurringFrequency.QUARTERLY, 26));
 
     static final String NOTES = "Thank you for working with us. It's a pleasure to be part of your project.";
     static final String TERMS =

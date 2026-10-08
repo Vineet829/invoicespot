@@ -40,7 +40,7 @@ class ReportQueries {
             long documents,
             BigDecimal billed,
             BigDecimal paid,
-            BigDecimal withheld) {}
+            BigDecimal owed) {}
 
     record Withheld(
             String currency,
@@ -77,12 +77,13 @@ class ReportQueries {
 
     record Daily(LocalDate day, BigDecimal amount) {}
 
+    record SpentDay(LocalDate day, BigDecimal cost, BigDecimal paid) {}
+
     record CategorySpent(String currency, String category, BigDecimal amount) {}
 
     record TaxBilled(BigDecimal current, BigDecimal previous) {}
 
-    // Income and costs, as profit and loss counts them by month or by day;
-    // the expenses list adds up costs the same way.
+    // Income and costs, as profit and loss counts them by month or by day.
     private static final String EARNED =
             "(case when d.document_type = 'Credit Note' then -d.sub_total else d.sub_total end)";
     private static final String SPENT = ExpenseLedger.SPENT;
@@ -239,18 +240,22 @@ class ReportQueries {
                 .list();
     }
 
-    // A client that was deleted is still named on its documents.
+    // A client that was deleted is still named on its documents. What a
+    // client owes is what is still owed on its invoices dated in the period,
+    // as each one's balance due counts it: less what credit notes of any date
+    // took off, the money received and the tax the client withheld, plus
+    // what was paid back.
     List<Client> clients(long businessPkid, LocalDate from, LocalDate to, View view) {
         return jdbc.sql("""
-                        select %s as currency, c.id as customer_id,
+                        select %1$s as currency, c.id as customer_id,
                                coalesce(c.name, d.customer_name) as name,
                                count(*) as documents,
-                               sum(%s) as billed,
-                               sum(%s) as paid,
-                               sum(%s) as withheld
+                               sum(%2$s) as billed,
+                               sum(%3$s) as paid,
+                               coalesce(sum(%4$s) filter (where d.document_type = 'Invoice' and %5$s > 0), 0) as owed
                         from documents d
                         left join customers c on c.pkid = d.customer_pkid
-                        where d.business_pkid = :business and %s and %s
+                        where d.business_pkid = :business and %6$s and %7$s
                           and d.issue_date between :from and :to
                         group by 1, 2, 3
                         order by billed desc, lower(coalesce(c.name, d.customer_name))
@@ -258,7 +263,8 @@ class ReportQueries {
                                 view.currency(),
                                 view.amount(DocumentLedger.BILLED),
                                 view.amount("(d.total_amount_received - d.total_refunded)"),
-                                view.amount("d.total_tds"),
+                                view.amount(DocumentLedger.OWED),
+                                DocumentLedger.OWED,
                                 DocumentLedger.BILLED_DOCUMENT,
                                 view.convertible()))
                 .param("business", businessPkid)
@@ -272,7 +278,7 @@ class ReportQueries {
                         result.getLong("documents"),
                         result.getBigDecimal("billed"),
                         result.getBigDecimal("paid"),
-                        result.getBigDecimal("withheld")))
+                        result.getBigDecimal("owed").setScale(2)))
                 .list();
     }
 
@@ -394,16 +400,20 @@ class ReportQueries {
                 .list();
     }
 
-    // What its expenses cost, by the day each was paid.
-    List<Daily> spentByDay(long businessPkid, String currency, OverviewWindow window) {
+    // What its expenses cost, by the day each was paid, and what was paid for
+    // them, tax that can be claimed back and all.
+    List<SpentDay> spentByDay(long businessPkid, String currency, OverviewWindow window) {
         return jdbc.sql("""
-                        select e.expense_date as day, sum(%s) as amount
+                        select e.expense_date as day, sum(%s) as cost, sum(%s) as paid
                         from expenses e
                         where e.business_pkid = :business and e.currency = :currency and %s
                         group by 1
-                        """.formatted(SPENT, inOverview("e.expense_date")))
+                        """.formatted(SPENT, ExpenseLedger.PAID, inOverview("e.expense_date")))
                 .params(overview(businessPkid, currency, window))
-                .query(ReportQueries::daily)
+                .query((result, rowNumber) -> new SpentDay(
+                        result.getObject("day", LocalDate.class),
+                        result.getBigDecimal("cost"),
+                        result.getBigDecimal("paid")))
                 .list();
     }
 
@@ -447,6 +457,35 @@ class ReportQueries {
 
     private static Daily daily(ResultSet result, int rowNumber) throws SQLException {
         return new Daily(result.getObject("day", LocalDate.class), result.getBigDecimal("amount"));
+    }
+
+    // Whether the currency's records reach back to the day: an invoice or
+    // receipt dated on it or before, a payment on an invoice made by then, or
+    // an expense paid by then. A period is compared with the one before it
+    // only when they reach back to that one's first day, so that it is a
+    // whole period and not the few days the records begin in.
+    boolean covers(long businessPkid, String currency, LocalDate day) {
+        return jdbc.sql("""
+                        select exists (
+                                   select 1 from documents d
+                                   where d.business_pkid = :business and %1$s
+                                     and d.document_type in ('Invoice', 'Receipt')
+                                     and coalesce(d.currency, '') = :currency and d.issue_date <= :day)
+                               or exists (
+                                   select 1 from payments p
+                                   join documents d on d.pkid = p.document_pkid
+                                   where d.business_pkid = :business and %1$s and d.document_type = 'Invoice'
+                                     and coalesce(d.currency, '') = :currency and p.date_paid <= :day)
+                               or exists (
+                                   select 1 from expenses e
+                                   where e.business_pkid = :business and e.currency = :currency
+                                     and e.expense_date <= :day)
+                        """.formatted(DocumentLedger.COUNTED))
+                .param("business", businessPkid)
+                .param("currency", currency)
+                .param("day", day)
+                .query(Boolean.class)
+                .single();
     }
 
     // The payments a client withheld tax from, by the date paid. A client that

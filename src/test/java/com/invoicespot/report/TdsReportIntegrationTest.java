@@ -105,7 +105,7 @@ class TdsReportIntegrationTest extends IntegrationTest {
         report("3m")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period").value("3m"))
-                .andExpect(jsonPath("$.from").value(today.withDayOfMonth(1).minusMonths(2).toString()))
+                .andExpect(jsonPath("$.from").value(today.minusMonths(3).plusDays(1).toString()))
                 .andExpect(jsonPath("$.to").value(today.toString()))
                 .andExpect(jsonPath("$.currencies.length()").value(2))
                 .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
@@ -144,7 +144,7 @@ class TdsReportIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("the CSV lists every payment tax was withheld from, oldest first, in each currency")
     void csv() throws Exception {
-        String from = today.withDayOfMonth(1).minusMonths(2).toString();
+        String from = today.minusMonths(3).plusDays(1).toString();
         String csv = new String(
                 mockMvc.perform(get("/api/v1/report/csv/tds")
                                 .param("period", "3m")

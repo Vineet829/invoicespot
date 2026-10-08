@@ -9,6 +9,7 @@ import com.invoicespot.report.dto.TaxReportResponse;
 import com.invoicespot.report.dto.TaxTotals;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.SettingsService;
+import com.invoicespot.tax.TaxRegime;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -35,6 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TaxReport {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
+
+    // The tax file's columns. The last four, GST's split and what was supplied
+    // under reverse charge, which only GST has, are GST's own.
+    private static final List<String> COLUMNS = List.of(
+            "Currency", "Month", "From", "To", "Rate %", "Documents", "Taxable", "Tax", "CGST", "SGST", "IGST",
+            "Reverse-charge taxable");
+    private static final int GST_COLUMNS = 4;
 
     // Running totals for one rate, in a month or over the period.
     private static final class Sum {
@@ -108,27 +116,35 @@ public class TaxReport {
                         : List.of());
     }
 
-    // Every month and rate, for every currency. The amounts are plain numbers.
+    // Every month and rate, for every currency, each month with the days of
+    // it the period covers. The amounts are plain numbers. GST's columns are
+    // there for a business in GST mode, which is when the reports page shows
+    // its GST helpers, or for a period with documents taxed under GST.
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CsvFile csv(BusinessAccess access, String periodKey, String viewKey) {
         TaxReportResponse report = report(access, periodKey, viewKey);
+        boolean gst = settingsService.forBusiness(access.businessPkid()).getTaxRegime() == TaxRegime.GST_INDIA
+                || report.currencies().stream().anyMatch(TaxCurrency::gst);
+        int columns = gst ? COLUMNS.size() : COLUMNS.size() - GST_COLUMNS;
         return CsvFile.of(
                 "invoice-spot-tax-by-rate-" + report.from() + "-to-" + report.to() + ".csv",
-                List.of("Currency", "Month", "Rate %", "Documents", "Taxable", "Tax", "CGST", "SGST", "IGST",
-                        "Reverse-charge taxable"),
+                COLUMNS.subList(0, columns),
                 report.currencies().stream()
                         .flatMap(currency -> currency.months().stream()
                                 .map(row -> List.<Object>of(
-                                        currency.currency(),
-                                        row.month(),
-                                        row.rate().toPlainString(),
-                                        row.documents(),
-                                        row.taxable(),
-                                        row.tax(),
-                                        row.cgst(),
-                                        row.sgst(),
-                                        row.igst(),
-                                        row.reverseChargeTaxable())))
+                                                currency.currency(),
+                                                row.month(),
+                                                ReportPeriod.firstDay(row.month(), report.from()),
+                                                ReportPeriod.lastDay(row.month(), report.to()),
+                                                row.rate().toPlainString(),
+                                                row.documents(),
+                                                row.taxable(),
+                                                row.tax(),
+                                                row.cgst(),
+                                                row.sgst(),
+                                                row.igst(),
+                                                row.reverseChargeTaxable())
+                                        .subList(0, columns)))
                         .toList());
     }
 

@@ -158,9 +158,10 @@ class DocumentDirectory {
         if (search.state() == DocumentState.ISSUED || search.status() != null || search.overdueOnly()) {
             conditions.add(DocumentLedger.COUNTED);
         }
-        // A credit note has no payment status.
+        // A payment status is an invoice's or a receipt's: a credit note has
+        // none, and a quotation is an offer, which nobody pays.
         if (search.status() != null) {
-            conditions.add("d.status = :status and d.document_type <> 'Credit Note'");
+            conditions.add("d.status = :status and d.document_type not in ('Credit Note', 'Quotation')");
             params.put("status", search.status().getValue());
         }
         if (search.type() != null) {

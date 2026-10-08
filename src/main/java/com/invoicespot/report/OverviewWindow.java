@@ -12,9 +12,9 @@ import org.springframework.http.HttpStatus;
 
 // The days the overview covers, ending today, and the days just before them
 // to compare with: the last 30 or 90 days and as many before them, the last
-// 12 months from the first of a month and the 12 before them, or this year to
-// date and last year up to the same day. The first three are RecentPeriod's,
-// which the lists the overview opens read too.
+// 12 months back to the same day and the 12 before them, or this year to date
+// and last year up to the same day. The first three are RecentPeriod's, which
+// the lists the overview opens read too.
 record OverviewWindow(
         String key, LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo, Step step) {
 
@@ -32,6 +32,7 @@ record OverviewWindow(
         return switch (value) {
             case "30d" -> lastDays(RecentPeriod.of(value, today), Step.DAY);
             case "90d" -> lastDays(RecentPeriod.of(value, today), Step.WEEK);
+            // Compared with the 12 months just before them, as long a span.
             case "12m" -> {
                 LocalDate from = RecentPeriod.of(value, today).from();
                 yield new OverviewWindow(value, from, today, from.minusMonths(12), from.minusDays(1), Step.MONTH);
@@ -57,7 +58,8 @@ record OverviewWindow(
     record Bucket(LocalDate from, LocalDate to) {}
 
     // Day by day, week by week from the first day with the last week ending
-    // today, or by calendar month with this one to date.
+    // today, or by calendar month, the first from the period's first day and
+    // this one to date, so that the first and last may be part months.
     List<Bucket> buckets() {
         List<Bucket> buckets = new ArrayList<>();
         for (LocalDate start = from; !start.isAfter(to); start = next(start)) {

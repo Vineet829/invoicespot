@@ -229,10 +229,12 @@ class PaymentSummaryIntegrationTest extends IntegrationTest {
                         "\"methods\":[{\"method\":\"Cash\",\"payments\":2,\"amount\":700.00},")))
                 .andExpect(content().string(containsString(
                         "{\"clientId\":null,\"client\":\"Oak Joinery\",\"payments\":1,\"amount\":250.00}")));
+        // The euros begin three days ago, so there is nothing to compare them
+        // with.
         summary("period", "30d", "currency", "EUR")
                 .andExpect(jsonPath("$.currency").value("EUR"))
                 .andExpect(jsonPath("$.total").value(900.0))
-                .andExpect(jsonPath("$.previousTotal").value(0.0))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()))
                 .andExpect(jsonPath("$.methods[*].method", contains("Cash")))
                 .andExpect(jsonPath("$.payers[*].client", contains("Acme")));
     }
@@ -245,7 +247,7 @@ class PaymentSummaryIntegrationTest extends IntegrationTest {
         inZone(zone);
         String acme = client("Acme");
         String birch = client("Birch Studio");
-        LocalDate year = today.withDayOfMonth(1).minusMonths(11);
+        LocalDate year = today.minusMonths(12).plusDays(1);
         LocalDate month = today.withDayOfMonth(1);
         LocalDate january = today.withDayOfYear(1);
         // Money on the first day of each period and the day before it, and
@@ -337,6 +339,43 @@ class PaymentSummaryIntegrationTest extends IntegrationTest {
         summary().andExpect(jsonPath("$.previousTotal").value(nullValue()));
     }
 
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the period before is compared only when the currency's records reach back to its first day, as"
+            + " the overview compares it")
+    void previousWhenCovered(ZoneId zone) throws Exception {
+        inZone(zone);
+        String acme = client("Acme");
+        // The 30 days before the last 30 begin 59 days ago; records from the
+        // day after cover only part of them.
+        String invoice = issue(acme, "Invoice", "USD", "1000", today.minusDays(10));
+        pay(invoice, "100", "0", "Cash", today.minusDays(58));
+        pay(invoice, "200", "0", "Cash", today);
+        summary("period", "30d")
+                .andExpect(jsonPath("$.total").value(200.0))
+                .andExpect(jsonPath("$.period.previousFrom").value(today.minusDays(59).toString()))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()));
+        hasPrevious("30d", false);
+
+        // A payment made on their first day.
+        pay(invoice, "50", "0", "Cash", today.minusDays(59));
+        summary("period", "30d").andExpect(jsonPath("$.previousTotal").value(150.0));
+        hasPrevious("30d", true);
+        summary("period", "90d").andExpect(jsonPath("$.previousTotal").value(nullValue()));
+        hasPrevious("90d", false);
+
+        // Older records cover the 90 days before the last 90 as well.
+        issue(acme, "Receipt", "USD", "30", today.minusDays(400));
+        summary("period", "90d").andExpect(jsonPath("$.previousTotal").value(0.0));
+        hasPrevious("90d", true);
+    }
+
+    // Whether the overview compares the period with the one before.
+    private void hasPrevious(String period, boolean compared) throws Exception {
+        send(get("/api/v1/report/overview").param("currency", "USD").param("period", period), "")
+                .andExpect(jsonPath("$.totals.hasPrevious").value(compared));
+    }
+
     @Test
     @DisplayName("five payers are listed, largest first and by name when two paid the same, and money on"
             + " documents linked to no client and saved without a name is one payer with neither")
@@ -367,7 +406,7 @@ class PaymentSummaryIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.currencies").isEmpty())
                 .andExpect(jsonPath("$.total").value(0.0))
-                .andExpect(jsonPath("$.previousTotal").value(0.0))
+                .andExpect(jsonPath("$.previousTotal").value(nullValue()))
                 .andExpect(jsonPath("$.payments").value(0))
                 .andExpect(content().string(containsString("\"methods\":[],\"payers\":[]")));
         summary()
