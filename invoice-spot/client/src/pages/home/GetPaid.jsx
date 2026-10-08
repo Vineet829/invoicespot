@@ -8,14 +8,14 @@ import { useReveal, useRunning } from "./motion";
 const STEPS = [
   ["Send", "A GST tax invoice with a UPI QR for the balance."],
   ["They pay", "By UPI or bank, and they tell you from the invoice."],
-  ["You confirm", "One click, and the invoice is paid in full."],
+  ["You confirm", "Check what they reported, then record the payment."],
 ];
 const TURN = 2800;
 
 // The sample invoice's lines.
 const LINES = [
-  ["Brand identity design", "HSN 998391", "40,000.00"],
-  ["Website design, 5 pages", "HSN 998314", "10,000.00"],
+  ["Brand identity design", "SAC 998391", "40,000.00"],
+  ["Website design, 5 pages", "SAC 998314", "10,000.00"],
 ];
 
 // The PDF templates, and how each dresses the sample invoice: Classic keeps
@@ -80,14 +80,12 @@ const SampleInvoice = ({ look, step, motion }) => (
       </div>
       <div className="text-right">
         <p className="font-medium">Tester Studio</p>
-        <p className={`mt-[3px] ${look.headLabel}`}>GSTIN 27ABCDE1234F1Z5</p>
+        <p className={`mt-[3px] ${look.headLabel}`}>GSTIN 27ABCFT1234F1ZH</p>
       </div>
     </div>
     <p className={`text-spot-muted ${look.block}`}>
       Bill to{" "}
-      <span className="font-medium text-spot-ink">
-        Harbor &amp; Pine Architects
-      </span>{" "}
+      <span className="font-medium text-spot-ink">Banyan Court Architects</span>{" "}
       · Maharashtra (27)
     </p>
     <div
@@ -126,7 +124,7 @@ const SampleInvoice = ({ look, step, motion }) => (
         <p className="text-spot-muted">CGST 9% + SGST 9% · 9,000.00</p>
         <p className="mt-1 text-[1.3em] font-medium">₹ 59,000.00</p>
         <p className="mt-[3px] text-[0.9em] text-spot-muted">
-          {step === 2 ? "Balance due 0.00" : "Rupees Fifty-Nine Thousand Only"}
+          {step === 2 ? "Balance due 0.00" : "Rupees Fifty Nine Thousand Only"}
         </p>
       </div>
     </div>
@@ -149,7 +147,7 @@ const SampleInvoice = ({ look, step, motion }) => (
             Payment reported · just now
           </span>
           <span className="font-medium">
-            Harbor &amp; Pine paid ₹ 59,000.00 by UPI
+            Banyan Court paid ₹ 59,000.00 by UPI
           </span>
         </span>
         <span className="inline-flex min-h-9 items-center rounded-[11px] bg-spot-night px-3.5 text-[13.5px] font-medium text-white">

@@ -1,9 +1,11 @@
 import { column } from "./layout";
 import { useReveal } from "./motion";
 
-// What the app covers, in four facts.
+// What the app covers, in four facts. The currency list has 179 codes,
+// but some are metals, funds, test codes or retired currencies; over 150
+// are money a client can be billed in.
 const FACTS = [
-  ["179", "currencies to invoice in"],
+  ["150+", "currencies to invoice in"],
   ["GST-ready", "CGST, SGST or IGST by place of supply"],
   ["4 roles", "for your team, owner to viewer"],
   ["1 step", "to confirm a payment"],

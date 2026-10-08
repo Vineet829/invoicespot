@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { GUEST_CREDENTIALS } from "../features/auth/components/authCommon";
+import { isValidGstin } from "../features/gst/gstin";
 
 // The homepage as the app draws it, through its own store and RTK Query,
 // with only fetch faked.
@@ -304,7 +305,7 @@ it("plays the tour: the pointer clicks one thing on each screen, then the next f
   expect(highlight(page)).toBeNull();
   await pass(1200);
   expect(area(highlight(page))).toEqual(["37.5%", "41%", "15%", "11%"]);
-  expect(note(page)).toBe("3 invoices overdue · 6,326.03");
+  expect(note(page)).toBe("3 invoices overdue · $6,326.03");
   expect(screenName(page).textContent).toBe("Overview");
   expect(screenName(page).getAttribute("aria-live")).toBe("off");
   await pass(2900);
@@ -317,7 +318,7 @@ it("plays the tour: the pointer clicks one thing on each screen, then the next f
   await pass(1900);
   expect(place(pointer(page))).toEqual(["93%", "73%"]);
   expect(area(highlight(page))).toEqual(["21.5%", "69.5%", "76.5%", "6.5%"]);
-  expect(note(page)).toBe("Reminder sent for INV-1026");
+  expect(note(page)).toBe("Reminder ready for INV-1026");
   await pass(2900);
   expect(shown(page)).toEqual([false, false, true, false]);
   await pass(4800);
@@ -337,14 +338,14 @@ it("stops the tour on the screen a dot picks, and says which", async () => {
   expect(screenName(page).getAttribute("aria-live")).toBe("polite");
   expect(place(pointer(page))).toEqual(["80%", "43%"]);
   expect(area(highlight(page))).toEqual(["60.5%", "31%", "37.5%", "19.5%"]);
-  expect(note(page)).toBe("Includes 4,654.08 tax at 7.25%");
+  expect(note(page)).toBe("$4,654.08 sales tax at 7.25%");
   await pass(20000);
   expect(shown(page)).toEqual([false, false, true, false]);
-  expect(note(page)).toBe("Includes 4,654.08 tax at 7.25%");
+  expect(note(page)).toBe("$4,654.08 sales tax at 7.25%");
   await click(dot(page, "Payments"));
   expect(shown(page)).toEqual([false, false, false, true]);
   expect(area(highlight(page))).toEqual(["60.5%", "55.5%", "37.5%", "6.5%"]);
-  expect(note(page)).toBe("Top payer: Quill & Co. · 11,490.77");
+  expect(note(page)).toBe("Top payer: Quill & Co. · $11,490.77");
 });
 
 it("holds the first screen still, with no pointer, for a visitor who prefers less motion", async () => {
@@ -354,10 +355,10 @@ it("holds the first screen still, with no pointer, for a visitor who prefers les
   expect(page.querySelectorAll("[class*='animate-']")).toHaveLength(0);
   expect(pointer(page)).toBeNull();
   expect(area(highlight(page))).toEqual(["37.5%", "41%", "15%", "11%"]);
-  expect(note(page)).toBe("3 invoices overdue · 6,326.03");
+  expect(note(page)).toBe("3 invoices overdue · $6,326.03");
   await pass(20000);
   expect(shown(page)).toEqual([true, false, false, false]);
-  expect(note(page)).toBe("3 invoices overdue · 6,326.03");
+  expect(note(page)).toBe("3 invoices overdue · $6,326.03");
   expect(ticker(page).style.transform).toBe("translateY(0em)");
   expect(currentStep(page)).toBe("Send");
   // The step's bar is there, full and still.
@@ -368,7 +369,7 @@ it("holds the first screen still, with no pointer, for a visitor who prefers les
   expect(stepBar.firstElementChild.className).not.toContain("animate-");
   await click(dot(page, "Payments"));
   expect(shown(page)).toEqual([false, false, false, true]);
-  expect(note(page)).toBe("Top payer: Quill & Co. · 11,490.77");
+  expect(note(page)).toBe("Top payer: Quill & Co. · $11,490.77");
   expect(pointer(page)).toBeNull();
 });
 
@@ -395,13 +396,13 @@ it("pauses the tour and the headline while the hero is off screen or the tab is 
   await watcher.report(true);
   expect(place(pointer(page))).toEqual(["84%", "90%"]);
   await pass(1900);
-  expect(note(page)).toBe("3 invoices overdue · 6,326.03");
+  expect(note(page)).toBe("3 invoices overdue · $6,326.03");
   await pass(900);
   expect(ticker(page).style.transform).toBe("translateY(-1.08em)");
   // In a tab that is not being looked at, the same.
   await tab("hidden");
   await pass(10000);
-  expect(note(page)).toBe("3 invoices overdue · 6,326.03");
+  expect(note(page)).toBe("3 invoices overdue · $6,326.03");
   expect(ticker(page).style.transform).toBe("translateY(-1.08em)");
   await tab("visible");
   await pass(4800);
@@ -446,6 +447,17 @@ it("plays the steps from invoice to paid, and lets a click pick one", async () =
       (element) => element.lastElementChild.firstElementChild.textContent,
     ),
   ).toEqual(["Send", "They pay", "You confirm"]);
+  // Each step says what the app does: a reported payment is opened to
+  // check, then recorded.
+  expect(
+    stepButtons().map(
+      (element) => element.lastElementChild.children[1].textContent,
+    ),
+  ).toEqual([
+    "A GST tax invoice with a UPI QR for the balance.",
+    "By UPI or bank, and they tell you from the invoice.",
+    "Check what they reported, then record the payment.",
+  ]);
   // Every step keeps its full colour; only the one playing has the bar
   // under its line, running out.
   const items = () => [...section.querySelectorAll("ol > li")];
@@ -461,17 +473,17 @@ it("plays the steps from invoice to paid, and lets a click pick one", async () =
   );
   expect(currentStep(page)).toBe("Send");
   expect(overlayText()).toBe("Sent by email and WhatsApp");
-  expect(section.textContent).toContain("Rupees Fifty-Nine Thousand Only");
+  expect(section.textContent).toContain("Rupees Fifty Nine Thousand Only");
   await pass(2800);
   expect(currentStep(page)).toBe("They pay");
   expect(overlayText()).toBe(
-    "Payment reported · just nowHarbor & Pine paid ₹ 59,000.00 by UPIConfirm",
+    "Payment reported · just nowBanyan Court paid ₹ 59,000.00 by UPIConfirm",
   );
   await pass(2800);
   expect(currentStep(page)).toBe("You confirm");
   expect(overlayText()).toBe("PAID IN FULL");
   expect(section.textContent).toContain("Balance due 0.00");
-  expect(section.textContent).not.toContain("Rupees Fifty-Nine Thousand Only");
+  expect(section.textContent).not.toContain("Rupees Fifty Nine Thousand Only");
   await pass(2800);
   expect(currentStep(page)).toBe("Send");
   await pass(1500);
@@ -537,16 +549,20 @@ it("dresses the sample invoice in the chosen PDF template", async () => {
     "TAX INVOICE",
     "INV-0042",
     "Tester Studio",
-    "GSTIN 27ABCDE1234F1Z5",
-    "Bill to Harbor & Pine Architects · Maharashtra (27)",
-    "Brand identity designHSN 99839140,000.00",
-    "Website design, 5 pagesHSN 99831410,000.00",
+    "GSTIN 27ABCFT1234F1ZH",
+    "Bill to Banyan Court Architects · Maharashtra (27)",
+    "Brand identity designSAC 99839140,000.00",
+    "Website design, 5 pagesSAC 99831410,000.00",
     "Pay by UPIyourstudio@upi",
     "CGST 9% + SGST 9% · 9,000.00",
     "₹ 59,000.00",
   ]) {
     expect(mock().textContent).toContain(line);
   }
+  // The sample's GSTIN passes the app's own check.
+  expect(isValidGstin(mock().textContent.match(/GSTIN (\w{15})/)[1])).toBe(
+    true,
+  );
   expect(mock().querySelector("[role=img]").getAttribute("aria-label")).toBe(
     "A sample UPI QR pattern",
   );
@@ -565,14 +581,14 @@ it("dresses the sample invoice in the chosen PDF template", async () => {
     false,
   );
   // The template changes the dress, not the step.
-  expect(mock().textContent).toContain("Rupees Fifty-Nine Thousand Only");
+  expect(mock().textContent).toContain("Rupees Fifty Nine Thousand Only");
 });
 
 it("counts what the app covers, under the hero", async () => {
   const { page } = await open();
   const facts = page.querySelector("section[aria-label='In numbers']");
   expect([...facts.querySelectorAll("dt")].map((dt) => dt.textContent)).toEqual(
-    ["179", "GST-ready", "4 roles", "1 step"],
+    ["150+", "GST-ready", "4 roles", "1 step"],
   );
   expect([...facts.querySelectorAll("dd")].map((dd) => dd.textContent)).toEqual(
     [
@@ -597,7 +613,7 @@ it("ends on free pricing and three questions, with sign-up", async () => {
   expect(
     [...pricing.querySelectorAll("dd")].map((dd) => dd.textContent),
   ).toEqual([
-    "Invoices, quotations and recurring invoices, UPI and bank payments, reminders, the client portal, reports and team roles, in any currency.",
+    "Invoices, quotations and recurring invoices, UPI and bank payments, reminders, the client portal, reports and team roles, in over 150 currencies.",
     "No. Without one, invoices use simple tax rates and no GST terms.",
     "Two-factor sign-in, links you can revoke, and a full export whenever you want it.",
   ]);
