@@ -105,8 +105,8 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
   const total = formatMoney(owedNow.total, currency);
   return (
     <section className={receivablesCard} aria-labelledby="receivables-title">
-      {/* The name keeps to one line. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {/* The name keeps to one line, and "as of today" sits on its baseline. */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2
           id="receivables-title"
           className={`${financeLabel("peach")} whitespace-nowrap`}

@@ -192,6 +192,7 @@ const SingleDocumentPage = () => {
     },
     {
       label: "Quantity",
+      type: "number",
       render: (item) =>
         item.unit ? `${item.quantity} ${item.unit}` : item.quantity,
     },
@@ -202,7 +203,11 @@ const SingleDocumentPage = () => {
         <Amount value={item.unitPrice} currency={document?.currency} hideCode />
       ),
     },
-    { label: "Discount (%)", render: (item) => item.discount || "0" },
+    {
+      label: "Discount (%)",
+      type: "number",
+      render: (item) => item.discount || "0",
+    },
     // Each line's rate shows when the lines are taxed at more than one.
     ...(document?.taxes?.length > 1
       ? [{ label: `${taxLabel} %`, render: (item) => item.taxRate }]

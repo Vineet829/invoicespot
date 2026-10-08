@@ -151,27 +151,30 @@ const CashFlowPanel = ({ snapshot }) => {
       className={`${overviewPanel} [--rise-delay:160ms]`}
       aria-labelledby="cash-flow-title"
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h2 id="cash-flow-title" className={sectionTitle}>
           Cash flow
         </h2>
-        <ul className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[13px] text-spot-body">
-          <li className="flex items-center gap-[7px]">
+        <ul className="m-0 flex list-none flex-wrap items-baseline gap-x-4 gap-y-1 p-0 text-[13px] text-spot-body">
+          <li className="flex items-baseline gap-[7px]">
             <span
-              className="size-3 rounded-[3px] bg-spot-violet"
+              className="size-3 self-center rounded-[3px] bg-spot-violet"
               aria-hidden="true"
             />
             Money in
           </li>
-          <li className="flex items-center gap-[7px]">
+          <li className="flex items-baseline gap-[7px]">
             <span
-              className="size-3 rounded-[3px] bg-flow-out"
+              className="size-3 self-center rounded-[3px] bg-flow-out"
               aria-hidden="true"
             />
             Money out
           </li>
-          <li className="flex items-center gap-[7px]">
-            <span className="relative h-0.5 w-5 bg-flow-net" aria-hidden="true">
+          <li className="flex items-baseline gap-[7px]">
+            <span
+              className="relative h-0.5 w-5 self-center bg-flow-net"
+              aria-hidden="true"
+            >
               <span className="absolute -top-[3px] left-1.5 size-2 rounded-full bg-flow-net" />
             </span>
             Net

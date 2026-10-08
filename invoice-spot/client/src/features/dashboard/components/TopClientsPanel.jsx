@@ -15,7 +15,7 @@ import { overviewPanel, panelLink } from "./DashboardPanels";
 // documents, which starts a new line with its dot when the row is narrow;
 // then what was billed, which can widen the column.
 const row =
-  "relative -mx-2 grid grid-cols-[minmax(0,1fr)_minmax(96px,auto)] items-center gap-2.5 rounded-xl px-2 py-[7px]";
+  "relative -mx-2 grid grid-cols-[minmax(0,1fr)_minmax(96px,auto)] items-baseline gap-2.5 rounded-xl px-2 py-[7px]";
 // A client's name is a link that covers the whole row, and the row shows the
 // link's focus. The name reads the whole row, so the words beside it are
 // hidden from screen readers rather than read twice.

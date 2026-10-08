@@ -319,11 +319,13 @@ module.exports = {
       addVariant("coarse", "@media (pointer: coarse)");
       // Workspace tables become labelled cards when their panel is too
       // narrow for every column, whatever the window size or zoom. Tables
-      // with eight or more columns need more room; narrow ones, with a few
-      // short columns, stay tables in half-width panels.
+      // with eight or more columns need more room, and broad ones, with many
+      // long columns, more still; narrow ones, with a few short columns, stay
+      // tables in half-width panels.
       addVariant("stacked", [
         "@container table (max-width: 860px)",
         "@container wide-table (max-width: 960px)",
+        "@container broad-table (max-width: 1200px)",
         "@container narrow-table (max-width: 400px)",
       ]);
       // The other side of stacked: wide enough to be a table. The ranges
@@ -332,14 +334,8 @@ module.exports = {
       addVariant("tabled", [
         "@container table (width > 860px)",
         "@container wide-table (width > 960px)",
+        "@container broad-table (width > 1200px)",
         "@container narrow-table (width > 400px)",
-      ]);
-      // A table with room to spare for larger text: a little wider than it
-      // needs to stay a table.
-      addVariant("roomy", [
-        "@container table (width > 860px)",
-        "@container wide-table (width > 1100px)",
-        "@container narrow-table (width > 440px)",
       ]);
       // Document line items: one row each in a wide form, four columns once
       // the form is too narrow for all eight fields, then two.

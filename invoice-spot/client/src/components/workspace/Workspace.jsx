@@ -223,13 +223,15 @@ const BADGE_DOTS = {
   partial: "bg-spot-lilac",
   unpaid: "bg-spot-coral",
 };
+// Its text sets its baseline and the dot is centred beside it, so in a table
+// the text sits on the row's baseline.
 export const Badge = ({ children, tone = "neutral" }) => (
   <span
-    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] leading-[1.3] ${BADGE_TONES[tone] || BADGE_TONES.neutral}`}
+    className={`inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] leading-[1.3] ${BADGE_TONES[tone] || BADGE_TONES.neutral}`}
   >
     {BADGE_DOTS[tone] && (
       <span
-        className={`size-1.5 shrink-0 rounded-full ${BADGE_DOTS[tone]}`}
+        className={`size-1.5 shrink-0 self-center rounded-full ${BADGE_DOTS[tone]}`}
         aria-hidden="true"
       />
     )}
@@ -277,7 +279,7 @@ export const Amount = ({
 
 // A row's share of the largest row, from 0 to 1, drawn under its name in a
 // table that sums something up. The figures are in the row's other cells.
-// In an evenly spaced table, its column keeps room for the bar, up to its
+// In a table, its column keeps room for the bar, up to its
 // 240px or 40% of the table's width.
 export const SHARE_BAR_TRACK = "minmax(min(240px,40%),auto)";
 export const ShareBar = ({ ratio, tone }) => (
@@ -575,101 +577,94 @@ export const Pagination = ({ pagination, sizes = [5, 10, 25, -1] }) => {
 };
 
 // Tables copy the overview's payment table. Each column's `type` sets its
-// style. When the panel is too narrow for every column, each row becomes a
-// card: the main value first, whichever column it is, then labelled fields
-// in as many columns as fit, then the actions on a line of their own.
+// style, and every table draws a type the same: one size for it in every
+// table on a window, larger from 1536px wide, where the widest tables still
+// fit on single lines, whatever the panel's size, so no two tables side by
+// side or page to page differ. When the panel is too
+// narrow for every column, each row becomes a card: the main value first,
+// whichever column it is, then labelled fields in as many columns as fit,
+// then the actions on a line of their own.
 const CARD_LABEL =
   "stacked:before:mb-1 stacked:before:block stacked:before:text-[12px] stacked:before:text-spot-muted stacked:before:content-[attr(data-label)]";
 const COLUMN_TYPES = {
   text: {
     th: "pr-3.5 text-left",
-    td: `pr-3.5 text-[13px] text-spot-body ${CARD_LABEL}`,
+    td: `pr-3.5 text-[13px] text-spot-body min-[1536px]:text-[15px] ${CARD_LABEL}`,
   },
   main: {
     th: "pr-3.5 text-left",
-    td: "pr-3.5 text-[14.5px] font-medium text-spot-ink [overflow-wrap:anywhere] stacked:order-first stacked:col-span-full stacked:pr-12",
+    td: "pr-3.5 text-[15px] font-medium text-spot-ink [overflow-wrap:anywhere] min-[1536px]:text-[17px] stacked:order-first stacked:col-span-full stacked:pr-12",
   },
   email: {
     th: "pr-3.5 text-left",
-    td: `pr-3.5 text-[13px] text-spot-body [overflow-wrap:anywhere] stacked:col-span-full ${CARD_LABEL}`,
+    td: `pr-3.5 text-[13px] text-spot-body [overflow-wrap:anywhere] min-[1536px]:text-[15px] tabled:whitespace-nowrap tabled:[overflow-wrap:normal] stacked:col-span-full ${CARD_LABEL}`,
   },
+  // A row's number, right-aligned so 9 and 10 end in one place.
   index: {
-    th: "w-10 pr-3.5 text-left",
-    td: "w-10 pr-3.5 text-[13px] tabular-nums text-spot-faint stacked:absolute stacked:right-0 stacked:top-[18px] stacked:w-auto stacked:pr-0",
+    th: "w-10 pr-3.5 text-right",
+    td: "w-10 pr-3.5 text-right text-[13px] tabular-nums text-spot-faint min-[1536px]:text-[15px] stacked:absolute stacked:right-0 stacked:top-[18px] stacked:w-auto stacked:pr-0",
   },
   // A count, right-aligned so its digits line up.
   number: {
-    th: "pr-3.5 text-right tabled:justify-end",
-    td: `pr-3.5 text-right text-[13px] tabular-nums text-spot-body stacked:text-left ${CARD_LABEL}`,
+    th: "pr-3.5 text-right",
+    td: `pr-3.5 text-right text-[13px] tabular-nums text-spot-body min-[1536px]:text-[15px] stacked:text-left ${CARD_LABEL}`,
   },
   amount: {
-    th: "pr-8 text-right tabled:justify-end",
-    td: `pr-8 text-right text-[17px] text-spot-ink stacked:pr-0 stacked:text-left ${CARD_LABEL}`,
+    th: "pr-8 text-right",
+    td: `pr-8 text-right text-[17px] text-spot-ink min-[1536px]:text-[20px] stacked:pr-0 stacked:text-left ${CARD_LABEL}`,
   },
+  // Buttons, centred under their heading so the two share a centre line,
+  // the last column's still meeting the table's right edge.
   action: {
-    th: "w-px pr-3.5 text-left",
-    td: "w-px whitespace-nowrap pr-3.5 stacked:w-auto",
+    th: "w-px pr-3.5 text-center",
+    td: "w-px whitespace-nowrap pr-3.5 tabled:text-center stacked:w-auto",
   },
 };
-// A `fillRows` table takes the rest of its panel on wide windows. Up to ten
-// of its rows share the height (40–88px each); longer pages scroll inside it,
-// so no row is cut off at the bottom. The text grows with the room left:
-// --fill-grow runs from 0 to 42px as the rows get taller than 46px or the
-// table wider, whichever is more.
+// A `fillRows` table takes the rest of its panel on wide windows, its rows
+// sharing the height, but never shorter than every table's 46px rows nor
+// taller than 88px. It is at least as tall as its 35px heading and its rows
+// at 46px, so a page that doesn't fit the window scrolls as a whole and no
+// row is ever cut off inside the panel. Its text is every table's size.
 const FILL = {
   wrapper:
-    "min-[1360px]:min-h-[240px] min-[1360px]:flex-[1_1_0] min-[1360px]:overflow-y-auto min-[1360px]:[container-type:size] min-[1360px]:[scrollbar-color:#a996e0_#ffffff26] min-[1360px]:[scrollbar-width:thin] min-[1360px]:[--fill-row:clamp(40px,calc((100cqh_-_34px)_/_var(--fill-rows)),88px)] min-[1360px]:[--fill-grow:clamp(0px,max(var(--fill-row)_-_46px,(100cqi_-_1016px)_*_0.0968),42px)]",
-  row: "min-[1360px]:[height:var(--fill-row)]",
-  // From the 46px row sizes up to 18px text, 20px names and 24px amounts.
-  text: {
-    text: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
-    main: "min-[1360px]:[font-size:calc(16px_+_var(--fill-grow)_*_0.0952)]",
-    email: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
-    number: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
-    index: "min-[1360px]:[font-size:calc(13px_+_var(--fill-grow)_*_0.0476)]",
-    amount: "min-[1360px]:[font-size:calc(19px_+_var(--fill-grow)_*_0.119)]",
-    action: "",
-  },
+    "min-[1360px]:min-h-[calc(35px+var(--fill-rows)*46px)] min-[1360px]:flex-[1_1_0] min-[1360px]:overflow-y-auto min-[1360px]:[container-type:size] min-[1360px]:[scrollbar-color:#a996e0_#ffffff26] min-[1360px]:[scrollbar-width:thin] min-[1360px]:[--fill-row:clamp(46px,calc((100cqh_-_35px)_/_var(--fill-rows)),88px)]",
+  row: "tabled:min-h-[var(--fill-row,46px)]",
 };
 
-// An `evenGaps` table, while it is a table, lays its rows on one grid: each
-// column as wide as its widest entry, and the room left over shared out
-// equally between the columns, so every gap is the same. An email column
-// keeps 224px, so a tight table wraps names rather than addresses, and a
-// column can ask for its own track. Its rows carry the borders and the
-// hover, which a cell would break at the gaps.
-const evenTrack = ({ type = "text", track }) =>
-  track || (type === "email" ? "minmax(224px,auto)" : "auto");
+// A table, while it is one, lays its rows on one grid: each column as wide
+// as its widest entry, and the room left over shared out equally between the
+// columns, so every gap is the same and the first and last columns meet the
+// panel's edges. An email address keeps to one line while the table is a
+// table, so a tight table wraps names rather than addresses, and a column
+// can ask for its own track. Every cell
+// of a row, and every heading, sits on one baseline, whatever its size, with
+// the row's content centred in its height. A row is 46px, or taller when a
+// cell holds two lines, never letting its content spill into the next. The
+// rows carry the borders and the hover, which a cell would break at the gaps.
+const evenTrack = ({ track }) => track || "auto";
+const WHOLE = new Set(["email", "index", "number", "amount", "action"]);
 const EVEN = {
   table: "tabled:grid tabled:justify-between tabled:gap-x-4",
   head: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:bg-spot-thead",
   headRow:
-    "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:border-b tabled:border-[#23273517]",
-  th: "tabled:flex tabled:w-auto tabled:items-center tabled:whitespace-nowrap tabled:border-b-0 tabled:bg-transparent tabled:pr-0",
+    "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:items-baseline tabled:border-b tabled:border-[#23273517]",
+  th: "tabled:block tabled:w-auto tabled:whitespace-nowrap tabled:border-b-0 tabled:bg-transparent tabled:pr-0 tabled:leading-7",
   body: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:before:col-span-full",
-  row: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:items-center tabled:hover:bg-[#5b47a00a] tabled:[&:hover>*]:bg-transparent tabled:[&:not(:first-child)>*]:border-t-0 tabled:[&:not(:first-child)]:border-t tabled:[&:not(:first-child)]:border-[#23273512]",
-  td: "tabled:w-auto tabled:min-w-0 tabled:pr-0",
-};
-
-// A `large` table's text grows to the size of the overview's lists where the
-// table has room to spare: names 17px, figures 20px, the rest 15px.
-const LARGE = {
-  th: "roomy:text-[14px]",
-  td: {
-    text: "roomy:text-[15px]",
-    main: "roomy:text-[17px]",
-    email: "roomy:text-[15px]",
-    index: "roomy:text-[15px]",
-    number: "roomy:text-[15px]",
-    amount: "roomy:text-[20px]",
-    action: "",
-  },
+  row: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:content-center tabled:items-baseline tabled:hover:bg-[#5b47a00a] tabled:[&:hover>*]:bg-transparent tabled:[&:not(:first-child)>*]:border-t-0 tabled:[&:not(:first-child)]:border-t tabled:[&:not(:first-child)]:border-[#23273512]",
+  // Text may shrink and wrap; figures, addresses, actions and any column
+  // marked `nowrap` keep their whole width, so no cell ever runs into the
+  // next.
+  td: "tabled:w-auto tabled:pr-0",
+  shrink: "tabled:min-w-0",
+  whole: "tabled:min-w-max",
 };
 
 // A column with `sortBy` gets a header button when the table has `onSort`;
 // `sort` ({ field, dir }) marks the column the rows are sorted by. Cards
 // have no headers, so their list needs another way to sort. A `narrow`
-// table has a few short columns, so it stays a table in a narrower panel.
+// table has a few short columns, so it stays a table in a narrower panel; a
+// `wide` one has many long ones, such as several actions, so it needs a
+// wider panel to stay one.
 export const DataTable = ({
   columns,
   rows,
@@ -680,35 +675,30 @@ export const DataTable = ({
   onSort,
   busy = false,
   narrow = false,
-  evenGaps = false,
-  large = false,
+  wide = false,
 }) => {
   // In a card, placing the first action in column 1 starts a new line.
   const firstAction = columns.findIndex(({ type }) => type === "action");
   const fill = fillRows > 0;
   return (
     <div
-      className={`relative transition-opacity [container-type:inline-size] ${narrow ? "[container-name:narrow-table]" : columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""} ${busy ? "opacity-60" : ""}`}
-      style={fill ? { "--fill-rows": Math.min(fillRows, 10) } : undefined}
+      className={`relative transition-opacity [container-type:inline-size] ${narrow ? "[container-name:narrow-table]" : wide ? "[container-name:broad-table]" : columns.length >= 8 ? "[container-name:wide-table]" : "[container-name:table]"} ${fill ? FILL.wrapper : ""} ${busy ? "opacity-60" : ""}`}
+      style={fill ? { "--fill-rows": fillRows } : undefined}
       aria-busy={busy || undefined}
     >
       <table
-        className={`w-full border-separate border-spacing-0 stacked:block ${evenGaps ? EVEN.table : ""}`}
-        style={
-          evenGaps
-            ? {
-                gridTemplateColumns: columns
-                  .map((column) => evenTrack(column))
-                  .join(" "),
-              }
-            : undefined
-        }
+        className={`w-full border-separate border-spacing-0 stacked:block ${EVEN.table}`}
+        style={{
+          gridTemplateColumns: columns
+            .map((column) => evenTrack(column))
+            .join(" "),
+        }}
       >
         <caption className="sr-only">{label}</caption>
         <thead
-          className={`sticky top-0 z-[1] stacked:absolute stacked:size-px stacked:overflow-hidden stacked:whitespace-nowrap stacked:[clip-path:inset(50%)] ${evenGaps ? EVEN.head : ""}`}
+          className={`sticky top-0 z-[1] stacked:absolute stacked:size-px stacked:overflow-hidden stacked:whitespace-nowrap stacked:[clip-path:inset(50%)] ${EVEN.head}`}
         >
-          <tr className={evenGaps ? EVEN.headRow : undefined}>
+          <tr className={EVEN.headRow}>
             {columns.map(({ label: heading, type = "text", sortBy }) => {
               const sorted = sortBy && sort?.field === sortBy;
               const SortIcon = sort?.dir === "asc" ? FiArrowUp : FiArrowDown;
@@ -723,7 +713,7 @@ export const DataTable = ({
                         : "descending"
                       : undefined
                   }
-                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[13px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th} ${evenGaps ? EVEN.th : ""} ${large ? LARGE.th : ""}`}
+                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[13px] font-normal text-spot-muted last:pr-0 min-[1536px]:text-[14px] ${COLUMN_TYPES[type].th} ${EVEN.th}`}
                 >
                   {sortBy && onSort ? (
                     <>
@@ -746,17 +736,17 @@ export const DataTable = ({
           </tr>
         </thead>
         <tbody
-          className={`before:table-row before:h-1.5 before:content-[''] stacked:block stacked:before:hidden ${evenGaps ? EVEN.body : ""}`}
+          className={`before:table-row before:h-1.5 before:content-[''] stacked:block stacked:before:hidden ${EVEN.body}`}
         >
           {rows.map((row, index) => (
             <tr
               key={rowKey(row, index)}
-              className={`h-[46px] ${fill ? FILL.row : ""} [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512] ${evenGaps ? EVEN.row : ""}`}
+              className={`h-[46px] tabled:h-auto ${fill ? FILL.row : "tabled:min-h-[46px]"} [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512] ${EVEN.row}`}
             >
               {columns.map((column, columnIndex) => (
                 <td
                   key={column.label}
-                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${fill ? FILL.text[column.type || "text"] : ""} ${columnIndex === firstAction ? "stacked:col-start-1" : ""} ${evenGaps ? EVEN.td : ""} ${large ? LARGE.td[column.type || "text"] : ""}`}
+                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${columnIndex === firstAction ? "stacked:col-start-1" : ""} ${EVEN.td} ${column.nowrap || WHOLE.has(column.type) ? EVEN.whole : EVEN.shrink}`}
                   data-label={column.label}
                 >
                   {column.render(row, index)}

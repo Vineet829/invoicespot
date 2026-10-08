@@ -97,6 +97,7 @@ const CustomerSalesPage = () => {
     },
     {
       label: "Documents",
+      type: "number",
       render: (row) => Number(row.documents).toLocaleString("en"),
     },
     {

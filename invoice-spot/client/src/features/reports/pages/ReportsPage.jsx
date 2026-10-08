@@ -169,8 +169,6 @@ const TaxCharged = ({
       >
         <TaxSentence entry={entry} currency={currency} />
         <DataTable
-          evenGaps
-          large
           narrow={narrow}
           label={`Tax charged by rate, ${currency}`}
           rows={entry.rates}
@@ -202,8 +200,6 @@ const TaxCharged = ({
           </summary>
           <div className="mt-3">
             <DataTable
-              evenGaps
-              large
               narrow={narrow}
               label={`Tax charged by month and rate, ${currency}`}
               rows={entry.months}
@@ -214,7 +210,11 @@ const TaxCharged = ({
                   type: "main",
                   render: (row) => monthSpan(row.month, report.from, report.to),
                 },
-                { label: "Rate", render: (row) => `${row.rate}%` },
+                {
+                  label: "Rate",
+                  type: "number",
+                  render: (row) => `${row.rate}%`,
+                },
                 ...taxColumns(currency, entry.gst),
               ]}
             />
@@ -278,8 +278,6 @@ const TaxWithheld = ({
               above the other in a narrower panel. */}
           <div className="grid min-w-0 gap-6 [@container_withheld_(min-width:800px)]:grid-cols-2">
             <DataTable
-              evenGaps
-              large
               label={`Tax withheld by client, ${currency}`}
               narrow
               rows={entry.clients}
@@ -323,8 +321,6 @@ const TaxWithheld = ({
               ]}
             />
             <DataTable
-              evenGaps
-              large
               label={`Tax withheld by month, ${currency}`}
               narrow
               rows={entry.months}
@@ -350,8 +346,6 @@ const TaxWithheld = ({
             </summary>
             <div className="mt-3">
               <DataTable
-                evenGaps
-                large
                 label={`Payments tax was withheld from, ${currency}`}
                 rows={entry.payments}
                 rowKey={(row, index) => `${row.documentId}-${index}`}
@@ -704,8 +698,6 @@ const ReportsPage = () => {
               </summary>
               <div className="mt-3">
                 <DataTable
-                  evenGaps
-                  large
                   label={`Billed and received by month, ${currency}`}
                   narrow
                   rows={shown.months}
@@ -748,8 +740,6 @@ const ReportsPage = () => {
               }
             >
               <DataTable
-                evenGaps
-                large
                 label={`Unpaid invoices by age, ${currency}`}
                 narrow
                 rows={shown.ageing}
@@ -792,8 +782,6 @@ const ReportsPage = () => {
             >
               {shown.methods.length ? (
                 <DataTable
-                  evenGaps
-                  large
                   label={`Payment methods, ${currency}`}
                   narrow
                   rows={shown.methods}
@@ -845,8 +833,6 @@ const ReportsPage = () => {
           >
             {clientRows.length ? (
               <DataTable
-                evenGaps
-                large
                 label={`Top clients, ${currency}`}
                 rows={clientRows}
                 rowKey={(row) =>

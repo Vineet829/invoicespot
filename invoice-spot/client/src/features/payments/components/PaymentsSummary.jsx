@@ -67,6 +67,7 @@ const Breakdown = ({ title, rows, name, rowKey, tone, currency, several }) => {
           },
           {
             label: "Payments",
+            type: "number",
             render: (row) => Number(row.payments).toLocaleString("en"),
           },
           {

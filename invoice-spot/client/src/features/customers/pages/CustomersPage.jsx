@@ -187,7 +187,6 @@ const CustomersPage = () => {
         rows={pagination.rows}
         fillRows={pagination.fullPage}
         label="Clients"
-        evenGaps
         sort={{ field: list.sort, dir: list.dir }}
         onSort={(field) =>
           update({ ...nextSort(SORT_FIELDS, list, field), page: 1 })

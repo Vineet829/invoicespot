@@ -182,8 +182,10 @@ const UsersListPage = () => {
     },
     {
       label: "Status",
+      // The badges keep to one line while the list is a table.
+      nowrap: true,
       render: (row) => (
-        <span className="flex flex-wrap gap-1.5">
+        <span className="flex flex-wrap gap-1.5 tabled:flex-nowrap">
           {isAdmin(row) && <Badge tone="paid">Admin</Badge>}
           <Badge tone={row.active ? "neutral" : "unpaid"}>
             {row.active ? "Active" : "Deactivated"}
@@ -338,6 +340,7 @@ const UsersListPage = () => {
                 fillRows={pagination.fullPage}
                 busy={query.isFetching}
                 label="Users"
+                wide
               />
               <Pagination pagination={pagination} sizes={[10, 25, 50, 100]} />
             </>

@@ -107,8 +107,6 @@ const GstHelpers = () => {
                 : "No documents issued in GST mode in these months."}
             </p>
             <DataTable
-              evenGaps
-              large
               label="GSTR-1 files"
               narrow
               rows={data.files}
@@ -146,8 +144,6 @@ const GstHelpers = () => {
               />
             </div>
             <DataTable
-              evenGaps
-              large
               label="GSTR-3B outward supplies, INR"
               rows={data.gstr3b}
               rowKey={(row, index) => `${row.table}-${index}`}

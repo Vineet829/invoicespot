@@ -113,6 +113,15 @@ it("keeps Get started and no section links by default", async () => {
   expect(scrolled).not.toHaveBeenCalled();
 });
 
+it("makes Log in the button where the page offers sign-up itself", async () => {
+  const { page } = await mount("/", { signUp: false });
+  const names = [...page.querySelectorAll("nav a")].map((a) =>
+    a.textContent.trim(),
+  );
+  expect(names).toEqual(["Features", "Getting paid", "Log in"]);
+  expect(link(page, "Log in").className).toContain("bg-spot-night");
+});
+
 it("scrolls smoothly to a section's address, and again on the next visit", async () => {
   const { page, address } = await mount();
   await click(link(page, "Getting paid"));

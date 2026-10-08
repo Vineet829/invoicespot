@@ -80,15 +80,18 @@ const changeWords = (change) =>
 
 // How a figure moved against the period before: an arrow and the size of
 // the change, green when it rose and rust when it fell, with the
-// comparison named beside it.
+// comparison named beside it on the same baseline.
 const Change = ({ change, compared }) => {
   const { icon: Icon, color, words } = CHANGES[change.direction];
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
       <span
-        className={`inline-flex items-center gap-[3px] rounded-full bg-white/80 py-[3px] pl-[5px] pr-2 text-[13px] font-medium leading-[1.3] ${color}`}
+        className={`inline-flex items-baseline gap-[3px] rounded-full bg-white/80 py-[3px] pl-[5px] pr-2 text-[13px] font-medium leading-[1.3] ${color}`}
       >
-        <Icon aria-hidden="true" className="size-3.5 stroke-[2.2]" />
+        <Icon
+          aria-hidden="true"
+          className="size-3.5 self-center stroke-[2.2]"
+        />
         <span className="sr-only">{words} </span>
         {percentLabel(change.percent)}
       </span>

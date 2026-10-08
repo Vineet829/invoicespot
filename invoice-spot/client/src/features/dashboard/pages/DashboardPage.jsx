@@ -36,8 +36,11 @@ import { Select } from "../../../components/workspace/Select";
 // sends, can't be shown.
 const OVERVIEW_FIELDS = ["period", "totals", "owedNow", "trend"];
 
+// The period's buttons sit in a frame as tall as a shortcut key, with the
+// keys' text size, so the two rows of buttons share their edges and their
+// baseline.
 const periodPill =
-  "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-[11px] px-3.5 text-[13px] transition-colors coarse:min-h-11 max-[700px]:flex-1 max-[700px]:px-2";
+  "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-[11px] px-3.5 text-[13.5px] transition-colors coarse:min-h-11 max-[700px]:flex-1 max-[700px]:px-2";
 
 const DashboardPage = () => {
   useTitle("Business overview — Invoice Spot");
@@ -119,7 +122,7 @@ const DashboardPage = () => {
 
   return (
     <DashboardShell>
-      <div className="flex min-w-0 flex-col gap-5">
+      <div className="flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5">
         <header className="flex animate-ov-rise flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="min-w-0">
             <h1 className={pageTitle}>
@@ -137,7 +140,7 @@ const DashboardPage = () => {
           <div className="flex flex-wrap items-center gap-3 max-[700px]:w-full">
             <nav
               aria-label="Period"
-              className="inline-flex gap-1 rounded-[14px] border border-white/90 bg-white/55 p-1 max-[700px]:w-full"
+              className="inline-flex gap-1 rounded-[14px] border border-white/90 bg-white/55 p-[3px] max-[700px]:w-full"
             >
               {PERIODS.map(({ key, label }) => (
                 <Link
@@ -191,7 +194,7 @@ const DashboardPage = () => {
         ) : (
           snapshot && (
             <div
-              className={`flex min-w-0 flex-col gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
+              className={`flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
               aria-busy={stale || undefined}
             >
               <OverviewTiles

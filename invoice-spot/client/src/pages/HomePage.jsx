@@ -7,7 +7,6 @@ import { logIn } from "../features/auth/authSlice";
 import { GUEST_CREDENTIALS } from "../features/auth/components/authCommon";
 import useTitle from "../hooks/useTitle";
 import PublicHeader from "../components/public/PublicHeader";
-import Facts from "./home/Facts";
 import GetPaid from "./home/GetPaid";
 import Hero from "./home/Hero";
 import Pricing from "./home/Pricing";
@@ -27,8 +26,8 @@ const page =
 const stage =
   "m-[clamp(8px,1.2vw,14px)] overflow-hidden rounded-[clamp(24px,3vw,38px)] bg-[radial-gradient(ellipse_at_74%_42%,#7c62d68c_0,#7c62d600_52%),radial-gradient(ellipse_at_18%_108%,#e8835f3d_0,#e8835f00_46%),radial-gradient(ellipse_at_100%_0%,#6ea0d238_0,#6ea0d200_40%)] bg-[#1b1430] text-white [&_:is(a,button):focus-visible]:outline-white";
 
-// The homepage: the dark stage with the hero, then what the app covers,
-// how an invoice gets paid, the price, and the sign-off.
+// The homepage: the dark stage with the hero, then how an invoice gets
+// paid, the price, and the sign-off.
 const HomePage = () => {
   useTitle("Invoice Spot — Good work. Great invoices.");
   const dispatch = useDispatch();
@@ -63,11 +62,7 @@ const HomePage = () => {
       <main id="main">
         <div id="top" className={stage}>
           <div className={`${column} py-3`}>
-            <PublicHeader
-              tone="dark"
-              sections={SECTIONS}
-              signUpLabel="Start for free"
-            />
+            <PublicHeader tone="dark" sections={SECTIONS} signUp={false} />
           </div>
           <Hero
             motion={motion}
@@ -76,7 +71,6 @@ const HomePage = () => {
             onDemo={openDemo}
           />
         </div>
-        <Facts motion={motion} />
         <GetPaid motion={motion} />
         <Pricing motion={motion} />
       </main>

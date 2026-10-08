@@ -229,14 +229,23 @@ it("draws the last 90 days from the server's figures, against the 90 days before
   expect(
     [...page.querySelectorAll("h2")].map((heading) => heading.textContent),
   ).toEqual(layout(page).flat());
-  // From 1200px what is owed takes five parts of its row to what needs
-  // attention's six, and from 1440px each list takes a third of its row.
-  const [, owed, , lists] = content(page).children;
-  expect(owed.className).toContain(
-    "min-[1200px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]",
-  );
-  expect(owed.className).not.toContain("col-span");
-  expect(lists.className).toContain("min-[1440px]:grid-cols-3");
+  // From 1200px the row under the figures shares their three columns, what
+  // is owed in one and what needs attention across the other two, and from
+  // 1360px each list takes one, so every row's edges line up.
+  const [figures, owed, , lists] = content(page).children;
+  expect(owed.className).toContain("min-[1200px]:grid-cols-3");
+  expect(owed.className).toContain("min-[1200px]:[&>:last-child]:col-span-2");
+  expect(lists.className).toContain("min-[1360px]:grid-cols-3");
+  // Every row keeps the page's spacing, the same across as down.
+  for (const row of [content(page), figures.lastElementChild, owed, lists])
+    expect(row.className).toMatch(/(^| )gap-6 compact:gap-5 /);
+  // Every card and panel has every page's padding and corners.
+  for (const surface of content(page).querySelectorAll("section, article, a"))
+    if (/rounded-\[(22|30)px\]/.test(surface.className)) {
+      expect(surface.className).toContain("rounded-[30px]");
+      expect(surface.className).toContain("p-6");
+      expect(surface.className).toContain("compact:p-[18px]");
+    }
 });
 
 it("charts money in and out, with the same figures in a table and on hover or focus", async () => {
@@ -1541,9 +1550,6 @@ it("leaves the rest of its row when the server sends no top items", async () => 
 
 const comingUp = (page) =>
   page.querySelector('[aria-labelledby="coming-up-title"]');
-// A detail after a quotation's number starts with its dot, kept on the line
-// of the word after it.
-const DOT = " ·\u00a0";
 const withComingUp = (changes) => ({
   ...overview,
   comingUp: { ...overview.comingUp, ...changes },
@@ -1604,23 +1610,22 @@ it("shows what is coming up beside the top items: each schedule's next invoice, 
   expect(awaiting.previousElementSibling.textContent).toBe(
     "Awaiting an answer · 1",
   );
+  // Laid out as a recurring invoice: the client with the amount on its
+  // line, then the number and last valid day across the row under them.
   expect(awaiting.textContent).toBe(
-    `QUO-0206${DOT}Kestrel Outdoor${DOT}valid until Oct 91,201.20`,
+    "Kestrel Outdoor1,201.20QUO-0206 · valid until Oct 9",
   );
-  // The day keeps to one line; a long client's name can wrap.
-  expect(
-    [...awaiting.querySelectorAll("a > span:first-child > span")].map(
-      (detail) => detail.className,
-    ),
-  ).toEqual(["whitespace-nowrap", "", "whitespace-nowrap"]);
+  const details = awaiting.querySelector("a").lastElementChild;
+  expect(details.className).toContain("col-span-2");
+  expect(awaiting.querySelector("a").className).toContain("items-baseline");
   // The latest three that expired, most recent first, then how many more.
   expect(expired.previousElementSibling.textContent).toBe(
     "Expired without an answer · 5",
   );
   expect([...expired.children].map((quote) => quote.textContent)).toEqual([
-    `QUO-0205${DOT}Atlas Robotics${DOT}valid until Aug 245,362.50`,
-    `QUO-0204${DOT}Lumen Health${DOT}valid until Jul 28,558.55`,
-    `QUO-0203${DOT}Tidewater Logistics${DOT}valid until May 15321.75`,
+    "Atlas Robotics5,362.50QUO-0205 · valid until Aug 24",
+    "Lumen Health8,558.55QUO-0204 · valid until Jul 2",
+    "Tidewater Logistics321.75QUO-0203 · valid until May 15",
   ]);
   expect(expired.nextElementSibling.textContent).toBe("and 2 more");
   expect(panel.lastElementChild.lastElementChild).toBe(expired.parentElement);
@@ -1842,9 +1847,9 @@ it("names the quotations waiting for an answer that it leaves out, and leaves ou
   const panel = comingUp(page);
   const awaiting = panel.querySelectorAll("ol")[1];
   expect([...awaiting.children].map((item) => item.textContent)).toEqual([
-    `QUO-0206${DOT}Kestrel Outdoor${DOT}valid until Oct 91,201.20`,
-    `QUO-0207${DOT}Kestrel Outdoor${DOT}valid until Oct 141,201.20`,
-    `QUO-0208${DOT}Kestrel Outdoor${DOT}valid until Oct 191,201.20`,
+    "Kestrel Outdoor1,201.20QUO-0206 · valid until Oct 9",
+    "Kestrel Outdoor1,201.20QUO-0207 · valid until Oct 14",
+    "Kestrel Outdoor1,201.20QUO-0208 · valid until Oct 19",
   ]);
   expect(awaiting.previousElementSibling.textContent).toBe(
     "Awaiting an answer · 5",
@@ -1888,7 +1893,7 @@ it("names a quotation with no last valid day as having no expiry", async () => {
   );
   const panel = comingUp(page);
   expect(panel.querySelectorAll("ol")[1].textContent).toBe(
-    `QUO-0206${DOT}Kestrel Outdoor${DOT}No expiry1,201.20`,
+    "Kestrel Outdoor1,201.20QUO-0206 · No expiry",
   );
   expect(links(panel)).toContainEqual([
     "/document/00000000-0000-0000-0000-000000000206",
@@ -1938,4 +1943,43 @@ it("counts the expired quotations without listing them when the server sends non
   );
   expect(listed.children).toHaveLength(0);
   expect(panel.textContent).not.toContain("more");
+});
+
+it("sets every row's text on one baseline: list figures on their names' line, and the header's two rows of buttons alike", async () => {
+  const page = await open("/dashboard");
+  // A list's figure, and a date, sit on the line of the name beside them.
+  for (const title of [
+    "top-clients-title",
+    "top-items-title",
+    "attention-title",
+    "coming-up-title",
+  ]) {
+    const panel = page.querySelector(`[aria-labelledby="${title}"]`);
+    const rows = [
+      ...panel.querySelectorAll("li > a, li > div, ol > li > a"),
+    ].filter((row) => row.className.includes("grid"));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.className).toContain("items-baseline");
+      expect(row.className).not.toContain("items-center");
+    }
+  }
+  // The period's buttons sit in a frame as tall as a shortcut key, with the
+  // keys' text size, so both rows of buttons share their edges and baseline.
+  const periods = page.querySelector('nav[aria-label="Period"]');
+  expect(periods.className).toContain("p-[3px]");
+  for (const pill of periods.querySelectorAll("a")) {
+    expect(pill.className).toContain("min-h-8");
+    expect(pill.className).toContain("text-[13.5px]");
+  }
+  // A card's name sits on a panel title's baseline: its pill is 6px taller
+  // than its text above and below.
+  const receivables = page.querySelector("#receivables-title");
+  expect(receivables.className).toContain("py-1.5");
+  // The cash flow's legend sits on its title's baseline, each swatch centred
+  // beside its word.
+  const legend = page.querySelector('[aria-labelledby="cash-flow-title"] ul');
+  expect(legend.className).toContain("items-baseline");
+  for (const item of legend.children)
+    expect(item.className).toContain("items-baseline");
 });
