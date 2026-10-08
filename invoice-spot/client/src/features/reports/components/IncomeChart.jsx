@@ -65,7 +65,7 @@ const IncomeChart = ({ months, currency }) => {
         className="grid grid-cols-[52px_minmax(0,1fr)] grid-rows-[272px_34px] max-[700px]:grid-rows-[200px_34px]"
       >
         <div
-          className="relative text-[12.5px] tabular-nums text-spot-muted"
+          className="relative text-[13.5px] tabular-nums text-spot-muted"
           aria-hidden="true"
         >
           {ticks.map((tick) => (
@@ -131,7 +131,7 @@ const IncomeChart = ({ months, currency }) => {
           </div>
           {shown != null && (
             <div
-              className="pointer-events-none absolute top-1 z-[2] w-[190px] rounded-[14px] bg-white px-3 py-2.5 text-[13px] leading-[1.45] text-spot-ink shadow-float"
+              className="pointer-events-none absolute top-1 z-[2] w-[190px] rounded-[14px] bg-white px-3 py-2.5 text-[14px] leading-[1.45] text-spot-ink shadow-float"
               style={{ left: cardLeft(shown) }}
               aria-hidden="true"
             >
@@ -152,7 +152,7 @@ const IncomeChart = ({ months, currency }) => {
         </div>
         <div aria-hidden="true" />
         <div
-          className="grid text-[12.5px] text-spot-muted"
+          className="grid text-[14px] text-spot-muted"
           style={{
             gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))`,
           }}
@@ -165,7 +165,7 @@ const IncomeChart = ({ months, currency }) => {
             >
               {index % every === 0 && monthName(month.month)}
               {(index === 0 || month.month.endsWith("-01")) && (
-                <span className="text-[11.5px] text-spot-faint">
+                <span className="text-[12.5px] text-spot-faint">
                   {month.month.slice(0, 4)}
                 </span>
               )}

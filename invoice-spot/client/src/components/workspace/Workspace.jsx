@@ -277,6 +277,9 @@ export const Amount = ({
 
 // A row's share of the largest row, from 0 to 1, drawn under its name in a
 // table that sums something up. The figures are in the row's other cells.
+// In an evenly spaced table, its column keeps room for the bar, up to its
+// 240px or 40% of the table's width.
+export const SHARE_BAR_TRACK = "minmax(min(240px,40%),auto)";
 export const ShareBar = ({ ratio, tone }) => (
   <span
     className="mt-2 block h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-[#23273510]"
@@ -594,8 +597,13 @@ const COLUMN_TYPES = {
     th: "w-10 pr-3.5 text-left",
     td: "w-10 pr-3.5 text-[13px] tabular-nums text-spot-faint stacked:absolute stacked:right-0 stacked:top-[18px] stacked:w-auto stacked:pr-0",
   },
+  // A count, right-aligned so its digits line up.
+  number: {
+    th: "pr-3.5 text-right tabled:justify-end",
+    td: `pr-3.5 text-right text-[13px] tabular-nums text-spot-body stacked:text-left ${CARD_LABEL}`,
+  },
   amount: {
-    th: "pr-8 text-right",
+    th: "pr-8 text-right tabled:justify-end",
     td: `pr-8 text-right text-[17px] text-spot-ink stacked:pr-0 stacked:text-left ${CARD_LABEL}`,
   },
   action: {
@@ -617,8 +625,43 @@ const FILL = {
     text: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
     main: "min-[1360px]:[font-size:calc(16px_+_var(--fill-grow)_*_0.0952)]",
     email: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
+    number: "min-[1360px]:[font-size:calc(14.5px_+_var(--fill-grow)_*_0.0833)]",
     index: "min-[1360px]:[font-size:calc(13px_+_var(--fill-grow)_*_0.0476)]",
     amount: "min-[1360px]:[font-size:calc(19px_+_var(--fill-grow)_*_0.119)]",
+    action: "",
+  },
+};
+
+// An `evenGaps` table, while it is a table, lays its rows on one grid: each
+// column as wide as its widest entry, and the room left over shared out
+// equally between the columns, so every gap is the same. An email column
+// keeps 224px, so a tight table wraps names rather than addresses, and a
+// column can ask for its own track. Its rows carry the borders and the
+// hover, which a cell would break at the gaps.
+const evenTrack = ({ type = "text", track }) =>
+  track || (type === "email" ? "minmax(224px,auto)" : "auto");
+const EVEN = {
+  table: "tabled:grid tabled:justify-between tabled:gap-x-4",
+  head: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:bg-spot-thead",
+  headRow:
+    "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:border-b tabled:border-[#23273517]",
+  th: "tabled:flex tabled:w-auto tabled:items-center tabled:whitespace-nowrap tabled:border-b-0 tabled:bg-transparent tabled:pr-0",
+  body: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:before:col-span-full",
+  row: "tabled:col-span-full tabled:grid tabled:grid-cols-subgrid tabled:items-center tabled:hover:bg-[#5b47a00a] tabled:[&:hover>*]:bg-transparent tabled:[&:not(:first-child)>*]:border-t-0 tabled:[&:not(:first-child)]:border-t tabled:[&:not(:first-child)]:border-[#23273512]",
+  td: "tabled:w-auto tabled:min-w-0 tabled:pr-0",
+};
+
+// A `large` table's text grows to the size of the overview's lists where the
+// table has room to spare: names 17px, figures 20px, the rest 15px.
+const LARGE = {
+  th: "roomy:text-[14px]",
+  td: {
+    text: "roomy:text-[15px]",
+    main: "roomy:text-[17px]",
+    email: "roomy:text-[15px]",
+    index: "roomy:text-[15px]",
+    number: "roomy:text-[15px]",
+    amount: "roomy:text-[20px]",
     action: "",
   },
 };
@@ -637,6 +680,8 @@ export const DataTable = ({
   onSort,
   busy = false,
   narrow = false,
+  evenGaps = false,
+  large = false,
 }) => {
   // In a card, placing the first action in column 1 starts a new line.
   const firstAction = columns.findIndex(({ type }) => type === "action");
@@ -647,10 +692,23 @@ export const DataTable = ({
       style={fill ? { "--fill-rows": Math.min(fillRows, 10) } : undefined}
       aria-busy={busy || undefined}
     >
-      <table className="w-full border-separate border-spacing-0 stacked:block">
+      <table
+        className={`w-full border-separate border-spacing-0 stacked:block ${evenGaps ? EVEN.table : ""}`}
+        style={
+          evenGaps
+            ? {
+                gridTemplateColumns: columns
+                  .map((column) => evenTrack(column))
+                  .join(" "),
+              }
+            : undefined
+        }
+      >
         <caption className="sr-only">{label}</caption>
-        <thead className="sticky top-0 z-[1] stacked:absolute stacked:size-px stacked:overflow-hidden stacked:whitespace-nowrap stacked:[clip-path:inset(50%)]">
-          <tr>
+        <thead
+          className={`sticky top-0 z-[1] stacked:absolute stacked:size-px stacked:overflow-hidden stacked:whitespace-nowrap stacked:[clip-path:inset(50%)] ${evenGaps ? EVEN.head : ""}`}
+        >
+          <tr className={evenGaps ? EVEN.headRow : undefined}>
             {columns.map(({ label: heading, type = "text", sortBy }) => {
               const sorted = sortBy && sort?.field === sortBy;
               const SortIcon = sort?.dir === "asc" ? FiArrowUp : FiArrowDown;
@@ -665,7 +723,7 @@ export const DataTable = ({
                         : "descending"
                       : undefined
                   }
-                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[13px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th}`}
+                  className={`h-7 border-b border-[#23273517] bg-spot-thead p-0 text-[13px] font-normal text-spot-muted last:pr-0 ${COLUMN_TYPES[type].th} ${evenGaps ? EVEN.th : ""} ${large ? LARGE.th : ""}`}
                 >
                   {sortBy && onSort ? (
                     <>
@@ -687,16 +745,18 @@ export const DataTable = ({
             })}
           </tr>
         </thead>
-        <tbody className="before:table-row before:h-1.5 before:content-[''] stacked:block stacked:before:hidden">
+        <tbody
+          className={`before:table-row before:h-1.5 before:content-[''] stacked:block stacked:before:hidden ${evenGaps ? EVEN.body : ""}`}
+        >
           {rows.map((row, index) => (
             <tr
               key={rowKey(row, index)}
-              className={`h-[46px] ${fill ? FILL.row : ""} [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512]`}
+              className={`h-[46px] ${fill ? FILL.row : ""} [&:hover>*]:bg-[#5b47a00a] [&:not(:first-child)>*]:border-t [&:not(:first-child)>*]:border-[#23273512] stacked:relative stacked:grid stacked:h-auto stacked:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] stacked:gap-x-3 stacked:gap-y-4 stacked:py-[18px] stacked:hover:bg-[#5b47a00a] stacked:[&:hover>*]:bg-transparent stacked:[&:not(:first-child)>*]:border-t-0 stacked:[&:not(:first-child)]:border-t stacked:[&:not(:first-child)]:border-[#23273512] ${evenGaps ? EVEN.row : ""}`}
             >
               {columns.map((column, columnIndex) => (
                 <td
                   key={column.label}
-                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${fill ? FILL.text[column.type || "text"] : ""} ${columnIndex === firstAction ? "stacked:col-start-1" : ""}`}
+                  className={`p-0 align-middle last:pr-0 ${COLUMN_TYPES[column.type || "text"].td} ${fill ? FILL.text[column.type || "text"] : ""} ${columnIndex === firstAction ? "stacked:col-start-1" : ""} ${evenGaps ? EVEN.td : ""} ${large ? LARGE.td[column.type || "text"] : ""}`}
                   data-label={column.label}
                 >
                   {column.render(row, index)}

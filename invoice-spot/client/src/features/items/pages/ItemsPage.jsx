@@ -212,6 +212,7 @@ const ItemsPage = () => {
                 rows={pagination.rows}
                 fillRows={pagination.fullPage}
                 label="Items"
+                evenGaps
               />
               <Pagination pagination={pagination} />
             </>

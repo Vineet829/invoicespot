@@ -326,6 +326,21 @@ module.exports = {
         "@container wide-table (max-width: 960px)",
         "@container narrow-table (max-width: 400px)",
       ]);
+      // The other side of stacked: wide enough to be a table. The ranges
+      // meet without a gap, since a container can be a fraction of a pixel
+      // wide.
+      addVariant("tabled", [
+        "@container table (width > 860px)",
+        "@container wide-table (width > 960px)",
+        "@container narrow-table (width > 400px)",
+      ]);
+      // A table with room to spare for larger text: a little wider than it
+      // needs to stay a table.
+      addVariant("roomy", [
+        "@container table (width > 860px)",
+        "@container wide-table (width > 1100px)",
+        "@container narrow-table (width > 440px)",
+      ]);
       // Document line items: one row each in a wide form, four columns once
       // the form is too narrow for all eight fields, then two.
       addVariant("items-md", "@container items (max-width: 900px)");

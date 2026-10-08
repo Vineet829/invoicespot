@@ -106,6 +106,81 @@ it("shows the profit and loss of a period with expenses but no invoices", () => 
   expect(page.textContent).toContain("a loss of INR 1,500.00");
 });
 
+it("shows each month's margin and the profit so far, and each category's share of the expenses", () => {
+  withFigures();
+  useGetProfitReportQuery.mockReturnValue(
+    loaded({
+      period: "12m",
+      currencies: [
+        {
+          currency: "USD",
+          income: 1000,
+          expenses: 1600,
+          profit: -600,
+          months: [
+            { month: "2026-08", income: 1000, expenses: 400, profit: 600 },
+            { month: "2026-09", income: 0, expenses: 1200, profit: -1200 },
+          ],
+          categories: [
+            { category: "Rent", expenses: 1200 },
+            { category: "Software", expenses: 396 },
+            { category: "Postage", expenses: 4 },
+          ],
+        },
+      ],
+    }),
+  );
+  const profit = render().querySelector("#profit");
+  const [months, categories] = profit.querySelectorAll("table");
+  const text = (table) =>
+    [...table.querySelectorAll("tbody tr")].map((row) =>
+      [...row.children].map((cell) => cell.textContent),
+    );
+  expect(
+    [...months.querySelectorAll("th")].map((heading) => heading.textContent),
+  ).toEqual([
+    "Month",
+    "Income",
+    "Expenses",
+    "Profit",
+    "Margin",
+    "Profit so far",
+  ]);
+  // No income in September, so no margin; the profit so far sums the months.
+  expect(text(months)).toEqual([
+    [
+      "August 2026",
+      "USD1,000.00",
+      "USD400.00",
+      "USD600.00",
+      "60%",
+      "USD600.00",
+    ],
+    [
+      "September 2026",
+      "USD0.00",
+      "USD1,200.00",
+      "USD-1,200.00",
+      "—",
+      "USD-600.00",
+    ],
+  ]);
+  // The categories follow the months, each with its bar and its share.
+  expect(text(categories)).toEqual([
+    ["Rent", "USD1,200.00", "75%"],
+    ["Software", "USD396.00", "25%"],
+    ["Postage", "USD4.00", "<1%"],
+  ]);
+  expect(
+    [...categories.querySelectorAll('[aria-hidden="true"] > span')].map(
+      (bar) => bar.style.width,
+    ),
+  ).toEqual(["100%", "33%", `${(4 / 1200) * 100}%`]);
+  expect(months.parentElement.nextElementSibling).toBe(
+    categories.parentElement,
+  );
+});
+
 it("shows only that there is nothing to report when there are no expenses either", () => {
   useGetProfitReportQuery.mockReturnValue(
     loaded({ period: "12m", currencies: [] }),
@@ -222,6 +297,113 @@ it("charts what was billed and received side by side, with the figures a click a
   ).toEqual(["September 2026: billed 1,000.00, received 600.00"]);
   expect(income.querySelector("caption").closest("details").open).toBe(false);
 });
+
+it("spaces every table's columns evenly, a count right-aligned and a bar given room", () => {
+  withFigures();
+  const page = render();
+  const tables = [...page.querySelectorAll("table")];
+  expect(tables.length).toBeGreaterThan(0);
+  for (const table of tables)
+    expect(table.className).toContain("tabled:justify-between");
+  const clients = page.querySelector("#clients table");
+  expect(clients.style.gridTemplateColumns).toBe(
+    "minmax(min(240px,40%),auto) auto auto auto auto",
+  );
+  const documents = clients.querySelector('[data-label="Documents"]');
+  expect(documents.className).toContain("text-right");
+  expect(documents.className).toContain("tabular-nums");
+  // With room to spare, every table's text grows.
+  for (const table of tables)
+    expect(table.querySelector("tbody td").className).toContain("roomy:text-");
+});
+
+// The report's rows from the profit and loss down: a panel's name, or for a
+// row of two, each one's.
+const rowsFrom = (first) => {
+  const name = (panel) => panel.querySelector("h2").textContent;
+  const rows = [];
+  for (let item = first; item; item = item.nextElementSibling)
+    rows.push(
+      item.tagName === "SECTION" ? name(item) : [...item.children].map(name),
+    );
+  return rows;
+};
+const owed = ["Unpaid invoices by age", "Payment methods"];
+
+it.each([
+  [
+    "a short period",
+    1,
+    false,
+    ["Profit and loss", owed, "Top clients", ["Tax charged", "Tax withheld"]],
+  ],
+  [
+    "a long period",
+    11,
+    false,
+    ["Profit and loss", owed, "Top clients", ["Tax charged", "Tax withheld"]],
+  ],
+  [
+    "tax split for GST",
+    1,
+    true,
+    ["Profit and loss", owed, "Top clients", "Tax charged", "Tax withheld"],
+  ],
+])(
+  "lays the reports out in the same rows for %s",
+  (_case, months, gst, layout) => {
+    withFigures();
+    useGetProfitReportQuery.mockReturnValue(
+      loaded({
+        period: "12m",
+        currencies: [
+          {
+            currency: "USD",
+            income: 900,
+            expenses: 0,
+            profit: 900,
+            months: Array.from({ length: months }, (_, index) => ({
+              month: `2025-${String(index + 1).padStart(2, "0")}`,
+              income: 900,
+              expenses: 0,
+              profit: 900,
+            })),
+            categories: [],
+          },
+        ],
+      }),
+    );
+    const tax = { taxable: 1000, tax: 70, cgst: 0, sgst: 0, igst: 0 };
+    useGetTaxReportQuery.mockReturnValue(
+      loaded({
+        currencies: [
+          {
+            currency: "USD",
+            tax: 70,
+            taxable: 1000,
+            documents: 1,
+            gst,
+            reverseChargeTaxable: 0,
+            rates: [{ rate: 7, documents: 1, ...tax }],
+            months: [{ month: "2026-09", rate: 7, ...tax }],
+          },
+        ],
+      }),
+    );
+    const page = render();
+    expect(rowsFrom(page.querySelector("#profit"))).toEqual(layout);
+    // Beside the tax withheld, the tax tables stay tables in half the
+    // width; split for GST, they need the page's width.
+    const rates = [...page.querySelectorAll("table")].find((table) =>
+      table
+        .querySelector("caption")
+        .textContent.startsWith("Tax charged by rate"),
+    );
+    expect(rates.parentElement.className).toContain(
+      gst ? "[container-name:table]" : "[container-name:narrow-table]",
+    );
+  },
+);
 
 it("reports on the overview's last 90 days when its profit opens the page", async () => {
   withFigures();

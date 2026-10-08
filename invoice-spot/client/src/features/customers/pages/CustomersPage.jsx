@@ -120,6 +120,7 @@ const CustomersPage = () => {
     { label: "Account no.", render: (row) => row.accountNo },
     {
       label: "Documents",
+      type: "number",
       sortBy: "documents",
       render: (row) => (row.documentCount ?? 0).toLocaleString("en"),
     },
@@ -186,6 +187,7 @@ const CustomersPage = () => {
         rows={pagination.rows}
         fillRows={pagination.fullPage}
         label="Clients"
+        evenGaps
         sort={{ field: list.sort, dir: list.dir }}
         onSort={(field) =>
           update({ ...nextSort(SORT_FIELDS, list, field), page: 1 })

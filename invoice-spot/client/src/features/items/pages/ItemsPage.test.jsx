@@ -152,6 +152,15 @@ it("lists every item, with nothing above the list, while no search is set", asyn
   expect(address).toBe("");
 });
 
+it("spaces the item columns evenly while the list is a table", async () => {
+  const page = await open("/items");
+  const table = page.querySelector("table");
+  expect(table.className).toContain("tabled:justify-between");
+  expect(table.style.gridTemplateColumns).toBe(
+    Array(table.querySelectorAll("th").length).fill("auto").join(" "),
+  );
+});
+
 it("opens at the item the address names, says how many it finds, and clears it", async () => {
   const page = await open("/items?q=Motion+graphics+%28per+15+seconds%29");
   expect(names(page)).toEqual(["Motion graphics (per 15 seconds)"]);

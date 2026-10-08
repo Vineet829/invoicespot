@@ -4,9 +4,17 @@ import {
   DataTable,
   EmptyState,
   Panel,
+  SHARE_BAR_TRACK,
+  ShareBar,
   money,
 } from "../../../components/workspace/Workspace";
-import { monthYear } from "../reportModel";
+import {
+  monthYear,
+  percentLabel,
+  percentOf,
+  profitMonths,
+  share,
+} from "../reportModel";
 
 const amountColumn = (label, key, currency) => ({
   label,
@@ -15,7 +23,9 @@ const amountColumn = (label, key, currency) => ({
 });
 
 // Profit and loss for the period, in each currency it has: income before tax
-// less credit notes, and what expenses cost, by month and by category.
+// less credit notes, and what expenses cost, by month, with each month's
+// margin and the profit made so far; then what each expense category cost,
+// and its share of all the expenses.
 const ProfitAndLoss = ({ report, periodName, busy }) => {
   const currencies = report?.currencies || [];
   return (
@@ -34,7 +44,7 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
               key={entry.currency}
               aria-label={`Profit and loss in ${entry.currency || "no currency"}`}
             >
-              <p className="mb-5 text-[14px] text-spot-body">
+              <p className="mb-5 text-[16px] text-spot-body">
                 Income{" "}
                 <span className="text-spot-ink">
                   {money(entry.income, entry.currency)}
@@ -49,11 +59,13 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
                 </span>
                 .
               </p>
-              <div className="grid min-w-0 gap-6 min-[1100px]:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-6">
                 <DataTable
+                  evenGaps
+                  large
                   label={`Profit and loss by month, ${entry.currency}`}
                   narrow
-                  rows={entry.months}
+                  rows={profitMonths(entry.months)}
                   rowKey={(row) => row.month}
                   columns={[
                     {
@@ -64,10 +76,18 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
                     amountColumn("Income", "income", entry.currency),
                     amountColumn("Expenses", "expenses", entry.currency),
                     amountColumn("Profit", "profit", entry.currency),
+                    {
+                      label: "Margin",
+                      type: "number",
+                      render: (row) => percentLabel(row.margin),
+                    },
+                    amountColumn("Profit so far", "soFar", entry.currency),
                   ]}
                 />
                 {entry.categories.length > 0 && (
                   <DataTable
+                    evenGaps
+                    large
                     label={`Expenses by category, ${entry.currency}`}
                     narrow
                     rows={entry.categories}
@@ -76,9 +96,30 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
                       {
                         label: "Category",
                         type: "main",
-                        render: (row) => row.category,
+                        track: SHARE_BAR_TRACK,
+                        render: (row) => (
+                          <>
+                            {row.category}
+                            <ShareBar
+                              ratio={share(
+                                row.expenses,
+                                entry.categories[0].expenses,
+                              )}
+                              tone="bg-flow-out"
+                            />
+                          </>
+                        ),
                       },
                       amountColumn("Expenses", "expenses", entry.currency),
+                      {
+                        label: "Share of expenses",
+                        type: "number",
+                        render: (row) =>
+                          percentLabel(
+                            percentOf(row.expenses, entry.expenses),
+                            row.expenses,
+                          ),
+                      },
                     ]}
                   />
                 )}
