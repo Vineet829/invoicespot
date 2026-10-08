@@ -7,7 +7,8 @@ import receivables from "./screens/receivables.webp";
 import sales from "./screens/sales.webp";
 
 // The four screens of the tour, taken from the sample business at
-// 1440×720. Each has where its pointer goes and what it highlights, as a
+// 1440×720. That business bills in dollars with sales tax, so the notes
+// say so. Each has where its pointer goes and what it highlights, as a
 // share of the screenshot's width and height, and the note that pops up on
 // the click.
 export const SCREENS = [
@@ -18,7 +19,7 @@ export const SCREENS = [
     x: 44,
     y: 48,
     box: [37.5, 41, 15, 11],
-    toast: "3 invoices overdue · 6,326.03",
+    toast: "3 invoices overdue · $6,326.03",
   },
   {
     name: "Receivables",
@@ -27,7 +28,7 @@ export const SCREENS = [
     x: 93,
     y: 73,
     box: [21.5, 69.5, 76.5, 6.5],
-    toast: "Reminder sent for INV-1026",
+    toast: "Reminder ready for INV-1026",
   },
   {
     name: "Sales",
@@ -36,7 +37,7 @@ export const SCREENS = [
     x: 80,
     y: 43,
     box: [60.5, 31, 37.5, 19.5],
-    toast: "Includes 4,654.08 tax at 7.25%",
+    toast: "$4,654.08 sales tax at 7.25%",
   },
   {
     name: "Payments",
@@ -45,7 +46,7 @@ export const SCREENS = [
     x: 66,
     y: 59,
     box: [60.5, 55.5, 37.5, 6.5],
-    toast: "Top payer: Quill & Co. · 11,490.77",
+    toast: "Top payer: Quill & Co. · $11,490.77",
   },
 ];
 

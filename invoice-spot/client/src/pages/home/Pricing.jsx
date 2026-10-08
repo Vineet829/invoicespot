@@ -6,7 +6,7 @@ import { useReveal } from "./motion";
 const QUESTIONS = [
   [
     "What's included?",
-    "Invoices, quotations and recurring invoices, UPI and bank payments, reminders, the client portal, reports and team roles, in any currency.",
+    "Invoices, quotations and recurring invoices, UPI and bank payments, reminders, the client portal, reports and team roles, in over 150 currencies.",
   ],
   [
     "Do I need a GSTIN?",
