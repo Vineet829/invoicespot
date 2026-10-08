@@ -69,16 +69,18 @@ const owner = {
 };
 
 // Answers each request by its path; `items` is the catalog, or gives it for
-// each request for it.
-const serve = (items = catalog) =>
+// each request for it, and `totalItems` how many there are in all.
+const serve = (items = catalog, totalItems) =>
   vi.stubGlobal(
     "fetch",
     vi.fn(async (request) => {
       const path = new URL(request.url).pathname.replace("/api/v1", "");
+      const listed = typeof items === "function" ? items() : items;
       const answer = {
         "/item": {
           success: true,
-          items: typeof items === "function" ? items() : items,
+          totalItems: totalItems ?? listed.length,
+          items: listed,
         },
         "/settings": { settings: { taxRegime: "STANDARD" } },
         "/businesses": owner,
@@ -87,8 +89,8 @@ const serve = (items = catalog) =>
     }),
   );
 
-const open = async (path, items) => {
-  serve(items);
+const open = async (path, items, totalItems) => {
+  serve(items, totalItems);
   const { Provider } = await import("react-redux");
   const { MemoryRouter, useLocation } = await import("react-router-dom");
   const { store } = await import("../../../app/store");
@@ -261,4 +263,25 @@ it("sits beside Sales by item", async () => {
     ["All items", "/items", "page"],
     ["Sales by item", "/items/sales", null],
   ]);
+});
+
+// The note under the list, if there is one.
+const cutNote = (page) =>
+  [...page.querySelectorAll("p")].find((note) =>
+    note.textContent.startsWith("Showing the first"),
+  )?.textContent;
+
+it("says how many items there are in all when the list holds only the first of them", async () => {
+  const page = await open("/items", catalog, 1234);
+  expect(cutNote(page)).toBe("Showing the first 12 of 1,234 items.");
+  // A search looks through the items the list holds, and says so too.
+  await type(searchBox(page), "zzz");
+  await press(searchBox(page), "Enter");
+  expect(page.textContent).toContain("No items match.");
+  expect(cutNote(page)).toBe("Showing the first 12 of 1,234 items.");
+});
+
+it("says nothing more while the list holds every item", async () => {
+  const page = await open("/items");
+  expect(cutNote(page)).toBeUndefined();
 });

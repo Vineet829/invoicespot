@@ -13,6 +13,7 @@ import ResultLine from "../../documents/components/ResultLine";
 import { PERIODS } from "../../documents/documentFilters";
 import { useGetDocumentSummaryQuery } from "../../documents/documentsApiSlice";
 import { useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
   useGetPaymentsQuery,
   useGetPaymentsSummaryQuery,
@@ -66,7 +67,10 @@ const PaymentsPage = () => {
   useTitle("Payments — Invoice Spot");
   const [list, update] = useListState(readPaymentList, paymentListSearch);
   const search = useCallback((q) => update({ q, page: 1 }), [update]);
-  const query = useGetPaymentsQuery(paymentQuery(list), {
+  // The calendar's periods are days of the business's calendar, as the
+  // summary's are.
+  const today = useBusinessToday();
+  const query = useGetPaymentsQuery(paymentQuery(list, today), {
     refetchOnMountOrArgChange: 60,
   });
   const filtered = isPaymentListFiltered(list);

@@ -1,4 +1,14 @@
 import QrPattern from "./QrPattern";
+import { dayMonthYear } from "../../utils/dates";
+
+// Two weeks after the visitor's own today, so the sample is always still to
+// pay: a homepage has no business, and so no business's today.
+const dueDay = () => {
+  const day = new Date();
+  day.setHours(0, 0, 0, 0);
+  day.setDate(day.getDate() + 14);
+  return dayMonthYear(day);
+};
 
 // What the client sees on their phone: the invoice's number, due date and
 // amount, the sample UPI QR, and the two things they can do with it. It
@@ -16,7 +26,7 @@ const ClientPhone = ({ motion }) => (
         <p className="mt-0.5 font-display text-[18px] font-light tracking-[-0.03em]">
           INV-0042
         </p>
-        <p className="mt-0.5 text-[11px] text-spot-muted">Due Oct 18, 2026</p>
+        <p className="mt-0.5 text-[11px] text-spot-muted">Due {dueDay()}</p>
       </div>
       <div className="flex flex-col items-center gap-[9px] px-3.5 pb-4 pt-3">
         <p className="text-[11px] text-spot-muted">Amount due</p>

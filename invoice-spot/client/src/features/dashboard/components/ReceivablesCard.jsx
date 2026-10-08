@@ -126,9 +126,11 @@ const ReceivablesCard = ({ snapshot, currencyChosen }) => {
             decimalClass={colors.decimal}
           />
         </span>
+        {/* Outstanding, as the Documents list says: the invoices with money
+            still owed, part paid ones too. */}
         <span className={`text-[16px] ${colors.muted}`}>
           {owedNow.invoices
-            ? `across ${countOf(owedNow.invoices, "unpaid invoice", "unpaid invoices")}`
+            ? `across ${countOf(owedNow.invoices, "outstanding invoice", "outstanding invoices")}`
             : "No unpaid invoices"}
         </span>
       </div>

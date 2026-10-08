@@ -105,6 +105,37 @@ it("shows a month's figures on hover or focus while the others fade, and the key
   expect(document.activeElement).toBe(september);
 });
 
+// The last 30 days hold the end of September and the start of October.
+it("names a month the period holds only part of by its days, as its column and its card read it", async () => {
+  await act(async () =>
+    root.render(
+      <IncomeChart
+        months={[
+          { month: "2026-09", billed: 1000, received: 600 },
+          { month: "2026-10", billed: 400, received: 900 },
+        ]}
+        currency="USD"
+        from="2026-09-08"
+        to="2026-10-07"
+      />,
+    ),
+  );
+  expect(
+    monthsShown().map((month) => month.getAttribute("aria-label")),
+  ).toEqual([
+    "Sep 8–30, 2026: billed 1,000.00, received 600.00",
+    "Oct 1–7, 2026: billed 400.00, received 900.00",
+  ]);
+  await act(async () =>
+    monthsShown()[1].dispatchEvent(
+      new MouseEvent("mouseover", { bubbles: true }),
+    ),
+  );
+  expect(card().textContent).toBe("Oct 1–7, 2026Billed400.00Received900.00");
+  // The axis keeps each month's short name.
+  expect(container.textContent).toContain("Sep2026Oct");
+});
+
 it("draws only its zero line when nothing was billed or received", async () => {
   await draw([{ month: "2026-09", billed: 0, received: 0 }]);
   expect(axis()).toEqual(["0"]);

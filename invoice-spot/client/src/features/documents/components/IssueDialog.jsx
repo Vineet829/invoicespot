@@ -17,6 +17,7 @@ import {
 } from "../../../components/workspace/pastel";
 import { useIssueDocMutation } from "../documentsApiSlice";
 import { useGetSettingsQuery } from "../../settings/settingsApiSlice";
+import useBusinessToday from "../../business/useBusinessToday";
 
 const DAY = 86400000;
 
@@ -34,7 +35,9 @@ const IssueForm = ({
   onClose,
   onIssued,
 }) => {
-  const today = dateInput();
+  // Today by the business's calendar: the server refuses a document dated
+  // after it.
+  const today = dateInput(useBusinessToday());
   const [issueDate, setIssueDate] = useState(document.issueDate || today);
   const invoice = document.documentType === "Invoice";
   const quotation = document.documentType === "Quotation";

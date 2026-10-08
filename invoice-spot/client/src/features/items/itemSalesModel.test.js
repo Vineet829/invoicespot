@@ -9,8 +9,10 @@ import {
   readItemDetail,
   readItemSales,
   shareLabel,
+  shareLabels,
   soldCount,
 } from "./itemSalesModel";
+import fixture from "./pages/ItemSalesPage.fixture.json";
 
 const read = (search) => readItemSales(new URLSearchParams(search));
 const readDetail = (search) => readItemDetail(new URLSearchParams(search));
@@ -106,6 +108,56 @@ describe("the figures", () => {
     expect(shareLabel(0.004)).toBe("<1%");
     expect(shareLabel(0)).toBe("0%");
     expect(shareLabel(-0.1)).toBe("0%");
+  });
+
+  // Each share rounded on its own, the demo's ten items came to 98%.
+  it("rounds the shares of every item so they add up to 100%", () => {
+    const labels = shareLabels(fixture.sales.items, fixture.sales.total);
+    expect(labels).toEqual([
+      "28%",
+      "15%",
+      "11%",
+      "10%",
+      "8%",
+      "8%",
+      "8%",
+      "6%",
+      "4%",
+      "2%",
+    ]);
+    expect(labels.reduce((sum, label) => sum + parseInt(label, 10), 0)).toBe(
+      100,
+    );
+    // Three equal thirds: the point left over goes to the first.
+    const thirds = [{ amount: 100 }, { amount: 100 }, { amount: 100 }];
+    expect(shareLabels(thirds, 300)).toEqual(["34%", "33%", "33%"]);
+  });
+
+  it("counts the items on other pages as one share, so a page's shares stay whole", () => {
+    // Two items of 1,000.00: the other 334.00 rounds up, these down.
+    expect(shareLabels([{ amount: 333 }, { amount: 333 }], 1000)).toEqual([
+      "33%",
+      "33%",
+    ]);
+  });
+
+  it("shows a share that rounds to nothing as under 1%, and an item that sold nothing as 0%", () => {
+    expect(
+      shareLabels([{ amount: 9990 }, { amount: 10 }, { amount: 0 }], 10000),
+    ).toEqual(["100%", "<1%", "0%"]);
+  });
+
+  it("rounds each share on its own when a credit note leaves an item below nothing", () => {
+    expect(
+      shareLabels(
+        [
+          { amount: 1200, share: 1.2 },
+          { amount: -200, share: -0.2 },
+        ],
+        1000,
+      ),
+    ).toEqual(["120%", "0%"]);
+    expect(shareLabels([{ amount: 0, share: 0 }], 0)).toEqual(["0%"]);
   });
 
   it("counts what was sold to two places at most", () => {

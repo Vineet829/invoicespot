@@ -6,6 +6,7 @@ import {
   gstFileName,
   margin,
   monthName,
+  monthSpan,
   monthYear,
   percentLabel,
   percentOf,
@@ -13,6 +14,7 @@ import {
   previousMonth,
   profitMonths,
   share,
+  taxedSales,
 } from "./reportModel";
 
 describe("reportModel", () => {
@@ -64,6 +66,60 @@ describe("reportModel", () => {
   });
 });
 
+// The period's first and last days, as the report sends them, and each
+// month of it as the report's rows name it.
+it.each([
+  [
+    "the last 30 days, part months at both ends",
+    ["2026-09-08", "2026-10-07"],
+    [
+      ["2026-09", "Sep 8–30, 2026"],
+      ["2026-10", "Oct 1–7, 2026"],
+    ],
+  ],
+  [
+    "the last 12 months, back to the same day, part months at both ends",
+    ["2025-10-09", "2026-10-08"],
+    [
+      ["2025-10", "Oct 9–31, 2025"],
+      ["2025-11", "November 2025"],
+      ["2026-02", "February 2026"],
+      ["2026-09", "September 2026"],
+      ["2026-10", "Oct 1–8, 2026"],
+    ],
+  ],
+  [
+    "this year, the month it is in so far",
+    ["2026-01-01", "2026-10-08"],
+    [
+      ["2026-01", "January 2026"],
+      ["2026-10", "Oct 1–8, 2026"],
+    ],
+  ],
+  [
+    "a year gone by, every month whole",
+    ["2025-01-01", "2025-12-31"],
+    [
+      ["2025-01", "January 2025"],
+      ["2025-02", "February 2025"],
+      ["2025-12", "December 2025"],
+    ],
+  ],
+  [
+    "one day of a month",
+    ["2026-09-08", "2026-10-01"],
+    [["2026-10", "Oct 1, 2026"]],
+  ],
+])("names the months of %s", (_case, [from, to], months) => {
+  expect(months.map(([month]) => [month, monthSpan(month, from, to)])).toEqual(
+    months,
+  );
+});
+
+it("names a month whole when the report gives no days", () => {
+  expect(monthSpan("2026-09")).toBe("September 2026");
+});
+
 it("names last month and this one by the reader's calendar, across a new year", () => {
   expect(previousMonth(new Date(2026, 0, 15))).toBe("2025-12");
   expect(previousMonth(new Date(2026, 9, 31))).toBe("2026-09");
@@ -110,4 +166,41 @@ it("adds each month's margin and the profit made so far, in cents", () => {
     ["2026-10", 100, 300.1],
   ]);
   expect(profitMonths()).toEqual([]);
+});
+
+it("counts only the sales taxed above 0% in what tax was charged on, and the rest apart", () => {
+  const entry = {
+    documents: 4,
+    rates: [
+      { rate: 0, documents: 2, taxable: 500 },
+      { rate: 5, documents: 1, taxable: 400.1 },
+      { rate: 18, documents: 1, taxable: 600.2 },
+    ],
+  };
+  expect(taxedSales(entry)).toEqual({
+    taxable: 1000.3,
+    documents: 2,
+    untaxed: 500,
+  });
+  // A document taxed at two rates is counted at each, never beyond all of them.
+  expect(
+    taxedSales({
+      documents: 1,
+      rates: [
+        { rate: 5, documents: 1, taxable: 100 },
+        { rate: 18, documents: 1, taxable: 100 },
+      ],
+    }),
+  ).toEqual({ taxable: 200, documents: 1, untaxed: 0 });
+  expect(
+    taxedSales({
+      documents: 2,
+      rates: [{ rate: 0, documents: 2, taxable: 80 }],
+    }),
+  ).toEqual({ taxable: 0, documents: 0, untaxed: 80 });
+  expect(taxedSales(undefined)).toEqual({
+    taxable: 0,
+    documents: 0,
+    untaxed: 0,
+  });
 });

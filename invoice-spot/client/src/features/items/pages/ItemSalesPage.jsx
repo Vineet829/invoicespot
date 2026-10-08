@@ -14,6 +14,7 @@ import {
   itemSalesSearch,
   readItemSales,
   shareLabel,
+  shareLabels,
   soldCount,
 } from "../itemSalesModel";
 import ItemsTabs from "../components/ItemsTabs";
@@ -66,6 +67,8 @@ const ItemSalesPage = () => {
 
   const currency = sales?.currency;
   const several = sales?.currencies?.length > 1;
+  // The shares shown add up to the 100% of the totals row.
+  const shares = shareLabels(pagination.rows, sales?.total);
   const columns = [
     {
       label: "Item",
@@ -100,7 +103,8 @@ const ItemSalesPage = () => {
     },
     {
       label: "Share of income",
-      render: (row) => shareLabel(row.share),
+      render: (row, index) =>
+        row.total ? shareLabel(row.share) : shares[index],
     },
   ];
   const days =

@@ -644,6 +644,8 @@ describe("the cash flow chart", () => {
 });
 
 describe("what needs attention", () => {
+  // The business's today, the day the fixture's figures were taken.
+  const OCT_4 = new Date(2026, 9, 4);
   const item = (kind, days, date, extra) => ({
     kind,
     documentId: "d1",
@@ -684,22 +686,53 @@ describe("what needs attention", () => {
       "Created Oct 1",
     ],
   ])("words %j", (entry, label, state, when) => {
-    expect(attentionRow(entry)).toMatchObject({ label, state, when });
+    expect(attentionRow(entry, OCT_4)).toMatchObject({ label, state, when });
+  });
+
+  // An invoice due last December is long gone, not coming up this December;
+  // every kind's day names its year once it isn't this year's.
+  it.each([
+    [item("overdue", 294, "2025-12-14"), "294 days late", "Due Dec 14, 2025"],
+    [
+      item("paymentReport", null, "2025-12-30"),
+      "Payment reported",
+      "Paid on Dec 30, 2025",
+    ],
+    [item("draft", null, "2025-11-03"), "Draft", "Created Nov 3, 2025"],
+    [item("dueSoon", 3, "2027-01-02"), "Due in 3 days", "Due Jan 2, 2027"],
+  ])("names the year of a day in another year: %j", (entry, state, when) => {
+    expect(attentionRow(entry, OCT_4)).toMatchObject({ state, when });
+  });
+
+  it("leaves the year off a day in the year of the business's today", () => {
+    expect(
+      attentionRow(item("overdue", 17, "2026-12-14"), new Date(2026, 11, 31))
+        .when,
+    ).toBe("Due Dec 14");
+    expect(
+      attentionRow(item("overdue", 18, "2026-12-14"), new Date(2027, 0, 1))
+        .when,
+    ).toBe("Due Dec 14, 2026");
   });
 
   it.each(["overdue", "dueSoon"])(
     "gives only the day for %s when the number of days is missing",
     (kind) => {
-      const row = attentionRow(item(kind, null, "2026-10-07"));
+      const row = attentionRow(item(kind, null, "2026-10-07"), OCT_4);
       expect(row.state).toBe("");
       expect(row.when).toMatch(/Oct 7$/);
-      expect(attentionRow(item(kind, undefined, "2026-10-07")).state).toBe("");
+      expect(
+        attentionRow(item(kind, undefined, "2026-10-07"), OCT_4).state,
+      ).toBe("");
     },
   );
 
   it("opens each item's document, and never its client", () => {
     for (const kind of ["paymentReport", "overdue", "dueSoon", "draft"]) {
-      const row = attentionRow(item(kind, 3, "2026-10-01", { clientId: "c1" }));
+      const row = attentionRow(
+        item(kind, 3, "2026-10-01", { clientId: "c1" }),
+        OCT_4,
+      );
       expect(row.to).toBe("/document/d1");
       expect(row).not.toHaveProperty("clientTo");
     }

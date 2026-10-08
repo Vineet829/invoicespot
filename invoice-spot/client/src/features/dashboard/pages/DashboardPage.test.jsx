@@ -18,11 +18,16 @@ let container;
 beforeEach(() => {
   vi.resetModules();
   vi.stubEnv("VITE_API_URL", "http://localhost:3001/api/v1");
+  // The days that need attention name their year from the day the fixture
+  // was taken, when it isn't that day's year.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 4, 12));
   requests = [];
 });
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -705,6 +710,59 @@ it("shows the invoices that need attention, each opening its invoice and nothing
   );
 });
 
+// At 5 in the morning of Jan 1, 2027 in Kolkata it is still Dec 31, 2026 in
+// Los Angeles, where the business is: a day of 2026 is this year's there,
+// and one of 2025 names its year, so it doesn't read as a day to come.
+it("names the year of a day that isn't in the business's current year", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "Asia/Kolkata";
+  try {
+    vi.setSystemTime(new Date("2027-01-01T05:00:00+05:30"));
+    const [late] = overview.attention.items;
+    const page = await open(
+      "/dashboard",
+      {
+        ...overview,
+        attention: {
+          items: [
+            { ...late, date: "2025-12-14", days: 382 },
+            {
+              ...late,
+              documentId: "d-2",
+              documentNumber: "INV-1101",
+              date: "2026-12-14",
+              days: 17,
+            },
+          ],
+          counts: { paymentReports: 0, overdue: 2, dueSoon: 0, drafts: 0 },
+        },
+      },
+      loaded,
+      {
+        businesses: owner.businesses.map((entry) => ({
+          ...entry,
+          timeZone: "America/Los_Angeles",
+        })),
+      },
+    );
+    const rows = () =>
+      [
+        ...page.querySelectorAll('[aria-labelledby="attention-title"] ol > li'),
+      ].map((item) => item.textContent);
+    await act(() =>
+      vi.waitFor(() =>
+        expect(rows()).toEqual([
+          "Sable FitnessINV-1026 · Due Dec 14, 2025 · 382 days late3,391.67",
+          "Sable FitnessINV-1101 · Due Dec 14 · 17 days late3,391.67",
+        ]),
+      ),
+    );
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 it("opens a document listed twice from its first row only", async () => {
   const [late] = overview.attention.items;
   const page = await open("/dashboard", {
@@ -803,7 +861,7 @@ it("shows what is owed today beside what needs attention, split into current and
   );
   expect(card.querySelector("h2").textContent).toBe("Total receivables");
   expect(card.textContent).toContain("Total receivablesas of today");
-  expect(card.textContent).toContain("24,285.79across 10 unpaid invoices");
+  expect(card.textContent).toContain("24,285.79across 10 outstanding invoices");
   // Not due yet, then each overdue band in a rust that deepens with age; a
   // band with nothing in it is left out of the bar.
   expect(bar(card)).toEqual([
@@ -873,6 +931,25 @@ it("opens a view or record of its own from every link", async () => {
   expect(hrefs).toContain("/receivables");
   expect(hrefs).toContain("/receivables?mode=overdue");
   expect(repeated(hrefs)).toEqual([]);
+});
+
+// One invoice part paid: money is still owed on it, so it is outstanding
+// rather than unpaid.
+it("names the invoices with money still owed on them as outstanding", async () => {
+  const page = await open("/dashboard", {
+    ...overview,
+    owedNow: {
+      total: 500,
+      notDue: 500,
+      overdue: 0,
+      invoices: 1,
+      overdueInvoices: 0,
+      bands: [{ key: "current", amount: 500, invoices: 1 }],
+    },
+  });
+  expect(receivables(page).textContent).toContain(
+    "500.00across 1 outstanding invoice",
+  );
 });
 
 it("says when nothing is owed", async () => {
@@ -981,7 +1058,7 @@ it("keeps each panel's place in its row while the overview loads", async () => {
   ).toBeNull();
   expect(layout(page).map((row) => row.length)).toEqual([1, 2, 1, 3]);
   expect(receivables(page).textContent).toContain(
-    "24,285.79across 10 unpaid invoices",
+    "24,285.79across 10 outstanding invoices",
   );
 });
 

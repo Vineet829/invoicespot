@@ -1,3 +1,5 @@
+import { dayMonth, parseDate } from "../../utils/dates";
+
 export const DEFAULT_PERIOD = "12m";
 
 // The last 30 and 90 days, as the overview has them, the last few months,
@@ -42,6 +44,25 @@ export const monthYear = (month) =>
     year: "numeric",
     timeZone: "UTC",
   });
+
+// A month of a report, named for the days of it that the report's period
+// holds: "September 2026" when it holds the whole month, or else as the
+// overview names a part month, "Sep 8–30, 2026" or "Oct 1–7, 2026". `from`
+// and `to` are the period's first and last days, as the report sends them;
+// without them the month is named whole.
+export const monthSpan = (month, from, to) => {
+  const [year, number] = String(month).split("-").map(Number);
+  const first = `${month}-01`;
+  const last = `${month}-${new Date(year, number, 0).getDate()}`;
+  const start = from > first ? from : first;
+  const end = to < last ? to : last;
+  if (start === first && end === last) return monthYear(month);
+  const days =
+    start === end
+      ? dayMonth(parseDate(start))
+      : `${dayMonth(parseDate(start))}–${parseDate(end).getDate()}`;
+  return `${days}, ${year}`;
+};
 
 // A month as "2026-09", by the reader's calendar: the one before `today`,
 // or the one it is in.
@@ -96,4 +117,24 @@ export const profitMonths = (months = []) => {
 export const percentOf = (part, total) => {
   const all = Number(total);
   return all > 0 ? Math.round((Number(part) / all) * 100) : 0;
+};
+
+// What a currency's tax was charged on: the sales taxed at a rate above
+// nothing, how many documents they came from, and what else was sold with
+// no tax. A document taxed at two rates is counted at each, never more
+// than all the documents.
+export const taxedSales = (entry) => {
+  const rates = entry?.rates || [];
+  const taxed = rates.filter((row) => Number(row.rate) > 0);
+  const untaxed = rates.filter((row) => !(Number(row.rate) > 0));
+  // Added in cents, so the amounts come out exact.
+  const taxable = (rows) =>
+    rows.reduce((sum, row) => sum + Math.round(Number(row.taxable) * 100), 0) /
+    100;
+  const documents = taxed.reduce((sum, row) => sum + row.documents, 0);
+  return {
+    taxable: taxable(taxed),
+    documents: Math.min(documents, entry?.documents ?? 0),
+    untaxed: taxable(untaxed),
+  };
 };

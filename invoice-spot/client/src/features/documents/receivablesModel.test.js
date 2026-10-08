@@ -93,10 +93,11 @@ describe("the invoices behind each figure", () => {
 });
 
 describe("how late or how soon", () => {
-  it("counts whole days from today by the reader's calendar", () => {
+  it("counts whole days from the business's today, whatever its hour", () => {
     expect(daysUntil("2026-10-06", OCT_4)).toBe(2);
     expect(daysUntil("2026-10-04", OCT_4)).toBe(0);
     expect(daysUntil("2026-08-11", OCT_4)).toBe(-54);
+    expect(daysUntil("2026-10-06", new Date(2026, 9, 4))).toBe(2);
   });
 
   it("names an overdue invoice's days late, at least one", () => {

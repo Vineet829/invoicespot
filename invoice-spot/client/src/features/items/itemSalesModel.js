@@ -88,6 +88,42 @@ export const shareLabel = (share) => {
   return percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
 };
 
+// The shares of the items listed, as whole percentages that add up to the
+// list's 100% total: each is rounded down, then the points left over go one
+// each to the shares rounding took the most from, the larger item first in
+// a tie. The items on the other pages count as one share among them, so a
+// page that lists every item adds up to exactly 100%. A share that gets no
+// point shows as under 1%. When a credit note leaves an item below nothing,
+// no whole shares can add up to 100, so each is rounded on its own.
+export const shareLabels = (rows, total) => {
+  const income = Number(total);
+  const amounts = rows.map((row) => Number(row.amount) || 0);
+  const others = income - amounts.reduce((sum, amount) => sum + amount, 0);
+  if (
+    !(income > 0) ||
+    others < -0.005 ||
+    amounts.some((amount) => amount < 0)
+  ) {
+    return rows.map((row) => shareLabel(row.share));
+  }
+  const exact = [...amounts, Math.max(others, 0)].map(
+    (amount) => (amount / income) * 100,
+  );
+  const whole = exact.map(Math.floor);
+  const lost = (index) => exact[index] - whole[index];
+  let left = 100 - whole.reduce((sum, percent) => sum + percent, 0);
+  [...exact.keys()]
+    .sort((one, other) => lost(other) - lost(one) || one - other)
+    .forEach((index) => {
+      if (left <= 0) return;
+      whole[index] += 1;
+      left -= 1;
+    });
+  return amounts.map((amount, index) =>
+    amount > 0 && whole[index] === 0 ? "<1%" : `${whole[index]}%`,
+  );
+};
+
 // How many of an item were sold, to two places at most.
 export const soldCount = (quantity) =>
   Number(quantity || 0).toLocaleString("en", { maximumFractionDigits: 2 });

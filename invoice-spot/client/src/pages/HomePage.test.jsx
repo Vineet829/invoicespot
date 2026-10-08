@@ -411,6 +411,9 @@ it("pauses the tour and the headline while the hero is off screen or the tab is 
 });
 
 it("shows the client's phone as one picture, and what is on it", async () => {
+  // Two weeks after the visitor's today, Oct 8, 2026.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 8, 10, 0));
   const { page } = await open();
   const phone = page.querySelector("[role=img]");
   expect(phone.getAttribute("aria-label")).toBe(
@@ -419,7 +422,7 @@ it("shows the client's phone as one picture, and what is on it", async () => {
   for (const line of [
     "Tester Studio",
     "INV-0042",
-    "Due Oct 18, 2026",
+    "Due Oct 22, 2026",
     "Amount due",
     "₹ 59,000.00",
     "Open in UPI app",
@@ -429,6 +432,15 @@ it("shows the client's phone as one picture, and what is on it", async () => {
   }
   expect(phone.querySelector("svg")).not.toBeNull();
   expect(phone.querySelector("a, button, input, [tabindex]")).toBeNull();
+});
+
+it("keeps the phone's due date two weeks ahead, across a month's and a year's end", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 11, 25, 23, 30));
+  const { page } = await open();
+  expect(page.querySelector("[role=img]").textContent).toContain(
+    "Due Jan 8, 2027",
+  );
 });
 
 it("plays the steps from invoice to paid, and lets a click pick one", async () => {

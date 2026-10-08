@@ -36,8 +36,8 @@ export const TYPE_FILTERS = [
 
 // Periods of issue dates. The last 30 or 90 days and the last 12 months are
 // the overview's, so the server works out their days, in the business's time
-// zone. For the others the browser's calendar picks the days, and the server
-// reads them in the business's time zone.
+// zone. The others are picked here from the business's today, which the
+// pages pass in, and the server reads them in the same time zone.
 export const PERIODS = [
   { value: "", label: "All dates" },
   { value: "30d", label: "Last 30 days", recent: true },
@@ -68,19 +68,18 @@ const localDay = (date) =>
   ].join("-");
 
 // The first and last day of a period, as the server's from and to dates.
+// This month, quarter and year run to today, as the server's views count
+// them; last month and last year are whole.
 export const periodRange = (period, today) => {
   const year = today.getFullYear();
   const month = today.getMonth();
   const quarter = month - (month % 3);
   const [from, to] =
     {
-      "this-month": [new Date(year, month, 1), new Date(year, month + 1, 0)],
+      "this-month": [new Date(year, month, 1), today],
       "last-month": [new Date(year, month - 1, 1), new Date(year, month, 0)],
-      "this-quarter": [
-        new Date(year, quarter, 1),
-        new Date(year, quarter + 3, 0),
-      ],
-      "this-year": [new Date(year, 0, 1), new Date(year, 11, 31)],
+      "this-quarter": [new Date(year, quarter, 1), today],
+      "this-year": [new Date(year, 0, 1), today],
       "last-year": [new Date(year - 1, 0, 1), new Date(year - 1, 11, 31)],
     }[period] || [];
   return from ? { from: localDay(from), to: localDay(to) } : {};

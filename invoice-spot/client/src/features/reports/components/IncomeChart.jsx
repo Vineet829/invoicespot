@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import useWidth from "../../../hooks/useWidth";
 import { axisLabel, formatMoney } from "../../dashboard/dashboardModel";
-import { axisTicks, monthName, monthYear } from "../reportModel";
+import { axisTicks, monthName, monthSpan } from "../reportModel";
 
 const AXIS = 52;
 const CARD = 190;
@@ -17,8 +17,10 @@ const amount = (month, key) => Number(month[key]) || 0;
 // Billed and received side by side for each month, drawn as the overview
 // draws its cash flow: a month's figures show on hover or focus while the
 // other months fade back, and the keys move between months. The table
-// under the chart has the same figures.
-const IncomeChart = ({ months, currency }) => {
+// under the chart has the same figures. A month the period, from `from` to
+// `to`, holds only part of is named by its days; the axis keeps the
+// month's short name.
+const IncomeChart = ({ months, currency, from, to }) => {
   const [measureRef, width] = useWidth(720);
   const columns = useRef([]);
   const [hovered, setHovered] = useState(null);
@@ -104,7 +106,7 @@ const IncomeChart = ({ months, currency }) => {
                     columns.current[index] = element;
                   }}
                   role="img"
-                  aria-label={`${monthYear(month.month)}: billed ${formatMoney(month.billed, currency)}, received ${formatMoney(month.received, currency)}`}
+                  aria-label={`${monthSpan(month.month, from, to)}: billed ${formatMoney(month.billed, currency)}, received ${formatMoney(month.received, currency)}`}
                   tabIndex={index === tabStop ? 0 : -1}
                   className={`relative flex items-end justify-center gap-1 rounded-lg transition-colors focus-visible:outline-offset-[-2px] ${shown === index ? "bg-spot-violet/[.06]" : ""}`}
                   onMouseEnter={() => setHovered(index)}
@@ -136,7 +138,7 @@ const IncomeChart = ({ months, currency }) => {
               aria-hidden="true"
             >
               <p className="mb-1.5 font-medium">
-                {monthYear(months[shown].month)}
+                {monthSpan(months[shown].month, from, to)}
               </p>
               {SERIES.map(({ key, label, column }) => (
                 <p className="mt-0.5 flex justify-between gap-3" key={key}>

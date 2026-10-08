@@ -9,6 +9,7 @@ import {
   formatMoney,
 } from "../dashboardModel";
 import { overviewPanel } from "./DashboardPanels";
+import useBusinessToday from "../../business/useBusinessToday";
 
 // Each kind's colour, for its heading and its state.
 const TINTS = {
@@ -50,11 +51,13 @@ const kindGroups = (items) =>
 // Overdue figure above opens every overdue invoice, so nothing here opens
 // what another panel opens. A document listed twice, such as an overdue
 // invoice with a payment reported on it, opens from its first row only. The
-// note names what there is none of, and what the list leaves out.
+// note names what there is none of, and what the list leaves out. A day in
+// another year than the business's today names its year.
 const AttentionPanel = ({ snapshot }) => {
   const { attention, currency } = snapshot;
   const items = attentionItems(attention);
   const footer = attentionFooter(attention?.counts, items);
+  const today = useBusinessToday();
   const opened = new Set();
   return (
     <section
@@ -76,11 +79,14 @@ const AttentionPanel = ({ snapshot }) => {
                   <h3
                     className={`m-0 text-[15px] font-medium ${TINTS[group[0].kind]}`}
                   >
-                    {attentionRow(group[0]).label}
+                    {attentionRow(group[0], today).label}
                   </h3>
                   <ol className="m-0 list-none p-0">
                     {group.map((item, index) => {
-                      const { label, state, when, to } = attentionRow(item);
+                      const { label, state, when, to } = attentionRow(
+                        item,
+                        today,
+                      );
                       const late = daysLate(item);
                       const number = item.documentNumber || "No number yet";
                       const client = item.client || "No client";

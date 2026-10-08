@@ -15,6 +15,13 @@ export const dayMonthYear = (date) =>
     year: "numeric",
   });
 
+// A day as "Oct 4" in the year `today` is in, or with its year, as "Dec 14,
+// 2025", in any other.
+export const dayMonthFrom = (date, today) =>
+  date.getFullYear() === today.getFullYear()
+    ? dayMonth(date)
+    : dayMonthYear(date);
+
 // From one day to another, as "Jul 7 – Oct 4, 2026": the year once at the
 // end when both days share it, or after each day when they don't.
 // `withYear` false leaves a shared year off.

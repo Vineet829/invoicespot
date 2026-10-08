@@ -1,4 +1,10 @@
-import { dateSpan, dayMonth, dayMonthYear, parseDate } from "../../utils/dates";
+import {
+  dateSpan,
+  dayMonth,
+  dayMonthFrom,
+  dayMonthYear,
+  parseDate,
+} from "../../utils/dates";
 import { compactAmount, formatAmount } from "../../utils/money";
 import {
   customerSalesLink,
@@ -419,9 +425,11 @@ export const attentionDocuments = (items = []) =>
   new Set(attentionItems({ items }).map((item) => item.documentId));
 
 // One item's row: its label, its state, the day that matters, and the
-// document it opens. Without a number of days, only the day is given.
-export const attentionRow = (item) => {
-  const date = item.date ? dayMonth(parseDate(item.date)) : "";
+// document it opens. Without a number of days, only the day is given. The
+// day names its year when it isn't in the year of the business's `today`,
+// so a day long gone doesn't read as one to come.
+export const attentionRow = (item, today) => {
+  const date = item.date ? dayMonthFrom(parseDate(item.date), today) : "";
   const days = item.days == null ? NaN : Number(item.days);
   const known = Number.isFinite(days);
   const [state, when] = {

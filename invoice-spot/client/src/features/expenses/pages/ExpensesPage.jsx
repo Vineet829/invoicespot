@@ -61,6 +61,7 @@ import {
 } from "../../../components/workspace/pastel";
 import { Select } from "../../../components/workspace/Select";
 import { RefusalNote, useBusiness } from "../../business/permissions";
+import useBusinessToday from "../../business/useBusinessToday";
 
 const NO_EXPENSES = [];
 const NO_CATEGORIES = [];
@@ -70,7 +71,9 @@ const ExpensesPage = () => {
   const [list, update] = useListState(readExpenseList, expenseListSearch);
   const [downloadCsv, exporting] = useFileDownload(useGetExpensesCsvMutation);
   const search = useCallback((q) => update({ q, page: 1 }), [update]);
-  const query = useGetExpensesQuery(expenseQuery(list), {
+  // The calendar's periods are days of the business's calendar.
+  const today = useBusinessToday();
+  const query = useGetExpensesQuery(expenseQuery(list, today), {
     refetchOnMountOrArgChange: 60,
   });
   // The currencies the business bills in, for the currency menu.
@@ -301,7 +304,7 @@ const ExpensesPage = () => {
               className={`${secondaryIconButton} max-[700px]:!flex-none`}
               onClick={() =>
                 downloadCsv(
-                  expenseFilterQuery(list),
+                  expenseFilterQuery(list, today),
                   `invoice-spot-expenses-${dateInput()}.csv`,
                 )
               }

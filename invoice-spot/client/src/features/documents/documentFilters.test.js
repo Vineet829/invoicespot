@@ -185,10 +185,22 @@ describe("issue date periods", () => {
     ["this-month", "2026-09-01", "2026-09-30"],
     ["last-month", "2026-08-01", "2026-08-31"],
     ["this-quarter", "2026-07-01", "2026-09-30"],
-    ["this-year", "2026-01-01", "2026-12-31"],
+    ["this-year", "2026-01-01", "2026-09-30"],
     ["last-year", "2025-01-01", "2025-12-31"],
   ])("%s runs from %s to %s", (period, from, to) => {
     expect(periodRange(period, today)).toEqual({ from, to });
+  });
+
+  // This month, quarter and year run to today, as the server's views count
+  // them; the month and year gone by stay whole.
+  it.each([
+    ["this-month", "2026-10-01", "2026-10-08"],
+    ["last-month", "2026-09-01", "2026-09-30"],
+    ["this-quarter", "2026-10-01", "2026-10-08"],
+    ["this-year", "2026-01-01", "2026-10-08"],
+    ["last-year", "2025-01-01", "2025-12-31"],
+  ])("%s runs from %s to %s on Oct 8", (period, from, to) => {
+    expect(periodRange(period, new Date(2026, 9, 8))).toEqual({ from, to });
   });
 
   it("works across the turn of the year", () => {
@@ -198,7 +210,11 @@ describe("issue date periods", () => {
     });
     expect(periodRange("this-quarter", new Date(2027, 0, 15))).toEqual({
       from: "2027-01-01",
-      to: "2027-03-31",
+      to: "2027-01-15",
+    });
+    expect(periodRange("this-year", new Date(2027, 0, 1))).toEqual({
+      from: "2027-01-01",
+      to: "2027-01-01",
     });
   });
 
@@ -207,6 +223,9 @@ describe("issue date periods", () => {
       from: "2026-09-01",
       to: "2026-09-30",
     });
+    expect(
+      documentQuery(read("period=this-year"), new Date(2026, 9, 8)),
+    ).toMatchObject({ from: "2026-01-01", to: "2026-10-08" });
     expect(documentQuery(read(""), today)).not.toHaveProperty("from");
   });
 

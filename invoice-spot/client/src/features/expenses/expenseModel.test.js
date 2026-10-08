@@ -75,16 +75,17 @@ describe("the expenses list in the URL", () => {
   });
 
   // The menu's last 30 and 90 days and 12 months are the overview's, whose
-  // days the server works out in the business's time zone.
+  // days the server works out in the business's time zone. This month,
+  // quarter and year run to today.
   it.each([
     ["", {}],
     ["30d", { period: "30d" }],
     ["90d", { period: "90d" }],
     ["12m", { period: "12m" }],
-    ["this-month", { from: "2026-10-01", to: "2026-10-31" }],
+    ["this-month", { from: "2026-10-01", to: "2026-10-04" }],
     ["last-month", { from: "2026-09-01", to: "2026-09-30" }],
-    ["this-quarter", { from: "2026-10-01", to: "2026-12-31" }],
-    ["this-year", { from: "2026-01-01", to: "2026-12-31" }],
+    ["this-quarter", { from: "2026-10-01", to: "2026-10-04" }],
+    ["this-year", { from: "2026-01-01", to: "2026-10-04" }],
     ["last-year", { from: "2025-01-01", to: "2025-12-31" }],
   ])("sends the period %j as %j", (period, sent) => {
     const today = new Date(2026, 9, 4, 12);
