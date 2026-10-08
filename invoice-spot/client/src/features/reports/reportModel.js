@@ -62,3 +62,38 @@ export const share = (value, largest) => {
   const most = Number(largest);
   return most > 0 && amount > 0 ? Math.min(amount / most, 1) : 0;
 };
+
+// A month's profit as a share of its income, as a whole percent, or nothing
+// when there was no income to measure it against.
+export const margin = (profit, income) => {
+  const earned = Number(income);
+  return earned > 0 ? Math.round((Number(profit) / earned) * 100) : null;
+};
+
+// A whole percent for a table; a share too small to round to 1% is "<1%",
+// and nothing to show is a dash.
+export const percentLabel = (value, exact = value) => {
+  if (value == null) return "—";
+  if (value === 0 && Number(exact) > 0) return "<1%";
+  return `${value.toLocaleString("en")}%`;
+};
+
+// The profit and loss months, each with its margin and the profit made so
+// far in the period, in cents so that sums don't drift.
+export const profitMonths = (months = []) => {
+  let soFar = 0;
+  return months.map((row) => {
+    soFar += Math.round((Number(row.profit) || 0) * 100);
+    return {
+      ...row,
+      margin: margin(row.profit, row.income),
+      soFar: soFar / 100,
+    };
+  });
+};
+
+// A part of a total as a whole percent, from 0 to 100.
+export const percentOf = (part, total) => {
+  const all = Number(total);
+  return all > 0 ? Math.round((Number(part) / all) * 100) : 0;
+};

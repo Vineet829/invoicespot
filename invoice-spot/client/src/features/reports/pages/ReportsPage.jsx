@@ -20,6 +20,7 @@ import {
   LoadingState,
   PageHeader,
   Panel,
+  SHARE_BAR_TRACK,
   ShareBar,
   WorkspacePage,
   dateLabel,
@@ -113,7 +114,14 @@ const taxColumns = (currency, gst) => [
 // The tax charged in the period at each rate, less credit notes, with each
 // month's figures behind a disclosure. Supplies under reverse charge carry no
 // tax the business charged, so they are only mentioned.
-const TaxCharged = ({ report, entry, currency, periodFile, busy }) => (
+const TaxCharged = ({
+  report,
+  entry,
+  currency,
+  periodFile,
+  busy,
+  narrow = false,
+}) => (
   <Panel
     title="Tax charged"
     description="Tax on the invoices and receipts issued in this period, at each rate, less credit notes. The CSV file has each month."
@@ -131,13 +139,16 @@ const TaxCharged = ({ report, entry, currency, periodFile, busy }) => (
         className={`transition-opacity ${busy ? "opacity-60" : ""}`}
         aria-busy={busy || undefined}
       >
-        <p className="mb-5 text-[14px] text-spot-body">
+        <p className="mb-5 text-[16px] text-spot-body">
           <span className="text-spot-ink">{money(entry.tax, currency)}</span>{" "}
           charged on {money(entry.taxable, currency)}, from{" "}
           {entry.documents.toLocaleString("en")}{" "}
           {entry.documents === 1 ? "document" : "documents"}.
         </p>
         <DataTable
+          evenGaps
+          large
+          narrow={narrow}
           label={`Tax charged by rate, ${currency}`}
           rows={entry.rates}
           rowKey={(row) => row.rate}
@@ -149,6 +160,7 @@ const TaxCharged = ({ report, entry, currency, periodFile, busy }) => (
             },
             {
               label: "Documents",
+              type: "number",
               render: (row) => row.documents.toLocaleString("en"),
             },
             ...taxColumns(currency, entry.gst),
@@ -162,11 +174,14 @@ const TaxCharged = ({ report, entry, currency, periodFile, busy }) => (
           </p>
         )}
         <details className="group mt-4">
-          <summary className={`w-max cursor-pointer ${textLink}`}>
+          <summary className={`w-max cursor-pointer text-[15px] ${textLink}`}>
             Show each month
           </summary>
           <div className="mt-3">
             <DataTable
+              evenGaps
+              large
+              narrow={narrow}
               label={`Tax charged by month and rate, ${currency}`}
               rows={entry.months}
               rowKey={(row) => `${row.month}-${row.rate}`}
@@ -226,18 +241,22 @@ const TaxWithheld = ({
       )}
       {entry ? (
         <div
-          className={`transition-opacity ${busy ? "opacity-60" : ""}`}
+          className={`transition-opacity [container-name:withheld] [container-type:inline-size] ${busy ? "opacity-60" : ""}`}
           aria-busy={busy || undefined}
         >
-          <p className="mb-5 text-[14px] text-spot-body">
+          <p className="mb-5 text-[16px] text-spot-body">
             <span className="text-spot-ink">
               {money(entry.withheld, currency)}
             </span>{" "}
             withheld from {count.toLocaleString("en")}{" "}
             {count === 1 ? "payment" : "payments"}.
           </p>
-          <div className="grid min-w-0 gap-6 min-[1100px]:grid-cols-2">
+          {/* By client beside by month when the panel has room for both, one
+              above the other in a narrower panel. */}
+          <div className="grid min-w-0 gap-6 [@container_withheld_(min-width:800px)]:grid-cols-2">
             <DataTable
+              evenGaps
+              large
               label={`Tax withheld by client, ${currency}`}
               narrow
               rows={entry.clients}
@@ -246,6 +265,7 @@ const TaxWithheld = ({
                 {
                   label: "Client",
                   type: "main",
+                  track: SHARE_BAR_TRACK,
                   render: (row) => (
                     <>
                       {row.customerId ? (
@@ -272,6 +292,7 @@ const TaxWithheld = ({
                 },
                 {
                   label: "Payments",
+                  type: "number",
                   render: (row) => row.payments.toLocaleString("en"),
                 },
                 amountColumn("Received", "received", currency),
@@ -279,6 +300,8 @@ const TaxWithheld = ({
               ]}
             />
             <DataTable
+              evenGaps
+              large
               label={`Tax withheld by month, ${currency}`}
               narrow
               rows={entry.months}
@@ -291,6 +314,7 @@ const TaxWithheld = ({
                 },
                 {
                   label: "Payments",
+                  type: "number",
                   render: (row) => row.payments.toLocaleString("en"),
                 },
                 amountColumn("Tax withheld", "withheld", currency),
@@ -298,11 +322,13 @@ const TaxWithheld = ({
             />
           </div>
           <details className="group mt-4">
-            <summary className={`w-max cursor-pointer ${textLink}`}>
+            <summary className={`w-max cursor-pointer text-[15px] ${textLink}`}>
               Show each payment
             </summary>
             <div className="mt-3">
               <DataTable
+                evenGaps
+                large
                 label={`Payments tax was withheld from, ${currency}`}
                 rows={entry.payments}
                 rowKey={(row, index) => `${row.documentId}-${index}`}
@@ -413,6 +439,40 @@ const ReportsPage = () => {
     ? `${dateLabel(report.from)} – ${dateLabel(report.to)}`
     : "";
   const periodFile = report ? `${report.from}-to-${report.to}` : "";
+  // The tax charged in the currency shown. Split for GST it needs the page's
+  // width; otherwise it sits beside the tax withheld.
+  const taxEntry = taxQuery.data?.currencies.find(
+    (entry) => entry.currency === currency,
+  );
+  const taxBeside = !taxEntry?.gst;
+  const taxCharged = (narrow) => (
+    <TaxCharged
+      report={report}
+      entry={taxEntry}
+      currency={currency}
+      periodFile={periodFile}
+      busy={taxQuery.isFetching}
+      narrow={narrow}
+    />
+  );
+  const taxWithheld = (
+    <TaxWithheld
+      report={report}
+      entry={tdsQuery.data?.currencies.find(
+        (entry) => entry.currency === currency,
+      )}
+      currency={currency}
+      elsewhere={
+        view
+          ? (tdsQuery.data?.currencies || [])
+              .filter((entry) => entry.currency !== currency)
+              .map((entry) => entry.currency || "no currency")
+          : []
+      }
+      periodFile={periodFile}
+      busy={tdsQuery.isFetching}
+    />
+  );
 
   const largestAge = Math.max(
     0,
@@ -585,7 +645,7 @@ const ReportsPage = () => {
                   {SERIES.map((series) => (
                     <li
                       key={series.key}
-                      className={`flex items-center gap-2 ${panelNote}`}
+                      className="flex items-center gap-2 text-[14px] text-spot-muted"
                     >
                       <span
                         className={`size-3 rounded-[3px] ${series.column}`}
@@ -606,11 +666,15 @@ const ReportsPage = () => {
           >
             <IncomeChart months={shown.months} currency={currency} />
             <details className="group mt-4">
-              <summary className={`w-max cursor-pointer ${textLink}`}>
+              <summary
+                className={`w-max cursor-pointer text-[15px] ${textLink}`}
+              >
                 Show the figures
               </summary>
               <div className="mt-3">
                 <DataTable
+                  evenGaps
+                  large
                   label={`Billed and received by month, ${currency}`}
                   narrow
                   rows={shown.months}
@@ -628,12 +692,16 @@ const ReportsPage = () => {
               </div>
             </details>
           </Panel>
+          {/* Profit and loss lists a row for every month of the period, so
+              it has the width to itself. */}
           <ProfitAndLoss
             report={profitQuery.data}
             periodName={periodName}
             busy={profitQuery.isFetching}
           />
-          <div className="grid min-w-0 gap-6 compact:gap-5 min-[1100px]:grid-cols-2 max-[700px]:gap-5">
+          {/* What is owed beside how it was paid, side by side from 1280px,
+              where half the width still holds each table. */}
+          <div className="grid min-w-0 gap-6 compact:gap-5 min-[1280px]:grid-cols-2 max-[700px]:gap-5">
             <Panel
               id="ageing"
               title="Unpaid invoices by age"
@@ -648,6 +716,8 @@ const ReportsPage = () => {
               }
             >
               <DataTable
+                evenGaps
+                large
                 label={`Unpaid invoices by age, ${currency}`}
                 narrow
                 rows={shown.ageing}
@@ -656,6 +726,7 @@ const ReportsPage = () => {
                   {
                     label: "Age",
                     type: "main",
+                    track: SHARE_BAR_TRACK,
                     render: (row) => (
                       <>
                         {row.label}
@@ -668,6 +739,7 @@ const ReportsPage = () => {
                   },
                   {
                     label: "Invoices",
+                    type: "number",
                     render: (row) => row.invoices.toLocaleString("en"),
                   },
                   amountColumn("Owed", "outstanding", currency),
@@ -688,6 +760,8 @@ const ReportsPage = () => {
             >
               {shown.methods.length ? (
                 <DataTable
+                  evenGaps
+                  large
                   label={`Payment methods, ${currency}`}
                   narrow
                   rows={shown.methods}
@@ -696,6 +770,7 @@ const ReportsPage = () => {
                     {
                       label: "Method",
                       type: "main",
+                      track: SHARE_BAR_TRACK,
                       render: (row) => (
                         <>
                           {row.method}
@@ -708,6 +783,7 @@ const ReportsPage = () => {
                     },
                     {
                       label: "Payments",
+                      type: "number",
                       render: (row) => row.payments.toLocaleString("en"),
                     },
                     amountColumn("Amount", "amount", currency),
@@ -737,6 +813,8 @@ const ReportsPage = () => {
           >
             {clientRows.length ? (
               <DataTable
+                evenGaps
+                large
                 label={`Top clients, ${currency}`}
                 rows={clientRows}
                 rowKey={(row) =>
@@ -746,6 +824,7 @@ const ReportsPage = () => {
                   {
                     label: "Client",
                     type: "main",
+                    track: SHARE_BAR_TRACK,
                     render: (row) =>
                       row.others ? (
                         <span className="font-normal text-spot-muted">
@@ -773,6 +852,7 @@ const ReportsPage = () => {
                   },
                   {
                     label: "Documents",
+                    type: "number",
                     render: (row) => row.documents.toLocaleString("en"),
                   },
                   amountColumn("Billed", "billed", currency),
@@ -788,32 +868,18 @@ const ReportsPage = () => {
               />
             )}
           </Panel>
-          <TaxCharged
-            report={report}
-            entry={taxQuery.data?.currencies.find(
-              (entry) => entry.currency === currency,
-            )}
-            currency={currency}
-            periodFile={periodFile}
-            busy={taxQuery.isFetching}
-          />
+          {/* The tax charged beside the tax withheld. Split for GST, the tax
+              charged needs the whole width, and the two follow each other. */}
+          {taxBeside ? (
+            <div className="grid min-w-0 gap-6 compact:gap-5 min-[1280px]:grid-cols-2 max-[700px]:gap-5">
+              {taxCharged(true)}
+              {taxWithheld}
+            </div>
+          ) : (
+            taxCharged(false)
+          )}
           {gstMode && <GstHelpers />}
-          <TaxWithheld
-            report={report}
-            entry={tdsQuery.data?.currencies.find(
-              (entry) => entry.currency === currency,
-            )}
-            currency={currency}
-            elsewhere={
-              view
-                ? (tdsQuery.data?.currencies || [])
-                    .filter((entry) => entry.currency !== currency)
-                    .map((entry) => entry.currency || "no currency")
-                : []
-            }
-            periodFile={periodFile}
-            busy={tdsQuery.isFetching}
-          />
+          {!taxBeside && taxWithheld}
         </>
       )}
     </WorkspacePage>

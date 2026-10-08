@@ -4,10 +4,14 @@ import {
   compactAmount,
   currentMonth,
   gstFileName,
+  margin,
   monthName,
   monthYear,
+  percentLabel,
+  percentOf,
   periodOptions,
   previousMonth,
+  profitMonths,
   share,
 } from "./reportModel";
 
@@ -73,4 +77,37 @@ it("names the GST helper files as the server does", () => {
   expect(gstFileName("gstr3b", "2026-04", "2026-06")).toBe(
     "invoice-spot-gstr3b-2026-04-to-2026-06.csv",
   );
+});
+
+it("measures a month's margin against its income, and leaves it out without income", () => {
+  expect(margin(300, 1000)).toBe(30);
+  expect(margin(-1500, 1000)).toBe(-150);
+  expect(margin(1, 3)).toBe(33);
+  expect(margin(-500, 0)).toBeNull();
+});
+
+it("labels percents whole, a tiny share as under 1%, and nothing as a dash", () => {
+  expect(percentLabel(30)).toBe("30%");
+  expect(percentLabel(-150)).toBe("-150%");
+  expect(percentLabel(1200)).toBe("1,200%");
+  expect(percentLabel(0, 0.2)).toBe("<1%");
+  expect(percentLabel(0, 0)).toBe("0%");
+  expect(percentLabel(null)).toBe("—");
+  expect(percentOf(250, 1000)).toBe(25);
+  expect(percentOf(5, 0)).toBe(0);
+});
+
+it("adds each month's margin and the profit made so far, in cents", () => {
+  expect(
+    profitMonths([
+      { month: "2026-08", income: 1000, expenses: 700, profit: 300 },
+      { month: "2026-09", income: 0, expenses: 0.1, profit: -0.1 },
+      { month: "2026-10", income: 0.2, expenses: 0, profit: 0.2 },
+    ]).map(({ month, margin: kept, soFar }) => [month, kept, soFar]),
+  ).toEqual([
+    ["2026-08", 30, 300],
+    ["2026-09", null, 299.9],
+    ["2026-10", 100, 300.1],
+  ]);
+  expect(profitMonths()).toEqual([]);
 });
