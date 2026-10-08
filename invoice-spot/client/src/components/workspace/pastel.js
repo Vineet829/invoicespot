@@ -51,9 +51,12 @@ export const dangerButton = `${buttonBase} border border-overdue-icon/20 bg-over
 export const secondaryIconButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-spot-violet/15 bg-white/70 text-spot-night transition-colors hover:bg-white disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:stroke-[1.8]";
 
-// Small actions inside tables and forms, such as View and Delete.
+// Small actions inside tables and forms, such as View and Delete. The label
+// sets the button's baseline and its icon is centred beside it, so in a table
+// the label sits on the row's baseline; the label's line and the padding make
+// the 32px height, 44px for a finger.
 const rowActionBase =
-  "inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 text-[13px] transition-colors disabled:cursor-default disabled:opacity-100 coarse:min-h-11 [&>svg]:size-[15px] [&>svg]:shrink-0 [&>svg]:stroke-[1.7]";
+  "inline-flex min-h-8 items-baseline justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 py-[7px] text-[13px] leading-[18px] transition-colors disabled:cursor-default disabled:opacity-100 coarse:min-h-11 coarse:py-[13px] [&>svg]:size-[15px] [&>svg]:shrink-0 [&>svg]:self-center [&>svg]:stroke-[1.7]";
 export const rowAction = `${rowActionBase} bg-spot-violet/[.07] text-spot-violet hover:bg-spot-violet/[.13] disabled:bg-spot-violet/[.04] disabled:text-spot-disabled`;
 export const rowActionDanger = `${rowActionBase} bg-overdue/70 text-overdue-strong hover:enabled:bg-overdue disabled:bg-overdue/30 disabled:text-overdue-muted`;
 

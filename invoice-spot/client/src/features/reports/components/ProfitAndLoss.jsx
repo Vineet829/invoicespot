@@ -62,8 +62,6 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
               </p>
               <div className="flex min-w-0 flex-col gap-6">
                 <DataTable
-                  evenGaps
-                  large
                   label={`Profit and loss by month, ${entry.currency}`}
                   narrow
                   rows={profitMonths(entry.months)}
@@ -88,8 +86,6 @@ const ProfitAndLoss = ({ report, periodName, busy }) => {
                 />
                 {entry.categories.length > 0 && (
                   <DataTable
-                    evenGaps
-                    large
                     label={`Expenses by category, ${entry.currency}`}
                     narrow
                     rows={entry.categories}

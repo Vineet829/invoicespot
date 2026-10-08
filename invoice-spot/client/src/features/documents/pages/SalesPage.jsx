@@ -145,6 +145,7 @@ const Summary = ({ sales, period, onPeriod, onCurrency, busy }) => {
                 },
                 {
                   label: "Documents",
+                  type: "number",
                   render: (row) => Number(row.documents).toLocaleString("en"),
                 },
                 {
@@ -175,6 +176,7 @@ const Summary = ({ sales, period, onPeriod, onCurrency, busy }) => {
                   },
                   {
                     label: "Documents",
+                    type: "number",
                     render: (row) => Number(row.documents).toLocaleString("en"),
                   },
                   {

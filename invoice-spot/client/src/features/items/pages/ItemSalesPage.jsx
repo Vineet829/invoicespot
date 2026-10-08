@@ -87,6 +87,7 @@ const ItemSalesPage = () => {
     },
     {
       label: "Sold",
+      type: "number",
       render: (row) => (row.total ? "" : soldCount(row.quantity)),
     },
     {
@@ -103,6 +104,7 @@ const ItemSalesPage = () => {
     },
     {
       label: "Share of income",
+      type: "number",
       render: (row, index) =>
         row.total ? shareLabel(row.share) : shares[index],
     },

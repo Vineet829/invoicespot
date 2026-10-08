@@ -295,6 +295,7 @@ const Summary = ({ summary, mode, onMode, onCurrency, busy }) => {
                 },
                 {
                   label: "Invoices",
+                  type: "number",
                   render: (row) => Number(row.invoices).toLocaleString("en"),
                 },
                 {

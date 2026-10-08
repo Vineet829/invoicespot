@@ -36,7 +36,7 @@ const Pricing = ({ motion }) => {
           Free<span>.</span>
         </h2>
         <p className="mt-[18px] max-w-[400px] text-[18px] leading-[1.6] text-spot-body">
-          Everything included, for you and your team. No card needed.
+          Everything included, for you and your team.
         </p>
         <p className="mt-7">
           <Link

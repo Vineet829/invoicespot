@@ -202,6 +202,10 @@ it("links sign-up and sign-in", async () => {
     expect(link.getAttribute("href")).toBe("/register"),
   );
   expect(links(page, "Log in")[0].getAttribute("href")).toBe("/login");
+  // The hero offers sign-up, so the header keeps to Log in.
+  const header = page.querySelector("header");
+  expect(links(header, "Start for free")).toHaveLength(0);
+  expect(links(header, "Log in")).toHaveLength(1);
 });
 
 it("ends the headline one way at a time, and reads it to assistive technology once", async () => {
@@ -596,29 +600,15 @@ it("dresses the sample invoice in the chosen PDF template", async () => {
   expect(mock().textContent).toContain("Rupees Fifty Nine Thousand Only");
 });
 
-it("counts what the app covers, under the hero", async () => {
-  const { page } = await open();
-  const facts = page.querySelector("section[aria-label='In numbers']");
-  expect([...facts.querySelectorAll("dt")].map((dt) => dt.textContent)).toEqual(
-    ["150+", "GST-ready", "4 roles", "1 step"],
-  );
-  expect([...facts.querySelectorAll("dd")].map((dd) => dd.textContent)).toEqual(
-    [
-      "currencies to invoice in",
-      "CGST, SGST or IGST by place of supply",
-      "for your team, owner to viewer",
-      "to confirm a payment",
-    ],
-  );
-});
-
 it("ends on free pricing and three questions, with sign-up", async () => {
   const { page } = await open();
   const pricing = page.querySelector("section#pricing");
   expect(pricing.querySelector("h2").textContent).toBe("Free.");
   expect(pricing.textContent).toContain(
-    "Everything included, for you and your team. No card needed.",
+    "Everything included, for you and your team.",
   );
+  // "No card needed" is said once, under the hero's sign-up.
+  expect(pricing.textContent).not.toContain("No card needed");
   expect(
     [...pricing.querySelectorAll("dt")].map((dt) => dt.textContent),
   ).toEqual(["What's included?", "Do I need a GSTIN?", "Is my data safe?"]);

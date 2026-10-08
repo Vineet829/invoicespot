@@ -117,6 +117,7 @@ const RecurringPage = () => {
     },
     {
       label: "Made",
+      type: "number",
       render: (schedule) =>
         `${schedule.runsDone}${schedule.maxRuns ? ` of ${schedule.maxRuns}` : ""}`,
     },

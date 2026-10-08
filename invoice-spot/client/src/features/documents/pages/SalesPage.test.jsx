@@ -176,7 +176,7 @@ it("sums up what was billed in the period against the period before, by type and
     ["Credit notes", "1", "-1,100.00"],
   ]);
   expect(
-    [...types.querySelectorAll("[style]")].map((bar) =>
+    [...types.querySelectorAll("tbody [style]")].map((bar) =>
       Math.round(parseFloat(bar.style.width)),
     ),
   ).toEqual([100, 34, 0]);

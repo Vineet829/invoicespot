@@ -96,14 +96,17 @@ const CARD_TONES = {
 };
 export const financeTones = CARD_TONES;
 
+// Cards side by side keep the page's spacing between them, the same across
+// as down, as panels do on every page.
 export const financeCards =
-  "grid min-h-0 grid-cols-3 gap-4 max-[1359px]:gap-3 max-[700px]:grid-cols-1";
+  "grid min-h-0 grid-cols-3 gap-6 compact:gap-5 max-[700px]:grid-cols-1 max-[700px]:gap-5";
 export const financeCard = (tone) =>
-  `flex min-w-0 flex-col justify-between gap-[18px] rounded-[22px] p-6 [container-name:finance-card] [container-type:inline-size] compact:gap-2.5 compact:px-3.5 compact:py-[18px] max-[1359px]:p-[18px] max-[700px]:min-h-[240px] max-[700px]:p-[22px] ${CARD_TONES[tone].card}`;
-// A financial card's name, on a white pill, and its figure, as large as the
-// card's width allows for its count of characters, up to 56px.
+  `flex min-w-0 flex-col justify-between gap-[18px] rounded-[30px] p-6 [container-name:finance-card] [container-type:inline-size] compact:gap-2.5 compact:p-[18px] max-[700px]:min-h-[240px] max-[700px]:rounded-3xl max-[700px]:p-[18px] ${CARD_TONES[tone].card}`;
+// A financial card's name, on a white pill whose text sits on the same
+// baseline as a panel's title, and its figure, as large as the card's width
+// allows for its count of characters, up to 56px.
 export const financeLabel = (tone) =>
-  `rounded-full bg-white/70 px-4 py-2 font-ui text-[15px] font-normal [@container_finance-card_(min-width:162px)]:text-[16px] ${CARD_TONES[tone].label}`;
+  `rounded-full bg-white/70 px-4 py-1.5 font-ui text-[15px] font-normal [@container_finance-card_(min-width:162px)]:text-[16px] ${CARD_TONES[tone].label}`;
 export const financeFigure =
   "[font-size:min(56px,calc(100cqi_/_(var(--chars)_*_0.5)))]";
 
@@ -142,8 +145,10 @@ export const FinancialCard = ({ label, value, detail, icon: Icon, tone }) => {
 };
 
 // The overview's charts and lists sit on the frosted panel surface, with
-// small links to the full lists beside their titles.
-export const overviewPanel = `${surface} relative flex min-w-0 animate-ov-rise flex-col gap-2.5 px-6 pb-4 pt-5 max-[700px]:rounded-3xl max-[700px]:p-[18px]`;
+// small links to the full lists beside their titles. Every panel and card
+// keeps every page's panel padding and corners, so their titles start the
+// same way in from the edge.
+export const overviewPanel = `${surface} relative flex min-w-0 animate-ov-rise flex-col gap-2.5 p-6 compact:p-[18px] max-[700px]:rounded-3xl max-[700px]:p-[18px]`;
 export const panelLink =
   "inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] text-spot-night underline-offset-4 transition-colors hover:text-spot-violet hover:underline coarse:min-h-11 [&>svg]:size-[13px] [&>svg]:stroke-[1.5]";
 // A panel's way to start what it has none of yet, such as recording an
@@ -152,20 +157,23 @@ export const panelAction =
   "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[11px] bg-white px-3.5 text-[15px] text-spot-night transition-colors hover:text-spot-violet disabled:cursor-default disabled:bg-white/40 disabled:text-spot-disabled disabled:opacity-100 coarse:min-h-11 [&>svg]:size-3.5 [&>svg]:stroke-[1.8]";
 
 // The rows under the figures: what is owed beside what needs attention,
-// five parts of the row to six from 1200px, then the cash flow across the
-// width. Stacked, the rows keep the page's spacing.
+// on the figures' three columns from 1200px, what is owed in one and what
+// needs attention across the other two, so their edges line up with the
+// figures above; then the cash flow across the width. Every row keeps the
+// page's spacing, the same across as down.
 export const owedRow =
-  "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3 min-[1200px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]";
+  "grid min-w-0 gap-6 compact:gap-5 max-[700px]:gap-5 min-[1200px]:grid-cols-3 min-[1200px]:[&>:last-child]:col-span-2";
 // The lists under the cash flow, as tall as each other: the top clients,
-// the top items and what is coming up, a column each from 1440px. Narrower,
-// three would cut most names short, so the first two share a row and the
-// third goes under them across both. Two lists share the row equally.
+// the top items and what is coming up, a column each from 1360px, on the
+// same three columns as every row above. Narrower, three would cut names
+// short, so the first two share a row and the third goes under them across
+// both. Two lists share the row equally.
 export const listRow = (count) =>
   [
-    "grid min-w-0 gap-x-4 gap-y-5 max-[1359px]:gap-x-3",
+    "grid min-w-0 gap-6 compact:gap-5 max-[700px]:gap-5",
     count > 1 && "min-[1200px]:grid-cols-2",
     count > 2 &&
-      "min-[1440px]:grid-cols-3 min-[1200px]:max-[1439px]:[&>:last-child]:col-span-2",
+      "min-[1360px]:grid-cols-3 min-[1200px]:max-[1359px]:[&>:last-child]:col-span-2",
   ]
     .filter(Boolean)
     .join(" ");
@@ -196,7 +204,7 @@ const BarListLoading = ({ lead, className = "" }) => (
 
 export const DashboardLoading = () => (
   <div
-    className="flex min-w-0 flex-col gap-5"
+    className="flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5"
     role="status"
     aria-label="Loading your business overview"
   >

@@ -40,7 +40,8 @@ const TONES = {
 // The top of every public page. Signed-in visitors get the way back to
 // their workspace, their profile and sign out, as in the workspace sidebar.
 // signUp={false} drops the sign-up button where the page offers sign-up
-// itself; signUpLabel names it. sections lists parts of the page to link
+// itself, and Log in takes the button's place; signUpLabel names the
+// sign-up button. sections lists parts of the page to link
 // to, as { id, label }, beside the logo: a link scrolls to its section,
 // smoothly unless the visitor prefers less motion. tone="dark" dresses the
 // header for a dark ground.
@@ -158,7 +159,7 @@ const PublicHeader = ({
             </>
           ) : (
             <>
-              <Link to="/login" className={look.link}>
+              <Link to="/login" className={signUp ? look.link : look.button}>
                 Log in
               </Link>
               {signUp && (

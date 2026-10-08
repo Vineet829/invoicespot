@@ -13,7 +13,7 @@ import { overviewPanel, panelLink } from "./DashboardPanels";
 // A row: the item, its bar, how many were sold and its share of income,
 // then what it brought in, which can widen the column.
 const row =
-  "grid grid-cols-[minmax(0,1fr)_minmax(96px,auto)] items-center gap-2.5 py-[7px]";
+  "grid grid-cols-[minmax(0,1fr)_minmax(96px,auto)] items-baseline gap-2.5 py-[7px]";
 
 const sold = (quantity) =>
   `${Number(quantity || 0).toLocaleString("en", { maximumFractionDigits: 2 })} sold`;

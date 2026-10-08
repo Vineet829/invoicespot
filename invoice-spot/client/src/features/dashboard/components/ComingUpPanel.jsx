@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { FiChevronRight, FiFileText, FiPlus, FiRepeat } from "react-icons/fi";
 import { ActionLink, Amount } from "../../../components/workspace/Workspace";
@@ -16,55 +15,44 @@ import {
 import { overviewPanel, panelAction, panelLink } from "./DashboardPanels";
 
 // Each part's title, beside its icon on the tint the attention list gives
-// the same kind, then the link to its list.
-const partHeading = "flex items-center justify-between gap-3";
-const partTitle = "flex min-w-0 items-center gap-2 text-[17px] font-medium";
+// the same kind, then the link to its list, the title and the link on one
+// baseline and the icon centred beside the title.
+const partHeading = "flex items-baseline justify-between gap-3";
+const partTitle = "flex min-w-0 items-baseline gap-2 text-[17px] font-medium";
 const partIcon =
-  "grid size-7 shrink-0 place-items-center rounded-[10px] [&>svg]:size-[15px] [&>svg]:stroke-[1.6]";
+  "grid size-7 shrink-0 self-center place-items-center rounded-[10px] [&>svg]:size-[15px] [&>svg]:stroke-[1.6]";
 const card = "rounded-[14px] bg-white/55";
 const amount = "text-[20px] font-light tracking-[-0.03em]";
-// A detail's dot, kept on the line of the word after it.
-const dot = "·\u00a0";
 // A row that opens something, as tall on a touch screen as the overview's
 // other small links, white under the pointer unless its list says otherwise.
+// Its date and amount sit on its first line's baseline.
 const rowBase =
-  "grid items-center gap-2.5 rounded-xl px-3 py-1.5 transition-colors coarse:min-h-11";
+  "grid items-baseline gap-2.5 rounded-xl px-3 py-1.5 transition-colors coarse:min-h-11";
 const rowLink = `${rowBase} hover:bg-white`;
 
-// A quotation's row: its number, client and last valid day, each detail
-// after the number starting with its dot, so a wrapped line never ends on
-// one, and the day keeps to one line; then its amount. It opens the
-// quotation.
+// A quotation's row, laid out as a recurring invoice's: its client, with its
+// amount on the client's line, then its number and last valid day under
+// them, across the row so they keep to one line. It opens the quotation.
 const QuotationRow = ({ quote, currency, hover = "hover:bg-white" }) => {
-  const details = [
-    quote.documentNumber || "No number yet",
-    quote.client || "No client",
-    quote.until,
-  ];
+  const number = quote.documentNumber || "No number yet";
+  const client = quote.client || "No client";
   return (
     <li>
       <Link
         to={quote.to}
-        className={`${rowBase} grid-cols-[minmax(0,1fr)_auto] ${hover}`}
-        aria-label={`${details.join(", ")}, ${formatMoney(quote.amount, currency)}. Open the quotation`}
+        className={`${rowBase} grid-cols-[minmax(0,1fr)_auto] gap-y-0 ${hover}`}
+        aria-label={`${[number, client, quote.until].join(", ")}, ${formatMoney(quote.amount, currency)}. Open the quotation`}
       >
-        <span className="min-w-0 text-[17px] [overflow-wrap:anywhere]">
-          {details.map((detail, index) => (
-            <Fragment key={index}>
-              {index > 0 && " "}
-              <span className={index === 1 ? "" : "whitespace-nowrap"}>
-                {index > 0 && dot}
-                {detail}
-              </span>
-            </Fragment>
-          ))}
-        </span>
+        <span className="truncate text-[17px]">{client}</span>
         <Amount
           value={quote.amount}
           currency={currency}
           hideCode
           className={amount}
         />
+        <span className="col-span-2 truncate text-[15px] text-spot-muted">
+          {number} · {quote.until}
+        </span>
       </Link>
     </li>
   );

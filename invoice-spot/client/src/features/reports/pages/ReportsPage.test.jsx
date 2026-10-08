@@ -468,9 +468,11 @@ it("spaces every table's columns evenly, a count right-aligned and a bar given r
   const documents = clients.querySelector('[data-label="Documents"]');
   expect(documents.className).toContain("text-right");
   expect(documents.className).toContain("tabular-nums");
-  // With room to spare, every table's text grows.
+  // Every table draws its text at the one scale set by the window's width.
   for (const table of tables)
-    expect(table.querySelector("tbody td").className).toContain("roomy:text-");
+    expect(table.querySelector("tbody td").className).toMatch(
+      /min-\[1536px\]:text-\[\d+px\]/,
+    );
 });
 
 // The report's rows from the profit and loss down: a panel's name, or for a
