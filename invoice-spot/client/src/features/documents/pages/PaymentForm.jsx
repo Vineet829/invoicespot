@@ -1,162 +1,134 @@
-import PaidIcon from "@mui/icons-material/Paid";
-import {
-	Autocomplete,
-	Box,
-	TextField,
-	Typography,
-	Button,
-} from "@mui/material";
+import { useState } from "react";
+import { FiCheck } from "react-icons/fi";
 import { toast } from "react-toastify";
-import Spinner from "../../../components/Spinner";
-import { useEffect, useState } from "react";
-import PaymentDate from "./components/PaymentDate";
-
+import { useCreatePaymentMutation } from "../documentsApiSlice";
+import { PAYMENT_METHODS } from "../paymentMethods";
+import { TAX_WITHHELD_HINT, TAX_WITHHELD_LABEL, cents } from "../taxWithheld";
+import useBusinessToday from "../../business/useBusinessToday";
 import {
-	useCreatePaymentMutation,
-	useUpdateDocMutation,
-} from "../documentsApiSlice";
-
+  Field,
+  dateInput,
+  errorMessage,
+  money,
+} from "../../../components/workspace/Workspace";
+import { primaryButton, textLink } from "../../../components/workspace/pastel";
 
 const PaymentForm = ({ document }) => {
-	const [createPayment, { isLoading, isSuccess, data }] =
-		useCreatePaymentMutation();
-
-	const [updateDoc] = useUpdateDocMutation();
-
-	const paymentOptions = [
-		"Mobile Money",
-		"Cash",
-		"Bank Transfer",
-		"PayPal",
-		"Credit Card",
-		"Others",
-	];
-
-	const [datePaid, setDatePaid] = useState(new Date());
-	const [paymentMethod, setPaymentMethod] = useState("");
-	const [additionalInfo, setAdditionalInfo] = useState("");
-	const [amountPaid, setAmountPaid] = useState(0);
-	const [totalAmountReceived, setTotalAmountReceived] = useState(0);
-
-	useEffect(() => {
-		if (isSuccess) {
-			const message = data.message;
-			toast.success(message);
-			setAmountPaid(0);
-			setPaymentMethod("");
-			setAdditionalInfo("");
-		}
-	}, [data, isSuccess]);
-
-	useEffect(() => {
-		let totalReceived = 0;
-		for (var i = 0; i < document?.paymentRecords?.length; i++) {
-			totalReceived += Number(document?.paymentRecords[i]?.amountPaid);
-			setTotalAmountReceived(totalReceived);
-		}
-	}, [document, totalAmountReceived]);
-
-	const paymentHandler = async (e) => {
-		e.preventDefault();
-
-		try {
-			await createPayment({
-				id: document._id,
-				paidBy: document.customer.name,
-				datePaid,
-				paymentMethod,
-				additionalInfo,
-				amountPaid,
-			}).unwrap();
-
-			await updateDoc({
-				id: document._id,
-				totalAmountReceived:
-					Number(totalAmountReceived) + Number(amountPaid),
-				status:
-					Number(totalAmountReceived) + Number(amountPaid) >=
-					document?.total
-						? "Paid"
-						: "Not Fully Paid",
-			}).unwrap();
-		} catch (err) {
-			const message = err.data.message;
-			toast.error(message);
-		}
-	};
-
-	return (
-		<Box
-			sx={{
-				mt: "1rem",
-				display: "flex",
-				flexDirection: "column",
-				alignItems: "center",
-			}}
-			component="form"
-			noValidate
-			autoComplete="off"
-			onSubmit={paymentHandler}
-		>
-			{isLoading ? (
-				<Spinner />
-			) : (
-				<>
-					<PaymentDate
-						datePaid={datePaid}
-						setDatePaid={setDatePaid}
-					/>
-					<TextField
-						margin="dense"
-						name="amountPaid"
-						label="Amount Paid"
-						type="number"
-						fullWidth
-						variant="standard"
-						onChange={(e) => setAmountPaid(e.target.value)}
-						value={amountPaid}
-					/>
-
-					<Autocomplete
-						options={paymentOptions}
-						sx={{ width: "100%" }}
-						renderInput={(params) => (
-							<TextField
-								{...params}
-								label="Payment Method"
-								variant="standard"
-							/>
-						)}
-						onChange={(event, value) => setPaymentMethod(value)}
-					/>
-
-					<TextField
-						margin="dense"
-						name="additionalInfo"
-						label="Additional Info"
-						type="text"
-						fullWidth
-						variant="standard"
-						onChange={(e) => setAdditionalInfo(e.target.value)}
-						value={additionalInfo}
-					/>
-				</>
-			)}
-
-			<Button
-				sx={{ mt: 3, mb: 2 }}
-				type="submit"
-				fullWidth
-				variant="contained"
-				color="success"
-				size="large"
-				startIcon={<PaidIcon />}
-				disabled={!amountPaid || !paymentMethod ? true : false}
-			>
-				<Typography variant="h5">Record Payment</Typography>
-			</Button>
-		</Box>
-	);
+  const balance = Number(document.ledger?.balanceDue || 0);
+  // A payment is dated today by the business's calendar, the one the server
+  // counts its days by, and no later.
+  const today = dateInput(useBusinessToday());
+  const [datePaid, setDatePaid] = useState(today);
+  const [amountPaid, setAmountPaid] = useState("");
+  // The tax the client withheld, or null while its field is hidden.
+  const [tdsAmount, setTdsAmount] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [additionalInfo, setAdditionalInfo] = useState("");
+  const [create, { isLoading: busy }] = useCreatePaymentMutation();
+  const withholding = tdsAmount !== null;
+  const settles = cents(amountPaid) + cents(tdsAmount);
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      await create({
+        id: document._id,
+        datePaid,
+        amountPaid: Number(amountPaid),
+        tdsAmount: Number(tdsAmount),
+        paymentMethod,
+        additionalInfo,
+      }).unwrap();
+      toast.success("Payment has been recorded successfully.");
+      setAmountPaid("");
+      setTdsAmount(null);
+      setPaymentMethod("");
+      setAdditionalInfo("");
+    } catch (error) {
+      toast.error(errorMessage(error, "The payment could not be recorded."));
+    }
+  };
+  return (
+    <form onSubmit={submit}>
+      <div className="grid grid-cols-4 gap-5 max-[1359px]:grid-cols-2 max-[700px]:grid-cols-1">
+        <Field
+          label="Date paid"
+          type="date"
+          required
+          max={today}
+          value={datePaid}
+          onChange={(event) => setDatePaid(event.target.value)}
+          disabled={busy}
+        />
+        <Field
+          label="Amount paid"
+          type="number"
+          min={withholding ? "0" : "0.01"}
+          max={cents(balance - cents(tdsAmount))}
+          step="0.01"
+          required={!withholding}
+          hint={`Up to ${money(balance, document.currency)} is still owed.`}
+          value={amountPaid}
+          onChange={(event) => setAmountPaid(event.target.value)}
+          disabled={busy}
+        />
+        <Field
+          label="Payment method"
+          as="select"
+          required
+          value={paymentMethod}
+          onChange={(event) => setPaymentMethod(event.target.value)}
+          disabled={busy}
+        >
+          <option value="">Choose a method</option>
+          {PAYMENT_METHODS.map((method) => (
+            <option key={method}>{method}</option>
+          ))}
+        </Field>
+        <Field
+          label="Additional info"
+          maxLength={255}
+          value={additionalInfo}
+          onChange={(event) => setAdditionalInfo(event.target.value)}
+          disabled={busy}
+        />
+        {withholding && (
+          <Field
+            id="payment-tds"
+            label={TAX_WITHHELD_LABEL}
+            type="number"
+            min="0"
+            max={cents(balance - cents(amountPaid))}
+            step="0.01"
+            hint={TAX_WITHHELD_HINT}
+            value={tdsAmount}
+            onChange={(event) => setTdsAmount(event.target.value)}
+            disabled={busy}
+          />
+        )}
+      </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 max-[700px]:flex-col max-[700px]:items-stretch">
+        <button
+          type="button"
+          className={`${textLink} self-start bg-transparent p-0 text-[13px] coarse:min-h-11`}
+          aria-expanded={withholding}
+          aria-controls={withholding ? "payment-tds" : undefined}
+          onClick={() => setTdsAmount(withholding ? null : "")}
+          disabled={busy}
+        >
+          {withholding
+            ? "Remove the tax withheld"
+            : "Add tax withheld by the client (TDS)"}
+        </button>
+        <button
+          type="submit"
+          className={primaryButton}
+          disabled={busy || settles <= 0 || !paymentMethod}
+        >
+          <FiCheck aria-hidden="true" />
+          {busy ? "Recording…" : "Record payment"}
+        </button>
+      </div>
+    </form>
+  );
 };
-
 export default PaymentForm;

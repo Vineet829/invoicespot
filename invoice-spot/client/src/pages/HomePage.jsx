@@ -1,92 +1,96 @@
-import { Box, Button, Grid, Link, styled, Typography, useTheme, useMediaQuery } from "@mui/material";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
-import "../styles/homepage.css";
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useLoginUserMutation } from "../features/auth/authApiSlice";
+import { logIn } from "../features/auth/authSlice";
+import { GUEST_CREDENTIALS } from "../features/auth/components/authCommon";
+import useTitle from "../hooks/useTitle";
+import PublicHeader from "../components/public/PublicHeader";
+import GetPaid from "./home/GetPaid";
+import Hero from "./home/Hero";
+import Pricing from "./home/Pricing";
+import { column } from "./home/layout";
+import { usePrefersReducedMotion } from "./home/motion";
 
-const StyledTypography = styled(Typography)(({ theme }) => ({
-    fontSize: "12rem",
-    [theme.breakpoints.down("sm")]: {
-        fontSize: "6rem", 
-    },
-}));
+const SECTIONS = [
+  { id: "get-paid", label: "How it works" },
+  { id: "pricing", label: "Pricing" },
+];
 
+// The page's canvas: the workspace's reset and type, on two soft glows.
+const page =
+  "dashboard-app min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_10%_60%,#eef0fb_0,#eef0fb00_44%),radial-gradient(ellipse_at_90%_75%,#f1dcd2_0,#f1dcd200_38%)] bg-spot-canvas font-ui font-normal leading-[normal] tracking-normal text-spot-ink [color-scheme:light]";
+// The dark stage the page opens on: rounded, inset from the window's
+// edges and lit by three soft glows, with focus rings that show on it.
+const stage =
+  "m-[clamp(8px,1.2vw,14px)] overflow-hidden rounded-[clamp(24px,3vw,38px)] bg-[radial-gradient(ellipse_at_74%_42%,#7c62d68c_0,#7c62d600_52%),radial-gradient(ellipse_at_18%_108%,#e8835f3d_0,#e8835f00_46%),radial-gradient(ellipse_at_100%_0%,#6ea0d238_0,#6ea0d200_40%)] bg-[#1b1430] text-white [&_:is(a,button):focus-visible]:outline-white";
 
-const CreateAccountButton = styled(Button)(({ theme }) => ({
-    borderColor: "#000000",
-    borderRadius: "25px",
-    border: "3px solid",
-    fontSize: "1rem", 
-    [theme.breakpoints.up("sm")]: {
-        fontSize: "1.5em", 
-    },
-    "&:hover": {
-        borderColor: "#07f011",
-        boxShadow: "none",
-        border: "2px solid",
-    },
-}));
-
+// The homepage: the dark stage with the hero, then how an invoice gets
+// paid, the price, and the sign-off.
 const HomePage = () => {
-    const navigate = useNavigate();
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  useTitle("Invoice Spot — Good work. Great invoices.");
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.user);
+  const [loginGuest, { isLoading }] = useLoginUserMutation();
+  const [demoError, setDemoError] = useState("");
+  const motion = !usePrefersReducedMotion();
 
-    return (
-        <>
-            <header className="masthead main-bg-image">
-                <Grid container justifyContent="center">
-                    <Grid item xs={12} sm={10} md={8} lg={6}>
-                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: isMobile ? 2 : 5 }}>
-                            <StyledTypography
-                                variant="h1"
-                                align="center"
-                                sx={{ textTransform: "uppercase", mt: isMobile ? 8 : 16 }}
-                                className="homepage-header"
-                            >
-                                Invoice Spot
-                            </StyledTypography>
-                            <Typography
-                                align="center"
-                                variant="h4"
-                                component="div"
-                                gutterBottom
-                                sx={{ color: "rgba(255,255,255,0.6)", fontSize: isMobile ? "1.25rem" : "inherit", mt:{xs:"20%", sm:"0%"}, mb:{xs:"20%", sm:"0%"} }}
-                            >
-                                Whatever business you run, Creating Invoices, Receipts and Quotations is made easy with our app.
-                            </Typography>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    justifyContent: "center",
-                                    mt: 5,
-                                }}
-                            >
-                                <CreateAccountButton
-                                    variant="contained"
-                                    color="success"
-                                    size="large"
-                                    onClick={() => navigate("/register")}
-                                >
-                                    <Link
-                                        component={RouterLink}
-                                        to="/register"
-                                        sx={{
-                                            textDecoration: "none",
-                                            color: "white",
-                                            fontSize: isMobile ? "1rem" : "2rem",
-                                        }}
-                                    >
-                                        Create Account
-                                    </Link>
-                                </CreateAccountButton>
-                            </Box>
-                        </Box>
-                    </Grid>
-                </Grid>
-            </header>
-        </>
-    );
+  // The demo: the sample business, as a guest, or straight in when
+  // already signed in.
+  const openDemo = async () => {
+    if (user) {
+      navigate("/dashboard");
+      return;
+    }
+    setDemoError("");
+    try {
+      const credentials = await loginGuest(GUEST_CREDENTIALS).unwrap();
+      dispatch(logIn(credentials));
+      navigate("/dashboard");
+    } catch (error) {
+      const message =
+        error?.data?.message || "Unable to open the demo. Please try again.";
+      setDemoError(message);
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div className={page}>
+      <main id="main">
+        <div id="top" className={stage}>
+          <div className={`${column} py-3`}>
+            <PublicHeader tone="dark" sections={SECTIONS} signUp={false} />
+          </div>
+          <Hero
+            motion={motion}
+            busy={isLoading}
+            error={demoError}
+            onDemo={openDemo}
+          />
+        </div>
+        <GetPaid motion={motion} />
+        <Pricing motion={motion} />
+      </main>
+      <footer
+        className={`${column} flex flex-wrap items-center justify-between gap-x-7 gap-y-3.5 pb-9 pt-[clamp(72px,8vw,104px)] text-[14px] text-spot-muted`}
+      >
+        <Link
+          to="/"
+          className="font-display text-[20px] font-light tracking-[-0.04em] text-spot-ink [&>span]:text-spot-brand"
+          aria-label="Invoice Spot home"
+        >
+          Invoice Spot<span>.</span>
+        </Link>
+        <p>
+          © {new Date().getFullYear()} Invoice Spot · Made for independent
+          business
+        </p>
+      </footer>
+    </div>
+  );
 };
 
 export default HomePage;
-

@@ -1,291 +1,225 @@
-import AlarmTwoToneIcon from "@mui/icons-material/AlarmTwoTone";
-import CloseTwoToneIcon from "@mui/icons-material/CloseTwoTone";
-import DashboardTwoToneIcon from "@mui/icons-material/DashboardTwoTone";
-import DifferenceTwoToneIcon from "@mui/icons-material/DifferenceTwoTone";
-import DoneAllTwoToneIcon from "@mui/icons-material/DoneAllTwoTone";
-import HistoryEduTwoToneIcon from "@mui/icons-material/HistoryEduTwoTone";
-import PaidTwoToneIcon from "@mui/icons-material/PaidTwoTone";
-import SavingsTwoToneIcon from "@mui/icons-material/SavingsTwoTone";
-import SentimentDissatisfiedTwoToneIcon from "@mui/icons-material/SentimentDissatisfiedTwoTone";
-import SentimentSatisfiedAltTwoToneIcon from "@mui/icons-material/SentimentSatisfiedAltTwoTone";
-import { Box, Container, CssBaseline, Grid, Typography } from "@mui/material";
-import StyledDashboardGrid from "../../../components/StyledDashboardGrid";
-import StyledDivider from "../../../components/StyledDivider";
-import { useGetAllUserCustomersQuery } from "../../customers/customersApiSlice";
-import { useGetAllMyDocsQuery } from "../../documents/documentsApiSlice";
-import { addCurrencyCommas } from "../../documents/pages/components/addCurrencyCommas";
-import PaymentHistory from "./components/paymentHistory";
+import { Link, useSearchParams } from "react-router-dom";
+import { FiAlertCircle } from "react-icons/fi";
 import useTitle from "../../../hooks/useTitle";
+import { useGetOverviewQuery } from "../dashboardApiSlice";
+import {
+  DEFAULT_PERIOD,
+  PERIODS,
+  findPeriod,
+  periodSubtitle,
+} from "../dashboardModel";
+import DashboardShell from "../components/DashboardShell";
+import {
+  DashboardLoading,
+  listRow,
+  owedRow,
+} from "../components/DashboardPanels";
+import ReceivablesCard from "../components/ReceivablesCard";
+import OverviewTiles from "../components/OverviewTiles";
+import CashFlowPanel from "../components/CashFlowPanel";
+import AttentionPanel from "../components/AttentionPanel";
+import TopClientsPanel from "../components/TopClientsPanel";
+import TopItemsPanel from "../components/TopItemsPanel";
+import ComingUpPanel from "../components/ComingUpPanel";
+import Shortcuts from "../components/Shortcuts";
+import {
+  errorBanner,
+  errorDetail,
+  errorTitle,
+  pageSubtitle,
+  pageTitle,
+  retryButton,
+} from "../../../components/workspace/pastel";
+import { Select } from "../../../components/workspace/Select";
 
+// What the overview draws from. An answer without these, as an older server
+// sends, can't be shown.
+const OVERVIEW_FIELDS = ["period", "totals", "owedNow", "trend"];
+
+// The period's buttons sit in a frame as tall as a shortcut key, with the
+// keys' text size, so the two rows of buttons share their edges and their
+// baseline.
+const periodPill =
+  "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-[11px] px-3.5 text-[13.5px] transition-colors coarse:min-h-11 max-[700px]:flex-1 max-[700px]:px-2";
 
 const DashboardPage = () => {
-	useTitle("My Dashboard - MERN Invoice");
-	const { data: customers } = useGetAllUserCustomersQuery();
-	const { data: documents } = useGetAllMyDocsQuery();
+  useTitle("Business overview — Invoice Spot");
+  const [params, setParams] = useSearchParams();
+  const period = findPeriod(params.get("period")).key;
+  const overviewQuery = useGetOverviewQuery(
+    { currency: params.get("currency") || undefined, period },
+    { refetchOnMountOrArgChange: 60 },
+  );
+  const answer = overviewQuery.data;
+  const snapshot =
+    answer && OVERVIEW_FIELDS.every((key) => answer[key]) ? answer : undefined;
+  const refreshing = overviewQuery.isFetching;
+  const hasError = overviewQuery.isError || (Boolean(answer) && !snapshot);
+  // Until the chosen period's or currency's figures arrive, or when they
+  // couldn't be loaded, the last ones stay on screen, dimmed.
+  const stale = Boolean(snapshot) && !overviewQuery.currentData;
+  const shownPeriod = snapshot && findPeriod(snapshot.period.key);
+  const failure = !snapshot
+    ? [
+        "We couldn’t load your overview.",
+        "Please try again to see your latest figures.",
+      ]
+    : stale && shownPeriod.key !== period
+      ? [
+          `We couldn’t load ${findPeriod(period).called}.`,
+          `Showing ${shownPeriod.called}.`,
+        ]
+      : stale
+        ? [
+            `We couldn’t load the figures in ${params.get("currency") || snapshot.currencies[0]}.`,
+            `Showing ${snapshot.currency}.`,
+          ]
+        : [
+            "Some workspace data couldn’t be refreshed.",
+            "Your last loaded figures are still shown. Try refreshing.",
+          ];
+  // Money is shown for one period and one currency at a time. The address
+  // keeps what was chosen; the default period, and the first currency,
+  // stay out of it. The currency switch appears only when there is more
+  // than one.
+  const search = (changes) => {
+    const chosen = { period, currency: params.get("currency"), ...changes };
+    const next = new URLSearchParams();
+    if (chosen.period !== DEFAULT_PERIOD) next.set("period", chosen.period);
+    if (chosen.currency && chosen.currency !== snapshot?.currencies[0]) {
+      next.set("currency", chosen.currency);
+    }
+    return next.toString() ? `?${next}` : "";
+  };
+  const chooseCurrency = (currency) =>
+    setParams(search({ currency }), { replace: true });
 
-	let totalRecieved = 0;
-	for (let i = 0; i < documents?.myDocuments?.length; i++) {
-		if (documents?.myDocuments[i]?.totalAmountReceived !== undefined) {
-			totalRecieved += documents?.myDocuments[i]?.totalAmountReceived;
-		}
-	}
+  const refresh = () => overviewQuery.refetch();
+  // The lists under the cash flow, in their order.
+  const lists = [
+    snapshot?.topClients && (
+      <TopClientsPanel
+        key="top-clients"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+    snapshot?.topItems && (
+      <TopItemsPanel
+        key="top-items"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+    snapshot?.comingUp && (
+      <ComingUpPanel
+        key="coming-up"
+        snapshot={snapshot}
+        currencyChosen={Boolean(params.get("currency"))}
+      />
+    ),
+  ].filter(Boolean);
 
-	const docOverDue = documents?.myDocuments?.filter(
-		(doc) => doc.dueDate <= new Date().toISOString()
-	);
-
-	let paymentHistory = [];
-	for (let i = 0; i < documents?.myDocuments?.length; i++) {
-		let history = [];
-		if (documents?.myDocuments[i]?.paymentRecords !== undefined) {
-			history = [
-				...paymentHistory,
-				documents?.myDocuments[i]?.paymentRecords,
-			];
-			paymentHistory = [].concat.apply([], history);
-		}
-	}
-
-	const sortPaymentHistory = paymentHistory.sort(function (a, b) {
-		const c = new Date(a.datePaid);
-		const d = new Date(b.datePaid);
-
-		return d - c;
-	});
-
-	let totalAmount = 0;
-	for (let i = 0; i < documents?.myDocuments?.length; i++) {
-		totalAmount += documents?.myDocuments[i]?.total;
-	}
-
-	const fullyPaid = documents?.myDocuments?.filter(
-		(doc) => doc.status === "Paid"
-	);
-
-	const partiallyPaid = documents?.myDocuments?.filter(
-		(doc) => doc.status === "Not Fully Paid"
-	);
-
-	const notPaid = documents?.myDocuments?.filter(
-		(doc) => doc.status === "Not Paid"
-	);
-
-	return (
-		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"100vw", sm:"md"} }}>
-			<CssBaseline />
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				<DashboardTwoToneIcon sx={{ fontSize: 70 }} />
-				<Typography variant="h2"  sx={{
-    fontSize: {
-      xs: '1.5rem',
-      sm: '3.75rem',
-    }}}>My Dashboard</Typography>
-			</Box>
-			<StyledDivider />
-			<Box>
-				<Grid container spacing={2} sx={{flexDirection:{xs:"column", sm:"row"}, justifyContent:{xs:"center", sm:"flex-start"},
-			alignItems: {xs:"center", sm:"flex-start"}}}
-			>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<SentimentSatisfiedAltTwoToneIcon
-								color="primary"
-								sx={{ fontSize: 30 }}
-							/>
-							<Typography variant="h5" sx={{ marginLeft: 1 }}>
-								{customers?.totalCustomers}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{textAlign:"center"}}>Total Customers</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<DifferenceTwoToneIcon
-								color="success"
-								sx={{ fontSize: 30 }}
-							/>
-							<Typography variant="h5" sx={{ marginLeft: 1 }}>
-								{documents?.totalDocuments}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{ textAlign:"center"}}>Total Documents</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<SavingsTwoToneIcon
-								color="secondary"
-								sx={{ fontSize: 30 }}
-							/>
-							<Typography variant="h5" sx={{ marginLeft: 1 }}>
-								{addCurrencyCommas(totalAmount.toFixed(2))}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{textAlign:"center"}}>Expected Income</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<PaidTwoToneIcon
-								sx={{ fontSize: 30, color: "#ff9100" }}
-							/>
-							<Typography variant="h6" sx={{ marginLeft: 1 }}>
-								{addCurrencyCommas(totalRecieved)}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{ textAlign:"center"}}>Cash Received</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<SentimentDissatisfiedTwoToneIcon
-								sx={{ fontSize: 30, color: "#ff3d00" }}
-							/>
-							<Typography variant="h5" sx={{ marginLeft: 1 }}>
-								{addCurrencyCommas(
-									(totalAmount - totalRecieved).toFixed(2)
-								)}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{ textAlign:"center"}}>Cash Pending</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<DoneAllTwoToneIcon
-								sx={{ fontSize: 30, color: "#651fff" }}
-							/>
-							<Typography variant="h6" sx={{ marginLeft: 1 }}>
-								{fullyPaid?.length}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{ textAlign:"center"}}>Total Paid Docs</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<CloseTwoToneIcon
-								sx={{ fontSize: 30, color: "#2196f3" }}
-							/>
-							<Typography variant="h6" sx={{ marginLeft: 1 }}>
-								{partiallyPaid?.length}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{textAlign:"center"}}>Not Fully Paid</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<AlarmTwoToneIcon
-								sx={{ fontSize: 30, color: "#006064" }}
-							/>
-							<Typography variant="h6" sx={{ marginLeft: 1 }}>
-								{docOverDue?.length}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{ textAlign:"center"}}>Overdue</Typography>
-					</StyledDashboardGrid>
-					
-					<StyledDashboardGrid>
-						<Box
-							sx={{
-								display: "flex",
-								flexDirection: "row",
-								justifyContent: "center",
-							}}
-						>
-							<SentimentDissatisfiedTwoToneIcon
-								sx={{ fontSize: 30, color: "#455a64" }}
-							/>
-							<Typography variant="h6" sx={{ marginLeft: 1 }}>
-								{notPaid?.length}
-							</Typography>
-						</Box>
-						<Typography variant="h6" sx={{textAlign:"center"}}>UnPaid</Typography>
-					</StyledDashboardGrid>
-				</Grid>
-			</Box>
-			<Box
-				sx={{
-					mt: 3,
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				<HistoryEduTwoToneIcon sx={{ fontSize: 60 }} />
-				<Typography variant="h3" sx={{
-    fontSize: {
-      xs: '1.5rem', 
-      sm: '3.75rem', 
-    }}}>
-					{paymentHistory?.length
-						? "Payment History"
-						: "No Payments as of now"}
-				</Typography>
-			</Box>
-			<StyledDivider />
-			<PaymentHistory sortPaymentHistory={sortPaymentHistory} />
-		</Container>
-	);
+  return (
+    <DashboardShell>
+      <div className="flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5">
+        <header className="flex animate-ov-rise flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <div className="min-w-0">
+            <h1 className={pageTitle}>
+              Business overview<span>.</span>
+            </h1>
+            {/* The words follow the figures shown, which can still be the
+                last period's while the chosen one loads. */}
+            <p className={pageSubtitle}>
+              {snapshot
+                ? periodSubtitle(snapshot.period, snapshot.totals.hasPrevious)
+                : findPeriod(period).name}
+            </p>
+            <Shortcuts />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 max-[700px]:w-full">
+            <nav
+              aria-label="Period"
+              className="inline-flex gap-1 rounded-[14px] border border-white/90 bg-white/55 p-[3px] max-[700px]:w-full"
+            >
+              {PERIODS.map(({ key, label }) => (
+                <Link
+                  key={key}
+                  to={{ search: search({ period: key }) }}
+                  replace
+                  aria-current={key === period ? "true" : undefined}
+                  className={`${periodPill} ${key === period ? "bg-white text-spot-ink shadow-key" : "text-spot-nav hover:bg-white/60 hover:text-spot-night"}`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            {snapshot?.currencies.length > 1 && (
+              <label className="flex items-center gap-2 text-[13px] text-spot-body">
+                Currency
+                <Select
+                  size="toolbar"
+                  value={snapshot.currency}
+                  onChange={chooseCurrency}
+                >
+                  {snapshot.currencies.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+          </div>
+        </header>
+        {hasError && (
+          <div className={errorBanner} role="alert">
+            <FiAlertCircle aria-hidden="true" />
+            <div className="flex-1">
+              <strong className={errorTitle}>{failure[0]}</strong>
+              <span className={errorDetail}>{failure[1]}</span>
+            </div>
+            <button
+              type="button"
+              className={retryButton}
+              onClick={refresh}
+              disabled={refreshing}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        {overviewQuery.isLoading ? (
+          <DashboardLoading />
+        ) : (
+          snapshot && (
+            <div
+              className={`flex min-w-0 flex-col gap-6 compact:gap-5 max-[700px]:gap-5 transition-opacity ${stale ? "opacity-60" : ""}`}
+              aria-busy={stale || undefined}
+            >
+              <OverviewTiles
+                snapshot={snapshot}
+                currencyChosen={Boolean(params.get("currency"))}
+              />
+              <div className={owedRow}>
+                <ReceivablesCard
+                  snapshot={snapshot}
+                  currencyChosen={Boolean(params.get("currency"))}
+                />
+                <AttentionPanel snapshot={snapshot} />
+              </div>
+              <CashFlowPanel snapshot={snapshot} />
+              {/* A list an older server's answer has no figures for is left
+                  out, and the rest share its row. */}
+              {lists.length > 0 && (
+                <div className={listRow(lists.length)}>{lists}</div>
+              )}
+            </div>
+          )
+        )}
+      </div>
+    </DashboardShell>
+  );
 };
 
 export default DashboardPage;

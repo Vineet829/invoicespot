@@ -1,104 +1,305 @@
+import { useEffect, useRef, useState } from "react";
+import { useDispatch } from "react-redux";
 import {
-	Box,
-	Container,
-	Divider,
-	Grid,
-	Link,
-	Typography,
-  } from "@mui/material";
-  import { FaSignInAlt } from "react-icons/fa";
-  import { Link as RouterLink } from "react-router-dom";
-  import StyledDivider from "../../../components/StyledDivider";
-  import AuthWrapper from "../forms/AuthWrapper";
-  import LoginForm from "../forms/LoginForm";
-  
-  
-  const LoginPage = () => {
-	return (
-	  <AuthWrapper>
-		<Container
-		  component="main"
-		  
-		  sx={{
-			border: "2px solid #e4e5e7",
-			borderRadius: "25px",
-			py: 2,
-			px: { xs: 1, sm: 2 },
-			maxWidth:{xs:"25rem", sm:"40rem"}
-		  }}
-		>
-		  <Grid container spacing={2}> 
-			<Grid item xs={12}>
-			  <Box
-				sx={{
-				  display: "flex",
-				  flexDirection: "row",
-				  justifyContent: "center",
-				  alignItems: "center",
-				}}
-			  >
-				<FaSignInAlt className="auth-svg" />
-				<Typography variant="h5" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}>Log In</Typography> 
-			  </Box>
-			  <StyledDivider />
-			</Grid>
-			
-			<LoginForm />
-			<Divider
-			  sx={{ flexGrow: 1, mb: 1, mt: 1 ,}}
-			  orientation="horizontal"
-			/>
-			
-			<Grid item xs={12}>
-			  <Box
-				sx={{
-				  justifyContent: "center",
-				  display: "flex",
-				  alignItems: "center",
-				}}
-			  >
-				<Typography variant="body1" sx={{ textAlign: 'center', fontSize: { xs: '0.875rem', sm: '1rem' } }}> 
-				  <Link
-					variant="body1"
-					component={RouterLink}
-					to="/register"
-					sx={{ textDecoration: "none", ml: 0.5 }} 
-				  >
-					Sign Up Here
-				  </Link>
-				</Typography>
-			  </Box>
-			</Grid>
-			<Divider
-			  sx={{ flexGrow: 1, mb: 1, mt: 1 }}
-			  orientation="horizontal"
-			/>
-			
-			<Grid item xs={12}>
-			  <Box
-				sx={{
-				  justifyContent: "center",
-				  display: "flex",
-				  alignItems: "center",
-				}}
-			  >
-				<Typography variant="body1" sx={{ textAlign: 'center', fontSize: { xs: '0.875rem', sm: '1rem' } }}> {/* Adjust font size for smaller screens */}
-				  Didn't get the verification email?
-				  <Link
-					variant="body1"
-					component={RouterLink}
-					to="/resend"
-					sx={{ textDecoration: "none", ml: 0.5 }} 
-				  >
-					Resend Email
-				  </Link>
-				</Typography>
-			  </Box>
-			</Grid>
-		  </Grid>
-		</Container>
-	  </AuthWrapper>
-	);
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+import { toast } from "react-toastify";
+import { Formik } from "formik";
+import * as Yup from "yup";
+import useTitle from "../../../hooks/useTitle";
+import { pendingInvitePath } from "../../business/pendingInvite";
+import { useLoginUserMutation } from "../authApiSlice";
+import { logIn } from "../authSlice";
+import { oauthErrorMessage } from "../oauthErrors";
+import AuthVisual from "../components/AuthVisual";
+import ProviderButtons from "../components/ProviderButtons";
+import TwoFactorStep from "../components/TwoFactorStep";
+import {
+  ArrowIcon,
+  EyeIcon,
+  GuestIcon,
+  MailIcon,
+  GUEST_CREDENTIALS,
+} from "../components/authCommon";
+import { auth, fieldError, passwordToggle, rise } from "../components/authForm";
+
+const loginSchema = Yup.object().shape({
+  email: Yup.string()
+    .email("Must be a valid email")
+    .max(254, "Must be a valid email")
+    .required("Email is required"),
+  password: Yup.string()
+    .max(128, "At most 128 characters")
+    .required("Password is required"),
+});
+
+const delay = (d) => ({ "--d": `${d}s` });
+
+const LoginPage = () => {
+  useTitle("Login - Invoice Spot");
+
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const location = useLocation();
+
+  // An invitation opened before logging in waits for the account it was
+  // sent to, even across signing up and verifying the email.
+  const from =
+    location.state?.from?.pathname || pendingInvitePath() || "/dashboard";
+
+  // A sign-in with Google that didn't work comes back here with the reason.
+  // It shows once, even though StrictMode runs effects twice in development,
+  // and leaves the address so a reload doesn't show it again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const oauthError = searchParams.get("oauth_error");
+  const oauthErrorShown = useRef(false);
+  useEffect(() => {
+    if (!oauthError || oauthErrorShown.current) return;
+    oauthErrorShown.current = true;
+    toast.error(oauthErrorMessage(oauthError));
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("oauth_error");
+        next.delete("provider");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [oauthError, setSearchParams]);
+
+  const [showPassword, setShowPassword] = useState(false);
+  // With two-factor sign-in on, a correct password earns a challenge that a
+  // code completes.
+  const [challenge, setChallenge] = useState(null);
+  const [loginUser, { isLoading }] = useLoginUserMutation();
+  const [loginGuest, { isLoading: guestLoading }] = useLoginUserMutation();
+
+  const signedIn = (credentials) => {
+    dispatch(logIn({ ...credentials }));
+    navigate(from, { replace: true });
   };
-  
-  export default LoginPage;
+
+  const handleGuestLogin = async () => {
+    try {
+      signedIn(await loginGuest(GUEST_CREDENTIALS).unwrap());
+    } catch (err) {
+      toast.error(
+        err?.data?.message || "Unable to open the demo. Please try again.",
+      );
+    }
+  };
+
+  // Both steps share the page, so the visual stays as it is between them.
+  const visual = (
+    <AuthVisual
+      headline={["Your invoices,", "simplified."]}
+      subtext="Create invoices, email PDFs, and track payments&nbsp;— all in one place."
+      loaderLabel="Setting up your workspace"
+    />
+  );
+
+  if (challenge) {
+    return (
+      <div className={auth.page}>
+        {visual}
+
+        <section className={auth.formPanel}>
+          <div className={auth.formWrap}>
+            <Link to="/" className={auth.mobileBrand}>
+              <span className={auth.brandMark}>IS</span>Invoice Spot
+            </Link>
+            <TwoFactorStep
+              challenge={challenge}
+              onBack={() => setChallenge(null)}
+              onSignedIn={signedIn}
+            />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className={auth.page}>
+      {visual}
+
+      <section className={auth.formPanel}>
+        <div className={auth.formWrap}>
+          <Link to="/" className={auth.mobileBrand}>
+            <span className={auth.brandMark}>IS</span>Invoice Spot
+          </Link>
+          <div className={auth.formHead}>
+            <h1 className={`${auth.title} ${rise}`} style={delay(0.15)}>
+              Welcome back
+            </h1>
+            <p className={`${auth.sub} ${rise}`} style={delay(0.22)}>
+              Log in to your Invoice Spot account
+            </p>
+          </div>
+
+          <Formik
+            initialValues={{ email: "", password: "" }}
+            validationSchema={loginSchema}
+            onSubmit={async (values, { setStatus, setSubmitting }) => {
+              try {
+                const result = await loginUser(values).unwrap();
+                setStatus({ success: true });
+                if (result.twoFactorRequired) setChallenge(result.challenge);
+                else signedIn(result);
+              } catch (err) {
+                toast.error(err?.data?.message || "Login failed");
+                setStatus({ success: false });
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            {({
+              errors,
+              handleBlur,
+              handleChange,
+              handleSubmit,
+              isSubmitting,
+              touched,
+              values,
+            }) => {
+              const busy = isSubmitting || isLoading || guestLoading;
+              const emailError = touched.email && errors.email;
+              const passwordError = touched.password && errors.password;
+              return (
+                <form className={auth.form} noValidate onSubmit={handleSubmit}>
+                  <div className={auth.fields}>
+                    <div className={`${auth.field} ${rise}`} style={delay(0.3)}>
+                      <label className={auth.label} htmlFor="login-email">
+                        Email
+                      </label>
+                      <input
+                        id="login-email"
+                        className={auth.input}
+                        type="email"
+                        name="email"
+                        autoComplete="email"
+                        placeholder="you@business.com"
+                        value={values.email}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        aria-invalid={Boolean(emailError)}
+                      />
+                      {emailError && (
+                        <div className={fieldError}>{errors.email}</div>
+                      )}
+                    </div>
+
+                    <div
+                      className={`${auth.field} ${rise}`}
+                      style={delay(0.36)}
+                    >
+                      <div className={auth.labelRow}>
+                        <label className={auth.label} htmlFor="login-password">
+                          Password
+                        </label>
+                        <Link
+                          to="/reset_password_request"
+                          className={auth.link}
+                        >
+                          Forgot password?
+                        </Link>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="login-password"
+                          className={auth.passwordInput}
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          autoComplete="current-password"
+                          placeholder="Enter your password"
+                          value={values.password}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          aria-invalid={Boolean(passwordError)}
+                        />
+                        <button
+                          type="button"
+                          className={passwordToggle}
+                          onClick={() => setShowPassword((shown) => !shown)}
+                          aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                          }
+                        >
+                          <EyeIcon slashed={showPassword} />
+                        </button>
+                      </div>
+                      {passwordError && (
+                        <div className={fieldError}>{errors.password}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className={`${auth.primary} ${rise}`}
+                    style={delay(0.42)}
+                    disabled={busy}
+                  >
+                    {isSubmitting || isLoading ? "Logging in…" : "Log in"}
+                  </button>
+
+                  <div className={auth.alt}>
+                    <div
+                      className={`${auth.divider} ${rise}`}
+                      style={delay(0.6)}
+                    >
+                      <div className={auth.dividerLine} />
+                      <span className={auth.dividerText}>or</span>
+                      <div className={auth.dividerLine} />
+                    </div>
+
+                    {/* Sign-in providers share Guest's row, in equal columns,
+                        tightened on narrow screens so labels stay on one line. */}
+                    <div
+                      className={`grid auto-cols-fr grid-flow-col gap-2.5 ${rise}`}
+                      style={delay(0.66)}
+                    >
+                      <ProviderButtons />
+                      <button
+                        type="button"
+                        className={`${auth.ghost} ${auth.tight}`}
+                        onClick={handleGuestLogin}
+                        disabled={busy}
+                      >
+                        <GuestIcon />
+                        {guestLoading ? "Opening demo…" : "Guest"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={`${auth.foot} ${rise}`} style={delay(0.72)}>
+                    <Link to="/register" className={auth.cta}>
+                      <span className={auth.ctaText}>New to Invoice Spot?</span>
+                      <span className={auth.ctaAction}>
+                        Create an account <ArrowIcon />
+                      </span>
+                    </Link>
+                    <p className={auth.note}>
+                      <MailIcon />
+                      <span>
+                        Didn't get the verification email?{" "}
+                        <Link to="/resend">Resend it</Link>
+                      </span>
+                    </p>
+                  </div>
+                </form>
+              );
+            }}
+          </Formik>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+export default LoginPage;

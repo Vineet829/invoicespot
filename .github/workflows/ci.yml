@@ -36,7 +36,34 @@ jobs:
           name: surefire-reports
           path: target/surefire-reports/
 
-  # Builds the backend image to prove the Dockerfile still works; nothing is pushed.
+  client:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: invoice-spot/client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: invoice-spot/client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+  # Builds both images to prove the Dockerfiles still work; nothing is pushed.
   images:
     runs-on: ubuntu-24.04
     steps:
@@ -52,3 +79,12 @@ jobs:
           push: false
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build client image
+        uses: docker/build-push-action@v7
+        with:
+          context: invoice-spot/client
+          file: invoice-spot/client/Dockerfile
+          push: false
+          cache-from: type=gha,scope=client
+          cache-to: type=gha,mode=max,scope=client

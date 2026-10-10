@@ -1,0 +1,383 @@
+{
+  "success": true,
+  "currencies": ["USD"],
+  "currency": "USD",
+  "clients": 12,
+  "expectedIncome": 209842.18,
+  "cashReceived": 185556.39,
+  "taxWithheld": 0.0,
+  "cashPending": 24285.79,
+  "period": {
+    "key": "90d",
+    "from": "2026-07-07",
+    "to": "2026-10-04",
+    "previousFrom": "2026-04-08",
+    "previousTo": "2026-07-06",
+    "step": "week"
+  },
+  "totals": {
+    "billed": { "current": 68848.08, "previous": 53344.02 },
+    "received": { "current": 44562.29, "previous": 59864.82 },
+    "profit": { "current": 64194.0, "previous": 49738.0 },
+    "tax": 4654.08,
+    "previousTax": 3606.02,
+    "hasPrevious": true
+  },
+  "owedNow": {
+    "total": 24285.79,
+    "notDue": 17959.76,
+    "overdue": 6326.03,
+    "invoices": 10,
+    "overdueInvoices": 3,
+    "bands": [
+      { "key": "current", "amount": 17959.76, "invoices": 7 },
+      { "key": "days1to15", "amount": 965.25, "invoices": 1 },
+      { "key": "days16to30", "amount": 1969.11, "invoices": 1 },
+      { "key": "days31to45", "amount": 0.0, "invoices": 0 },
+      { "key": "over45", "amount": 3391.67, "invoices": 1 }
+    ]
+  },
+  "trend": [
+    {
+      "from": "2026-07-07",
+      "to": "2026-07-13",
+      "billed": 0.0,
+      "received": 0.0,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-14",
+      "to": "2026-07-20",
+      "billed": 750.75,
+      "received": 300.3,
+      "income": 700.0,
+      "expenses": 0.0,
+      "moneyIn": 300.3,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-21",
+      "to": "2026-07-27",
+      "billed": 11218.35,
+      "received": 4332.9,
+      "income": 10460.0,
+      "expenses": 0.0,
+      "moneyIn": 4332.9,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-07-28",
+      "to": "2026-08-03",
+      "billed": 8172.45,
+      "received": 6002.14,
+      "income": 7620.0,
+      "expenses": 0.0,
+      "moneyIn": 6002.14,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-04",
+      "to": "2026-08-10",
+      "billed": 4268.55,
+      "received": 2120.98,
+      "income": 3980.0,
+      "expenses": 0.0,
+      "moneyIn": 2120.98,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-11",
+      "to": "2026-08-17",
+      "billed": 4395.11,
+      "received": 5743.67,
+      "income": 4098.0,
+      "expenses": 0.0,
+      "moneyIn": 5743.67,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-18",
+      "to": "2026-08-24",
+      "billed": 0.0,
+      "received": 1406.44,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 1406.44,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-08-25",
+      "to": "2026-08-31",
+      "billed": 3861.0,
+      "received": 0.0,
+      "income": 3600.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-01",
+      "to": "2026-09-07",
+      "billed": 0.0,
+      "received": 4410.33,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 4410.33,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-08",
+      "to": "2026-09-14",
+      "billed": 965.25,
+      "received": 2988.67,
+      "income": 900.0,
+      "expenses": 0.0,
+      "moneyIn": 2988.67,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-15",
+      "to": "2026-09-21",
+      "billed": 0.0,
+      "received": 0.0,
+      "income": 0.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-22",
+      "to": "2026-09-28",
+      "billed": 16956.23,
+      "received": 0.0,
+      "income": 15810.0,
+      "expenses": 0.0,
+      "moneyIn": 0.0,
+      "moneyOut": 0.0
+    },
+    {
+      "from": "2026-09-29",
+      "to": "2026-10-04",
+      "billed": 18260.39,
+      "received": 17256.86,
+      "income": 17026.0,
+      "expenses": 0.0,
+      "moneyIn": 17256.86,
+      "moneyOut": 0.0
+    }
+  ],
+  "attention": {
+    "items": [
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001026",
+        "documentNumber": "INV-1026",
+        "client": "Sable Fitness",
+        "clientId": "00000000-0000-0000-0000-00000000c105",
+        "amount": 3391.67,
+        "date": "2026-08-11",
+        "days": 54
+      },
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001030",
+        "documentNumber": "INV-1030",
+        "client": "Quill & Co. Publishing",
+        "clientId": "00000000-0000-0000-0000-00000000c107",
+        "amount": 1969.11,
+        "date": "2026-09-13",
+        "days": 21
+      },
+      {
+        "kind": "overdue",
+        "documentId": "00000000-0000-0000-0000-000000001031",
+        "documentNumber": "INV-1031",
+        "client": "Verdant Farms",
+        "clientId": null,
+        "amount": 965.25,
+        "date": "2026-09-24",
+        "days": 10
+      },
+      {
+        "kind": "dueSoon",
+        "documentId": "00000000-0000-0000-0000-000000001032",
+        "documentNumber": "INV-1032",
+        "client": "Bluefin Analytics",
+        "clientId": "00000000-0000-0000-0000-00000000c103",
+        "amount": 2664.09,
+        "date": "2026-10-06",
+        "days": 2
+      }
+    ],
+    "counts": {
+      "paymentReports": 0,
+      "overdue": 3,
+      "dueSoon": 1,
+      "drafts": 0
+    }
+  },
+  "topClients": [
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c107",
+      "client": "Quill & Co. Publishing",
+      "billed": 13459.88,
+      "owed": 1969.11,
+      "documents": 2
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c109",
+      "client": "Kestrel Outdoor",
+      "billed": 10317.45,
+      "owed": 0.0,
+      "documents": 2
+    },
+    {
+      "clientId": null,
+      "client": "Verdant Farms",
+      "billed": 8590.73,
+      "owed": 5311.77,
+      "documents": 2
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c110",
+      "client": "Oak Street Bakery",
+      "billed": 8363.36,
+      "owed": 3217.5,
+      "documents": 3
+    },
+    {
+      "clientId": "00000000-0000-0000-0000-00000000c101",
+      "client": "Atlas Robotics",
+      "billed": 5298.15,
+      "owed": 2550.4,
+      "documents": 2
+    }
+  ],
+  "topItems": [
+    {
+      "item": "Motion graphics (per 15 seconds)",
+      "quantity": 28.0,
+      "amount": 18200.0,
+      "documents": 6
+    },
+    {
+      "item": "Logo and identity system",
+      "quantity": 3.0,
+      "amount": 9280.0,
+      "documents": 3
+    },
+    {
+      "item": "Consulting (hourly)",
+      "quantity": 52.0,
+      "amount": 7140.0,
+      "documents": 5
+    },
+    {
+      "item": "Front-end build (per page)",
+      "quantity": 17.0,
+      "amount": 6460.0,
+      "documents": 3
+    },
+    {
+      "item": "Brand strategy workshop",
+      "quantity": 3.0,
+      "amount": 5400.0,
+      "documents": 3
+    }
+  ],
+  "itemsTotal": 64194.0,
+  "comingUp": {
+    "recurring": {
+      "active": 3,
+      "next90Days": { "invoices": 7, "amount": 10650.0 },
+      "nextRuns": [
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c1",
+          "templateId": "00000000-0000-0000-0000-000000001012",
+          "documentNumber": "INV-1012",
+          "client": "Harbor & Pine Architects",
+          "amount": 450.0,
+          "date": "2026-10-12"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c2",
+          "templateId": "00000000-0000-0000-0000-000000001020",
+          "documentNumber": "INV-1020",
+          "client": "Bluefin Analytics",
+          "amount": 2500.0,
+          "date": "2026-10-20"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c3",
+          "templateId": "00000000-0000-0000-0000-000000001027",
+          "documentNumber": "INV-1027",
+          "client": "Oak Street Bakery",
+          "amount": 1800.0,
+          "date": "2026-11-03"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c1",
+          "templateId": "00000000-0000-0000-0000-000000001012",
+          "documentNumber": "INV-1012",
+          "client": "Harbor & Pine Architects",
+          "amount": 450.0,
+          "date": "2026-11-12"
+        },
+        {
+          "scheduleId": "00000000-0000-0000-0000-0000000005c2",
+          "templateId": "00000000-0000-0000-0000-000000001020",
+          "documentNumber": "INV-1020",
+          "client": "Bluefin Analytics",
+          "amount": 2500.0,
+          "date": "2026-11-20"
+        }
+      ]
+    },
+    "quotations": {
+      "awaiting": {
+        "count": 1,
+        "amount": 1201.2,
+        "items": [
+          {
+            "documentId": "00000000-0000-0000-0000-000000000206",
+            "documentNumber": "QUO-0206",
+            "client": "Kestrel Outdoor",
+            "amount": 1201.2,
+            "validUntil": "2026-10-09",
+            "days": 5
+          }
+        ]
+      },
+      "expired": {
+        "count": 5,
+        "amount": 25343.18,
+        "items": [
+          {
+            "documentId": "00000000-0000-0000-0000-000000000205",
+            "documentNumber": "QUO-0205",
+            "client": "Atlas Robotics",
+            "amount": 5362.5,
+            "validUntil": "2026-08-24"
+          },
+          {
+            "documentId": "00000000-0000-0000-0000-000000000204",
+            "documentNumber": "QUO-0204",
+            "client": "Lumen Health",
+            "amount": 8558.55,
+            "validUntil": "2026-07-02"
+          },
+          {
+            "documentId": "00000000-0000-0000-0000-000000000203",
+            "documentNumber": "QUO-0203",
+            "client": "Tidewater Logistics",
+            "amount": 321.75,
+            "validUntil": "2026-05-15"
+          }
+        ]
+      }
+    }
+  }
+}
