@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+<meta charset="utf-8" />
+<title th:text="${'Statement for ' + statement.client().name()}">Statement</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 16mm 18mm 16mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 8pt;
+      color: #6b7080;
+    }
+  }
+  body { margin: 0; font-family: 'Noto Sans', sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 0; vertical-align: top; }
+  .head td { padding-bottom: 22px; }
+  .logo { max-height: 56px; max-width: 150px; margin-bottom: 12px; }
+  .sender-name { font-size: 13pt; color: #232735; font-weight: bold; margin-bottom: 4px; }
+  .muted { color: #5d6170; }
+  .doc { text-align: right; width: 46%; }
+  .title { font-size: 28pt; font-weight: normal; color: #232735; letter-spacing: -0.5pt; line-height: 1.1; }
+  .subtitle { font-size: 10pt; color: #5b47a0; margin: 4px 0 12px; }
+  .meta { width: auto; margin-left: auto; }
+  .meta td { padding: 1px 0 1px 18px; }
+  .meta .k { color: #6b7080; text-align: left; }
+  .meta .v { color: #232735; text-align: right; }
+  .band { background: #f3f2f8; border-radius: 12px; }
+  .band td { padding: 14px 16px; }
+  .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.8pt; color: #6b7080; margin-bottom: 5px; }
+  .client-name { font-size: 11pt; color: #232735; font-weight: bold; margin-bottom: 3px; }
+  .account { margin-top: 22px; }
+  .account .label { margin-bottom: 8px; }
+  .ledger { -fs-table-paginate: paginate; }
+  .ledger th { font-size: 8pt; font-weight: normal; text-transform: uppercase; letter-spacing: 0.6pt; color: #6b7080; text-align: left; padding: 0 8px 7px 0; border-bottom: 1px solid #d9d8e2; }
+  .ledger td { padding: 8px 8px 8px 0; border-bottom: 1px solid #ecebf1; color: #232735; }
+  .ledger .date { width: 22%; white-space: nowrap; color: #5d6170; }
+  .ledger .num { text-align: right; white-space: nowrap; }
+  .ledger th.num { white-space: normal; }
+  .ledger tr { page-break-inside: avoid; }
+  .summary { width: 46%; margin: 14px 0 0 auto; page-break-inside: avoid; }
+  .summary td { padding: 4px 0; }
+  .summary .v { text-align: right; color: #232735; white-space: nowrap; }
+  .summary .overdue td { color: #9c4526; }
+  .summary .balance td { border-top: 1px solid #d9d8e2; padding-top: 10px; font-size: 11pt; color: #30234f; font-weight: bold; }
+  .empty { margin-top: 26px; }
+</style>
+<th:block th:if="${theme != null}"><style th:replace="~{pdf/fragments/themes :: ${theme}}"></style></th:block>
+</head>
+<body>
+  <table class="head">
+    <tr>
+      <td th:replace="~{pdf/fragments/parties :: seller(${statement.seller()})}">Business</td>
+      <td class="doc">
+        <div class="title">Statement</div>
+        <div class="subtitle">Account activity</div>
+        <table class="meta">
+          <tr>
+            <td class="k">Date</td>
+            <td class="v" th:text="${statement.date()}">Sep 30, 2026</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table th:replace="~{pdf/fragments/parties :: client('Statement for', ${statement.client()})}"></table>
+
+  <div class="account" th:each="account : ${statement.accounts()}">
+    <div class="label" th:if="${statement.accounts().size() > 1}" th:text="${account.currency()}">USD</div>
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th class="date">Date</th>
+          <th>Description</th>
+          <th class="num">Charges</th>
+          <th class="num">Payments &amp; credits</th>
+          <th class="num">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="line : ${account.lines()}">
+          <td class="date" th:text="${line.date()}">Sep 1, 2026</td>
+          <td th:text="${line.description()}">Invoice INV-0001</td>
+          <td class="num" th:text="${line.charge()}">100.00</td>
+          <td class="num" th:text="${line.payment()}"></td>
+          <td class="num" th:text="${line.balance()}">100.00</td>
+        </tr>
+      </tbody>
+    </table>
+    <table th:replace="~{pdf/fragments/totals ::
+        totals(${account.currency()}, ${account.totals()}, 'Amount due', ${account.due()})}"></table>
+  </div>
+
+  <p class="muted empty" th:if="${statement.accounts().isEmpty()}">No invoices yet, so nothing is due.</p>
+</body>
+</html>

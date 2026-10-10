@@ -1,0 +1,26 @@
+# Published on this machine only: the database password is a well-known
+# default, and Mailpit's inbox shows sign-in and password-reset links and has
+# no login.
+services:
+  postgres:
+    image: postgres:16
+    container_name: invoicespot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: invoicespot
+      POSTGRES_USER: invoicespot
+      POSTGRES_PASSWORD: invoicespot
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - invoicespot_pg:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:v1.15
+    container_name: invoicespot_mailpit
+    ports:
+      - "127.0.0.1:1026:1025"
+      - "127.0.0.1:8026:8025"
+
+volumes:
+  invoicespot_pg:

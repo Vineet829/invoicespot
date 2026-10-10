@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+  <!-- A document's lines, with each line's tax rate when the rates differ,
+       and always on a GST invoice. -->
+  <table class="items" th:fragment="items(lines, rated, rateHeader)">
+    <thead>
+      <tr>
+        <th class="index">#</th>
+        <th>Item</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit price</th>
+        <th class="num">Discount</th>
+        <th th:if="${rated}" class="num" th:text="${rateHeader}">Tax</th>
+        <th class="num">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="item : ${lines}">
+        <td class="index" th:text="${item.index()}">1</td>
+        <td th:if="${item.hsnSac() == null}" th:text="${item.name()}">Item</td>
+        <td th:if="${item.hsnSac() != null}">
+          <div th:text="${item.name()}">Item</div>
+          <div class="hsn" th:text="${'HSN/SAC ' + item.hsnSac()}">HSN/SAC 998314</div>
+        </td>
+        <td class="num" th:text="${item.quantity()}">1</td>
+        <td class="num" th:text="${item.unitPrice()}">0.00</td>
+        <td class="num" th:text="${item.discount()}">0%</td>
+        <td th:if="${rated}" class="num" th:text="${item.taxRate()}">18%</td>
+        <td class="num" th:text="${item.amount()}">0.00</td>
+      </tr>
+      <tr th:if="${lines.isEmpty()}">
+        <td></td>
+        <td colspan="5" class="muted">No items</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>
