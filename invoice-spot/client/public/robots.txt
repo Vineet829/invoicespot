@@ -1,2 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
+# Share links and client portals are private to whoever holds them.
+Disallow: /p/
+Disallow: /c/

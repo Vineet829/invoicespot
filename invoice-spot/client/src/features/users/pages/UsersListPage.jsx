@@ -1,301 +1,374 @@
+import { useState } from "react";
+import { useSelector } from "react-redux";
 import {
-	Box,
-	Badge,
-	Container,
-	CssBaseline,
-	Paper,
-	Table,
-	TableBody,
-	TableCell,
-	TableContainer,
-	TableFooter,
-	TableHead,
-	TablePagination,
-	TableRow,
-	Checkbox,
-	Typography,
-	Tooltip,
-	styled,
-	tooltipClasses,
-} from "@mui/material";
-
-import ClearIcon from "@mui/icons-material/Clear";
-import GroupIcon from "@mui/icons-material/Group";
-import moment from "moment";
-import { useEffect, useState } from "react";
-import { MdOutlineBadge } from "react-icons/md";
+  FiPlay,
+  FiShield,
+  FiShieldOff,
+  FiSlash,
+  FiTrash2,
+  FiUsers,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
-import Spinner from "../../../components/Spinner";
-import StyledDivider from "../../../components/StyledDivider";
-import StyledTableCell from "../../../components/StyledTableCell";
-import StyledTableRow from "../../../components/StyledTableRow";
-import TablePaginationActions from "../../../components/TablePaginationActions";
 import useTitle from "../../../hooks/useTitle";
 import {
-	useGetAllUsersQuery,
-	useDeleteUserMutation,
-	useDeactivateUserMutation,
+  useDeleteUserMutation,
+  useDeactivateUserMutation,
 } from "../usersApiSlice";
-import "../../../styles/homepage.css"
-const UserListPage = () => {
-	useTitle("All Users - Invoice Spot");
+import {
+  useGetAdminStatsQuery,
+  useGetUsersPageQuery,
+  useReactivateUserMutation,
+  useSetUserAdminMutation,
+} from "../adminApiSlice";
+import AdminTabs from "../components/AdminTabs";
+import {
+  WorkspacePage,
+  PageHeader,
+  Panel,
+  DataTable,
+  Pagination,
+  ConfirmDialog,
+  EmptyState,
+  LoadingState,
+  ErrorState,
+  Badge,
+  SearchField,
+  dateLabel,
+  errorMessage,
+  serverPagination,
+} from "../../../components/workspace/Workspace";
+import {
+  panelNote,
+  rowAction,
+  rowActionDanger,
+} from "../../../components/workspace/pastel";
 
-	const [page, setPage] = useState(0);
-	const [rowsPerPage, setRowsPerPage] = useState(5);
+const PROVIDERS = { email: "Email", google: "Google", github: "GitHub" };
 
-	const { data, isLoading, isSuccess, isError, error } = useGetAllUsersQuery(
-		"allUsersList",
-		{
-			pollingInterval: 60000,
-			refetchOnFocus: true,
-			refetchOnMountOrArgChange: true,
-		}
-	);
+const STATS = [
+  ["accounts", "Accounts"],
+  ["active", "Active"],
+  ["admins", "Admins"],
+  ["unverified", "Unverified"],
+  ["joinedLast30Days", "New, last 30 days"],
+  ["signedInLast30Days", "Signed in, last 30 days"],
+];
 
-	const [deleteUser] = useDeleteUserMutation();
-	const [deactivateUser] = useDeactivateUserMutation();
-
-	const rows = data?.users;
-
-	const emptyRows =
-		page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows?.length) : 0;
-
-	const handleChangePage = (event, newPage) => {
-		setPage(newPage);
-	};
-
-	const handleChangeRowsPerPage = (event) => {
-		setRowsPerPage(parseInt(event.target.value, 10));
-		setPage(0);
-	};
-
-	const deactivateUserHandler = async (id) => {
-		try {
-			await deactivateUser(id).unwrap();
-			toast.success("User deactivated");
-		} catch (err) {
-			const message = err.data.message;
-			toast.error(message);
-		}
-	};
-
-	const deleteHandler = async (id) => {
-		try {
-			if (window.confirm("Are you sure you want to delete this user?")) {
-				await deleteUser(id).unwrap();
-				toast.success("User deleted successfully");
-			}
-		} catch (err) {
-			const message = err.data.message;
-			toast.error(message);
-		}
-	};
-
-	useEffect(() => {
-		if (isError) {
-			const message = error.data.message;
-			toast.error(message);
-		}
-	}, [error, isError]);
-
-	const CustomTooltip = styled(({ className, ...props }) => (
-		<Tooltip {...props} arrow classes={{ popper: className }} />
-	))(({ theme }) => ({
-		[`& .${tooltipClasses.arrow}`]: {
-			color: theme.palette.common.black,
-		},
-		[`& .${tooltipClasses.tooltip}`]: {
-			backgroundColor: theme.palette.common.black,
-			fontSize: 18,
-		},
-	}));
-
-	return (
-		<Container component="main"  sx={{ mt: 10, maxWidth:{xs:"25rem", sm:"lg"} }}>
-			<CssBaseline />
-
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				<MdOutlineBadge className="auth-svg"  />
-				<Typography variant="h1" sx={{ml:{xs:"5%", sm:"2%"},
-            fontSize: {
-                xs: '1.5rem', 
-                sm: '2rem',
-				 
-            },
-        }}> Users</Typography>
-			</Box>
-			<StyledDivider />
-			<Box
-				sx={{
-					display: "flex",
-					flexDirection: "row",
-					ml:{xs:"30%", sm:"0%"},
-					mt:{xs:"15%", sm:"0%"}
-				}}
-			>
-				<Typography variant="h4"> Total: </Typography>
-				<Badge
-					badgeContent={data?.count}
-					color="primary"
-					sx={{ marginTop: "3px", marginLeft: "5px" }}
-				>
-					<GroupIcon color="action" fontSize="large" />
-				</Badge>
-			</Box>
-			{isLoading ? (
-				<Spinner />
-			) : (
-				<TableContainer component={Paper} sx={{  mt:{xs:"20%", sm:"0%"}, ml:{xs:"10%", sm:"0%"} }}>
-					<Table sx={{ minWidth: 650 }} aria-label="user table">
-						<TableHead>
-							<TableRow>
-								<StyledTableCell>Email</StyledTableCell>
-								<StyledTableCell align="right">
-									Username
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									Provider
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									isEmailVerified
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									Roles
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									Joined
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									Active Users
-								</StyledTableCell>
-								<StyledTableCell align="right">
-									Delete
-								</StyledTableCell>
-							</TableRow>
-						</TableHead>
-
-						<TableBody>
-							{isSuccess && (
-								<>
-									{(rowsPerPage > 0
-										? rows.slice(
-												page * rowsPerPage,
-												page * rowsPerPage + rowsPerPage
-										  )
-										: rows
-									).map((row, index) => (
-										<StyledTableRow
-											key={row._id}
-											sx={{
-												"&:last-chid td, &:last-child th":
-													{ border: 0 },
-											}}
-										>
-											<StyledTableCell
-												component="th"
-												scope="row"
-											>
-												{row.email}
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												{row.username}
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												{row.provider}
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												{row.isEmailVerified.toString()}
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												{row.roles
-													.toString()
-													.replace(",", ", ")}
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												{moment(row?.dueDate).format(
-													"DD-MM-YYYY"
-												)}
-											</StyledTableCell>
-											<StyledTableCell>
-												<CustomTooltip title="Uncheck to deactivate user">
-													<Checkbox
-														color="success"
-														checked={row?.active}
-														onChange={() =>
-															deactivateUserHandler(
-																row._id
-															)
-														}
-													/>
-												</CustomTooltip>
-											</StyledTableCell>
-											<StyledTableCell align="right">
-												<Box>
-													<ClearIcon
-														color="error"
-														fontSize="medium"
-														sx={{
-															cursor: "pointer",
-														}}
-														onClick={() =>
-															deleteHandler(
-																row._id
-															)
-														}
-													/>
-												</Box>
-											</StyledTableCell>
-										</StyledTableRow>
-									))}
-								</>
-							)}
-							
-							{emptyRows > 0 && (
-								<TableRow style={{ height: 53 * emptyRows }}>
-									<TableCell colSpan={6} />
-								</TableRow>
-							)}
-						</TableBody>
-						
-						<TableFooter>
-							<TableRow>
-								<TablePagination
-									rowsPerPageOptions={[
-										5,
-										10,
-										25,
-										{ label: "All", value: -1 },
-									]}
-									colSpan={9}
-									count={rows?.length}
-									rowsPerPage={rowsPerPage}
-									page={page}
-									SelectProps={{
-										inputProps: {
-											"aria-label": "rows per page",
-										},
-										native: true,
-									}}
-									onPageChange={handleChangePage}
-									onRowsPerPageChange={
-										handleChangeRowsPerPage
-									}
-									ActionsComponent={TablePaginationActions}
-								/>
-							</TableRow>
-						</TableFooter>
-					</Table>
-				</TableContainer>
-			)}
-		</Container>
-	);
+// What each confirmed action does, and how it is worded.
+const CONFIRMATIONS = {
+  promote: {
+    title: "Make this account an admin?",
+    label: "Make admin",
+    text: (row) =>
+      `${row.email} will be able to see and change every account, and read the audit log.`,
+  },
+  demote: {
+    title: "Remove this admin?",
+    label: "Remove admin",
+    text: (row) => `${row.email} will become a regular user at once.`,
+  },
+  deactivate: {
+    title: "Deactivate this account?",
+    label: "Deactivate",
+    text: (row) =>
+      `${row.email} is signed out everywhere and can't sign in until reactivated.`,
+  },
+  delete: {
+    title: "Delete this account?",
+    label: "Delete account",
+    text: (row) =>
+      `${row.email} and everything in it will be permanently deleted.`,
+  },
 };
 
-export default UserListPage;
+const isAdmin = (row) => (row.roles || []).includes("Admin");
+
+const UsersListPage = () => {
+  useTitle("Administration — Invoice Spot");
+  const me = useSelector((state) => state.auth.user?.username);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(10);
+  const query = useGetUsersPageQuery(
+    { page: page + 1, size, q },
+    { refetchOnMountOrArgChange: true },
+  );
+  const stats = useGetAdminStatsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const rows = query.data?.users || [];
+  const pagination = serverPagination({
+    rows,
+    count: query.data?.count || 0,
+    page,
+    size,
+    setPage,
+    setSize: (next) => {
+      setSize(next);
+      setPage(0);
+    },
+  });
+  const [confirming, setConfirming] = useState(null);
+  const [remove, { isLoading: deleting }] = useDeleteUserMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateUserMutation();
+  const [reactivate, { isLoading: reactivating }] = useReactivateUserMutation();
+  const [setAdmin, { isLoading: changingRole }] = useSetUserAdminMutation();
+  const busy = deleting || deactivating || reactivating || changingRole;
+  const run = async (action, success, failure) => {
+    try {
+      await action().unwrap();
+      toast.success(success);
+      return true;
+    } catch (error) {
+      toast.error(errorMessage(error, failure));
+      return false;
+    }
+  };
+  const confirm = async () => {
+    const { kind, row } = confirming;
+    const done = await {
+      promote: () =>
+        run(
+          () => setAdmin({ id: row._id, admin: true }),
+          `${row.username} is now an admin.`,
+          "The account could not be made an admin.",
+        ),
+      demote: () =>
+        run(
+          () => setAdmin({ id: row._id, admin: false }),
+          `${row.username} is no longer an admin.`,
+          "The admin role could not be removed.",
+        ),
+      deactivate: () =>
+        run(
+          () => deactivate(row._id),
+          `${row.username} was deactivated.`,
+          "The account could not be deactivated.",
+        ),
+      delete: () =>
+        run(
+          () => remove(row._id),
+          `${row.username} was deleted.`,
+          "The account could not be deleted.",
+        ),
+    }[kind]();
+    if (done) setConfirming(null);
+  };
+  // Why an action can't be taken on this row, if it can't.
+  const blocked = (row) =>
+    row.username === me
+      ? "That’s your own account"
+      : row.demo
+        ? "The shared demo account"
+        : null;
+  const columns = [
+    {
+      label: "Account",
+      type: "main",
+      render: (row) => (
+        <span className="flex flex-col gap-0.5">
+          <span>
+            {[row.firstName, row.lastName].filter(Boolean).join(" ") ||
+              row.username}
+          </span>
+          <span className={`font-normal ${panelNote}`}>{row.email}</span>
+        </span>
+      ),
+    },
+    { label: "Username", render: (row) => row.username },
+    {
+      label: "Signs in with",
+      render: (row) => PROVIDERS[row.provider] || row.provider,
+    },
+    {
+      label: "Status",
+      // The badges keep to one line while the list is a table.
+      nowrap: true,
+      render: (row) => (
+        <span className="flex flex-wrap gap-1.5 tabled:flex-nowrap">
+          {isAdmin(row) && <Badge tone="paid">Admin</Badge>}
+          <Badge tone={row.active ? "neutral" : "unpaid"}>
+            {row.active ? "Active" : "Deactivated"}
+          </Badge>
+          {!row.isEmailVerified && <Badge tone="partial">Unverified</Badge>}
+        </span>
+      ),
+    },
+    { label: "Joined", render: (row) => dateLabel(row.createdAt) },
+    {
+      label: "Role",
+      type: "action",
+      render: (row) => {
+        const reason = blocked(row);
+        const admin = isAdmin(row);
+        return (
+          <button
+            type="button"
+            className={rowAction}
+            onClick={() =>
+              setConfirming({ kind: admin ? "demote" : "promote", row })
+            }
+            disabled={busy || Boolean(reason) || (!admin && !row.active)}
+            aria-label={
+              reason
+                ? `${reason} can’t change role`
+                : `${admin ? "Remove admin role from" : "Make admin"} ${row.username}`
+            }
+          >
+            {admin ? (
+              <FiShieldOff aria-hidden="true" />
+            ) : (
+              <FiShield aria-hidden="true" />
+            )}
+            <span>{admin ? "Remove admin" : "Make admin"}</span>
+          </button>
+        );
+      },
+    },
+    {
+      label: "Access",
+      type: "action",
+      render: (row) => {
+        const reason = blocked(row);
+        return row.active ? (
+          <button
+            type="button"
+            className={rowActionDanger}
+            onClick={() => setConfirming({ kind: "deactivate", row })}
+            disabled={busy || Boolean(reason)}
+            aria-label={
+              reason
+                ? `${reason} can’t be deactivated`
+                : `Deactivate ${row.username}`
+            }
+          >
+            <FiSlash aria-hidden="true" />
+            <span>Deactivate</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={rowAction}
+            onClick={() =>
+              run(
+                () => reactivate(row._id),
+                `${row.username} can sign in again.`,
+                "The account could not be reactivated.",
+              )
+            }
+            disabled={busy}
+            aria-label={`Reactivate ${row.username}`}
+          >
+            <FiPlay aria-hidden="true" />
+            <span>Reactivate</span>
+          </button>
+        );
+      },
+    },
+    {
+      label: "Delete",
+      type: "action",
+      render: (row) => {
+        const reason = blocked(row);
+        return (
+          <button
+            type="button"
+            className={rowActionDanger}
+            onClick={() => setConfirming({ kind: "delete", row })}
+            disabled={busy || Boolean(reason)}
+            aria-label={
+              reason ? `${reason} can’t be deleted` : `Delete ${row.username}`
+            }
+          >
+            <FiTrash2 aria-hidden="true" />
+            <span>Delete</span>
+          </button>
+        );
+      },
+    },
+  ];
+  const dialog = confirming && CONFIRMATIONS[confirming.kind];
+  return (
+    <WorkspacePage section="Administration" fill>
+      <PageHeader
+        title="Administration"
+        description="View user accounts and manage their access."
+        actions={<AdminTabs />}
+      />
+      <dl
+        className="m-0 grid grid-cols-6 gap-3 max-[1359px]:grid-cols-3 max-[700px]:grid-cols-2"
+        aria-busy={stats.isFetching || undefined}
+      >
+        {STATS.map(([key, label]) => (
+          <div
+            key={key}
+            className="min-w-0 rounded-[20px] border border-white/90 bg-white/60 px-4 py-3.5"
+          >
+            <dt className={panelNote}>{label}</dt>
+            <dd className="m-0 mt-1 font-display text-[26px] font-light tracking-[-0.03em] text-spot-ink">
+              {stats.data ? stats.data[key].toLocaleString("en") : "—"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {query.isLoading ? (
+        <LoadingState />
+      ) : query.isError && !query.data ? (
+        <ErrorState error={query.error} retry={query.refetch} />
+      ) : (
+        <Panel fill={rows.length > 0}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 compact:mb-4">
+            <h2 className="font-display text-[22px] font-light tracking-[-0.02em] text-spot-ink">
+              Users
+            </h2>
+            <SearchField
+              value={q}
+              onSearch={(next) => {
+                setQ(next);
+                setPage(0);
+              }}
+              label="Search accounts"
+              placeholder="Name, email or username"
+              className="w-[280px] max-[700px]:w-full"
+            />
+          </div>
+          {rows.length ? (
+            <>
+              <DataTable
+                columns={columns}
+                rows={rows}
+                fillRows={pagination.fullPage}
+                busy={query.isFetching}
+                label="Users"
+                wide
+              />
+              <Pagination pagination={pagination} sizes={[10, 25, 50, 100]} />
+            </>
+          ) : (
+            <EmptyState
+              title={q ? "No account matches." : "No users to display."}
+              text={
+                q
+                  ? "Try a name, an email or a username."
+                  : "User accounts will appear here."
+              }
+              icon={FiUsers}
+            />
+          )}
+        </Panel>
+      )}
+      <ConfirmDialog
+        open={Boolean(dialog)}
+        title={dialog?.title}
+        confirmLabel={dialog?.label}
+        onConfirm={confirm}
+        onClose={() => setConfirming(null)}
+        busy={busy}
+      >
+        {dialog?.text(confirming.row)}
+      </ConfirmDialog>
+    </WorkspacePage>
+  );
+};
+
+export default UsersListPage;
