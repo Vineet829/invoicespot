@@ -1,252 +1,173 @@
 # Invoice Spot
 
-Invoice Spot is an app for managing invoices, featuring client management, payment tracking, PDF generation, and email invoicing.
+Invoice Spot is an invoicing app for freelancers and small businesses,
+featuring GST invoices, UPI QR codes, payment tracking, and client portals.
+It is available at
+[invoice.confidental.online](https://invoice.confidental.online).
 
 ## Features
 
-- **Invoices, Quotations and Receipts**: Create documents with line items, discounts and tax; the server works out every total to the cent, and each type is numbered in order (INV-0001, QUO-0001, REC-0001).
-- **Clients**: Keep client details, see what each client owes in every currency, and send a statement of account.
-- **Payments and Receipts**: Record, edit and remove payments, and send a receipt for each one.
-- **PDFs and Email**: Download, print or email any document as a PDF.
-- **Share Links**: Send a client a link to view and download a document, and to accept a quotation.
-- **Reminders**: Remind clients about unpaid invoices yourself, or automatically before and after the due date.
-- **Recurring Invoices**: Repeat an invoice weekly, monthly, quarterly or yearly, and email each new one if you like.
-- **Notifications**: Hear when a client views or accepts a shared document, an invoice becomes overdue, or a recurring invoice is made.
-- **Search**: Find documents and clients by number, name, status, type or date, and jump to anything with ⌘K.
-- **Reports**: Income by month, unpaid invoices by age, top clients and payment methods, per currency, each downloadable as CSV.
-- **Import and Export**: Import clients from a CSV file after previewing every row; export documents, payments and clients as CSV, or everything as a ZIP file.
-- **Settings**: Defaults for currency, payment terms, tax, notes, numbering, reminders and time zone.
-- **Account Security**: Change your password, sign in with a code from an authenticator app, see and sign out your devices, and review your security activity.
-- **Administration**: Search accounts, see how many are active, deactivate and reactivate them, manage admins, and read the audit log.
-- **Demo Account**: Try the app as a guest, with sample data.
+- **Invoices and Quotations**: Create invoices, quotations, receipts, and
+  credit notes with drafts and automatic numbering. Issued documents are
+  locked, so mistakes are fixed with a void or a credit note.
+- **GST and Tax**: Set a tax rate on each line, or turn on India GST mode for
+  CGST, SGST, and IGST, HSN/SAC codes, and GSTR-1 and GSTR-3B helper files.
+  Record TDS withheld by your clients.
+- **Getting Paid**: Show UPI QR codes and bank details on your invoices.
+  Clients can report a payment for you to confirm. Send receipts and payment
+  reminders.
+- **Clients**: See balances by currency, send statements, import clients
+  from a CSV file, and give clients their own portal.
+- **Sharing**: Download PDFs in three templates, or send documents by email,
+  share link, or WhatsApp.
+- **Recurring Invoices**: Repeat an invoice weekly, monthly, quarterly, or
+  yearly.
+- **Expenses**: Record your expenses and see your profit and loss.
+- **Reports**: See income, receivables by age, sales, tax, and payments.
+  Download them as CSV files, or export everything as a ZIP file.
+- **Teams**: Work together in a business with owner, admin, member, and viewer
+  roles, and invite people by email.
+- **Overview**: Start from a dashboard whose figures open the records behind
+  them.
+- **Account Security**: Use two-factor sign-in or Google sign-in, see and sign
+  out your devices, and review your security activity. Sign-ins and other
+  sensitive requests are rate limited.
+
+## Architecture
+
+- **Client**: A React 18 single-page app built with Vite, Redux Toolkit, React
+  Router, and Tailwind CSS. In Docker, nginx serves it and passes `/api`
+  requests to the backend on the same origin.
+- **Backend**: A Java 21 and Spring Boot 3.5 API on PostgreSQL 16, with Flyway
+  migrations. It renders PDFs, sends email over SMTP, and runs a daily job for
+  recurring invoices, reminders, and overdue alerts.
+- **Data**: Clients, documents, payments, and expenses belong to a business.
+  The API checks the user's membership and role on every request, and tests
+  make sure no business can reach another's data.
+
+## Engineering
+
+- **Testing**: The backend has over 850 tests, nearly 600 of which run against
+  a real PostgreSQL database through Testcontainers. The client has over 650
+  tests with Vitest.
+- **Money**: Amounts are stored as exact decimals, and totals are calculated
+  on the server.
+- **Concurrency**: Concurrent edits and the daily job can't undo each other,
+  because records are locked while they change.
+- **Scaling**: The app is built to run on several servers. The daily job runs
+  on one of them at a time, and rate limits are shared through PostgreSQL.
+- **Encryption**: Two-factor secrets and share links are encrypted with an
+  app-wide key.
+
+## Getting Started
+
+The commands below are for macOS and Linux. On Windows, use WSL.
+
+### Prerequisites
+
+- Docker
+- Java 21, Maven, and Node.js 24 for local development
+
+### Run with Docker
+
+```bash
+cp .env.example .env    # then replace every change-me
+docker compose --profile mail up -d --build
+```
+
+The first build takes a few minutes. Then open <http://localhost:8088>. Emails
+go to Mailpit at <http://localhost:8027>. To stop the app, run
+`docker compose down`, or `docker compose down -v` to delete the data as well.
+
+### Run Locally
+
+Create a key once with `openssl rand -base64 48` and reuse it. A new key on
+each run signs everyone out.
+
+```bash
+# Terminal 1: PostgreSQL and Mailpit, then the API on port 8080
+docker compose -f docker/spring/local.yml up -d
+export JWT_ACCESS_SECRET_KEY="paste-your-key-here"
+export CLIENT_URL=http://localhost:3001    # where emailed links point
+mvn spring-boot:run
+```
+
+```bash
+# Terminal 2: the client on port 3001
+cd invoice-spot/client
+npm install
+npm start
+```
+
+Open <http://localhost:3001>. Emails go to Mailpit at <http://localhost:8026>.
+
+### First Login
+
+1. Sign up, then open the verification email in Mailpit and follow the link.
+2. Sign in.
+3. To make yourself an admin, run this SQL once and sign in again. Admins can
+   then promote other accounts in the app.
+
+```sql
+INSERT INTO user_roles (user_pkid, role)
+SELECT pkid, 'Admin' FROM users WHERE email = 'you@example.com';
+```
 
-### Authentication
+If it prints `INSERT 0 0`, no account has that email. To open the database,
+run `docker exec -it invoicespot_postgres psql -U invoicespot -d invoicespot`
+locally, or `docker compose exec db psql -U invoicespot -d invoicespot` with
+the Docker stack.
 
-- **Register a new user:**
-  Register a new account to start using the app.
+## Tests
 
-- **Login:**
-  Log in with your credentials to access your dashboard.
+```bash
+mvn test                  # backend, needs Docker for PostgreSQL
 
-- **Logout:**
-  Log out to end your session securely.
-
-- **Verify Email:**
-  Verify your email address during registration.
-  Resend verification emails if needed.
-
-- **Password Reset:**
-  Request a password reset if you've forgotten your password.
-  Follow the instructions sent to your email to reset your password.
-
-- **Two-Factor Sign-In:**
-  Add a code from an authenticator app to your sign-in, with recovery codes in case you lose your phone.
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice1.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice2.png" alt="alt text 1" width="850" />
-
-</p>
-
-  <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in1.jpeg" alt="alt text" width="300" height="500">
-</p>
-
- <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in2.jpeg" alt="alt text" width="300" height="500">
-</p>
- 
-### Customer Management
-
-- **Create Customer:**
-  Add new customers with their contact details.
-
-- **Update Customer Information:**
-  Modify existing customer details as needed.
-
-- **Delete Customer:**
-  Remove customer entries when they are no longer needed.
-
-- **Retrieve Customer Information:**
-  View all customers or a specific customer's details, with what each owes and their documents.
-
-- **Statements:**
-  Download or email a client's statement of account.
-
-- **Import and Export:**
-  Import clients from a CSV file, or export them as one.
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice10.png" alt="alt text 1" width="850" />
-
-</p>
-
-### Document Management
-
-- **Create Document:**
-  Generate new invoices and related documents.
-
-- **Update Document:**
-  Modify existing invoices with updated information.
-
-- **Delete Document:**
-  Remove invoices that are no longer needed.
-
-- **Generate PDF:**
-  Create PDF versions of invoices for easy sharing.
-
-- **Copy and Convert:**
-  Duplicate any document, or turn a quotation into an invoice.
-
-- **Share:**
-  Send a link where the client can view the document and accept a quotation.
-
-- **Remind and Repeat:**
-  Send payment reminders, automatically if you like, and make invoices repeat on a schedule.
-
-- **Timeline:**
-  See when each document was created, sent, viewed, reminded and paid.
-
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice6.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice7.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice8.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice9.png" alt="alt text 1" width="850" />
-
-</p>
-
-
-  <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in4.jpeg" alt="alt text" width="300" height="500">
-</p>
-
-  <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in5.jpeg" alt="alt text" width="300" height="500">
-</p>
-
-  <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in6.jpeg" alt="alt text" width="300" height="500">
-</p>
-
-
-### Payment Management
-
-- **Record Payments:**
-  Record payments and track the payment status of invoices.
-
-- **Edit and Remove Payments:**
-  Correct a payment or remove it, and the invoice's status follows.
-
-- **Receipts:**
-  Download or email a receipt for each payment.
-
-### Reports and Data
-
-- **Reports:**
-  Income by month, unpaid invoices by age, top clients and payment methods, for the last few months or any year.
-
-- **CSV Files:**
-  Download each report, and your documents, payments and clients, as CSV files.
-
-- **Export Everything:**
-  Download all your records, settings and profile in one ZIP file.
-
-### User Account Management
-
-- **View User Profile:**
-  Access your user profile to view personal information.
-
-- **Update User Profile:**
-  Edit your profile details to keep them up-to-date.
-
-- **Delete Account:**
-  Delete your account if you no longer wish to use the app.
-
-- **Security:**
-  Change your password, turn on two-factor sign-in, sign out other devices and review your recent sign-ins.
-
-
-   <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice3.png" alt="alt text 1" width="850" />
-
-</p>
-
-  <p align="center">
-<img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/in13.jpeg" alt="alt text" width="300" height="500">
-</p>
-
-
-   <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice4.png" alt="alt text 1" width="850" />
-
-</p>
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice5.png" alt="alt text 1" width="850" />
-
-</p>
-
-### User Management
-
-- **User List:**
-  Access and manage all registered users from a single interface.
-
-- **Deactivate User:**
-  Temporarily disable user accounts without deleting them.
-
-- **Delete User:**
-  Remove user accounts that are no longer needed.
-
-- **Search and Reactivate:**
-  Find accounts by name or email, and let deactivated accounts sign in again.
-
-- **Admins:**
-  Make an account an admin or a regular user. You can never change your own role, or remove the last admin.
-
-- **Audit Log:**
-  Read every sign-in, security change and admin action.
-
-
- <p align="center">
-    <img src="https://github.com/Vineet829/invoicespot/blob/main/invoice-spot/images/invoice11.png" alt="alt text 1" width="850" />
-
-</p>
+cd invoice-spot/client    # after npm install
+npm run lint
+npx vitest run
+```
 
 ## Configuration
 
-The backend's settings are in `src/main/resources/application.yml`. Besides the database, mail and
-`JWT_ACCESS_SECRET_KEY` settings there, it reads:
+All settings are environment variables. `.env.example` explains each one, and
+`src/main/resources/application.yml` holds the defaults. For production:
 
-- `APP_ENCRYPTION_KEY`: 32 random bytes, base64-encoded (for example `openssl rand -base64 32`), which
-  two-factor secrets and share links are encrypted with. Without it the app runs, but two-factor sign-in
-  can't be turned on, and a share link is shown only once, when it is made.
-- `JOBS_ENABLED`, `JOBS_CRON` and `JOBS_ZONE`: the daily run that makes recurring invoices, sends automatic
-  reminders, raises overdue alerts and removes expired sign-ins. It is on by default, at 07:00 UTC.
-- `DEMO_EMAIL`, `DEMO_SEED` and `DEMO_RESET`: the shared demo account. With `DEMO_SEED=true` it gets sample
-  data at startup. With `DEMO_RESET=true` as well, its business is cleared and the sample data added afresh,
-  dated from today, at startup and every day at the daily run's time, while the daily run is on. Both are off
-  by default.
+- **Keys**: Set `JWT_ACCESS_SECRET_KEY` and `APP_ENCRYPTION_KEY`, and keep the
+  encryption key safe. A new key can't read the two-factor secrets and share
+  links sealed with the old one.
+- **HTTPS**: Put a TLS reverse proxy such as Caddy or nginx in front of port
+  8088, point `CLIENT_URL` and `SERVER_URL` at its https address, and set
+  `COOKIE_SECURE=true`.
+- **Email**: Set `EMAIL_HOST`, `EMAIL_PORT`, `SENDER_EMAIL`, and the
+  `SPRING_MAIL_*` login lines.
+- **Google Sign-In**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and
+  register the callback address given in `.env.example`.
 
-`JWT_REFRESH_SECRET_KEY` is no longer used: each sign-in is kept as a session.
+## Known Limitations
+
+- There is no payment gateway. Clients pay by UPI or bank transfer and report
+  the payment for you to confirm.
+- GST e-invoicing (IRN), e-way bills, cess, SEZ supplies, and the composition
+  scheme aren't supported. The GSTR-1 and GSTR-3B files are helpers to check
+  before filing.
+- Exchange rates are entered by hand. There is no rate feed.
+
+## Project Structure
+
+- `src/`: The Spring Boot backend.
+- `invoice-spot/client/`: The React client.
+- `docker/spring/local.yml`: PostgreSQL and Mailpit for local development.
+
+## Contributing
+
+Bug reports and questions are welcome as
+[issues](https://github.com/Vineet829/invoicespot/issues). Please report
+security issues privately through the repository's
+[Security tab](https://github.com/Vineet829/invoicespot/security) instead of
+opening an issue.
+
+## License
+
+[MIT](LICENSE) © 2023-2026 Vineet Singh. The bundled Noto Sans fonts are under
+the [SIL Open Font License](src/main/resources/fonts/OFL.txt).
