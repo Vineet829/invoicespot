@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+<meta charset="utf-8" />
+<title th:text="${'Payment receipt ' + receipt.number()}">Payment receipt</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 16mm 18mm 16mm;
+  }
+  body { margin: 0; font-family: 'Noto Sans', sans-serif; font-size: 9.5pt; line-height: 1.45; color: #4f5566; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 0; vertical-align: top; }
+  .head td { padding-bottom: 22px; }
+  .logo { max-height: 56px; max-width: 150px; margin-bottom: 12px; }
+  .sender-name { font-size: 13pt; color: #232735; font-weight: bold; margin-bottom: 4px; }
+  .muted { color: #5d6170; }
+  .doc { text-align: right; width: 46%; }
+  .title { font-size: 28pt; font-weight: normal; color: #232735; letter-spacing: -0.5pt; line-height: 1.1; }
+  .number { font-size: 10pt; color: #5b47a0; margin: 4px 0 12px; }
+  .meta { width: auto; margin-left: auto; }
+  .meta td { padding: 1px 0 1px 18px; }
+  .meta .k { color: #6b7080; text-align: left; }
+  .meta .v { color: #232735; text-align: right; }
+  .band { background: #f3f2f8; border-radius: 12px; }
+  .band td { padding: 14px 16px; }
+  .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.8pt; color: #6b7080; margin-bottom: 5px; }
+  .client-name { font-size: 11pt; color: #232735; font-weight: bold; margin-bottom: 3px; }
+  .received { margin-top: 22px; background: #e5e1f8; border-radius: 12px; }
+  .received td { padding: 18px 20px; color: #261f3d; }
+  .amount { font-size: 22pt; color: #261f3d; letter-spacing: -0.3pt; }
+  .method { margin-top: 4px; color: #4a4262; }
+  .summary { width: 46%; margin: 18px 0 0 auto; }
+  .summary td { padding: 4px 0; }
+  .summary .v { text-align: right; color: #232735; white-space: nowrap; padding-left: 8px; }
+  .summary .balance td { border-top: 1px solid #d9d8e2; padding-top: 10px; font-size: 11pt; color: #30234f; font-weight: bold; }
+  .thanks { margin-top: 30px; color: #5d6170; }
+</style>
+<th:block th:if="${theme != null}"><style th:replace="~{pdf/fragments/themes :: ${theme}}"></style></th:block>
+</head>
+<body>
+  <table class="head">
+    <tr>
+      <td th:replace="~{pdf/fragments/parties :: seller(${receipt.seller()})}">Business</td>
+      <td class="doc">
+        <div class="title">Payment receipt</div>
+        <div class="number" th:text="${receipt.number()}">INV-0001-P1</div>
+        <table class="meta">
+          <tr>
+            <td class="k">Paid on</td>
+            <td class="v" th:text="${receipt.date()}">Sep 30, 2026</td>
+          </tr>
+          <tr>
+            <td class="k">For</td>
+            <td class="v" th:text="${receipt.documentTitle()}">Invoice INV-0001</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table th:replace="~{pdf/fragments/parties :: client('Received from', ${receipt.client()})}"></table>
+
+  <table class="received">
+    <tr>
+      <td>
+        <div class="label">Amount received</div>
+        <div class="amount" th:text="${receipt.currency() + ' ' + receipt.amount()}">USD 0.00</div>
+        <th:block th:if="${receipt.withheld() != null}">
+          <div class="method" th:text="${'Tax withheld by you (TDS) ' + receipt.currency() + ' ' + receipt.withheld()}">Tax withheld by you (TDS) USD 0.00</div>
+          <div class="method" th:text="${'Settles ' + receipt.currency() + ' ' + receipt.settles()}">Settles USD 0.00</div>
+        </th:block>
+        <div class="method" th:text="${'Paid by ' + receipt.method()}">Paid by Cash</div>
+        <div class="method" th:if="${receipt.note() != null}" th:text="${receipt.note()}">Deposit</div>
+      </td>
+    </tr>
+  </table>
+
+  <table th:replace="~{pdf/fragments/totals ::
+      totals(${receipt.currency()}, ${receipt.totals()}, 'Balance after this payment', ${receipt.balance()})}"></table>
+
+  <p class="thanks">Thank you for your payment.</p>
+</body>
+</html>

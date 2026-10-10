@@ -1,0 +1,253 @@
+package com.invoicespot.document;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.invoicespot.business.Business;
+import com.invoicespot.settings.BusinessSettings;
+import com.invoicespot.settings.PdfTemplate;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.fontbox.ttf.TTFParser;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+// Every kind of PDF rendered for real, and read back as text: the pieces its
+// template is built from come together into a PDF that says what it should.
+class PdfRenderingTest {
+
+    @TempDir
+    Path uploads;
+
+    private PdfService service;
+    private Business seller;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        service = PdfFixtures.service(uploads);
+        seller = PdfFixtures.seller(uploads);
+    }
+
+    @Test
+    @DisplayName("an invoice names both parties and shows its lines, totals, notes and page number")
+    void invoice() {
+        String text = PdfText.of(service.render(PdfFixtures.invoice(), seller, PdfFixtures.settings()));
+
+        assertThat(text).contains(
+                "Ada Analytics Private Limited",
+                "Invoice",
+                "INV-0042",
+                "Beta & <Sons> LLP",
+                "Prototype & <review>",
+                "GST (18%)",
+                "Balance due",
+                "INR 1,00,000.00",
+                "Late payments carry 1.5% interest a month.",
+                "Page 1 of 1");
+    }
+
+    @Test
+    @DisplayName("PDFs print in the embedded Noto Sans, so the rupee sign and accented names show")
+    void notoSans() throws IOException {
+        for (String font : List.of("fonts/NotoSans-Regular.ttf", "fonts/NotoSans-Bold.ttf")) {
+            try (InputStream in = getClass().getClassLoader().getResourceAsStream(font)) {
+                assertThat(new TTFParser().parse(in).getUnicodeCmapLookup().getGlyphId(0x20B9)).as(font).isPositive();
+            }
+        }
+        Document invoice = PdfFixtures.invoice();
+        invoice.setAdditionalInfo("Pay ₹1,00,000 to Zoë Sánchez-Dvořák.");
+
+        byte[] pdf = service.render(invoice, seller, PdfFixtures.settings());
+
+        assertThat(PdfText.of(pdf)).contains("Pay ₹1,00,000 to Zoë Sánchez-Dvořák.");
+        assertThat(fontNames(pdf)).isNotEmpty().allMatch(name -> name.contains("NotoSans"));
+    }
+
+    private static List<String> fontNames(byte[] pdf) throws IOException {
+        try (PDDocument document = PDDocument.load(pdf)) {
+            Set<String> names = new TreeSet<>();
+            for (PDPage page : document.getPages()) {
+                PDResources resources = page.getResources();
+                for (COSName name : resources.getFontNames()) {
+                    names.add(resources.getFont(name).getName());
+                }
+            }
+            return List.copyOf(names);
+        }
+    }
+
+    @Test
+    @DisplayName("a draft is marked on every page, with no number or payment status, and is dated on issue")
+    void draft() {
+        Document draft = PdfFixtures.draft();
+        for (int line = 2; line <= 40; line++) {
+            draft.getBillingItems().add(PdfFixtures.line("Workshop day " + line, "1000", 1, "0"));
+        }
+
+        List<String> pages = PdfText.pages(service.render(draft, seller, PdfFixtures.settings()));
+
+        assertThat(pages).hasSizeGreaterThan(1).allSatisfy(page -> assertThat(page).contains("DRAFT"));
+        assertThat(pages.get(0)).contains("Invoice", "On issue", "Ada Analytics").doesNotContain("Unpaid", "INV-");
+        assertThat(String.join("", pages)).contains("GST (18%)");
+    }
+
+    @Test
+    @DisplayName("a void invoice keeps its number, is marked void, and says when and why")
+    void voided() {
+        String text = PdfText.of(service.render(PdfFixtures.voided(), seller, PdfFixtures.settings()))
+                .replaceAll("\\s+", " ");
+
+        assertThat(text).contains(
+                "INV-0042", "VOID", "Voided on Oct 3, 2026: Sent to the wrong client & <branch>", "Balance due INR 0.00");
+        assertThat(text).doesNotContain("Unpaid");
+    }
+
+    @Test
+    @DisplayName("lines taxed at two rates show each line's rate, a tax row per rate and a table of both")
+    void twoRates() {
+        String text = PdfText.of(service.render(PdfFixtures.twoRates(), seller, PdfFixtures.settings()))
+                .replaceAll("\\s+", " ");
+
+        assertThat(text).contains(
+                "Printed guides 4 450.00 0% 5% 1,800.00",
+                "Design sprint 1 1,00,000.00 0% 18% 1,00,000.00",
+                "GST (5%) INR 90.00",
+                "GST (18%) INR 18,000.00",
+                "RATE TAXABLE TAX",
+                "5% INR 1,800.00 INR 90.00",
+                "18% INR 1,00,000.00 INR 18,000.00",
+                "Balance due INR 1,19,890.00");
+    }
+
+    @Test
+    @DisplayName("a quotation shows its total and when it is valid until")
+    void quotation() {
+        String text = PdfText.of(service.render(PdfFixtures.quotation(), seller, PdfFixtures.settings()));
+
+        assertThat(text).contains("Quotation", "QUO-0007", "Valid until", "Oct 30, 2026", "USD 3,504.60");
+        assertThat(text).doesNotContain("Balance due");
+    }
+
+    @Test
+    @DisplayName("a payment receipt shows the amount received and the balance left")
+    void paymentReceipt() {
+        Document invoice = PdfFixtures.invoice();
+        String text = PdfText.of(service.renderReceipt(
+                invoice,
+                invoice.getPayments().get(0),
+                "INV-0042-P1",
+                new BigDecimal("44550.00"),
+                seller,
+                PdfTemplate.CLASSIC))
+                .replaceAll("\\s+", " ");
+
+        assertThat(text).contains(
+                "Payment receipt",
+                "INV-0042-P1",
+                "INR 44,550.00",
+                "Paid by Bank Transfer",
+                "Invoice INV-0042 total",
+                "Balance after this payment INR 1,00,000.00");
+    }
+
+    @Test
+    @DisplayName("a payment receipt sets the balance apart from its label in every template, however long it is")
+    void receiptBalanceApart() {
+        BigDecimal paid = new BigDecimal("44550.00");
+        for (PdfTemplate template : PdfTemplate.values()) {
+            for (String balance : List.of("10,000.00", "1,00,000.00", "10,00,000.00", "1,00,00,000.00")) {
+                Document invoice = PdfFixtures.invoice();
+                invoice.setTotal(paid.add(new BigDecimal(balance.replace(",", ""))));
+
+                byte[] pdf = service.renderReceipt(
+                        invoice, invoice.getPayments().get(0), "INV-0042-P1", paid, seller, template);
+
+                assertThat(PdfText.gapBefore(pdf, "INR " + balance))
+                        .as("%s, a balance of INR %s", template, balance)
+                        .isGreaterThan(5f);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a statement shows each currency's ledger, what is overdue and the amount due")
+    void statement() {
+        String text = PdfText.of(service.renderStatement(
+                seller,
+                PdfFixtures.customer(),
+                LocalDate.of(2026, 10, 3),
+                PdfFixtures.accounts(),
+                PdfTemplate.CLASSIC));
+
+        assertThat(text).contains(
+                "Statement",
+                "Payment for INV-0040 (Bank Transfer)",
+                "Credit note CN-0001 for INV-0040",
+                "Credited INR 20,000.00",
+                "Overdue",
+                "INR 80,000.00",
+                "Amount due",
+                "USD 0.00");
+    }
+
+    @Test
+    @DisplayName("a statement's headings and amounts never print over one another, however wide, in every template")
+    void statementColumns() {
+        // From an everyday amount up to the widest the database holds.
+        List<String> amounts = List.of("144550.00", "888888888.88", "888888888888.88", "88888888888888888.88");
+        List<String> overprinted = new ArrayList<>();
+        for (PdfTemplate template : PdfTemplate.values()) {
+            for (String amount : amounts) {
+                BigDecimal charged = new BigDecimal(amount);
+                // A small payment leaves the heading the widest thing in its
+                // column; one as wide as the charge widens every column.
+                for (BigDecimal paid : List.of(
+                        new BigDecimal("44550.00"), charged.subtract(new BigDecimal("20000.00")))) {
+                    byte[] pdf = service.renderStatement(
+                            seller,
+                            PdfFixtures.customer(),
+                            LocalDate.of(2026, 10, 3),
+                            PdfFixtures.account(charged, paid),
+                            template);
+
+                    PdfText.overlaps(pdf).forEach(pair ->
+                            overprinted.add(template + ", charged " + charged + ", paid " + paid + ": " + pair));
+                }
+            }
+        }
+
+        assertThat(overprinted).isEmpty();
+    }
+
+    @Test
+    @DisplayName("every template renders invoices, payment receipts and statements, with their page numbers")
+    void templates() {
+        for (PdfTemplate template : PdfTemplate.values()) {
+            BusinessSettings settings = PdfFixtures.settings();
+            settings.setPdfTemplate(template);
+            Document invoice = PdfFixtures.invoice();
+
+            String document = PdfText.of(service.render(invoice, seller, settings));
+            String receipt = PdfText.of(service.renderReceipt(
+                    invoice, invoice.getPayments().get(0), "INV-0042-P1", new BigDecimal("44550.00"), seller, template));
+            String statement = PdfText.of(service.renderStatement(
+                    seller, PdfFixtures.customer(), LocalDate.of(2026, 10, 3), PdfFixtures.accounts(), template));
+
+            assertThat(document).as(template.name()).contains("Invoice", "INV-0042", "Page 1 of 1");
+            assertThat(receipt).as(template.name()).contains("Payment receipt", "INV-0042-P1");
+            assertThat(statement).as(template.name()).contains("Statement", "Page 1 of");
+        }
+    }
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+  <!-- How to pay an unpaid invoice, with whichever details the business gave,
+       and beside them a UPI QR code for the balance when there is one. -->
+  <div class="payment" th:fragment="payment(payment, upi)" th:if="${payment != null}">
+    <div class="label">How to pay</div>
+    <table>
+      <tr>
+        <td>
+          <table class="pay">
+            <tr th:if="${payment.accountHolder() != null}">
+              <td class="k">Account holder</td>
+              <td class="v" th:text="${payment.accountHolder()}">Ada &amp; Co</td>
+            </tr>
+            <tr th:if="${payment.bankName() != null}">
+              <td class="k">Bank</td>
+              <td class="v" th:text="${payment.bankName()}">HDFC Bank</td>
+            </tr>
+            <tr th:if="${payment.accountNumber() != null}">
+              <td class="k">Account number</td>
+              <td class="v" th:text="${payment.accountNumber()}">50100123456789</td>
+            </tr>
+            <tr th:if="${payment.bankCode() != null}">
+              <td class="k" th:text="${payment.bankCodeName()}">IFSC</td>
+              <td class="v" th:text="${payment.bankCode()}">HDFC0001234</td>
+            </tr>
+            <tr th:if="${payment.upiId() != null}">
+              <td class="k">UPI ID</td>
+              <td class="v" th:text="${payment.upiId()}">ada@okhdfcbank</td>
+            </tr>
+            <tr th:if="${payment.link() != null}">
+              <td class="k">Pay online</td>
+              <td class="v"><a th:href="${payment.link()}" th:text="${payment.link()}">https://pay.example</a></td>
+            </tr>
+          </table>
+          <p th:if="${payment.instructions() != null}" th:text="${payment.instructions()}">Use the invoice number as the reference.</p>
+        </td>
+        <td th:if="${upi != null}" class="upi">
+          <img th:src="${upi.image()}" alt="UPI QR code" />
+          <div th:text="${upi.caption()}">Scan to pay INR 1,500.00 with any UPI app</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

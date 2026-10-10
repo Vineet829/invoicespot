@@ -1,0 +1,129 @@
+spring:
+  application:
+    name: invoice-spot
+
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5442}/${POSTGRES_DB:invoicespot}
+    username: ${POSTGRES_USER:invoicespot}
+    password: ${POSTGRES_PASSWORD:invoicespot}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+  mail:
+    host: ${EMAIL_HOST:localhost}
+    port: ${EMAIL_PORT:1026}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+          # Milliseconds. Unset, they never run out: a mail server that stops
+          # answering would hold up a request, or the daily run with the invoice
+          # its reminder locks, forever.
+          connectiontimeout: 10000
+          timeout: 30000
+          writetimeout: 30000
+
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+    generator:
+      write-bigdecimal-as-plain: true
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
+  servlet:
+    context-path: /
+
+management:
+  # A port of its own when MANAGEMENT_PORT is set, kept private for the
+  # Prometheus scraper: metrics are served only there, and health moves there
+  # too. Unset, it is the app's port, and metrics are refused.
+  server:
+    port: ${MANAGEMENT_PORT:}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  jwt:
+    access-secret: ${JWT_ACCESS_SECRET_KEY}
+    access-token-ttl: PT10M
+    refresh-token-ttl: P1D
+  # The one key secrets are sealed with, such as two-factor secrets. 32 random
+  # bytes, base64.
+  encryption:
+    key: ${APP_ENCRYPTION_KEY:}
+  # The client and the API share one origin (nginx, or the dev server's
+  # proxy), so the refresh cookie can stay Lax: a form another site posts,
+  # such as one signing someone out, doesn't carry it.
+  cookie:
+    refresh-name: jwt
+    path: /
+    same-site: Lax
+    secure: ${COOKIE_SECURE:true}
+  site:
+    name: ${SITE_NAME:Invoice Spot}
+    client-url: ${CLIENT_URL:http://localhost:3000}
+    server-url: ${SERVER_URL:http://localhost:8080}
+    default-from-email: ${SENDER_EMAIL:support@invoicespot.local}
+  verification:
+    token-ttl: PT15M
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
+  # The shared demo account. With seed on, it gets sample data at startup;
+  # with reset on too, its business is cleared and the sample data added
+  # afresh, dated from today, at startup and every day at the jobs' time
+  # (while the jobs are on).
+  demo:
+    email: ${DEMO_EMAIL:guest@demo.invoicespot.local}
+    seed: ${DEMO_SEED:false}
+    reset: ${DEMO_RESET:false}
+  # Google sign-in, offered once both its client ID and secret are set. The
+  # provider sends people back to {redirect-base}/api/v1/auth/oauth2/callback/
+  # {provider}: the origin the browser reaches the API through, registered
+  # with the provider.
+  oauth:
+    redirect-base: ${OAUTH_REDIRECT_BASE:${app.site.client-url}}
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+  jobs:
+    enabled: ${JOBS_ENABLED:true}
+    cron: ${JOBS_CRON:0 0 7 * * *}
+    zone: ${JOBS_ZONE:UTC}
+  # Rate limits are kept in the database, so every instance of the app shares
+  # them; false keeps them in each instance's memory.
+  rate-limit:
+    shared: ${RATE_LIMIT_SHARED:true}
+
+# The app's own logging, INFO unless LOG_LEVEL asks for more (or less).
+logging:
+  level:
+    com.invoicespot: ${LOG_LEVEL:INFO}

@@ -1,0 +1,5 @@
+# The backend image is built from the pom and src only. Everything else, such
+# as the client, .env files, local uploads and build output, stays out.
+*
+!pom.xml
+!src/

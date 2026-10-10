@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tax Invoice INV/0044</title>
+<style>
+@page {
+size: A4;
+margin: 16mm 16mm 18mm 16mm;
+@bottom-right {
+content: "Page " counter(page) " of " counter(pages);
+font-family: 'Noto Sans', sans-serif;
+font-size: 8pt;
+color: #6b7080;
+}
+}
+body {
+margin: 0;
+font-family: 'Noto Sans', sans-serif;
+font-size: 9.5pt;
+line-height: 1.45;
+color: #4f5566;
+}
+table {
+border-collapse: collapse;
+width: 100%;
+}
+td, th {
+padding: 0;
+vertical-align: top;
+}
+.head td {
+padding-bottom: 22px;
+}
+.logo {
+max-height: 56px;
+max-width: 150px;
+margin-bottom: 12px;
+}
+.sender-name {
+font-size: 13pt;
+color: #232735;
+font-weight: bold;
+margin-bottom: 4px;
+}
+.muted {
+color: #5d6170;
+}
+.doc {
+text-align: right;
+width: 46%;
+}
+.title {
+font-size: 28pt;
+font-weight: normal;
+color: #232735;
+letter-spacing: -0.5pt;
+line-height: 1.1;
+}
+.number {
+font-size: 10pt;
+color: #5b47a0;
+margin: 4px 0 12px;
+}
+.meta {
+width: auto;
+margin-left: auto;
+}
+.meta td {
+padding: 1px 0 1px 18px;
+}
+.meta .k {
+color: #6b7080;
+text-align: left;
+}
+.meta .v {
+color: #232735;
+text-align: right;
+}
+.badge {
+display: inline-block;
+margin-top: 10px;
+padding: 3px 10px;
+border-radius: 9px;
+font-size: 8.5pt;
+}
+.badge.paid {
+background: #e5e1f8;
+color: #4a3a80;
+}
+.badge.partial {
+background: #eeeaf9;
+color: #4a3a80;
+}
+.badge.unpaid {
+background: #fbe3d8;
+color: #9c4526;
+}
+.void-note {
+margin-top: 10px;
+color: #9c4526;
+}
+.reference {
+margin-top: 10px;
+color: #6b7080;
+}
+.band {
+background: #f3f2f8;
+border-radius: 12px;
+}
+.band td {
+padding: 14px 16px;
+}
+.label {
+font-size: 8pt;
+text-transform: uppercase;
+letter-spacing: 0.8pt;
+color: #6b7080;
+margin-bottom: 5px;
+}
+.client-name {
+font-size: 11pt;
+color: #232735;
+font-weight: bold;
+margin-bottom: 3px;
+}
+.items {
+margin-top: 22px;
+-fs-table-paginate: paginate;
+}
+.items th {
+font-size: 8pt;
+font-weight: normal;
+text-transform: uppercase;
+letter-spacing: 0.6pt;
+color: #6b7080;
+text-align: left;
+padding: 0 8px 7px 0;
+border-bottom: 1px solid #d9d8e2;
+}
+.items td {
+padding: 9px 8px 9px 0;
+border-bottom: 1px solid #ecebf1;
+color: #232735;
+}
+.items .num {
+text-align: right;
+white-space: nowrap;
+}
+.items .index {
+color: #6b7080;
+width: 22px;
+}
+.items tr {
+page-break-inside: avoid;
+}
+.summary {
+width: 46%;
+margin: 16px 0 0 auto;
+}
+.summary td {
+padding: 4px 0;
+}
+.summary .v {
+text-align: right;
+color: #232735;
+white-space: nowrap;
+}
+.summary .balance td {
+border-top: 1px solid #d9d8e2;
+padding-top: 10px;
+font-size: 11pt;
+color: #30234f;
+font-weight: bold;
+}
+.rates {
+width: 46%;
+margin: 18px 0 0 auto;
+}
+.rates th {
+font-size: 8pt;
+font-weight: normal;
+text-transform: uppercase;
+letter-spacing: 0.6pt;
+color: #6b7080;
+text-align: left;
+padding: 0 0 6px;
+border-bottom: 1px solid #d9d8e2;
+}
+.rates td {
+padding: 5px 0;
+border-bottom: 1px solid #ecebf1;
+color: #232735;
+}
+.rates .num {
+text-align: right;
+white-space: nowrap;
+}
+.gst-rates {
+width: 100%;
+}
+.hsn {
+font-size: 8pt;
+color: #6b7080;
+}
+.words {
+margin-top: 14px;
+color: #232735;
+}
+.endorsement {
+margin-top: 6px;
+color: #30234f;
+}
+.signatory {
+width: 46%;
+margin: 36px 0 0 auto;
+text-align: right;
+page-break-inside: avoid;
+}
+.signatory .line {
+margin-top: 34px;
+padding-top: 5px;
+border-top: 1px solid #d9d8e2;
+color: #6b7080;
+}
+.payment {
+margin-top: 26px;
+padding: 14px 16px;
+background: #f3f2f8;
+border-radius: 12px;
+page-break-inside: avoid;
+}
+.pay {
+table-layout: fixed;
+}
+.pay td {
+padding: 2px 0;
+}
+.pay .k {
+width: 36mm;
+color: #6b7080;
+}
+.pay .v {
+color: #232735;
+word-wrap: break-word;
+}
+.pay a {
+color: #5b47a0;
+text-decoration: none;
+}
+.payment p {
+margin: 8px 0 0;
+white-space: pre-wrap;
+}
+.upi {
+width: 36mm;
+padding-left: 6mm;
+text-align: center;
+vertical-align: middle;
+}
+.upi img {
+width: 30mm;
+height: 30mm;
+}
+.upi div {
+margin-top: 3px;
+font-size: 7.5pt;
+line-height: 1.35;
+color: #6b7080;
+}
+.notes {
+margin-top: 26px;
+page-break-inside: avoid;
+}
+.notes p {
+margin: 0;
+white-space: pre-wrap;
+}
+.notes .block {
+margin-bottom: 16px;
+}
+.watermark {
+position: fixed;
+z-index: -1;
+top: 105mm;
+left: 0;
+right: 0;
+text-align: center;
+font-size: 96pt;
+font-weight: bold;
+letter-spacing: 12pt;
+color: #ecebf1;
+transform: rotate(-30deg);
+}
+</style>
+</head>
+<body>
+<table class="head">
+<tr>
+<td>
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" class="logo" alt="" />
+<div class="sender-name">Ada Analytics</div>
+<div class="muted">Ada Analytics Private Limited</div>
+<div class="muted">accounts@ada.example</div>
+<div class="muted">+91 20 5555 0100</div>
+<div class="muted">12 MG Road, Pune, Maharashtra 411001, India</div>
+<div class="muted">GSTIN 27AAPFU0939F1ZV</div>
+<div class="muted">State: Maharashtra (27)</div>
+</td>
+<td class="doc">
+<div class="title">Tax Invoice</div>
+<div class="number">INV/0044</div>
+<table class="meta">
+<tr>
+<td class="k">Issued</td>
+<td class="v">Oct 1, 2026</td>
+</tr>
+<tr>
+<td class="k">Due</td>
+<td class="v">Oct 15, 2026</td>
+</tr>
+<tr>
+<td class="k">Reverse charge</td>
+<td class="v">No</td>
+</tr>
+</table>
+<span class="badge unpaid">Unpaid</span>
+</td>
+</tr>
+</table>
+<table class="band">
+<tr>
+<td>
+<div class="label">Bill to</div>
+<div class="client-name">Beta &amp; &lt;Sons&gt; LLP</div>
+<div>accounts@beta.example</div>
+<div>+91 22 5555 0199</div>
+<div>4 Marine Drive, Mumbai, India</div>
+<div>Account no. CUS-100042</div>
+<div>VAT / TIN 27AABCB1234C1Z5</div>
+<div>GSTIN 27AAACB1234C1ZF</div>
+<div>Place of supply: 27 – Maharashtra</div>
+</td>
+</tr>
+</table>
+<table class="items">
+<thead>
+<tr>
+<th class="index">#</th>
+<th>Item</th>
+<th class="num">Qty</th>
+<th class="num">Unit price</th>
+<th class="num">Discount</th>
+<th class="num">GST</th>
+<th class="num">Amount</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="index">1</td>
+<td>
+<div>Printed guides</div>
+<div class="hsn">HSN/SAC 4901</div>
+</td>
+<td class="num">4</td>
+<td class="num">450.00</td>
+<td class="num">0%</td>
+<td class="num">5%</td>
+<td class="num">1,800.00</td>
+</tr>
+<tr>
+<td class="index">2</td>
+<td>
+<div>Design sprint</div>
+<div class="hsn">HSN/SAC 998391</div>
+</td>
+<td class="num">1</td>
+<td class="num">1,00,000.00</td>
+<td class="num">0%</td>
+<td class="num">18%</td>
+<td class="num">1,00,000.00</td>
+</tr>
+</tbody>
+</table>
+<table class="summary">
+<tr>
+<td>Subtotal</td>
+<td class="v">INR 1,01,800.00</td>
+</tr>
+<tr>
+<td>CGST 2.5%</td>
+<td class="v">INR 45.00</td>
+</tr>
+<tr>
+<td>SGST 2.5%</td>
+<td class="v">INR 45.00</td>
+</tr>
+<tr>
+<td>CGST 9%</td>
+<td class="v">INR 9,000.00</td>
+</tr>
+<tr>
+<td>SGST 9%</td>
+<td class="v">INR 9,000.00</td>
+</tr>
+<tr>
+<td>Total</td>
+<td class="v">INR 1,19,890.00</td>
+</tr>
+<tr>
+<td>Amount paid</td>
+<td class="v">INR 0.00</td>
+</tr>
+<tr class="balance">
+<td>Balance due</td>
+<td class="v">INR 1,19,890.00</td>
+</tr>
+</table>
+<table class="rates gst-rates">
+<thead>
+<tr>
+<th>HSN/SAC</th>
+<th>Rate</th>
+<th class="num">Taxable</th>
+<th class="num">CGST</th>
+<th class="num">SGST</th>
+<th class="num">IGST</th>
+<th class="num">Total tax</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4901</td>
+<td>5%</td>
+<td class="num">INR 1,800.00</td>
+<td class="num">45.00</td>
+<td class="num">45.00</td>
+<td class="num">0.00</td>
+<td class="num">90.00</td>
+</tr>
+<tr>
+<td>998391</td>
+<td>18%</td>
+<td class="num">INR 1,00,000.00</td>
+<td class="num">9,000.00</td>
+<td class="num">9,000.00</td>
+<td class="num">0.00</td>
+<td class="num">18,000.00</td>
+</tr>
+</tbody>
+</table>
+<div class="words">Rupees One Lakh Nineteen Thousand Eight Hundred Ninety Only</div>
+<div class="notes">
+<div class="block">
+<div class="label">Notes</div>
+<p>Thanks for your business. Payments within 15 days, please.</p>
+</div>
+<div class="block">
+<div class="label">Terms &amp; conditions</div>
+<p>Late payments carry 1.5% interest a month.</p>
+</div>
+</div>
+<div class="signatory">
+<div>For Ada Analytics Private Limited</div>
+<div class="line">Authorised signatory</div>
+</div>
+</body>
+</html>

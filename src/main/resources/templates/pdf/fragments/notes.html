@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+  <!-- Notes and terms, when there are any. -->
+  <div class="notes" th:fragment="notes(notes, terms)" th:if="${notes != null or terms != null}">
+    <div class="block" th:if="${notes != null}">
+      <div class="label">Notes</div>
+      <p th:text="${notes}">Notes</p>
+    </div>
+    <div class="block" th:if="${terms != null}">
+      <div class="label">Terms &amp; conditions</div>
+      <p th:text="${terms}">Terms</p>
+    </div>
+  </div>
+</body>
+</html>

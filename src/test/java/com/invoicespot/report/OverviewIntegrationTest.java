@@ -1,0 +1,811 @@
+package com.invoicespot.report;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.invoicespot.IntegrationTest;
+import com.invoicespot.user.User;
+import com.jayway.jsonpath.JsonPath;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+class OverviewIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    private User owner;
+    private String client;
+
+    @BeforeEach
+    void owner() throws Exception {
+        owner = createUser();
+        String body = mockMvc.perform(post("/api/v1/customer/create")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Acme\", \"email\": \"acme-%s@clients.test\", \"phoneNumber\": \"+1\"}"
+                                .formatted(UUID.randomUUID())))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        client = JsonPath.read(body, "$.createdCustomer._id");
+    }
+
+    private String document(String type, String currency, String amount, int dueInDays) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/document/create")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"customerId": "%s", "documentType": "%s", "currency": "%s",
+                                 "issueDate": "%s", "dueDate": "%s",
+                                 "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1}]}
+                                """.formatted(
+                                        client,
+                                        type,
+                                        currency,
+                                        today.plusDays(Math.min(dueInDays, 0)),
+                                        today.plusDays(dueInDays).atTime(12, 0).toInstant(ZoneOffset.UTC),
+                                        amount)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return JsonPath.read(body, "$.newDocument._id");
+    }
+
+    private void pay(String document, String amount, String date) throws Exception {
+        mockMvc.perform(post("/api/v1/document/{id}/payment", document)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amountPaid\": %s, \"datePaid\": \"%s\", \"paymentMethod\": \"Cash\"}"
+                                .formatted(amount, date)))
+                .andExpect(status().isCreated());
+    }
+
+    private ResultActions overview(String currency) throws Exception {
+        return overview(currency, null);
+    }
+
+    private ResultActions overview(String currency, String period) throws Exception {
+        MockHttpServletRequestBuilder request =
+                get("/api/v1/report/overview").header(HttpHeaders.AUTHORIZATION, bearer(owner));
+        if (currency != null) {
+            request.param("currency", currency);
+        }
+        if (period != null) {
+            request.param("period", period);
+        }
+        return mockMvc.perform(request);
+    }
+
+    private ResultActions send(MockHttpServletRequestBuilder request, String json) throws Exception {
+        return mockMvc.perform(request.header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    // Puts the business in the time zone and returns its today.
+    private LocalDate inZone(ZoneId zone) throws Exception {
+        send(put("/api/v1/settings"), """
+                {"defaultCurrency": "USD", "paymentTermsDays": 15, "defaultTaxRate": 0,
+                 "taxLabel": "Tax", "timeZone": "%s"}
+                """.formatted(zone.getId()))
+                .andExpect(status().isOk());
+        return LocalDate.now(zone);
+    }
+
+    // A document dated the given day and due on the other, at one price taxed
+    // at a rate; a draft is only planned for that day.
+    private String create(
+            String type, String currency, String price, String rate, LocalDate issued, LocalDate due, boolean draft)
+            throws Exception {
+        return JsonPath.read(
+                send(post("/api/v1/document/create"), """
+                                {"customerId": "%s", "documentType": "%s", "currency": "%s", "draft": %s,
+                                 "issueDate": "%s", "dueDate": %s,
+                                 "billingItems": [{"itemName": "Work", "unitPrice": %s, "quantity": 1,
+                                                   "taxRate": "%s"}]}
+                                """.formatted(
+                                        client,
+                                        type,
+                                        currency,
+                                        draft,
+                                        issued,
+                                        due == null ? "null" : "\"" + due + "\"",
+                                        price,
+                                        rate))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.newDocument._id");
+    }
+
+    private String issue(String type, String currency, String amount, LocalDate issued, LocalDate due)
+            throws Exception {
+        return create(type, currency, amount, "0", issued, due, false);
+    }
+
+    private void pay(String document, String amount, String withheld, LocalDate date) throws Exception {
+        send(post("/api/v1/document/{id}/payment", document), """
+                {"amountPaid": %s, "tdsAmount": %s, "datePaid": "%s", "paymentMethod": "Bank Transfer"}
+                """.formatted(amount, withheld, date))
+                .andExpect(status().isCreated());
+    }
+
+    // A credit note taking the amount off the document, dated the given day.
+    // Its line takes the one tax rate the note was copied with, if it had one.
+    private void credit(String document, String amount, LocalDate issued) throws Exception {
+        creditNote(document, "\"unitPrice\": %s".formatted(amount), issued);
+    }
+
+    // The same, with the line taxed at the given rate.
+    private void credit(String document, String amount, String rate, LocalDate issued) throws Exception {
+        creditNote(document, "\"unitPrice\": %s, \"taxRate\": \"%s\"".formatted(amount, rate), issued);
+    }
+
+    // A credit note on the document with one line of work, issued on the day.
+    private void creditNote(String document, String line, LocalDate issued) throws Exception {
+        String note = JsonPath.read(
+                send(post("/api/v1/document/{id}/credit-note", document), "")
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(),
+                "$.newDocument._id");
+        send(patch("/api/v1/document/{id}", note), """
+                {"billingItems": [{"itemName": "Work", "quantity": 1, %s}]}
+                """.formatted(line))
+                .andExpect(status().isOk());
+        send(post("/api/v1/document/{id}/issue", note), "{\"issueDate\": \"%s\"}".formatted(issued))
+                .andExpect(status().isOk());
+    }
+
+    private void refund(String document, String amount, LocalDate date) throws Exception {
+        send(post("/api/v1/document/{id}/refund", document), """
+                {"amount": %s, "dateRefunded": "%s", "paymentMethod": "Bank Transfer"}
+                """.formatted(amount, date))
+                .andExpect(status().isCreated());
+    }
+
+    private void expense(String currency, String amount, String tax, boolean reclaimable, LocalDate date)
+            throws Exception {
+        send(post("/api/v1/expense"), """
+                {"date": "%s", "category": "Office", "currency": "%s", "amount": %s, "taxAmount": %s,
+                 "taxReclaimable": %s}
+                """.formatted(date, currency, amount, tax, reclaimable))
+                .andExpect(status().isCreated());
+    }
+
+    private void voided(String document) throws Exception {
+        send(post("/api/v1/document/{id}/void", document), "{\"reason\": \"Issued twice\"}")
+                .andExpect(status().isOk());
+    }
+
+    // Moves a document's due date to a moment on the business's clock.
+    private void dueAt(String document, LocalDateTime moment, ZoneId zone) {
+        jdbcTemplate.update(
+                "update documents set due_date = ? where id = ?",
+                Timestamp.from(moment.atZone(zone).toInstant()),
+                UUID.fromString(document));
+    }
+
+    private static BigDecimal amount(String body, String path) {
+        return new BigDecimal(JsonPath.read(body, path).toString());
+    }
+
+    // One of the trend's figures, summed over its buckets.
+    private static BigDecimal trendSum(String body, String figure) {
+        List<Object> amounts = JsonPath.read(body, "$.trend[*]." + figure);
+        return amounts.stream()
+                .map(amount -> new BigDecimal(amount.toString()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Test
+    @DisplayName("income is invoices and receipts, pending what they still await")
+    void figures() throws Exception {
+        String partly = document("Invoice", "USD", "100", -1);
+        pay(partly, "20", "2025-01-10");
+        pay(document("Invoice", "USD", "200", 5), "200", "2025-02-01");
+        document("Quotation", "USD", "900", -3);
+        document("Receipt", "USD", "60", 0);
+        document("Invoice", "USD", "30", -10);
+
+        overview(null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencies[0]").value("USD"))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.clients").value(1))
+                .andExpect(jsonPath("$.expectedIncome").value(390.0))
+                .andExpect(jsonPath("$.cashReceived").value(280.0))
+                .andExpect(jsonPath("$.cashPending").value(110.0));
+    }
+
+    @Test
+    @DisplayName("money is shown one currency at a time, the default first")
+    void currencies() throws Exception {
+        pay(document("Invoice", "USD", "100", 5), "40", "2025-01-10");
+        pay(document("Invoice", "EUR", "50", 5), "10", "2025-03-01");
+        document("Quotation", "GBP", "70", 5);
+
+        overview("EUR")
+                .andExpect(jsonPath("$.currencies.length()").value(2))
+                .andExpect(jsonPath("$.currencies[0]").value("USD"))
+                .andExpect(jsonPath("$.currencies[1]").value("EUR"))
+                .andExpect(jsonPath("$.currency").value("EUR"))
+                .andExpect(jsonPath("$.expectedIncome").value(50.0))
+                .andExpect(jsonPath("$.cashReceived").value(10.0));
+        overview("JPY")
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.expectedIncome").value(100.0));
+    }
+
+    @Test
+    @DisplayName("a new account sees zeros in its default currency")
+    void empty() throws Exception {
+        owner = createUser();
+        overview(null)
+                .andExpect(jsonPath("$.currencies").isEmpty())
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.expectedIncome").value(0.0))
+                .andExpect(content().string(containsString(
+                        "\"totals\":{\"billed\":{\"current\":0.00,\"previous\":0.00}")))
+                .andExpect(content().string(containsString("\"tax\":0.00,\"previousTax\":0.00,\"hasPrevious\":false")))
+                .andExpect(jsonPath("$.totals.hasPrevious").value(false))
+                .andExpect(content().string(containsString(
+                        "\"owedNow\":{\"total\":0.00,\"notDue\":0.00,\"overdue\":0.00,"
+                                + "\"invoices\":0,\"overdueInvoices\":0,\"bands\":["
+                                + "{\"key\":\"current\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days1to15\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days16to30\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"days31to45\",\"amount\":0.00,\"invoices\":0},"
+                                + "{\"key\":\"over45\",\"amount\":0.00,\"invoices\":0}]}")));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the period is the last 90 days unless another is chosen, beside as long a stretch just before it")
+    void periods(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        overview(null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.period.key").value("90d"))
+                .andExpect(jsonPath("$.period.from").value(day.minusDays(89).toString()))
+                .andExpect(jsonPath("$.period.to").value(day.toString()))
+                .andExpect(jsonPath("$.period.previousFrom").value(day.minusDays(179).toString()))
+                .andExpect(jsonPath("$.period.previousTo").value(day.minusDays(90).toString()))
+                .andExpect(jsonPath("$.period.step").value("week"));
+        overview("USD", "30d")
+                .andExpect(jsonPath("$.period.key").value("30d"))
+                .andExpect(jsonPath("$.period.from").value(day.minusDays(29).toString()))
+                .andExpect(jsonPath("$.period.to").value(day.toString()))
+                .andExpect(jsonPath("$.period.previousFrom").value(day.minusDays(59).toString()))
+                .andExpect(jsonPath("$.period.previousTo").value(day.minusDays(30).toString()))
+                .andExpect(jsonPath("$.period.step").value("day"));
+        // The last 12 months go back to the same day a year ago, beside the
+        // 12 months before them.
+        LocalDate first = day.minusMonths(12).plusDays(1);
+        overview(null, "12m")
+                .andExpect(jsonPath("$.period.key").value("12m"))
+                .andExpect(jsonPath("$.period.from").value(first.toString()))
+                .andExpect(jsonPath("$.period.to").value(day.toString()))
+                .andExpect(jsonPath("$.period.previousFrom").value(first.minusMonths(12).toString()))
+                .andExpect(jsonPath("$.period.previousTo").value(first.minusDays(1).toString()))
+                .andExpect(jsonPath("$.period.step").value("month"));
+        overview(null, "ytd")
+                .andExpect(jsonPath("$.period.key").value("ytd"))
+                .andExpect(jsonPath("$.period.from").value(day.withDayOfYear(1).toString()))
+                .andExpect(jsonPath("$.period.to").value(day.toString()))
+                .andExpect(jsonPath("$.period.previousFrom").value(day.withDayOfYear(1).minusYears(1).toString()))
+                .andExpect(jsonPath("$.period.previousTo").value(day.minusYears(1).toString()))
+                .andExpect(jsonPath("$.period.step").value("month"));
+        overview(null, "7d")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Choose 30 days, 90 days, 12 months or this year"));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("billed, received and profit in the period and the one before, counted as the reports count them")
+    void totals(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // In the last 90 days: an invoice taxed 10% and partly paid, a receipt,
+        // an invoice partly paid and credited, and one paid, credited and
+        // refunded; an expense with tax that can't be claimed back, and one
+        // with tax that can.
+        String taxed = create("Invoice", "USD", "1000", "10", day.minusDays(10), day.plusDays(20), false);
+        pay(taxed, "400", "0", day.minusDays(5));
+        create("Receipt", "USD", "300", "0", day.minusDays(3), null, false);
+        String credited = issue("Invoice", "USD", "500", day.minusDays(20), day.minusDays(1));
+        pay(credited, "100", "0", day.minusDays(2));
+        credit(credited, "50", day.minusDays(1));
+        String refunded = issue("Invoice", "USD", "200", day.minusDays(30), day.minusDays(15));
+        pay(refunded, "200", "0", day.minusDays(30));
+        credit(refunded, "80", day.minusDays(4));
+        refund(refunded, "80", day.minusDays(2));
+        expense("USD", "100", "18", false, day.minusDays(6));
+        expense("USD", "50", "9", true, day.minusDays(7));
+        // In the 90 days before: an invoice paid partly then and partly now,
+        // a payment on an older invoice, and an expense.
+        String older = issue("Invoice", "USD", "2000", day.minusDays(100), day.minusDays(70));
+        pay(older, "1500", "0", day.minusDays(95));
+        pay(older, "500", "0", day.minusDays(10));
+        pay(issue("Invoice", "USD", "250", day.minusDays(200), day.minusDays(170)), "250", "0", day.minusDays(150));
+        expense("USD", "300", "0", false, day.minusDays(120));
+        // Never counted: a draft, a void invoice, a quotation, another currency.
+        create("Invoice", "USD", "700", "0", day.minusDays(1), null, true);
+        voided(issue("Invoice", "USD", "300", day.minusDays(1), day.plusDays(10)));
+        issue("Quotation", "USD", "900", day.minusDays(2), day.plusDays(10));
+        pay(issue("Invoice", "EUR", "400", day.minusDays(1), day.plusDays(10)), "100", "0", day);
+        expense("EUR", "30", "0", false, day.minusDays(1));
+
+        overview(null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.totals.billed.current").value(1970.0))
+                .andExpect(jsonPath("$.totals.billed.previous").value(2000.0))
+                .andExpect(jsonPath("$.totals.received.current").value(1420.0))
+                .andExpect(jsonPath("$.totals.received.previous").value(1750.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(1702.0))
+                .andExpect(jsonPath("$.totals.profit.previous").value(1700.0))
+                .andExpect(jsonPath("$.totals.hasPrevious").value(true));
+        // The 30 days before the last 30 end on the day the refunded invoice
+        // was dated and paid.
+        overview(null, "30d")
+                .andExpect(jsonPath("$.totals.billed.current").value(1770.0))
+                .andExpect(jsonPath("$.totals.billed.previous").value(200.0))
+                .andExpect(jsonPath("$.totals.received.current").value(1220.0))
+                .andExpect(jsonPath("$.totals.received.previous").value(200.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(1502.0))
+                .andExpect(jsonPath("$.totals.profit.previous").value(200.0));
+        overview("EUR", null)
+                .andExpect(jsonPath("$.totals.billed.current").value(400.0))
+                .andExpect(jsonPath("$.totals.received.current").value(100.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(370.0))
+                .andExpect(jsonPath("$.totals.hasPrevious").value(false));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the period is compared with the one before only when money was billed, paid or spent on that one's"
+            + " first day or earlier")
+    void previous(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // The last 90 days are compared with the 90 before them, which begin
+        // 179 days ago. Money from the day after that covers only part of
+        // them: a deposit the day before the period, on an invoice dated in
+        // it, and an expense.
+        String invoice = issue("Invoice", "USD", "100", day.minusDays(89), day.plusDays(10));
+        pay(invoice, "40", "0", day.minusDays(90));
+        expense("USD", "20", "0", false, day.minusDays(178));
+        // Earlier, but none of it counts: a quotation, a draft, a void
+        // invoice, and money in another currency.
+        issue("Quotation", "USD", "50", day.minusDays(400), day.minusDays(380));
+        create("Invoice", "USD", "60", "0", day.minusDays(400), null, true);
+        voided(issue("Invoice", "USD", "70", day.minusDays(400), day.minusDays(380)));
+        issue("Invoice", "EUR", "80", day.minusDays(400), day.minusDays(380));
+        expense("EUR", "90", "0", false, day.minusDays(400));
+
+        overview("USD", null)
+                .andExpect(jsonPath("$.totals.hasPrevious").value(false))
+                .andExpect(jsonPath("$.totals.billed.current").value(100.0))
+                .andExpect(jsonPath("$.totals.received.previous").value(40.0))
+                .andExpect(jsonPath("$.totals.profit.previous").value(-20.0));
+        // The 30 days before the last 30 are all covered.
+        overview("USD", "30d").andExpect(jsonPath("$.totals.hasPrevious").value(true));
+
+        // Money of any kind on the first of the 90 days before is enough: an
+        // invoice or a receipt dated then, a payment made then on a later
+        // invoice, or an expense paid then.
+        for (String kind : List.of("Invoice", "Receipt", "Payment", "Expense")) {
+            owner();
+            LocalDate first = inZone(zone).minusDays(179);
+            switch (kind) {
+                case "Invoice" -> issue(kind, "USD", "100", first, first.plusDays(30));
+                case "Receipt" -> create(kind, "USD", "100", "0", first, null, false);
+                case "Payment" -> {
+                    String paid = issue("Invoice", "USD", "100", first.plusDays(1), first.plusDays(30));
+                    pay(paid, "100", "0", first);
+                }
+                default -> expense("USD", "100", "0", false, first);
+            }
+            overview("USD", null).andExpect(jsonPath("$.totals.hasPrevious").value(true));
+            overview("USD", "30d").andExpect(jsonPath("$.totals.hasPrevious").value(true));
+        }
+
+        // A business whose only money is an old expense.
+        owner = createUser();
+        LocalDate later = inZone(zone);
+        expense("USD", "10", "0", false, later.minusDays(400));
+        overview(null, null)
+                .andExpect(jsonPath("$.totals.hasPrevious").value(true))
+                .andExpect(jsonPath("$.totals.profit.previous").value(0.0));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the trend splits the period's money by day, week or month, and adds up to its totals")
+    void trend(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // Today: a receipt, and a credit note on yesterday's invoice taxed 10%,
+        // which was partly paid. Two days ago: a credit note on the day
+        // before's receipt, paid back, and an expense with tax that can't be
+        // claimed back. On the first day of the last 30: an expense.
+        create("Receipt", "USD", "300", "0", day, null, false);
+        String invoice = create("Invoice", "USD", "1000", "10", day.minusDays(1), day.plusDays(30), false);
+        pay(invoice, "400", "0", day.minusDays(1));
+        credit(invoice, "100", day);
+        String receipt = create("Receipt", "USD", "200", "0", day.minusDays(3), null, false);
+        credit(receipt, "50", day.minusDays(2));
+        refund(receipt, "50", day.minusDays(2));
+        expense("USD", "100", "18", false, day.minusDays(2));
+        expense("USD", "10", "0", false, day.minusDays(29));
+        // The day before the last 30, and money in another currency.
+        pay(issue("Invoice", "USD", "500", day.minusDays(35), day.minusDays(5)), "500", "0", day.minusDays(30));
+        expense("USD", "70", "0", false, day.minusDays(30));
+        pay(issue("Invoice", "EUR", "900", day, day.plusDays(5)), "900", "0", day);
+
+        overview(null, "30d")
+                .andExpect(jsonPath("$.trend.length()").value(30))
+                .andExpect(jsonPath("$.trend[0].from").value(day.minusDays(29).toString()))
+                .andExpect(jsonPath("$.trend[0].to").value(day.minusDays(29).toString()))
+                .andExpect(jsonPath("$.trend[0].expenses").value(10.0))
+                .andExpect(jsonPath("$.trend[0].moneyOut").value(10.0))
+                .andExpect(jsonPath("$.trend[1].billed").value(0.0))
+                .andExpect(jsonPath("$.trend[1].moneyIn").value(0.0))
+                .andExpect(jsonPath("$.trend[26].from").value(day.minusDays(3).toString()))
+                .andExpect(jsonPath("$.trend[26].billed").value(200.0))
+                .andExpect(jsonPath("$.trend[26].received").value(200.0))
+                .andExpect(jsonPath("$.trend[26].income").value(200.0))
+                .andExpect(jsonPath("$.trend[26].moneyIn").value(200.0))
+                // A refund is money out, and comes off what was received.
+                .andExpect(jsonPath("$.trend[27].billed").value(-50.0))
+                .andExpect(jsonPath("$.trend[27].received").value(-50.0))
+                .andExpect(jsonPath("$.trend[27].income").value(-50.0))
+                .andExpect(jsonPath("$.trend[27].expenses").value(118.0))
+                .andExpect(jsonPath("$.trend[27].moneyIn").value(0.0))
+                .andExpect(jsonPath("$.trend[27].moneyOut").value(168.0))
+                .andExpect(jsonPath("$.trend[28].billed").value(1100.0))
+                .andExpect(jsonPath("$.trend[28].received").value(400.0))
+                .andExpect(jsonPath("$.trend[28].income").value(1000.0))
+                .andExpect(jsonPath("$.trend[28].moneyIn").value(400.0))
+                .andExpect(jsonPath("$.trend[28].moneyOut").value(0.0))
+                .andExpect(jsonPath("$.trend[29].from").value(day.toString()))
+                .andExpect(jsonPath("$.trend[29].to").value(day.toString()))
+                .andExpect(jsonPath("$.trend[29].billed").value(190.0))
+                .andExpect(jsonPath("$.trend[29].received").value(300.0))
+                .andExpect(jsonPath("$.trend[29].income").value(200.0))
+                .andExpect(jsonPath("$.trend[29].expenses").value(0.0))
+                .andExpect(jsonPath("$.trend[29].moneyIn").value(300.0))
+                .andExpect(jsonPath("$.totals.billed.current").value(1440.0))
+                .andExpect(jsonPath("$.totals.received.current").value(850.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(1222.0));
+        overview(null, null)
+                .andExpect(jsonPath("$.trend.length()").value(13))
+                .andExpect(jsonPath("$.trend[0].from").value(day.minusDays(89).toString()))
+                .andExpect(jsonPath("$.trend[0].to").value(day.minusDays(83).toString()))
+                .andExpect(jsonPath("$.trend[12].from").value(day.minusDays(5).toString()))
+                .andExpect(jsonPath("$.trend[12].to").value(day.toString()))
+                .andExpect(jsonPath("$.trend[12].billed").value(1440.0))
+                .andExpect(jsonPath("$.trend[12].moneyIn").value(900.0))
+                .andExpect(jsonPath("$.trend[12].moneyOut").value(168.0));
+        // By calendar month, the first from the day after today's date a year
+        // ago, which is a part month unless it is the 1st.
+        LocalDate first = day.minusMonths(12).plusDays(1);
+        int months = first.getDayOfMonth() == 1 ? 12 : 13;
+        overview(null, "12m")
+                .andExpect(jsonPath("$.trend.length()").value(months))
+                .andExpect(jsonPath("$.trend[0].from").value(first.toString()))
+                .andExpect(jsonPath("$.trend[0].to").value(YearMonth.from(first).atEndOfMonth().toString()))
+                .andExpect(jsonPath("$.trend[%d].from".formatted(months - 1)).value(day.withDayOfMonth(1).toString()))
+                .andExpect(jsonPath("$.trend[%d].to".formatted(months - 1)).value(day.toString()));
+        overview(null, "ytd")
+                .andExpect(jsonPath("$.trend.length()").value(day.getMonthValue()))
+                .andExpect(jsonPath("$.trend[0].from").value(day.withDayOfYear(1).toString()));
+
+        for (String period : List.of("30d", "90d", "12m", "ytd")) {
+            String body = overview(null, period).andReturn().getResponse().getContentAsString();
+            assertThat(trendSum(body, "billed")).isEqualByComparingTo(amount(body, "$.totals.billed.current"));
+            assertThat(trendSum(body, "received")).isEqualByComparingTo(amount(body, "$.totals.received.current"));
+            assertThat(trendSum(body, "income").subtract(trendSum(body, "expenses")))
+                    .isEqualByComparingTo(amount(body, "$.totals.profit.current"));
+            // Received is the money in less what was paid back, and money out
+            // is what was paid for expenses, here with no tax to claim back,
+            // and what was paid back.
+            assertThat(trendSum(body, "moneyIn").subtract(trendSum(body, "received")))
+                    .isEqualByComparingTo(trendSum(body, "moneyOut").subtract(trendSum(body, "expenses")));
+        }
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("money out is what was paid for expenses, tax that can be claimed back and all, as the expenses"
+            + " list's Spent adds it up, while profit takes off only what they cost")
+    void reclaimableTax(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        create("Receipt", "USD", "1000", "0", day, null, false);
+        // Yesterday: an expense with tax that can be claimed back, and one
+        // with tax that can't.
+        expense("USD", "100", "18", true, day.minusDays(1));
+        expense("USD", "50", "9", false, day.minusDays(1));
+
+        overview("USD", "30d")
+                .andExpect(jsonPath("$.trend[28].expenses").value(159.0))
+                .andExpect(jsonPath("$.trend[28].moneyOut").value(177.0))
+                .andExpect(jsonPath("$.trend[29].moneyIn").value(1000.0))
+                .andExpect(jsonPath("$.totals.profit.current").value(841.0));
+        send(get("/api/v1/expense").param("period", "30d").param("currency", "USD"), "")
+                .andExpect(jsonPath("$.expenses[*].total", contains(59.0, 118.0)))
+                .andExpect(jsonPath("$.totals[0].spent").value(177.0));
+        send(get("/api/v1/report/profit").param("period", "30d"), "")
+                .andExpect(jsonPath("$.currencies[0].expenses").value(159.0))
+                .andExpect(jsonPath("$.currencies[0].profit").value(841.0));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("what is owed now is the pending money, split by due date into overdue and not due yet")
+    void owedNow(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        issue("Invoice", "USD", "100", day.minusDays(10), day.minusDays(1));
+        String partly = issue("Invoice", "USD", "300", day.minusDays(40), day.minusDays(30));
+        pay(partly, "100", "20", day.minusDays(5));
+        issue("Invoice", "USD", "50", day.minusDays(2), day);
+        String credited = issue("Invoice", "USD", "400", day.minusDays(1), day.plusDays(30));
+        credit(credited, "150", day);
+        // Nothing owed: a paid invoice, a receipt, a draft, a void invoice
+        // and a quotation; one in euros is owed in euros.
+        pay(issue("Invoice", "USD", "70", day.minusDays(20), day.minusDays(10)), "70", "0", day);
+        create("Receipt", "USD", "60", "0", day, null, false);
+        create("Invoice", "USD", "500", "0", day.minusDays(9), day.minusDays(5), true);
+        voided(issue("Invoice", "USD", "600", day.minusDays(9), day.minusDays(5)));
+        issue("Quotation", "USD", "700", day.minusDays(9), day.minusDays(5));
+        issue("Invoice", "EUR", "800", day.minusDays(9), day.minusDays(5));
+
+        overview("USD", null)
+                .andExpect(jsonPath("$.cashPending").value(580.0))
+                .andExpect(jsonPath("$.owedNow.total").value(580.0))
+                .andExpect(jsonPath("$.owedNow.overdue").value(280.0))
+                .andExpect(jsonPath("$.owedNow.notDue").value(300.0))
+                .andExpect(jsonPath("$.owedNow.invoices").value(4))
+                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(2));
+        overview("EUR", "30d")
+                .andExpect(jsonPath("$.cashPending").value(800.0))
+                .andExpect(jsonPath("$.owedNow.total").value(800.0))
+                .andExpect(jsonPath("$.owedNow.overdue").value(800.0))
+                .andExpect(jsonPath("$.owedNow.notDue").value(0.0))
+                .andExpect(jsonPath("$.owedNow.overdueInvoices").value(1));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("what is owed now is split by days late on the business's calendar: not due yet, then up to 15, 30"
+            + " and 45 days, and over 45")
+    void owedBands(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // Not due yet: due in the first minutes of today by the business's
+        // clock, due later, and saved without a due date, as the oldest
+        // invoices were.
+        String early = issue("Invoice", "USD", "100", day.minusDays(1), day);
+        dueAt(early, day.atTime(0, 30), zone);
+        issue("Invoice", "USD", "200", day.minusDays(1), day.plusDays(30));
+        String undated = issue("Invoice", "USD", "300", day.minusDays(1), day.plusDays(5));
+        jdbcTemplate.update("update documents set due_date = null where id = ?", UUID.fromString(undated));
+        // Due in the last minutes of yesterday, then each side of 15, 30 and
+        // 45 days late: one partly paid with tax withheld, and one partly
+        // credited.
+        String late = issue("Invoice", "USD", "10", day.minusDays(20), day.minusDays(1));
+        dueAt(late, day.minusDays(1).atTime(23, 30), zone);
+        pay(issue("Invoice", "USD", "1000", day.minusDays(40), day.minusDays(15)), "400", "50", day.minusDays(3));
+        issue("Invoice", "USD", "20", day.minusDays(40), day.minusDays(16));
+        credit(issue("Invoice", "USD", "500", day.minusDays(60), day.minusDays(30)), "120", day.minusDays(2));
+        issue("Invoice", "USD", "40", day.minusDays(60), day.minusDays(31));
+        issue("Invoice", "USD", "50", day.minusDays(60), day.minusDays(45));
+        issue("Invoice", "USD", "60", day.minusDays(90), day.minusDays(46));
+        issue("Invoice", "USD", "70", day.minusDays(400), day.minusDays(365));
+        // Nothing owed: paid in full, a receipt, a draft, a void invoice and a
+        // quotation. Euros are owed in euros.
+        pay(issue("Invoice", "USD", "80", day.minusDays(30), day.minusDays(20)), "80", "0", day);
+        create("Receipt", "USD", "90", "0", day.minusDays(20), null, false);
+        create("Invoice", "USD", "500", "0", day.minusDays(30), day.minusDays(20), true);
+        voided(issue("Invoice", "USD", "600", day.minusDays(30), day.minusDays(20)));
+        issue("Quotation", "USD", "700", day.minusDays(30), day.minusDays(20));
+        issue("Invoice", "EUR", "800", day.minusDays(30), day.minusDays(20));
+        pay(issue("Invoice", "EUR", "90", day.minusDays(80), day.minusDays(50)), "40", "0", day.minusDays(10));
+
+        String dollars = overview("USD", null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                        "$.owedNow.bands[*].key",
+                        contains("current", "days1to15", "days16to30", "days31to45", "over45")))
+                .andExpect(jsonPath("$.owedNow.bands[*].amount", contains(600.0, 560.0, 400.0, 90.0, 130.0)))
+                .andExpect(jsonPath("$.owedNow.bands[*].invoices", contains(3, 2, 2, 2, 2)))
+                .andExpect(jsonPath("$.owedNow.total").value(1780.0))
+                .andExpect(jsonPath("$.owedNow.invoices").value(11))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String euros = overview("EUR", "30d")
+                .andExpect(jsonPath("$.owedNow.bands[*].amount", contains(0.0, 0.0, 800.0, 0.0, 50.0)))
+                .andExpect(jsonPath("$.owedNow.bands[*].invoices", contains(0, 0, 1, 0, 1)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        for (String body : List.of(dollars, euros)) {
+            bandsAddUp(body);
+        }
+    }
+
+    // The bands add up to what is owed now: not due yet is the first, and the
+    // other four are what is overdue, in money and in invoices.
+    private static void bandsAddUp(String body) {
+        BigDecimal overdue = BigDecimal.ZERO;
+        int late = 0;
+        for (int band = 1; band < 5; band++) {
+            overdue = overdue.add(amount(body, "$.owedNow.bands[%d].amount".formatted(band)));
+            late += JsonPath.<Integer>read(body, "$.owedNow.bands[%d].invoices".formatted(band));
+        }
+        BigDecimal notDue = amount(body, "$.owedNow.bands[0].amount");
+        int current = JsonPath.read(body, "$.owedNow.bands[0].invoices");
+        assertThat(notDue).isEqualByComparingTo(amount(body, "$.owedNow.notDue"));
+        assertThat(overdue).isEqualByComparingTo(amount(body, "$.owedNow.overdue"));
+        assertThat(notDue.add(overdue)).isEqualByComparingTo(amount(body, "$.owedNow.total"));
+        assertThat(late).isEqualTo(JsonPath.<Integer>read(body, "$.owedNow.overdueInvoices"));
+        assertThat(current + late).isEqualTo(JsonPath.<Integer>read(body, "$.owedNow.invoices"));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the reports' last 30 and 90 days are the overview's, and bill, receive and earn as it does")
+    void reportPeriods(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // On the first day of each period and the day before it: invoices
+        // paid, one with tax withheld and one credited and paid back, a
+        // receipt, and expenses.
+        pay(issue("Invoice", "USD", "1000", day.minusDays(29), day.plusDays(10)), "300", "20", day.minusDays(29));
+        pay(issue("Invoice", "USD", "500", day.minusDays(30), day.plusDays(10)), "500", "0", day.minusDays(30));
+        String credited = issue("Invoice", "USD", "800", day.minusDays(89), day.plusDays(10));
+        pay(credited, "800", "0", day.minusDays(89));
+        credit(credited, "100", day.minusDays(1));
+        refund(credited, "100", day);
+        issue("Invoice", "USD", "700", day.minusDays(90), day.plusDays(10));
+        create("Receipt", "USD", "60", "0", day, null, false);
+        expense("USD", "40", "0", false, day.minusDays(29));
+        expense("USD", "30", "0", false, day.minusDays(90));
+        // Never counted with dollars: euros, a quotation and a draft.
+        pay(issue("Invoice", "EUR", "900", day, day.plusDays(5)), "900", "0", day);
+        issue("Quotation", "USD", "5000", day, day.plusDays(5));
+        create("Invoice", "USD", "6000", "0", day, null, true);
+
+        List<String> periods = List.of("30d", "90d");
+        List<List<String>> figures = List.of(List.of("960", "260", "920"), List.of("2260", "1560", "2220"));
+        for (int index = 0; index < periods.size(); index++) {
+            String period = periods.get(index);
+            String overview = overview("USD", period).andReturn().getResponse().getContentAsString();
+            String report = send(get("/api/v1/report").param("period", period), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.period").value(period))
+                    .andExpect(jsonPath("$.from").value(JsonPath.<String>read(overview, "$.period.from")))
+                    .andExpect(jsonPath("$.to").value(JsonPath.<String>read(overview, "$.period.to")))
+                    .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            String profit = send(get("/api/v1/report/profit").param("period", period), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.currencies[0].currency").value("USD"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            assertThat(amount(report, "$.currencies[0].billed"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.billed.current"))
+                    .isEqualByComparingTo(figures.get(index).get(0));
+            assertThat(amount(report, "$.currencies[0].received"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.received.current"))
+                    .isEqualByComparingTo(figures.get(index).get(1));
+            assertThat(amount(profit, "$.currencies[0].profit"))
+                    .as(period)
+                    .isEqualByComparingTo(amount(overview, "$.totals.profit.current"))
+                    .isEqualByComparingTo(figures.get(index).get(2));
+        }
+        // The other reports read the same days.
+        for (String report : List.of("/api/v1/report/tax", "/api/v1/report/tds")) {
+            send(get(report).param("period", "30d"), "")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.from").value(day.minusDays(29).toString()))
+                    .andExpect(jsonPath("$.to").value(day.toString()));
+        }
+        // The CSV gives each month the days of it the period covers, the
+        // first from the period's first day and the last to today.
+        LocalDate first = day.minusDays(89);
+        send(get("/api/v1/report/csv/income").param("period", "90d"), "")
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("USD,%s,%s,%s,".formatted(
+                        YearMonth.from(first), first, YearMonth.from(first).atEndOfMonth()))))
+                .andExpect(content().string(containsString(
+                        "USD,%s,%s,%s,".formatted(YearMonth.from(day), day.withDayOfMonth(1), day))));
+    }
+
+    @ParameterizedTest(name = "in {0}")
+    @ArgumentsSource(AwayFromUtc.class)
+    @DisplayName("the tax in what was billed is the tax report's, in every period and currency, and the period"
+            + " before it counts the same way")
+    void taxBilled(ZoneId zone) throws Exception {
+        LocalDate day = inZone(zone);
+        // In the last 30 days: an invoice taxed 10%, a receipt taxed 18%, an
+        // invoice taxed 5% on their first day, and a credit note taking 18%
+        // off an invoice from the 90 days.
+        create("Invoice", "USD", "1000", "10", day.minusDays(10), day.plusDays(20), false);
+        create("Receipt", "USD", "200", "18", day.minusDays(3), null, false);
+        create("Invoice", "USD", "300", "5", day.minusDays(29), day.plusDays(1), false);
+        String older = create("Invoice", "USD", "500", "18", day.minusDays(60), day.minusDays(30), false);
+        credit(older, "100", "18", day.minusDays(2));
+        // The day before the last 30 days, and the 90 days before the last 90.
+        create("Invoice", "USD", "400", "10", day.minusDays(30), day.plusDays(1), false);
+        create("Invoice", "USD", "700", "10", day.minusDays(100), day.minusDays(70), false);
+        // Never counted: a draft, a void invoice and a quotation. Euros count
+        // as euros.
+        create("Invoice", "USD", "900", "18", day.minusDays(1), null, true);
+        voided(create("Invoice", "USD", "800", "18", day.minusDays(1), day.plusDays(10), false));
+        create("Quotation", "USD", "600", "18", day.minusDays(1), day.plusDays(10), false);
+        create("Invoice", "EUR", "250", "20", day.minusDays(1), day.plusDays(10), false);
+
+        // The last 30 days: 100 + 36 + 15 - 18, with 40 the day before them.
+        // The last 90 days add that 40 and the older invoice's 90, with 70 in
+        // the 90 days before them.
+        overview("USD", "30d")
+                .andExpect(jsonPath("$.totals.tax").value(133.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(40.0));
+        overview("USD", null)
+                .andExpect(jsonPath("$.totals.tax").value(263.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(70.0));
+        overview("EUR", "30d")
+                .andExpect(jsonPath("$.totals.tax").value(50.0))
+                .andExpect(jsonPath("$.totals.previousTax").value(0.0));
+        for (String currency : List.of("USD", "EUR")) {
+            for (String period : List.of("30d", "90d", "12m", "ytd")) {
+                String overview = overview(currency, period).andReturn().getResponse().getContentAsString();
+                String report = send(get("/api/v1/report/tax").param("period", period), "")
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+                // A currency the report has nothing in, as early in January
+                // this year can be, had no tax.
+                List<Object> tax = JsonPath.read(report, "$.currencies[?(@.currency == '%s')].tax".formatted(currency));
+                assertThat(amount(overview, "$.totals.tax"))
+                        .as(currency + " " + period)
+                        .isEqualByComparingTo(tax.isEmpty() ? BigDecimal.ZERO : new BigDecimal(tax.get(0).toString()));
+            }
+        }
+    }
+}

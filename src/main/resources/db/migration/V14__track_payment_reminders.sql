@@ -1,0 +1,2 @@
+ALTER TABLE documents ADD COLUMN reminders_sent INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE documents ADD COLUMN last_reminded_at TIMESTAMPTZ;

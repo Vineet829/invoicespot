@@ -1,0 +1,42 @@
+package com.invoicespot.expense;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface ExpenseRepository extends JpaRepository<Expense, Long> {
+
+    @Query("select e from Expense e where e.id = :externalId")
+    Optional<Expense> findByExternalId(@Param("externalId") UUID externalId);
+
+    boolean existsByBusinessPkid(Long businessPkid);
+
+    boolean existsByBusinessPkidAndVendorIn(Long businessPkid, Collection<String> vendors);
+
+    // The categories a business has used, in alphabetical order.
+    @Query("""
+            select e.category from Expense e
+            where e.business.pkid = :businessPkid
+            group by e.category
+            order by lower(e.category), e.category
+            """)
+    List<String> categories(@Param("businessPkid") Long businessPkid);
+
+    // How the business's other expenses spell a category, in any letter case.
+    // Two members saving a new category at the same moment can each keep
+    // their own spelling; the one used first comes first.
+    @Query("""
+            select e.category from Expense e
+            where e.business.pkid = :businessPkid and lower(e.category) = lower(:category) and e.pkid <> :exceptPkid
+            group by e.category
+            order by min(e.pkid)
+            """)
+    List<String> spellingsOf(
+            @Param("businessPkid") Long businessPkid,
+            @Param("category") String category,
+            @Param("exceptPkid") long exceptPkid);
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <!-- Themes laid over the Classic layout every PDF has: each restyles the
+       classes the layouts share, after Classic's own rules. -->
+
+  <!-- Modern: the heading on a tinted band, painted once on its table so no
+       seam shows between its cells, with the title in violet and a size
+       smaller so the longest titles fit beside the band's padding; tables
+       have violet headings over a violet rule. -->
+  <style th:fragment="modern">
+    .head { margin-bottom: 20px; background: #efeaf9; }
+    .head td { padding: 18px 16px; }
+    .head .meta td { padding: 1px 0 1px 18px; }
+    .head .meta .k { white-space: nowrap; }
+    .title { font-size: 22pt; color: #4a3a80; }
+    .band { background: #ffffff; border: 1px solid #e2dcf3; }
+    .items th, .ledger th, .rates th, .items th.index, .ledger th.date { color: #4a3a80; border-bottom: 2px solid #4a3a80; }
+    .summary .balance td { color: #4a3a80; border-top: 2px solid #4a3a80; }
+    .payment { background: #efeaf9; }
+    .received { background: #4a3a80; }
+    .received td, .received .amount { color: #ffffff; }
+    .received .label, .received .method { color: #ddd6f3; }
+  </style>
+
+  <!-- Compact: smaller type and tighter spacing, to fit more on a page. -->
+  <style th:fragment="compact">
+    @page { margin: 12mm 12mm 14mm 12mm; }
+    body { font-size: 8.5pt; line-height: 1.35; }
+    .head td { padding-bottom: 14px; }
+    .head .meta td { padding: 1px 0 1px 14px; }
+    .logo { max-height: 40px; margin-bottom: 8px; }
+    .sender-name { font-size: 11.5pt; }
+    .title { font-size: 20pt; }
+    .band td { padding: 10px 12px; }
+    .items { margin-top: 14px; }
+    .items td { padding: 5px 8px 5px 0; }
+    .ledger td { padding: 5px 8px 5px 0; }
+    .summary { margin-top: 10px; }
+    .summary td { padding: 2px 0; }
+    .summary .balance td { padding-top: 6px; }
+    .rates { margin-top: 12px; }
+    .payment { margin-top: 16px; padding: 10px 12px; }
+    .notes { margin-top: 16px; }
+    .signatory { margin-top: 24px; }
+    .account { margin-top: 14px; }
+    .received { margin-top: 14px; }
+    .received td { padding: 12px 14px; }
+    .amount { font-size: 18pt; }
+  </style>
+</head>
+</html>
