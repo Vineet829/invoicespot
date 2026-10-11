@@ -36,6 +36,12 @@ export const refreshRequest = {
 
 let refreshInFlight;
 
+// Only the server refusing the session ends it. A refresh lost to the
+// network, or answered by a server that is restarting, leaves the user
+// signed in, with whatever they were typing, to try again.
+const sessionRefused = (error) =>
+  [401, 403].includes(error?.originalStatus ?? error?.status);
+
 // The server answers an expired or revoked access token with an empty 403.
 // A 403 with a message is a refusal the token can't fix, so it isn't retried.
 const rejectedToken = (error) =>
@@ -61,8 +67,11 @@ const refreshingQuery = async (args, api, extraOptions) => {
         .then((result) => {
           if (result?.data) {
             api.dispatch(logIn({ ...result.data }));
-          } else {
+          } else if (sessionRefused(result?.error)) {
             api.dispatch(logOut());
+            // What the session loaded goes with it, so whoever signs in next
+            // in this tab never sees it.
+            api.dispatch(baseApiSlice.util.resetApiState());
           }
           return result;
         })

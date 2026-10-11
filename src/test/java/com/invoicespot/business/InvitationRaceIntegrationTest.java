@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.auth.dto.ConfirmIdentityRequest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
 import java.util.List;
@@ -62,7 +63,7 @@ class InvitationRaceIntegrationTest extends IntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        User founder = createUser();
+        User founder = withAccountPassword(createUser());
         business = businessOf(founder);
         access = new BusinessAccess(business.getPkid(), business.getId(), BusinessRole.OWNER, founder);
         clearInvocations(mailSender);
@@ -167,7 +168,8 @@ class InvitationRaceIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("an acceptance that waits while the business is deleted finds the link gone")
     void acceptWhileBusinessDeleted() throws Exception {
-        int accepted = acceptWhile(token, () -> teamService.delete(access));
+        int accepted = acceptWhile(
+                token, () -> teamService.delete(access, new ConfirmIdentityRequest(ACCOUNT_PASSWORD, null)));
 
         assertThat(accepted).isEqualTo(404);
     }

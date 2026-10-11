@@ -238,31 +238,21 @@ class DocumentSummaryIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("documents without a currency aren't offered, so no currency looks like all of them")
+    @DisplayName("a document made without a currency counts in its business's default currency")
     void noCurrency() throws Exception {
         create("Invoice", null, "70", today.minusDays(2), today.plusDays(5), false);
         pay(issue("Invoice", "100", today.minusDays(2), today.plusDays(5)), "40", "0", today);
 
-        send(get("/api/v1/report/overview"), "").andExpect(jsonPath("$.currencies[1]").value(""));
+        send(get("/api/v1/report/overview"), "")
+                .andExpect(jsonPath("$.currencies.length()").value(1))
+                .andExpect(jsonPath("$.currencies[0]").value("USD"));
         for (String currency : new String[] {null, "", " "}) {
             summary(currency)
                     .andExpect(jsonPath("$.currency").value("USD"))
                     .andExpect(jsonPath("$.currencies.length()").value(1))
                     .andExpect(jsonPath("$.currencies[0]").value("USD"))
-                    .andExpect(jsonPath("$.outstanding.total").value(60.0));
+                    .andExpect(jsonPath("$.outstanding.total").value(130.0));
         }
-        // A business whose only documents have no currency sees its default one.
-        owner = createUser();
-        client = JsonPath.read(
-                body(send(post("/api/v1/customer/create"), """
-                        {"name": "Birch", "email": "birch-%s@clients.test", "phoneNumber": "+1"}
-                        """.formatted(UUID.randomUUID()))),
-                "$.createdCustomer._id");
-        create("Invoice", null, "70", today.minusDays(2), today.plusDays(5), false);
-        summary(null)
-                .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.currencies").isEmpty())
-                .andExpect(jsonPath("$.outstanding.total").value(0.0));
     }
 
     @Test

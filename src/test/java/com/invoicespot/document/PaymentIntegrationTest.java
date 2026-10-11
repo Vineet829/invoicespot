@@ -181,6 +181,12 @@ class PaymentIntegrationTest extends IntegrationTest {
         pay(owner, documentId, "{\"amountPaid\": 1.005}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("An amount can have at most 2 decimals"));
+        pay(owner, documentId, "{\"amountPaid\": 1234567890123456}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Amounts can have at most 15 whole digits"));
+        pay(owner, documentId, "{\"amountPaid\": 5, \"tdsAmount\": 1E+20}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Amounts can have at most 15 whole digits"));
         pay(owner, documentId, "{\"amountPaid\": 5, \"datePaid\": \"30/09/2026\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Enter the payment date as YYYY-MM-DD"));

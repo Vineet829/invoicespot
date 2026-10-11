@@ -34,20 +34,26 @@ class AccountDeletionIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("an owner whose business others work in keeps their account until they hand it over or remove them")
     void ownerOfASharedBusiness() throws Exception {
-        User owner = createUser();
+        User owner = withAccountPassword(createUser());
         Business business = businessOf(owner);
         User member = createMember(business, BusinessRole.MEMBER);
         String session = bearer(owner, business);
 
         mockMvc.perform(get("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, session))
                 .andExpect(jsonPath("$.userProfile.sharedBusinesses[0]").value("Test User"));
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, session))
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(SHARED));
 
         mockMvc.perform(delete("/api/v1/business/members/" + member.getId()).header(HttpHeaders.AUTHORIZATION, session))
                 .andExpect(status().isOk());
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, session))
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
                 .andExpect(status().isOk());
         assertThat(businessRepository.findById(business.getPkid())).isEmpty();
     }
@@ -74,7 +80,7 @@ class AccountDeletionIntegrationTest extends IntegrationTest {
     void member() throws Exception {
         User owner = createUser();
         Business business = businessOf(owner);
-        User member = createMember(business, BusinessRole.MEMBER);
+        User member = withAccountPassword(createMember(business, BusinessRole.MEMBER));
         String memberSession = bearer(member, business);
         String body = mockMvc.perform(post("/api/v1/customer/create")
                         .header(HttpHeaders.AUTHORIZATION, memberSession)
@@ -85,7 +91,10 @@ class AccountDeletionIntegrationTest extends IntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         UUID client = UUID.fromString(JsonPath.read(body, "$.createdCustomer._id"));
 
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, memberSession))
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, memberSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
                 .andExpect(status().isOk());
 
         assertThat(businessRepository.findById(business.getPkid())).isPresent();
@@ -93,5 +102,34 @@ class AccountDeletionIntegrationTest extends IntegrationTest {
                 .satisfies(customer -> assertThat(customer.getCreatedBy()).isNull());
         mockMvc.perform(get("/api/v1/business/members").header(HttpHeaders.AUTHORIZATION, bearer(owner, business)))
                 .andExpect(jsonPath("$.members.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("deleting an account asks for its password again; a wrong one keeps it, and one without sets one first")
+    void asksForThePassword() throws Exception {
+        User user = withAccountPassword(createUser());
+        String session = bearer(user);
+
+        for (String json : new String[] {"", "{}", "{\"password\": \"Wrong!pass1\"}"}) {
+            mockMvc.perform(delete("/api/v1/user/profile")
+                            .header(HttpHeaders.AUTHORIZATION, session)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message")
+                            .value(json.contains("Wrong") ? "Your password is wrong" : "Enter your password to confirm"));
+        }
+        assertThat(userRepository.findById(user.getPkid())).isPresent();
+
+        // Signed up with Google, so there is no password to confirm yet.
+        User withoutPassword = createUser();
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(withoutPassword))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Set a password first, with Forgot password on the sign-in page"));
+        assertThat(userRepository.findById(withoutPassword.getPkid())).isPresent();
     }
 }

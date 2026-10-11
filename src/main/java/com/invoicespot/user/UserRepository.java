@@ -1,6 +1,7 @@
 package com.invoicespot.user;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
     Optional<User> findByEmailIgnoreCase(String email);
+
+    @Query("select u from User u where u.isEmailVerified = false and u.createdAt < :cutoff")
+    List<User> findUnverifiedCreatedBefore(@Param("cutoff") Instant cutoff);
 
     Optional<User> findByUsername(String username);
 

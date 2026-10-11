@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Permission;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.common.SecretBox;
 import com.invoicespot.common.SecretTokens;
@@ -189,6 +190,9 @@ public class ShareService {
         return new WhatsAppShareResponse(true, WhatsAppLink.of(client.getPhoneNumber(), indian, text), link.replaced());
     }
 
+    // Everyone in the business sees whether a link is on and how it is used.
+    // Its address lets whoever has it accept a quotation or report a payment,
+    // so only members who can send it see that.
     @Transactional(readOnly = true)
     public ShareStatusResponse status(BusinessAccess access, String id) {
         return shareLinkRepository.findByDocumentAndRevokedAtIsNull(requireInBusiness(access, id))
@@ -198,7 +202,7 @@ public class ShareService {
                         link.getCreatedAt(),
                         link.getLastViewedAt(),
                         link.getViewCount(),
-                        recovered(link).orElse(null)))
+                        access.can(Permission.EDIT_RECORDS) ? recovered(link).orElse(null) : null))
                 .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0, null));
     }
 

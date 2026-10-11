@@ -6,6 +6,7 @@ import com.invoicespot.audit.dto.EventPageResponse;
 import com.invoicespot.audit.dto.TeamActivityResponse;
 import com.invoicespot.auth.session.DeviceName;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Pages;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.user.DemoAccountGuard;
 import com.invoicespot.user.User;
@@ -94,8 +95,8 @@ public class AuditActivity {
 
     private <T> EventPageResponse<T> page(
             Specification<AuditEvent> specification, int page, int size, Function<AuditEvent, T> view) {
-        int number = Math.max(page, 1);
         int perPage = Math.min(Math.max(size, 1), MOST_PER_PAGE);
+        int number = Pages.number(page, perPage);
         Page<AuditEvent> result = repository.findAll(specification, PageRequest.of(number - 1, perPage, NEWEST_FIRST));
         return new EventPageResponse<>(
                 true,

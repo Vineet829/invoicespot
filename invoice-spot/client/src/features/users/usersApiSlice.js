@@ -34,9 +34,10 @@ export const usersApiSlice = baseApiSlice.injectEndpoints({
 			invalidatesTags: [{ type: "User", id: "SINGLE_USER" }],
 		}),
 		deleteMyAccount: builder.mutation({
-			query: () => ({
+			query: (confirmation) => ({
 				url: "user/profile",
 				method: "DELETE",
+				body: confirmation,
 			}),
 			invalidatesTags: [{ type: "User", id: "LIST" }],
 		}),

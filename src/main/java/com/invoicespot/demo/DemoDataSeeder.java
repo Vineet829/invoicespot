@@ -54,6 +54,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class DemoDataSeeder {
 
     private static final String ZONE = "America/Los_Angeles";
+    // The sample expenses and recurring invoices go with the rest of the
+    // sample data, never into another business.
+    private static final String NO_SAMPLE_DATA = "the demo account's business doesn't hold the sample data";
     private static final BigDecimal TAX_RATE = new BigDecimal("7.25");
     private static final PaymentMethod[] METHODS = {
         PaymentMethod.BANK_TRANSFER, PaymentMethod.BANK_TRANSFER, PaymentMethod.BANK_TRANSFER,
@@ -144,9 +147,12 @@ public class DemoDataSeeder {
         if (owner.isEmpty()) {
             return Result.skipped(missing(demoEmail));
         }
-        if (customerRepository.existsByBusinessPkidAndEmailIgnoreCase(
-                owner.get().businessPkid(), DemoData.MARKER_EMAIL)) {
-            return Result.skipped("the demo account already has the sample data");
+        // Sample data goes only into an empty business, so a demo email set to
+        // someone's real account never mixes it in with their records.
+        if (customerRepository.existsByBusinessPkid(owner.get().businessPkid())) {
+            return Result.skipped(holdsSampleData(owner.get().businessPkid())
+                    ? "the demo account already has the sample data"
+                    : "the demo account has clients of its own, so no sample data was added");
         }
         return transactionTemplate.execute(status -> seed(owner.get()));
     }
@@ -166,6 +172,9 @@ public class DemoDataSeeder {
         if (expenseRepository.existsByBusinessPkid(businessPkid)) {
             return ExpenseResult.skipped("the demo account already has expenses of its own");
         }
+        if (!holdsSampleData(businessPkid)) {
+            return ExpenseResult.skipped(NO_SAMPLE_DATA);
+        }
         return transactionTemplate.execute(status -> new ExpenseResult(true, null, expenses(owner.get())));
     }
 
@@ -180,6 +189,9 @@ public class DemoDataSeeder {
         }
         if (scheduleRepository.existsByBusinessPkid(owner.get().businessPkid())) {
             return RecurringResult.skipped("the demo account already has recurring invoices");
+        }
+        if (!holdsSampleData(owner.get().businessPkid())) {
+            return RecurringResult.skipped(NO_SAMPLE_DATA);
         }
         int schedules = transactionTemplate.execute(status -> schedules(owner.get()));
         return schedules == 0
@@ -197,8 +209,17 @@ public class DemoDataSeeder {
         return "the demo account " + demoEmail + " does not exist";
     }
 
+    // Whether the sample data was added to the business: marked then, where
+    // nothing in the app changes the mark, unlike its records, which anyone
+    // trying the demo can delete or rename.
+    private boolean holdsSampleData(Long businessPkid) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "select sample_data from businesses where pkid = ?", Boolean.class, businessPkid));
+    }
+
     private Result seed(BusinessAccess owner) {
         ZoneId zone = ZoneId.of(ZONE);
+        jdbcTemplate.update("update businesses set sample_data = true where pkid = ?", owner.businessPkid());
         if (settingsRepository.findByBusinessPkid(owner.businessPkid()).isEmpty()) {
             settingsService.update(owner, new UpdateSettingsRequest(
                     "USD", 14, TAX_RATE, "Sales tax", DemoData.NOTES, DemoData.TERMS,

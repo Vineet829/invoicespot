@@ -24,6 +24,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,6 +43,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class IntegrationTest {
 
     protected static final String DEMO_EMAIL = "demo@invoicespot.test";
+
+    // The password withAccountPassword gives an account, which steps that
+    // can't be undone, such as deleting it, ask for again.
+    protected static final String ACCOUNT_PASSWORD = "Acc0unt!pass";
+    protected static final String CONFIRMATION = "{\"password\": \"" + ACCOUNT_PASSWORD + "\"}";
 
     @TestConfiguration(proxyBeanMethods = false)
     static class Database {
@@ -91,6 +97,9 @@ public abstract class IntegrationTest {
     @MockBean
     protected JavaMailSender mailSender;
 
+    @Autowired
+    private PasswordEncoder accountPasswords;
+
     protected User createUser() {
         String handle = "user-" + UUID.randomUUID().toString().substring(0, 8);
         User user = new User();
@@ -112,6 +121,11 @@ public abstract class IntegrationTest {
             user.setEmailVerified(true);
             return withBusiness(userRepository.save(user));
         });
+    }
+
+    protected User withAccountPassword(User user) {
+        user.setPassword(accountPasswords.encode(ACCOUNT_PASSWORD));
+        return userRepository.save(user);
     }
 
     protected User createAdmin() {

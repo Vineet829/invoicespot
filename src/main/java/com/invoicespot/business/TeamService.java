@@ -2,6 +2,8 @@ package com.invoicespot.business;
 
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.IdentityCheck;
+import com.invoicespot.auth.dto.ConfirmIdentityRequest;
 import com.invoicespot.auth.session.UserSessionRepository;
 import com.invoicespot.business.dto.MemberResponse;
 import com.invoicespot.common.ApiException;
@@ -41,6 +43,7 @@ public class TeamService {
     private final DemoAccountGuard demoAccountGuard;
     private final MailService mailService;
     private final AppProperties.Site site;
+    private final IdentityCheck identityCheck;
 
     public TeamService(
             BusinessRepository businessRepository,
@@ -50,7 +53,8 @@ public class TeamService {
             AuditLog auditLog,
             DemoAccountGuard demoAccountGuard,
             MailService mailService,
-            AppProperties properties) {
+            AppProperties properties,
+            IdentityCheck identityCheck) {
         this.businessRepository = businessRepository;
         this.memberRepository = memberRepository;
         this.sessionRepository = sessionRepository;
@@ -59,6 +63,7 @@ public class TeamService {
         this.demoAccountGuard = demoAccountGuard;
         this.mailService = mailService;
         this.site = properties.site();
+        this.identityCheck = identityCheck;
     }
 
     // The owner first, then by role and name.
@@ -166,10 +171,11 @@ public class TeamService {
     }
 
     // Everything the business keeps goes with it; the event survives, with
-    // the business's name.
+    // the business's name. The owner confirms it with their password.
     @Transactional
-    public void delete(BusinessAccess access) {
+    public void delete(BusinessAccess access, ConfirmIdentityRequest confirmation) {
         demoAccountGuard.requireNotDemo(access.user(), "deleting the business");
+        identityCheck.require(access.user(), confirmation);
         Business business = lock(access);
         auditLog.recordForBusiness(
                 AuditEventType.BUSINESS_DELETED, access.businessPkid(), access.user(), access.user(),

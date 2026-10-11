@@ -193,6 +193,25 @@ class InvitationIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a business has at most fifty invitations waiting, not counting any that expired")
+    void waitingCap() throws Exception {
+        for (int index = 0; index < 50; index++) {
+            jdbcTemplate.update(
+                    "insert into business_invitations (business_pkid, email, role, token_hash, sent_at, expires_at)"
+                            + " values (?, ?, 'MEMBER', ?, now() - interval '30 days', now() - interval '23 days')",
+                    business.getPkid(), "expired" + index + "@example.test", UUID.randomUUID().toString());
+        }
+        invite(owner, "fresh-" + UUID.randomUUID() + "@example.test", "MEMBER").andExpect(status().isCreated());
+
+        jdbcTemplate.update(
+                "update business_invitations set expires_at = now() + interval '7 days' where business_pkid = ?",
+                business.getPkid());
+        invite(owner, "another-" + UUID.randomUUID() + "@example.test", "MEMBER")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("A business can have at most 50 invitations waiting"));
+    }
+
+    @Test
     @DisplayName("a business sends at most twenty invitations an hour")
     void rateLimited() throws Exception {
         for (int sent = 0; sent < 20; sent++) {

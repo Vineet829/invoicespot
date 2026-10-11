@@ -53,7 +53,7 @@ class TeamIntegrationTest extends IntegrationTest {
 
     @BeforeEach
     void setUp() {
-        founder = createUser();
+        founder = withAccountPassword(createUser());
         business = businessOf(founder);
         owner = bearer(founder, business);
     }
@@ -210,7 +210,7 @@ class TeamIntegrationTest extends IntegrationTest {
         send(delete("/api/v1/business"), adminSession, "")
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(Permission.OWN_BUSINESS.refusal()));
-        send(delete("/api/v1/business"), owner, "").andExpect(status().isOk());
+        send(delete("/api/v1/business"), owner, CONFIRMATION).andExpect(status().isOk());
 
         send(get("/api/v1/business"), owner, "")
                 .andExpect(status().isConflict())
@@ -228,6 +228,19 @@ class TeamIntegrationTest extends IntegrationTest {
                         .map(event -> event.getDetail())
                         .toList())
                 .containsExactly(business.getName());
+    }
+
+    @Test
+    @DisplayName("deleting a business asks for the owner's password again, and a wrong one keeps it")
+    void asksForThePassword() throws Exception {
+        send(delete("/api/v1/business"), owner, "{\"password\": \"Wrong!pass1\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Your password is wrong"));
+        send(delete("/api/v1/business"), owner, "")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Enter your password to confirm"));
+
+        send(get("/api/v1/business"), owner, "").andExpect(status().isOk());
     }
 
     @Test

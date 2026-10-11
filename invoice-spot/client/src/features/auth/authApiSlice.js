@@ -1,4 +1,5 @@
 import { baseApiSlice, refreshRequest } from "../api/baseApiSlice";
+import { forgetInvite } from "../business/pendingInvite";
 import { logOut } from "./authSlice";
 
 export const authApiSlice = baseApiSlice.injectEndpoints({
@@ -31,13 +32,18 @@ export const authApiSlice = baseApiSlice.injectEndpoints({
         method: "POST",
       }),
 
+      // The session ends here once the server has ended it and taken back
+      // its cookie, or couldn't be reached: either way nothing of it is kept,
+      // nor an invitation opened while signed in.
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
-          dispatch(logOut());
-          dispatch(baseApiSlice.util.resetApiState());
-        } catch (err) {
-          console.log(err);
+          await queryFulfilled;
+        } catch {
+          // Signed out here all the same.
         }
+        dispatch(logOut());
+        dispatch(baseApiSlice.util.resetApiState());
+        forgetInvite();
       },
     }),
     resendVerifyEmail: builder.mutation({

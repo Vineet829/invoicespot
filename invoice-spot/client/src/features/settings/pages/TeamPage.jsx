@@ -56,6 +56,9 @@ import {
 } from "../../business/permissions";
 import useEnterBusiness from "../../business/useEnterBusiness";
 import { useGetUserProfileQuery } from "../../users/usersApiSlice";
+import IdentityFields, {
+  emptyIdentity,
+} from "../../auth/components/IdentityFields";
 import SettingsTabs from "../components/SettingsTabs";
 import TeamActivity from "../components/TeamActivity";
 
@@ -64,11 +67,14 @@ const ROLES = ["ADMIN", "MEMBER", "VIEWER"];
 const nameOf = (member) =>
   [member.firstName, member.lastName].filter(Boolean).join(" ") || member.email;
 
-// Deleting a business can't be undone, so its name is typed to confirm.
+// Deleting a business can't be undone, so its name is typed to confirm, and
+// the owner's password asked for again.
 const DeleteBusinessDialog = ({ open, name, busy, onConfirm, onClose }) => {
   const [typed, setTyped] = useState("");
+  const [identity, setIdentity] = useState(emptyIdentity);
   const close = () => {
     setTyped("");
+    setIdentity(emptyIdentity);
     onClose();
   };
   return (
@@ -94,6 +100,11 @@ const DeleteBusinessDialog = ({ open, name, busy, onConfirm, onClose }) => {
         disabled={busy}
         data-autofocus
       />
+      <IdentityFields
+        values={identity}
+        onChange={setIdentity}
+        disabled={busy}
+      />
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <button
           type="button"
@@ -106,8 +117,8 @@ const DeleteBusinessDialog = ({ open, name, busy, onConfirm, onClose }) => {
         <button
           type="button"
           className={dangerButton}
-          onClick={onConfirm}
-          disabled={busy || typed.trim() !== name}
+          onClick={() => onConfirm(identity)}
+          disabled={busy || typed.trim() !== name || !identity.password}
         >
           <FiTrash2 aria-hidden="true" />
           {busy ? "Deleting…" : "Delete business"}
@@ -305,10 +316,13 @@ const TeamPage = () => {
   const members = query.data?.members || [];
   const teamRefusal = reason("MANAGE_TEAM");
   const owner = business?.role === "OWNER";
-  const demo = useGetUserProfileQuery().data?.userProfile?.demo;
+  const profile = useGetUserProfileQuery().data?.userProfile;
+  const demo = profile?.demo;
   const deleteNote = demo
     ? "Deleting the business is turned off for the shared demo account."
-    : undefined;
+    : profile?.hasPassword === false
+      ? "Deleting the business asks for your password. Set one first with Forgot password on the sign-in page."
+      : undefined;
   const inviteNote =
     teamRefusal ||
     (demo
@@ -371,10 +385,10 @@ const TeamPage = () => {
       }
     }
   };
-  const remove = async () => {
+  const remove = async (identity) => {
     if (
       await run(
-        () => deleteBusiness().unwrap(),
+        () => deleteBusiness(identity).unwrap(),
         `${business.name} was deleted.`,
         "The business could not be deleted.",
       )

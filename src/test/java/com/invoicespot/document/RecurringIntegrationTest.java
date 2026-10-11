@@ -261,6 +261,50 @@ class RecurringIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a schedule resumed after its dates passed skips them, and carries on from its next date")
+    void resumeSkipsPassedDates() throws Exception {
+        String id = scheduleId(
+                document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(today));
+        mockMvc.perform(post("/api/v1/recurring/{id}/pause", id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+        // Paused before its first invoice, three months ago.
+        LocalDate first = today.minusMonths(3).plusDays(5);
+        jdbc.update(
+                "update recurring_schedules set start_date = ?, next_run = ? where id = ?::uuid", first, first, id);
+
+        mockMvc.perform(post("/api/v1/recurring/{id}/resume", id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.schedule.nextRun").value(first.plusMonths(3).toString()))
+                .andExpect(jsonPath("$.schedule.runsDone").value(0));
+        recurring.makeDue(Instant.now());
+        assertThat(documents()).isEqualTo(1);
+
+        recurring.makeDue(daysFromNow(10));
+        assertThat(documents()).isEqualTo(2);
+        list().andExpect(jsonPath("$.schedules[0].nextRun").value(first.plusMonths(4).toString()));
+    }
+
+    @Test
+    @DisplayName("a schedule can't be moved onto a day it already made an invoice on, where it would never run")
+    void notOntoADayItRan() throws Exception {
+        String id = scheduleId(
+                document("Invoice"), "\"frequency\": \"monthly\", \"startDate\": \"%s\"".formatted(today));
+        recurring.makeDue(Instant.now());
+        assertThat(documents()).isEqualTo(2);
+
+        mockMvc.perform(patch("/api/v1/recurring/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"frequency\": \"weekly\", \"startDate\": \"%s\"}".formatted(today)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("This schedule already made an invoice that day. Choose a later date for its next one"));
+        list().andExpect(jsonPath("$.schedules[0].frequency").value("MONTHLY"));
+
+        recurring.makeDue(daysFromNow(40));
+        assertThat(documents()).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("a schedule can email each new invoice to the client")
     void emailsEachInvoice() throws Exception {
         when(mailSender.createMimeMessage()).thenAnswer(invocation -> new MimeMessage((Session) null));

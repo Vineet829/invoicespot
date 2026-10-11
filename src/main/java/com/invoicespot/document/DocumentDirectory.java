@@ -2,6 +2,7 @@ package com.invoicespot.document;
 
 import com.invoicespot.common.SearchText;
 import com.invoicespot.document.dto.DocumentListTotals;
+import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -42,10 +44,12 @@ class DocumentDirectory {
 
     private final JdbcClient jdbc;
     private final DocumentRepository documentRepository;
+    private final EntityManager entityManager;
 
-    DocumentDirectory(JdbcClient jdbc, DocumentRepository documentRepository) {
+    DocumentDirectory(JdbcClient jdbc, DocumentRepository documentRepository, EntityManager entityManager) {
         this.jdbc = jdbc;
         this.documentRepository = documentRepository;
+        this.entityManager = entityManager;
     }
 
     // One page of the documents the search matches, in its order, with
@@ -67,21 +71,22 @@ class DocumentDirectory {
         return load(pkids, documentRepository::findByPkidIn);
     }
 
-    // Every document the search matches, in its order. A CSV file names each
-    // document's client from the document itself, so clients aren't read.
-    List<Document> all(Long businessPkid, DocumentSearch search, LocalDate today, ZoneId zone) {
+    // Every document the search matches, in its order, handed over a batch at
+    // a time. Each batch is let go once handed over, so a business's whole
+    // history is never held at once. A CSV file names each document's client
+    // from the document itself, so clients aren't read.
+    void forEach(Long businessPkid, DocumentSearch search, LocalDate today, ZoneId zone, Consumer<Document> each) {
         Filter filter = filter(businessPkid, search, today, zone);
         List<Long> pkids = jdbc.sql("select d.pkid from documents d where %s order by %s"
                         .formatted(filter.where(), orderBy(search)))
                 .params(filter.params())
                 .query(Long.class)
                 .list();
-        List<Document> documents = new ArrayList<>();
         for (int start = 0; start < pkids.size(); start += BATCH) {
             List<Long> batch = pkids.subList(start, Math.min(start + BATCH, pkids.size()));
-            documents.addAll(load(batch, documentRepository::findAllById));
+            load(batch, documentRepository::findAllById).forEach(each);
+            entityManager.clear();
         }
-        return documents;
     }
 
     // What every document the search matches comes to in each currency: how

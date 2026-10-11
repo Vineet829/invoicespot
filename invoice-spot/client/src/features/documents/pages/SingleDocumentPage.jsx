@@ -765,6 +765,7 @@ const SingleDocumentPage = () => {
                   document={document}
                   demo={profile?.demo}
                   refusal={editRefusal}
+                  deleteRefusal={voidRefusal}
                 />
               </Panel>
             )}
@@ -774,7 +775,11 @@ const SingleDocumentPage = () => {
             {!voided &&
               (Number(document.ledger?.refundDue) > 0 ||
                 document.refunds?.length > 0) && (
-                <RefundsPanel document={document} refusal={editRefusal} />
+                <RefundsPanel
+                  document={document}
+                  refusal={editRefusal}
+                  deleteRefusal={voidRefusal}
+                />
               )}
             {document.documentType === "Invoice" && !draft && !voided && (
               <PaymentClaims document={document} refusal={editRefusal} />

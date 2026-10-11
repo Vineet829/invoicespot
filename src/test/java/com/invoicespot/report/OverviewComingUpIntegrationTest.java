@@ -237,8 +237,8 @@ class OverviewComingUpIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "in {0}")
     @ArgumentsSource(AwayFromUtc.class)
-    @DisplayName("runs whose day went by while a schedule was paused are made at the next daily run, so they count"
-            + " as today's until then")
+    @DisplayName("runs whose day went by while a schedule was paused are skipped when it resumes, so only the"
+            + " runs still to come count")
     void resumedLate(ZoneId zone) throws Exception {
         inZone(zone);
         Made late = invoice(acme, "USD", "100");
@@ -254,32 +254,32 @@ class OverviewComingUpIntegrationTest extends IntegrationTest {
         Made other = invoice(birch, "USD", "200");
         repeat(other, "MONTHLY", today.plusDays(1), "");
 
-        // Two of the late schedule's runs went by; three more are within the
-        // 90 days, as are three of the other's.
-        LocalDate caughtUp = today.minusDays(40).plusMonths(2);
+        // The two runs that went by are skipped; the late schedule carries on
+        // from its next date, and three of its runs are within the 90 days, as
+        // are three of the other's.
+        LocalDate resumed = today.minusDays(40).plusMonths(2);
         overview()
                 .andExpect(jsonPath("$.comingUp.recurring.active").value(2))
-                .andExpect(jsonPath("$.comingUp.recurring.next90Days.invoices").value(8))
-                .andExpect(jsonPath("$.comingUp.recurring.next90Days.amount").value(1100.0))
+                .andExpect(jsonPath("$.comingUp.recurring.next90Days.invoices").value(6))
+                .andExpect(jsonPath("$.comingUp.recurring.next90Days.amount").value(900.0))
                 .andExpect(jsonPath(
                         "$.comingUp.recurring.nextRuns[*].date",
                         contains(
-                                today.toString(),
-                                today.toString(),
                                 today.plusDays(1).toString(),
-                                caughtUp.toString(),
-                                today.plusDays(1).plusMonths(1).toString())))
+                                resumed.toString(),
+                                today.plusDays(1).plusMonths(1).toString(),
+                                resumed.plusMonths(1).toString(),
+                                today.plusDays(1).plusMonths(2).toString())))
                 .andExpect(jsonPath(
                         "$.comingUp.recurring.nextRuns[*].documentNumber",
-                        contains(late.number(), late.number(), other.number(), late.number(), other.number())));
+                        contains(other.number(), late.number(), other.number(), late.number(), other.number())));
 
-        // The daily run makes the two, and the schedule carries on from its dates.
+        // The daily run has nothing to make for the days that went by.
         recurring.makeDue(Instant.now());
         overview()
                 .andExpect(jsonPath("$.comingUp.recurring.next90Days.invoices").value(6))
                 .andExpect(jsonPath("$.comingUp.recurring.next90Days.amount").value(900.0))
-                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[0].date").value(today.plusDays(1).toString()))
-                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[1].date").value(caughtUp.toString()))
+                .andExpect(jsonPath("$.comingUp.recurring.nextRuns[1].date").value(resumed.toString()))
                 .andExpect(jsonPath("$.comingUp.recurring.nextRuns[1].documentNumber").value(late.number()));
     }
 

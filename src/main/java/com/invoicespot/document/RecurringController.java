@@ -69,7 +69,7 @@ public class RecurringController {
     }
 
     @DeleteMapping("/api/v1/recurring/{id}")
-    public MessageResponse delete(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+    public MessageResponse delete(@Requires(Permission.DELETE_RECORDS) BusinessAccess access, @PathVariable String id) {
         recurringService.delete(access, id);
         return new MessageResponse(true, "The invoice no longer repeats");
     }

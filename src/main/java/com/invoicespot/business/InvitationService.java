@@ -108,7 +108,12 @@ public class InvitationService {
             waiting.setRevokedAt(now);
             invitationRepository.saveAndFlush(waiting);
         });
-        if (invitationRepository.findWaiting(business.getPkid()).size() >= MOST_WAITING) {
+        // Only invitations that can still be accepted count: one that has
+        // expired is waiting for nothing.
+        if (invitationRepository.findWaiting(business.getPkid()).stream()
+                        .filter(waiting -> !waiting.isExpiredAt(now))
+                        .count()
+                >= MOST_WAITING) {
             throw new ApiException(
                     HttpStatus.CONFLICT, "A business can have at most " + MOST_WAITING + " invitations waiting");
         }

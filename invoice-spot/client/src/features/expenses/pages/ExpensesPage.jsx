@@ -103,6 +103,7 @@ const ExpensesPage = () => {
 
   const { business, reason } = useBusiness();
   const editRefusal = reason("EDIT_RECORDS");
+  const deleteRefusal = reason("DELETE_RECORDS");
   // `editing` is the expense being edited, or "new" for the add dialog.
   const [editing, setEditing] = useState(null);
   // A link to record an expense, such as the overview's, opens the add
@@ -244,10 +245,13 @@ const ExpensesPage = () => {
       ),
     },
   ];
-  // Viewers see the expenses, but not the ways to change them.
-  const shown = editRefusal
-    ? columns.filter((column) => !["Edit", "Delete"].includes(column.label))
-    : columns;
+  // Viewers see the expenses, but not the ways to change them; members don't
+  // see the way to delete them.
+  const shown = columns.filter(
+    (column) =>
+      !(editRefusal && ["Edit", "Delete"].includes(column.label)) &&
+      !(deleteRefusal && column.label === "Delete"),
+  );
 
   const results = query.isError ? (
     <ErrorState error={query.error} retry={query.refetch} />

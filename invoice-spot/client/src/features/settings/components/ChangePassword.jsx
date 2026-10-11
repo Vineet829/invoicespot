@@ -9,6 +9,7 @@ import {
 } from "../../../components/workspace/Workspace";
 import { panelNote, primaryButton } from "../../../components/workspace/pastel";
 import { logIn } from "../../auth/authSlice";
+import { MAX_PASSWORD_BYTES } from "../../auth/passwordLength";
 import { useChangePasswordMutation } from "../securityApiSlice";
 
 const EMPTY = { currentPassword: "", newPassword: "", confirmPassword: "" };
@@ -62,7 +63,7 @@ const ChangePassword = ({ demo, hasPassword }) => {
               label="New password"
               type="password"
               autoComplete="new-password"
-              maxLength={128}
+              maxLength={MAX_PASSWORD_BYTES}
               required
               value={values.newPassword}
               onChange={edit("newPassword")}
@@ -73,7 +74,7 @@ const ChangePassword = ({ demo, hasPassword }) => {
               label="Confirm new password"
               type="password"
               autoComplete="new-password"
-              maxLength={128}
+              maxLength={MAX_PASSWORD_BYTES}
               required
               value={values.confirmPassword}
               onChange={edit("confirmPassword")}

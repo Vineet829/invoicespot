@@ -12,6 +12,9 @@ public enum RateLimit {
     SIGN_UP(5, Duration.ofHours(1), "Too many sign-ups from this network"),
     PASSWORD_RESET(5, Duration.ofHours(1), "Too many password reset requests"),
     VERIFICATION_EMAIL(5, Duration.ofHours(1), "Too many verification emails requested"),
+    // Sign-up, verification and password reset emails to one address,
+    // whoever asks for them and from wherever.
+    ACCOUNT_EMAIL_TO(3, Duration.ofHours(1), "Too many emails sent to this address"),
     OUTGOING_EMAIL(30, Duration.ofHours(1), "Too many emails sent"),
     SHARED_DOCUMENT(60, Duration.ofMinutes(1), "Too many requests for shared documents"),
     PAYMENT_CLAIM(5, Duration.ofHours(1), "Too many payments reported from this network"),
@@ -19,7 +22,8 @@ public enum RateLimit {
     INVITATION(20, Duration.ofHours(1), "Too many invitations sent"),
     INVITATION_LOOKUP(30, Duration.ofMinutes(1), "Too many requests for invitations"),
     // A business's whole archive is built in memory each time.
-    WHOLE_EXPORT(10, Duration.ofHours(1), "Too many exports of everything");
+    WHOLE_EXPORT(10, Duration.ofHours(1), "Too many exports of everything"),
+    LOGO_UPLOAD(20, Duration.ofHours(1), "Too many logos uploaded");
 
     private final int capacity;
     private final Duration period;

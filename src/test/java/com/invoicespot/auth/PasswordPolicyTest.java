@@ -32,4 +32,15 @@ class PasswordPolicyTest {
                 .isEqualTo("Password must be at least 8 characters long, with at least 1 uppercase letter,"
                         + " 1 lowercase letter, 1 number and 1 symbol");
     }
+
+    @Test
+    @DisplayName("a password fits in at most 72 bytes, however many characters that is")
+    void fits() {
+        String devanagari = Character.toString(0x0915);
+        assertThat(PasswordPolicy.fits("a".repeat(72))).isTrue();
+        assertThat(PasswordPolicy.fits("a".repeat(73))).isFalse();
+        assertThat(PasswordPolicy.fits(devanagari.repeat(24))).isTrue();
+        assertThat(PasswordPolicy.fits(devanagari.repeat(25))).isFalse();
+        assertThat(PasswordPolicy.fits(null)).isTrue();
+    }
 }

@@ -83,7 +83,9 @@ const ItemsPage = () => {
   // `editing` is the item being edited, or "new" for the add dialog.
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
-  const editRefusal = useBusiness().reason("EDIT_RECORDS");
+  const { reason } = useBusiness();
+  const editRefusal = reason("EDIT_RECORDS");
+  const deleteRefusal = reason("DELETE_RECORDS");
   const [deleteItem, { isLoading: deleting }] = useDeleteItemMutation();
   const gstMode =
     useGetSettingsQuery().data?.settings?.taxRegime === "GST_INDIA";
@@ -162,9 +164,11 @@ const ItemsPage = () => {
     },
   ];
   // Viewers see the items, but not the ways to change them.
-  const shown = editRefusal
-    ? columns.filter((column) => !["Edit", "Delete"].includes(column.label))
-    : columns;
+  const shown = columns.filter(
+    (column) =>
+      !(editRefusal && ["Edit", "Delete"].includes(column.label)) &&
+      !(deleteRefusal && column.label === "Delete"),
+  );
   return (
     <WorkspacePage section="Items" fill>
       <PageHeader

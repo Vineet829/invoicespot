@@ -146,7 +146,11 @@ class DocumentActivityIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/v1/document/{id}/activity", id).header(HttpHeaders.AUTHORIZATION, memberSession))
                 .andExpect(jsonPath("$.events[*].byYou", contains(false, true, true, false, false)));
 
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, memberSession))
+        withAccountPassword(member);
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, memberSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
                 .andExpect(status().isOk());
         activity(id, owner)
                 .andExpect(jsonPath("$.events[*].actor", contains(null, null, null, "Test User", "Test User")));

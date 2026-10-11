@@ -154,7 +154,7 @@ public class DocumentController {
 
     @DeleteMapping("/{id}/payment/{paymentId}")
     public PaymentResultResponse deletePayment(
-            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @Requires(Permission.DELETE_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @PathVariable String paymentId) {
         return new PaymentResultResponse(
@@ -184,7 +184,7 @@ public class DocumentController {
 
     @DeleteMapping("/{id}/refund/{refundId}")
     public PaymentResultResponse deleteRefund(
-            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
+            @Requires(Permission.DELETE_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @PathVariable String refundId) {
         return new PaymentResultResponse(

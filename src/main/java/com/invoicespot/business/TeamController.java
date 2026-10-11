@@ -1,5 +1,6 @@
 package com.invoicespot.business;
 
+import com.invoicespot.auth.dto.ConfirmIdentityRequest;
 import com.invoicespot.auth.dto.MessageResponse;
 import com.invoicespot.business.dto.ChangeRoleRequest;
 import com.invoicespot.business.dto.MemberListResponse;
@@ -59,8 +60,10 @@ public class TeamController {
     }
 
     @DeleteMapping
-    public MessageResponse delete(@Requires(Permission.OWN_BUSINESS) BusinessAccess access) {
-        teamService.delete(access);
+    public MessageResponse delete(
+            @Requires(Permission.OWN_BUSINESS) BusinessAccess access,
+            @Valid @RequestBody(required = false) ConfirmIdentityRequest request) {
+        teamService.delete(access, request);
         return new MessageResponse(true, "The business was deleted");
     }
 }

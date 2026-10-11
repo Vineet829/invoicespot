@@ -365,7 +365,7 @@ class DemoDataSeederIntegrationTest extends IntegrationTest {
         User bare = createUser();
         DemoDataSeeder.RecurringResult none = seeder.seedRecurring(bare.getEmail());
         assertThat(none.seeded()).isFalse();
-        assertThat(none.reason()).isEqualTo("the demo account has no sample invoices to repeat");
+        assertThat(none.reason()).isEqualTo("the demo account's business doesn't hold the sample data");
     }
 
     @Test

@@ -118,16 +118,41 @@ public class RecurringService {
     public RecurringResponse update(BusinessAccess access, String id, RecurringRequest request) {
         RecurringSchedule schedule = requireInBusiness(access, id);
         apply(schedule, request, today(access.businessPkid()));
+        // A schedule makes one invoice a day at most, so one moved onto a day
+        // it already made an invoice on could never make its next.
+        if (schedule.getNextRun() != null
+                && runRepository.existsByScheduleAndRunDate(schedule, schedule.getNextRun())) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "This schedule already made an invoice that day. Choose a later date for its next one");
+        }
         return respond(schedule);
     }
 
-    // A schedule resumed after its date has passed makes that invoice at the
-    // next daily run.
+    // A schedule resumed after dates passed while it was paused skips those
+    // dates and carries on from its next one, today or later: a pause stops
+    // the invoices of its time, rather than saving them up to be made all at
+    // once, each dated the day of the next daily run.
     @Transactional
     public RecurringResponse setPaused(BusinessAccess access, String id, boolean paused) {
         RecurringSchedule schedule = requireInBusiness(access, id);
+        if (schedule.isPaused() && !paused) {
+            skipPassedDates(schedule, today(access.businessPkid()));
+        }
         schedule.setPaused(paused);
         return respond(schedule);
+    }
+
+    // Each date skipped moves the count its dates are worked out from on by
+    // one, so a schedule keeps its day of the month, and only the invoices it
+    // made count toward the most allowed.
+    private static void skipPassedDates(RecurringSchedule schedule, LocalDate today) {
+        LocalDate next = schedule.getNextRun();
+        while (next != null && next.isBefore(today)) {
+            schedule.setStartOffset(schedule.getStartOffset() - 1);
+            next = nextRun(schedule);
+        }
+        schedule.setNextRun(next);
     }
 
     @Transactional

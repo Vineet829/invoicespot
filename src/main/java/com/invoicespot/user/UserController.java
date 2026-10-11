@@ -1,5 +1,6 @@
 package com.invoicespot.user;
 
+import com.invoicespot.auth.dto.ConfirmIdentityRequest;
 import com.invoicespot.auth.dto.MessageResponse;
 import com.invoicespot.user.dto.AdminRoleRequest;
 import com.invoicespot.user.dto.AdminStatsResponse;
@@ -45,8 +46,10 @@ public class UserController {
     }
 
     @DeleteMapping("/profile")
-    public MessageResponse deleteOwnAccount(@AuthenticationPrincipal User principal) {
-        userService.deleteOwnAccount(principal.getPkid());
+    public MessageResponse deleteOwnAccount(
+            @AuthenticationPrincipal User principal,
+            @Valid @RequestBody(required = false) ConfirmIdentityRequest request) {
+        userService.deleteOwnAccount(principal.getPkid(), request);
         return new MessageResponse(true, "Your user account has been deleted");
     }
 

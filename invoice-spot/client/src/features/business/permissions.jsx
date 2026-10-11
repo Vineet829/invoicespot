@@ -5,7 +5,8 @@ import { useGetBusinessesQuery } from "./businessApiSlice";
 // controls it disables.
 export const REFUSALS = {
   EDIT_RECORDS: "Viewers can't change anything in this business",
-  DELETE_RECORDS: "Only the owner and admins can delete documents and clients",
+  DELETE_RECORDS:
+    "Only the owner and admins can delete anything in this business",
   EXPORT_ARCHIVE: "Only the owner and admins can download everything",
   MANAGE_BUSINESS:
     "Only the owner and admins can change the business's details and settings",
@@ -19,7 +20,7 @@ export const REFUSALS = {
 export const ROLE_SUMMARIES = {
   ADMIN: "Everything except handing the business over or deleting it.",
   MEMBER:
-    "Creates, edits and emails documents, and works on clients, items and payments. Can't delete documents or clients, download everything, or manage the business or its team.",
+    "Creates, edits and emails documents, and works on clients, items and payments. Can't delete anything, download everything, or manage the business or its team.",
   VIEWER: "Sees everything and exports lists, but changes nothing.",
 };
 

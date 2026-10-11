@@ -57,7 +57,9 @@ const RecurringPage = () => {
   const [removing, setRemoving] = useState(null);
   const [setPaused, { isLoading: pausing }] = useSetSchedulePausedMutation();
   const [remove, { isLoading: deleting }] = useDeleteScheduleMutation();
-  const editRefusal = useBusiness().reason("EDIT_RECORDS");
+  const { reason } = useBusiness();
+  const editRefusal = reason("EDIT_RECORDS");
+  const deleteRefusal = reason("DELETE_RECORDS");
   const togglePause = async (schedule) => {
     try {
       const result = await setPaused({
@@ -182,12 +184,13 @@ const RecurringPage = () => {
       ),
     },
   ];
-  // Viewers see the schedules, but not the ways to change them.
-  const shown = editRefusal
-    ? columns.filter(
-        (column) => !["Edit", "Pause", "Stop"].includes(column.label),
-      )
-    : columns;
+  // Viewers see the schedules, but not the ways to change them; members
+  // don't see the way to stop one for good.
+  const shown = columns.filter(
+    (column) =>
+      !(editRefusal && ["Edit", "Pause", "Stop"].includes(column.label)) &&
+      !(deleteRefusal && column.label === "Stop"),
+  );
   return (
     <WorkspacePage section="Documents">
       <PageHeader

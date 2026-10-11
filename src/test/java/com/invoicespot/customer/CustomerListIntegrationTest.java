@@ -94,6 +94,29 @@ class CustomerListIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a client's number of documents counts issued ones only, as the client's own page does")
+    void issuedDocumentsOnly() throws Exception {
+        String fabrikam = customer("Fabrikam", email());
+        document(fabrikam, "Invoice", 100, "USD");
+        String voided = document(fabrikam, "Invoice", 200, "USD");
+        mockMvc.perform(post("/api/v1/document/{id}/void", voided)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Sent twice\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/document/create")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"customerId": "%s", "documentType": "Invoice", "currency": "USD", "draft": true,
+                                 "billingItems": [{"itemName": "Work", "unitPrice": 300, "quantity": 1}]}
+                                """.formatted(fabrikam)))
+                .andExpect(status().isOk());
+
+        list("q=fabrikam").andExpect(jsonPath("$.myCustomers[0].documentCount").value(1));
+    }
+
+    @Test
     @DisplayName("search matches the name, email or account number, and % and _ match themselves")
     void search() throws Exception {
         customer("Acme_Co", email());

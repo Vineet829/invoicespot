@@ -12,7 +12,9 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class AuthService {
@@ -23,6 +25,7 @@ public class AuthService {
     private final SessionService sessionService;
     private final TwoFactorService twoFactorService;
     private final AuditLog auditLog;
+    private final TransactionTemplate transactions;
     private final String unusedHash;
 
     public AuthService(
@@ -31,19 +34,23 @@ public class AuthService {
             JwtService jwtService,
             SessionService sessionService,
             TwoFactorService twoFactorService,
-            AuditLog auditLog) {
+            AuditLog auditLog,
+            PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.sessionService = sessionService;
         this.twoFactorService = twoFactorService;
         this.auditLog = auditLog;
+        this.transactions = new TransactionTemplate(transactionManager);
         this.unusedHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     // A sign-in starts a session; one the browser still had is ended. With
-    // two-factor sign-in on, a correct password only earns a challenge.
-    @Transactional
+    // two-factor sign-in on, a correct password only earns a challenge. The
+    // password is checked before a transaction opens: hashing it takes a
+    // while, and a database connection held meanwhile is one that other
+    // requests can't use.
     public LoginOutcome login(String email, String password, String presentedRefreshToken) {
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Please provide an email and password");
@@ -59,7 +66,16 @@ public class AuthService {
                     email, account.orElse(null), account.isEmpty() ? "No account with this email" : "Wrong password");
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Incorrect email or password");
         }
-        User user = account.get();
+        return transactions.execute(status -> signIn(email, account.get().getPkid(), hash, presentedRefreshToken));
+    }
+
+    // The account as it is now, once its password has matched: a password
+    // changed meanwhile has to be signed in with afresh.
+    private LoginOutcome signIn(String email, Long pkid, String checkedHash, String presentedRefreshToken) {
+        User user = userRepository
+                .findById(pkid)
+                .filter(found -> checkedHash.equals(found.getPassword()))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Incorrect email or password"));
 
         if (!user.isEmailVerified()) {
             auditLog.signInFailed(email, user, "Email not verified");

@@ -17,12 +17,20 @@ import {
   ActionLink,
   Panel,
   InfoGrid,
-  ConfirmDialog,
   LoadingState,
   ErrorState,
   errorMessage,
 } from "../../../components/workspace/Workspace";
-import { buttonBase, sectionTitle } from "../../../components/workspace/pastel";
+import { Dialog } from "../../../components/workspace/Dialog";
+import {
+  buttonBase,
+  dangerButton,
+  secondaryButton,
+  sectionTitle,
+} from "../../../components/workspace/pastel";
+import IdentityFields, {
+  emptyIdentity,
+} from "../../auth/components/IdentityFields";
 
 // The danger zone is already peach, so its button is white.
 const deleteAccountButton = `${buttonBase} border border-overdue-icon/25 bg-white/80 text-overdue-strong hover:enabled:bg-white disabled:bg-white/40 disabled:text-overdue-muted`;
@@ -31,6 +39,52 @@ const listed = (names) =>
   names.length < 2
     ? names.join("")
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+// Deleting an account can't be undone, so its password is asked for again.
+const DeleteAccountDialog = ({ open, busy, onConfirm, onClose }) => {
+  const [identity, setIdentity] = useState(emptyIdentity);
+  const close = () => {
+    setIdentity(emptyIdentity);
+    onClose();
+  };
+  return (
+    <Dialog
+      open={open}
+      title="Delete your account?"
+      onClose={close}
+      busy={busy}
+      closeLabel="Close confirmation"
+    >
+      <p className="mt-3 text-[14px] leading-[1.6] text-spot-body">
+        This permanently deletes your account and your business, with all its
+        documents, clients and items. This action cannot be undone.
+      </p>
+      <IdentityFields
+        values={identity}
+        onChange={setIdentity}
+        disabled={busy}
+      />
+      <div className="mt-7 flex flex-wrap justify-end gap-2.5">
+        <button
+          type="button"
+          className={secondaryButton}
+          onClick={close}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={dangerButton}
+          onClick={() => onConfirm(identity)}
+          disabled={busy || !identity.password}
+        >
+          {busy ? "Please wait…" : "Delete account"}
+        </button>
+      </div>
+    </Dialog>
+  );
+};
 
 const ProfilePage = () => {
   useTitle("Profile — Invoice Spot");
@@ -42,9 +96,9 @@ const ProfilePage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [remove, { isLoading: deleting }] = useDeleteMyAccountMutation();
-  const deleteAccount = async () => {
+  const deleteAccount = async (identity) => {
     try {
-      await remove().unwrap();
+      await remove(identity).unwrap();
       setOpen(false);
       dispatch(logOut());
       dispatch(baseApiSlice.util.resetApiState());
@@ -144,14 +198,18 @@ const ProfilePage = () => {
                     ? "The shared demo account can’t be deleted."
                     : shared.length
                       ? `You own ${listed(shared)}, which others work in. Hand it over or remove them first, in Settings → Team.`
-                      : "Permanently delete your Invoice Spot account and your business."}
+                      : !profile.hasPassword
+                        ? "Deleting your account asks for your password. Set one first with Forgot password on the sign-in page."
+                        : "Permanently delete your Invoice Spot account and your business."}
                 </p>
               </div>
               <button
                 type="button"
                 className={deleteAccountButton}
                 onClick={() => setOpen(true)}
-                disabled={profile.demo || shared.length > 0}
+                disabled={
+                  profile.demo || shared.length > 0 || !profile.hasPassword
+                }
               >
                 <FiTrash2 aria-hidden="true" /> Delete account
               </button>
@@ -159,17 +217,12 @@ const ProfilePage = () => {
           </>
         )
       )}
-      <ConfirmDialog
+      <DeleteAccountDialog
         open={open}
-        title="Delete your account?"
-        confirmLabel="Delete account"
+        busy={deleting}
         onConfirm={deleteAccount}
         onClose={() => setOpen(false)}
-        busy={deleting}
-      >
-        This permanently deletes your account and your business, with all its
-        documents, clients and items. This action cannot be undone.
-      </ConfirmDialog>
+      />
     </WorkspacePage>
   );
 };

@@ -10,6 +10,7 @@ import com.invoicespot.settings.dto.SettingsResponse;
 import com.invoicespot.settings.dto.UpdateSettingsRequest;
 import com.invoicespot.tax.Gstin;
 import com.invoicespot.tax.TaxRegime;
+import com.invoicespot.user.DemoAccountGuard;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.List;
@@ -25,10 +26,15 @@ public class SettingsService {
 
     private final BusinessSettingsRepository settingsRepository;
     private final BusinessRepository businessRepository;
+    private final DemoAccountGuard demoAccountGuard;
 
-    public SettingsService(BusinessSettingsRepository settingsRepository, BusinessRepository businessRepository) {
+    public SettingsService(
+            BusinessSettingsRepository settingsRepository,
+            BusinessRepository businessRepository,
+            DemoAccountGuard demoAccountGuard) {
         this.settingsRepository = settingsRepository;
         this.businessRepository = businessRepository;
+        this.demoAccountGuard = demoAccountGuard;
     }
 
     // A business that never saved its settings works with the defaults.
@@ -119,8 +125,11 @@ public class SettingsService {
         return PaymentDetailsResponse.from(forBusiness(access.businessPkid()).getPaymentDetails());
     }
 
+    // The shared demo business's payment details are on every visitor's
+    // invoices and share links, so nobody trying it can put theirs there.
     @Transactional
     public PaymentDetailsResponse updatePaymentDetails(BusinessAccess access, PaymentDetailsRequest request) {
+        demoAccountGuard.requireNotDemo(access.user(), "changing the payment details");
         PaymentDetails details = PaymentDetailsValidator.validate(request);
         BusinessSettings settings = saved(access);
         settings.setPaymentDetails(details);

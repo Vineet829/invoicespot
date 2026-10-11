@@ -53,8 +53,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class GstReturns {
 
     // Above this, an invoice to an unregistered buyer in another state is a
-    // B2C large one; its credit notes follow it.
+    // B2C large one; its credit notes follow it. Invoices dated before August
+    // 2024 count by the limit of their time, 2,50,000.
     public static final BigDecimal B2CL_LIMIT = new BigDecimal("100000");
+    static final BigDecimal B2CL_LIMIT_BEFORE = new BigDecimal("250000");
+    static final LocalDate B2CL_LIMIT_LOWERED = LocalDate.of(2024, 8, 1);
     static final int MOST_MONTHS = 12;
     static final String MISSING_HSN = "(missing HSN/SAC)";
     private static final YearMonth FIRST_MONTH = YearMonth.of(2017, 7);
@@ -188,7 +191,7 @@ public class GstReturns {
                 true,
                 returns.months().first(),
                 returns.months().last(),
-                B2CL_LIMIT,
+                b2clLimit(returns.months().last().atEndOfMonth()),
                 Arrays.stream(Section.values())
                         .filter(section -> section != Section.GSTR3B)
                         .map(section -> new GstFile(section.key, section.label, rows(section, returns).size()))
@@ -341,9 +344,13 @@ public class GstReturns {
             return Kind.B2B;
         }
         return document.getSupplyType() == SupplyType.INTER
-                        && value(document, rates(document)).compareTo(B2CL_LIMIT) > 0
+                        && value(document, rates(document)).compareTo(b2clLimit(document.getIssueDate())) > 0
                 ? Kind.B2CL
                 : Kind.B2CS;
+    }
+
+    static BigDecimal b2clLimit(LocalDate issued) {
+        return issued != null && issued.isBefore(B2CL_LIMIT_LOWERED) ? B2CL_LIMIT_BEFORE : B2CL_LIMIT;
     }
 
     private static String gstin(Document document) {
@@ -510,7 +517,10 @@ public class GstReturns {
                 key.hsn(),
                 "",
                 key.uqc(),
-                plain(sum.quantity),
+                // A number, not text: credit notes can leave it below nothing,
+                // and text starting with a minus is kept from being read as a
+                // formula.
+                BillingItemResponse.plain(sum.quantity),
                 sum.taxable.add(sum.igst).add(sum.cgst).add(sum.sgst),
                 key.rate().toPlainString(),
                 sum.taxable,

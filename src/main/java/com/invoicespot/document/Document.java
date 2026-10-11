@@ -146,7 +146,7 @@ public class Document extends BaseEntity {
     @Column(name = "total", nullable = false, precision = 19, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
-    @Column(name = "currency", length = 10)
+    @Column(name = "currency", nullable = false, length = 10)
     private String currency;
 
     // "1 {currency} = {exchangeRate} {exchangeBase}", typed in for a document

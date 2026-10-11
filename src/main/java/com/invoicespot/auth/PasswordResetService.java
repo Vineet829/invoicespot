@@ -86,6 +86,9 @@ public class PasswordResetService {
         if (!request.password().equals(request.passwordConfirm())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Passwords do not match");
         }
+        if (!PasswordPolicy.fits(request.password())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, PasswordPolicy.TOO_LONG);
+        }
         if (!PasswordPolicy.isStrong(request.password())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, PasswordPolicy.REQUIREMENTS);
         }

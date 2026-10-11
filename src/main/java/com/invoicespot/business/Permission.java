@@ -6,7 +6,7 @@ public enum Permission {
     VIEW_RECORDS("You can't see this business's records"),
     EXPORT_LISTS("You can't download this business's records"),
     EDIT_RECORDS("Viewers can't change anything in this business"),
-    DELETE_RECORDS("Only the owner and admins can delete documents and clients"),
+    DELETE_RECORDS("Only the owner and admins can delete anything in this business"),
     EXPORT_ARCHIVE("Only the owner and admins can download everything"),
     MANAGE_BUSINESS("Only the owner and admins can change the business's details and settings"),
     MANAGE_TEAM("Only the owner and admins can manage the team"),

@@ -4,7 +4,6 @@ import com.invoicespot.business.BusinessService;
 import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.BusinessSettingsRepository;
 import com.invoicespot.user.DemoAccountGuard;
-import jakarta.mail.MessagingException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -12,15 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.mail.MailSendException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 // Sends the automatic payment reminders due on a given day. Each reminder is
 // sent on its own, so one that fails is logged and the rest still go out.
-// Its invoice is locked and checked again before it goes, and stays locked
-// until the reminder is recorded, so two runs at once never both send it.
+// Its invoice is locked and checked again, and the reminder recorded, before
+// it goes, so two runs at once never both send it.
 @Service
 public class AutomaticReminders {
 
@@ -82,12 +80,8 @@ public class AutomaticReminders {
                 || !ReminderPlanner.isDue(invoice, reminder.settings(), reminder.today(), reminder.zone())) {
             return false;
         }
-        try {
-            documentMailService.remindAutomatically(
-                    businessService.ownerAccess(reminder.businessPkid()), reminder.documentId());
-        } catch (MessagingException exception) {
-            throw new MailSendException("The reminder could not be sent", exception);
-        }
+        documentMailService.remindAutomatically(
+                businessService.ownerAccess(reminder.businessPkid()), reminder.documentId());
         return true;
     }
 

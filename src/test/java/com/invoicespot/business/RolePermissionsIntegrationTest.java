@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -102,6 +103,24 @@ class RolePermissionsIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a viewer sees that a share link is on and how it is used, but not its address or an email with it")
+    void viewerAndLinks() throws Exception {
+        String viewer = as(BusinessRole.VIEWER);
+        String member = as(BusinessRole.MEMBER);
+        String document = document();
+        send(post("/api/v1/document/" + document + "/share"), member, "").andExpect(status().isCreated());
+
+        send(get("/api/v1/document/" + document + "/share"), viewer, "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.url").doesNotExist());
+        send(get("/api/v1/document/" + document + "/share"), member, "")
+                .andExpect(jsonPath("$.url").isString());
+        refused(send(get("/api/v1/document/" + document + "/email"), viewer, ""), Permission.EDIT_RECORDS);
+        send(get("/api/v1/document/" + document + "/email"), member, "").andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("a member works on records, but can't delete them, change settings or download everything")
     void member() throws Exception {
         String member = as(BusinessRole.MEMBER);
@@ -114,6 +133,17 @@ class RolePermissionsIntegrationTest extends IntegrationTest {
                 .andExpect(status().isCreated());
         refused(send(delete("/api/v1/document/" + document), member, ""), Permission.DELETE_RECORDS);
         refused(send(delete("/api/v1/customer/" + clientId), member, ""), Permission.DELETE_RECORDS);
+        // Nor payments, refunds, expenses, items or recurring schedules: the role is
+        // refused before anything is looked up.
+        for (String path : List.of(
+                "/api/v1/document/" + document + "/payment/" + UUID.randomUUID(),
+                "/api/v1/document/" + document + "/refund/" + UUID.randomUUID(),
+                "/api/v1/expense/" + UUID.randomUUID(),
+                "/api/v1/item/" + UUID.randomUUID(),
+                "/api/v1/recurring/" + UUID.randomUUID())) {
+            refused(send(delete(path), member, ""), Permission.DELETE_RECORDS);
+            send(delete(path), as(BusinessRole.ADMIN), "").andExpect(status().isNotFound());
+        }
         refused(send(put("/api/v1/settings"), member, SETTINGS), Permission.MANAGE_BUSINESS);
         refused(send(patch("/api/v1/business"), member, "{\"name\": \"Renamed\"}"), Permission.MANAGE_BUSINESS);
         refused(send(get("/api/v1/export/all"), member, ""), Permission.EXPORT_ARCHIVE);

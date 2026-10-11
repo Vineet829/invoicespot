@@ -103,13 +103,23 @@ public class SessionService {
             return Optional.of(new Continued(session, null));
         }
         if (session.isActiveAt(now)) {
-            revokeAll(session.getUser());
+            // The shared demo account has many visitors at once, each in a
+            // session of their own: an old token coming back ends only the
+            // session it was for, not every visitor's.
+            boolean demo = demoAccountGuard.isDemo(session.getUser());
+            if (demo) {
+                session.setRevokedAt(now);
+            } else {
+                revokeAll(session.getUser());
+            }
             auditLog.record(
                     AuditEventType.SESSION_TOKEN_REUSED,
                     session.getUser(),
                     null,
                     null,
-                    "An old sign-in token was used again, so every session was signed out",
+                    demo
+                            ? "An old sign-in token was used again, so its session was signed out"
+                            : "An old sign-in token was used again, so every session was signed out",
                     session.getId());
         }
         return Optional.empty();

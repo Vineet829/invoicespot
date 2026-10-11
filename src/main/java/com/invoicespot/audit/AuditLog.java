@@ -1,17 +1,19 @@
 package com.invoicespot.audit;
 
 import com.invoicespot.auth.session.CurrentSession;
-import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.user.User;
-import com.invoicespot.user.UserRepository;
+import com.zaxxer.hikari.HikariDataSource;
+import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.jdbc.JdbcConnectionDetails;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -19,24 +21,41 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 // Each entry commits on its own, so a failed sign-in is kept even though the
 // sign-in rolls back. An entry for a deletion is written before the account
 // goes, and keeps its email after.
+//
+// Entries are written through a small connection pool of their own. Most are
+// recorded inside transactions that already hold one of the app's
+// connections: taking a second from the same pool, a burst of sign-ins could
+// hold every connection while each waited for another, until all of them
+// timed out. An entry waits a few seconds at most for one of its own.
 @Service
-@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class AuditLog {
 
-    private final AuditEventRepository repository;
-    private final UserRepository userRepository;
-    private final BusinessRepository businessRepository;
+    static final int POOL_SIZE = 3;
+    private static final Duration CONNECTION_WAIT = Duration.ofSeconds(5);
+    private static final String INSERT = "insert into audit_events (id, type, business_pkid, user_pkid, actor_pkid,"
+            + " email, detail, ip, user_agent, session_id, occurred_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+    private final HikariDataSource pool = new HikariDataSource();
+    private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
 
-    public AuditLog(
-            AuditEventRepository repository,
-            UserRepository userRepository,
-            BusinessRepository businessRepository,
-            Clock clock) {
-        this.repository = repository;
-        this.userRepository = userRepository;
-        this.businessRepository = businessRepository;
+    public AuditLog(JdbcConnectionDetails connection, Clock clock) {
+        pool.setPoolName("audit-log");
+        pool.setMaximumPoolSize(POOL_SIZE);
+        pool.setConnectionTimeout(CONNECTION_WAIT.toMillis());
+        // Through a data source of its own, as the rate limiter's pool is, so
+        // the wait is set on this pool's connections only.
+        pool.setDataSourceClassName("org.postgresql.ds.PGSimpleDataSource");
+        pool.addDataSourceProperty("url", connection.getJdbcUrl());
+        pool.setUsername(connection.getUsername());
+        pool.setPassword(connection.getPassword());
+        this.jdbcTemplate = new JdbcTemplate(pool);
         this.clock = clock;
+    }
+
+    @PreDestroy
+    void close() {
+        pool.close();
     }
 
     public void record(AuditEventType type, User user) {
@@ -82,22 +101,27 @@ public class AuditLog {
             String email,
             String detail,
             UUID sessionId) {
-        AuditEvent event = new AuditEvent();
-        event.setBusiness(businessPkid == null ? null : businessRepository.getReferenceById(businessPkid));
-        event.setType(type);
-        event.setUser(user == null ? null : userRepository.getReferenceById(user.getPkid()));
-        event.setActor(actor == null ? null : userRepository.getReferenceById(actor.getPkid()));
         String address = email != null ? email : user == null ? null : user.getEmail();
-        event.setEmail(clip(address == null ? null : address.trim().toLowerCase(Locale.ROOT), 254));
-        event.setDetail(clip(detail, 255));
+        String ip = null;
+        String userAgent = null;
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
             HttpServletRequest request = attributes.getRequest();
-            event.setIp(clip(request.getRemoteAddr(), 64));
-            event.setUserAgent(clip(request.getHeader(HttpHeaders.USER_AGENT), 255));
+            ip = request.getRemoteAddr();
+            userAgent = request.getHeader(HttpHeaders.USER_AGENT);
         }
-        event.setSessionId(sessionId != null ? sessionId : CurrentSession.id().orElse(null));
-        event.setOccurredAt(clock.instant());
-        repository.save(event);
+        jdbcTemplate.update(
+                INSERT,
+                UUID.randomUUID(),
+                type.name(),
+                businessPkid,
+                user == null ? null : user.getPkid(),
+                actor == null ? null : actor.getPkid(),
+                clip(address == null ? null : address.trim().toLowerCase(Locale.ROOT), 254),
+                clip(detail, 255),
+                clip(ip, 64),
+                clip(userAgent, 255),
+                sessionId != null ? sessionId : CurrentSession.id().orElse(null),
+                clock.instant().atOffset(ZoneOffset.UTC));
     }
 
     private static String clip(String value, int length) {

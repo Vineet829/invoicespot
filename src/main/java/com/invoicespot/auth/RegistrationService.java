@@ -6,8 +6,11 @@ import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.mail.MailService;
+import com.invoicespot.ratelimit.RateLimit;
+import com.invoicespot.ratelimit.RateLimiter;
 import com.invoicespot.user.User;
 import com.invoicespot.user.UserRepository;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,14 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RegistrationService {
 
+    // A link sent at sign-up may wait in an inbox a while before it is opened.
+    static final Duration VERIFICATION_LINK_TTL = Duration.ofHours(24);
+
     public static final String VERIFICATION_RESENT =
-            "If that email has an account waiting to be verified, we've sent it a new link. It works for 15 minutes";
+            "If that email has an account waiting to be verified, we've sent it a new link. It works for 24 hours";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService tokenService;
     private final MailService mailService;
     private final BusinessService businessService;
+    private final UnverifiedSignUps unverifiedSignUps;
+    private final RateLimiter rateLimiter;
     private final AppProperties.Site site;
 
     public RegistrationService(
@@ -35,12 +43,16 @@ public class RegistrationService {
             VerificationTokenService tokenService,
             MailService mailService,
             BusinessService businessService,
+            UnverifiedSignUps unverifiedSignUps,
+            RateLimiter rateLimiter,
             AppProperties properties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.mailService = mailService;
         this.businessService = businessService;
+        this.unverifiedSignUps = unverifiedSignUps;
+        this.rateLimiter = rateLimiter;
         this.site = properties.site();
     }
 
@@ -56,18 +68,36 @@ public class RegistrationService {
         if (!request.password().equals(request.passwordConfirm())) {
             throw badRequest("Passwords do not match");
         }
+        if (!PasswordPolicy.fits(request.password())) {
+            throw badRequest(PasswordPolicy.TOO_LONG);
+        }
         if (!PasswordPolicy.isStrong(request.password())) {
             throw badRequest(PasswordPolicy.REQUIREMENTS);
         }
 
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         String username = request.username().trim();
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw badRequest(
-                    "The email address you've entered is already associated with another account");
+        Optional<User> holder = userRepository.findByEmailIgnoreCase(email);
+        if (holder.isPresent() && !holder.get().isEmailVerified()) {
+            unverifiedSignUps.remove(holder.get());
+            holder = Optional.empty();
         }
         if (userRepository.existsByUsername(username)) {
             throw badRequest("That username is already taken");
+        }
+        // From here on the sign-up emails its address, a link or a note to the
+        // account's owner, so it counts toward the address's emails, alike in
+        // both cases. One refused before, as for a taken username, sends
+        // nothing and isn't counted.
+        rateLimiter.consume(RateLimit.ACCOUNT_EMAIL_TO, email);
+        // Hashed either way, so a sign-up for an email that has an account
+        // takes as long to answer as a new one.
+        String password = passwordEncoder.encode(request.password());
+        // An email with an account gets the same answer as a new sign-up, so
+        // the form can't tell anyone who has one; its owner is told instead.
+        if (holder.isPresent()) {
+            tellOwnerOfSignUp(holder.get());
+            return registered(request.firstName().trim());
         }
 
         User user = new User();
@@ -75,15 +105,32 @@ public class RegistrationService {
         user.setUsername(username);
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
-        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setPassword(password);
         userRepository.save(user);
         businessService.createPersonal(user);
 
         sendVerification(user);
+        return registered(user.getFirstName());
+    }
+
+    private static String registered(String firstName) {
         return "A new user "
-                + user.getFirstName()
+                + firstName
                 + " has been registered! A Verification email has been sent to your account. Please"
-                + " verify within 15 minutes";
+                + " verify within 24 hours";
+    }
+
+    private void tellOwnerOfSignUp(User owner) {
+        String to = owner.getEmail();
+        String body = "Hello "
+                + owner.getFirstName()
+                + ", someone tried to sign up for "
+                + site.name()
+                + " with this email address, which already has an account. If it was you, log in at "
+                + site.clientUrl()
+                + "/login, or reset your password there if you have forgotten it. If it wasn't, you can"
+                + " ignore this email.";
+        AfterCommit.run(() -> mailService.send(to, "Someone tried to sign up with your email", body));
     }
 
     @Transactional
@@ -92,7 +139,7 @@ public class RegistrationService {
                 .flatMap(userRepository::findByExternalId)
                 .orElseThrow(() -> badRequest("We were unable to find a user for this token"));
         if (user.isEmailVerified()) {
-            throw badRequest("This user has already been verified. Please login");
+            throw new ApiException(HttpStatus.CONFLICT, "This user has already been verified. Please login");
         }
 
         VerifyResetToken verificationToken = tokenService
@@ -130,14 +177,14 @@ public class RegistrationService {
     }
 
     private void sendVerification(User user) {
-        String token = tokenService.issue(user);
+        String token = tokenService.issue(user, VERIFICATION_LINK_TTL);
         String link = site.serverUrl() + "/api/v1/auth/verify/" + token + "/" + user.getId();
         String to = user.getEmail();
         String body = "Hello "
                 + user.getFirstName()
                 + ", welcome to "
                 + site.name()
-                + ". Please verify your account within 15 minutes using this link: "
+                + ". Please verify your account within 24 hours using this link: "
                 + link;
         AfterCommit.run(() -> mailService.send(to, "Account Verification", body));
     }

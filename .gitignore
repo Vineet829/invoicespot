@@ -1,5 +1,4 @@
 target/
-!.mvn/wrapper/maven-wrapper.jar
 *.class
 *.jar
 *.war
@@ -9,6 +8,7 @@ target/
 .vscode/
 .DS_Store
 
+# Local notes, kept out of the repository
 docs/
 uploads/
 

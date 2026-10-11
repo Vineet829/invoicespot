@@ -54,9 +54,10 @@ public class PdfController {
         return inline(documentService.renderReceipt(access, id, paymentId));
     }
 
+    // A draft is for whoever can send it, and holds the document's link.
     @GetMapping("/{id}/payment/{paymentId}/receipt/email")
     public EmailDraftResponse receiptDraft(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access,
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access,
             @PathVariable String id,
             @PathVariable String paymentId) {
         EmailDraft draft = documentMailService.receiptDraft(access, id, paymentId);
@@ -76,7 +77,7 @@ public class PdfController {
 
     @GetMapping("/{id}/remind")
     public EmailDraftResponse reminderDraft(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.reminderDraft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
@@ -92,7 +93,7 @@ public class PdfController {
 
     @GetMapping("/{id}/email")
     public EmailDraftResponse emailDraft(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.draft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }
