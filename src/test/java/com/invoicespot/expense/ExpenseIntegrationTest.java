@@ -395,7 +395,8 @@ class ExpenseIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("a viewer reads and downloads expenses but records nothing; a member records, changes and deletes")
+    @DisplayName("a viewer reads and downloads expenses but records nothing; a member records and changes them,"
+            + " and only the owner and admins delete them")
     void roles() throws Exception {
         Business business = businessOf(owner);
         String id = expense(TODAY, "Uber", "Travel", "8");
@@ -412,7 +413,10 @@ class ExpenseIntegrationTest extends IntegrationTest {
 
         send(post("/api/v1/expense"), member, json).andExpect(status().isCreated());
         send(patch("/api/v1/expense/{id}", id), member, "{\"amount\": 9}").andExpect(status().isOk());
-        send(delete("/api/v1/expense/{id}", id), member, "").andExpect(status().isOk());
+        send(delete("/api/v1/expense/{id}", id), member, "")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(Permission.DELETE_RECORDS.refusal()));
+        send(delete("/api/v1/expense/{id}", id), "").andExpect(status().isOk());
     }
 
     @Test

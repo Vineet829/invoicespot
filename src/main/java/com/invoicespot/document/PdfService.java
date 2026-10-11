@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.ITemplateEngine;
@@ -50,6 +51,14 @@ public class PdfService {
     private static final String FONT = "Noto Sans";
     private static final byte[] REGULAR = font("fonts/NotoSans-Regular.ttf");
     private static final byte[] BOLD = font("fonts/NotoSans-Bold.ttf");
+
+    // Characters a PDF's page can't hold, as XML 1.0 has no place for them:
+    // control characters other than tabs and line breaks, and halves of
+    // characters cut in two. Word puts a vertical tab where Shift+Enter
+    // breaks a line, so one pasted into a client's name or a note would
+    // otherwise stop every PDF of the document.
+    private static final Pattern LINE_BREAK_CONTROLS = Pattern.compile("[\\x0B\\x0C]");
+    private static final Pattern UNPRINTABLE = Pattern.compile("[\\x00-\\x08\\x0E-\\x1F\\x{FFFE}\\x{FFFF}\\p{Cs}]");
 
     private final ITemplateEngine templateEngine;
     private final UploadService uploadService;
@@ -580,7 +589,11 @@ public class PdfService {
     }
 
     private String logo(String avatar) {
-        return uploadService.localFile(avatar).flatMap(PdfService::dataUri).orElse(null);
+        return uploadService
+                .localFile(avatar)
+                .filter(UploadService::printable)
+                .flatMap(PdfService::dataUri)
+                .orElse(null);
     }
 
     private static Optional<String> dataUri(Path file) {
@@ -609,6 +622,11 @@ public class PdfService {
         return context;
     }
 
+    // The page as a PDF can hold it.
+    static String printable(String html) {
+        return UNPRINTABLE.matcher(LINE_BREAK_CONTROLS.matcher(html).replaceAll(" ")).replaceAll("");
+    }
+
     private static byte[] toPdf(String html) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -616,7 +634,7 @@ public class PdfService {
             builder.useFastMode();
             builder.useFont(() -> new ByteArrayInputStream(REGULAR), FONT, 400, FontStyle.NORMAL, true);
             builder.useFont(() -> new ByteArrayInputStream(BOLD), FONT, 700, FontStyle.NORMAL, true);
-            builder.withHtmlContent(html, null);
+            builder.withHtmlContent(printable(html), null);
             builder.toStream(out);
             builder.run();
             return out.toByteArray();

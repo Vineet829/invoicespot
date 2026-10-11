@@ -80,6 +80,9 @@ public class PasswordChangeService {
         if (!request.newPassword().equals(request.confirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "The new passwords don't match");
         }
+        if (!PasswordPolicy.fits(request.newPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, PasswordPolicy.TOO_LONG);
+        }
         if (!PasswordPolicy.isStrong(request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, PasswordPolicy.REQUIREMENTS);
         }

@@ -280,6 +280,18 @@ class ClientPortalIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("a page far past the last, such as one typed into the address, is empty rather than an error")
+    void pageFarPastTheLast() throws Exception {
+        String customer = customer("Paging Co");
+        document(customer, "Invoice", "USD", 100, false);
+        String token = portal(customer);
+
+        mockMvc.perform(from(get("/api/v1/public/portal/{token}", token)).param("page", String.valueOf(Integer.MAX_VALUE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents").isEmpty());
+    }
+
+    @Test
     @DisplayName("a network asking for portals more than 60 times a minute is asked to wait")
     void slowedDown() throws Exception {
         String token = portal(customer("Acme"));

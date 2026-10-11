@@ -61,7 +61,7 @@ class CustomerDirectory {
         String pattern = SearchText.containing(search.query());
         List<Row> rows = jdbc.sql("""
                         select c.pkid,
-                               count(d.pkid) as documents,
+                               count(d.pkid) filter (where %s) as documents,
                                coalesce(sum(%s) filter (
                                    where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
@@ -71,7 +71,7 @@ class CustomerDirectory {
                         group by c.pkid
                         order by %s %s, c.pkid %s
                         limit :limit offset :offset
-                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
+                        """.formatted(DocumentLedger.COUNTED, DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
                                 ORDER_BY.get(search.sort()), direction, direction))
                 .param("business", businessPkid)
                 .param("pattern", pattern)
@@ -94,7 +94,7 @@ class CustomerDirectory {
         return jdbc.sql("""
                         select c.pkid, c.name, c.email, c.phone_number, c.account_no, c.vat_tin_no, c.gstin,
                                c.address, c.city, c.country, c.created_at,
-                               count(d.pkid) as documents,
+                               count(d.pkid) filter (where %s) as documents,
                                coalesce(sum(%s) filter (
                                    where %s and d.document_type = 'Invoice' and d.status <> 'Paid'
                                      and d.currency = :currency), 0) as balance
@@ -103,7 +103,7 @@ class CustomerDirectory {
                         where %s
                         group by c.pkid
                         order by %s %s, c.pkid %s
-                        """.formatted(DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
+                        """.formatted(DocumentLedger.COUNTED, DocumentLedger.OWED, DocumentLedger.COUNTED, MATCHING,
                                 ORDER_BY.get(search.sort()), direction, direction))
                 .param("business", businessPkid)
                 .param("pattern", SearchText.containing(search.query()))

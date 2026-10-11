@@ -192,7 +192,7 @@ const EditRefundForm = ({
 // Money paid back to the client when a credit note leaves this document
 // overpaid. The form shows while something is due back; the server keeps
 // every refund within it.
-const RefundsPanel = ({ document, refusal }) => {
+const RefundsPanel = ({ document, refusal, deleteRefusal }) => {
   const due = Number(document.ledger?.refundDue || 0);
   const refunds = document.refunds || [];
   // A new refund is dated today by the business's calendar, the one the
@@ -282,13 +282,11 @@ const RefundsPanel = ({ document, refusal }) => {
       <div className="flex flex-col gap-6">
         {refunds.length > 0 && (
           <DataTable
-            columns={
-              refusal
-                ? columns.filter(
-                    (column) => !["Edit", "Delete"].includes(column.label),
-                  )
-                : columns
-            }
+            columns={columns.filter(
+              (column) =>
+                !(refusal && ["Edit", "Delete"].includes(column.label)) &&
+                !(deleteRefusal && column.label === "Delete"),
+            )}
             rows={refunds}
             label="Refunds"
           />

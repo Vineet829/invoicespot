@@ -1,6 +1,8 @@
 package com.invoicespot.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -202,6 +204,7 @@ class DemoResetIntegrationTest extends IntegrationTest {
         User other = createUser();
         Long business = businessOf(demo).getPkid();
         Long theirs = businessOf(other).getPkid();
+        runner(demo, false).run(null);
         visit(demo);
         visit(other);
         Map<String, Object> before = snapshot(theirs);
@@ -215,6 +218,63 @@ class DemoResetIntegrationTest extends IntegrationTest {
         assertThat(snapshot(theirs)).isEqualTo(before);
         assertThat(reset.clear("nobody@invoicespot.test"))
                 .isEqualTo(new DemoReset.Result(false, "the demo account nobody@invoicespot.test does not exist", 0));
+    }
+
+    @Test
+    @DisplayName("an account named as the demo that holds records of its own is never cleared or given sample data")
+    void realAccountLeftAlone() throws Exception {
+        User someone = createUser();
+        Long business = businessOf(someone).getPkid();
+        visit(someone);
+        Map<String, Object> theirs = snapshot(business);
+
+        assertThat(reset.clear(someone.getEmail())).isEqualTo(new DemoReset.Result(
+                false, "the account " + someone.getEmail() + " holds no sample data, so it was left as it was", 0));
+        runner(someone, true).run(null);
+        runner(someone, true).renew();
+
+        assertThat(snapshot(business)).isEqualTo(theirs);
+    }
+
+    @Test
+    @DisplayName("a visitor deleting or renaming the sample clients doesn't stop the demo renewing")
+    void sampleClientsChanged() throws Exception {
+        User demo = createUser();
+        Long business = businessOf(demo).getPkid();
+        DemoSeedRunner runner = runner(demo, true);
+        runner.run(null);
+        Map<String, Object> fresh = snapshot(business);
+
+        List<UUID> clients = jdbcTemplate.queryForList(
+                "select id from customers where business_pkid = ? order by pkid", UUID.class, business);
+        send(demo, delete("/api/v1/customer/{id}", clients.getFirst()), "").andExpect(status().isOk());
+        for (UUID client : clients.subList(1, clients.size())) {
+            send(demo, patch("/api/v1/customer/{id}", client), """
+                            {"email": "%s@clients.test"}
+                            """.formatted(UUID.randomUUID()))
+                    .andExpect(status().isOk());
+        }
+
+        runner.renew();
+
+        assertThat(snapshot(business)).isEqualTo(fresh);
+    }
+
+    @Test
+    @DisplayName("an account named as the demo with clients but no expenses or schedules gets no sample ones")
+    void ownClientsOnly() throws Exception {
+        User someone = createUser();
+        Long business = businessOf(someone).getPkid();
+        send(someone, post("/api/v1/customer/create"), """
+                        {"name": "Own Ltd", "email": "%s@clients.test", "phoneNumber": "+1"}
+                        """.formatted(UUID.randomUUID()))
+                .andExpect(status().isOk());
+        Map<String, Object> theirs = snapshot(business);
+
+        runner(someone, false).run(null);
+        runner(someone, true).renew();
+
+        assertThat(snapshot(business)).isEqualTo(theirs);
     }
 
     @Test

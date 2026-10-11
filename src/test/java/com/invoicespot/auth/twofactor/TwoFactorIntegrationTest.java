@@ -7,6 +7,7 @@ import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -225,6 +226,28 @@ class TwoFactorIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         login(enabled.user()).andExpect(jsonPath("$.accessToken").exists()).andExpect(cookie().exists("jwt"));
+    }
+
+    @Test
+    @DisplayName("with it on, deleting the account takes a code as well as the password")
+    void deletingTakesACode() throws Exception {
+        Enabled enabled = enabled();
+        String authorization = bearer(enabled.user());
+
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, authorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"%s\"}".formatted(PASSWORD)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("That code didn't work"));
+        assertThat(userRepository.findById(enabled.user().getPkid())).isPresent();
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, authorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"%s\", \"code\": \"%s\"}"
+                                .formatted(PASSWORD, enabled.recoveryCodes().get(0))))
+                .andExpect(status().isOk());
+        assertThat(userRepository.findById(enabled.user().getPkid())).isEmpty();
     }
 
     @Test

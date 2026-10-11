@@ -112,10 +112,14 @@ class GstReturnsIntegrationTest extends IntegrationTest {
     }
 
     private List<String> csv(String section) throws Exception {
+        return csv(section, month.toString(), month.toString());
+    }
+
+    private List<String> csv(String section, String from, String to) throws Exception {
         return new String(
                         mockMvc.perform(get("/api/v1/report/gst/{section}/csv", section)
-                                        .param("from", month.toString())
-                                        .param("to", month.toString())
+                                        .param("from", from)
+                                        .param("to", to)
                                         .header(HttpHeaders.AUTHORIZATION, session))
                                 .andExpect(status().isOk())
                                 .andReturn()
@@ -194,6 +198,32 @@ class GstReturnsIntegrationTest extends IntegrationTest {
         assertThat(csv("cdnur")).containsExactly(
                 "B2CL,CN-0002," + date + ",C,07-Delhi,1180.00,,18,1000.00,",
                 "EXPWP,CN-0004," + date + ",C,,982.35,,18,832.50,");
+    }
+
+    @Test
+    @DisplayName("an invoice dated before August 2024 is B2C large only above that time's limit of 2,50,000")
+    void b2clLimitBeforeAugust2024() throws Exception {
+        settings("GST_INDIA");
+        String delhi = client("Delhi Earlier", ", \"stateCode\": \"07\"");
+        invoice(delhi, ", \"issueDate\": \"2024-07-31\"", line("1", "200000", "0", "998314", null));
+        invoice(delhi, ", \"issueDate\": \"2024-08-01\"", line("1", "200000", "0", "998314", null));
+
+        assertThat(csv("b2cl", "2024-07", "2024-08")).singleElement().asString().contains("01-Aug-2024");
+        assertThat(csv("b2cs", "2024-07", "2024-08")).singleElement().asString().contains("07-Delhi");
+        summary("2024-07", "2024-07").andExpect(jsonPath("$.b2clLimit").value(250000));
+        summary("2024-07", "2024-08").andExpect(jsonPath("$.b2clLimit").value(100000));
+    }
+
+    @Test
+    @DisplayName("a code whose credit notes outweigh its sales in a month has its quantity below nothing, as a number")
+    void negativeHsnQuantity() throws Exception {
+        settings("GST_INDIA");
+        String pune = client("Pune Returns", ", \"stateCode\": \"27\"");
+        String earlier = invoice(pune, ", \"issueDate\": \"%s\"".formatted(month.minusMonths(1).atDay(1)),
+                line("5", "100", "5", "4820", "pcs"));
+        credit(earlier, line("3", "100", "5", "4820", "pcs"));
+
+        assertThat(csv("hsn-b2c")).contains("4820,,PCS,-3,-315.00,5,-300.00,0.00,-7.50,-7.50,");
     }
 
     @Test

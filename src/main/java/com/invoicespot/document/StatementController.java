@@ -33,9 +33,10 @@ public class StatementController {
         return PdfController.inline(statementService.render(access, id));
     }
 
+    // A draft is for whoever can send it, and holds the client's portal link.
     @GetMapping("/email")
     public EmailDraftResponse emailDraft(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.statementDraft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }

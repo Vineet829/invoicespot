@@ -3,6 +3,7 @@ package com.invoicespot.item;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessRepository;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Pages;
 import com.invoicespot.common.Percentage;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.item.dto.CreateItemRequest;
@@ -41,8 +42,8 @@ public class CatalogItemService {
 
     @Transactional(readOnly = true)
     public ItemListResponse list(BusinessAccess access, String query, int pageNumber, int pageSize) {
-        int page = Math.max(pageNumber, 1);
         int size = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
+        int page = Pages.number(pageNumber, size);
         Page<CatalogItem> result = itemRepository.search(
                 access.businessPkid(),
                 SearchText.containing(query),

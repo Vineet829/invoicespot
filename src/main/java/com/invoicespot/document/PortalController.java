@@ -45,9 +45,10 @@ public class PortalController {
         return portalService.create(access, id);
     }
 
+    // A draft is for whoever can send it, and holds the portal link.
     @GetMapping("/email")
     public EmailDraftResponse emailDraft(
-            @Requires(Permission.VIEW_RECORDS) BusinessAccess access, @PathVariable String id) {
+            @Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
         EmailDraft draft = documentMailService.portalDraft(access, id);
         return new EmailDraftResponse(true, draft.to(), draft.subject(), draft.message(), draft.note());
     }

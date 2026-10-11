@@ -2,15 +2,19 @@ package com.invoicespot.user;
 
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.IdentityCheck;
+import com.invoicespot.auth.dto.ConfirmIdentityRequest;
 import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Pages;
 import com.invoicespot.common.SearchText;
 import com.invoicespot.user.dto.AdminStatsResponse;
 import com.invoicespot.user.dto.UpdateProfileRequest;
 import com.invoicespot.user.dto.UserPageResponse;
 import com.invoicespot.user.dto.UserProfileResponse;
 import com.invoicespot.user.dto.UserSummaryResponse;
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -36,6 +40,8 @@ public class UserService {
     private final AuditLog auditLog;
     private final AdminStats adminStats;
     private final BusinessService businessService;
+    private final IdentityCheck identityCheck;
+    private final EntityManager entityManager;
     private final Clock clock;
 
     public UserService(
@@ -45,6 +51,8 @@ public class UserService {
             AuditLog auditLog,
             AdminStats adminStats,
             BusinessService businessService,
+            IdentityCheck identityCheck,
+            EntityManager entityManager,
             Clock clock) {
         this.userRepository = userRepository;
         this.demoAccountGuard = demoAccountGuard;
@@ -52,6 +60,8 @@ public class UserService {
         this.auditLog = auditLog;
         this.adminStats = adminStats;
         this.businessService = businessService;
+        this.identityCheck = identityCheck;
+        this.entityManager = entityManager;
         this.clock = clock;
     }
 
@@ -99,10 +109,17 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteOwnAccount(Long pkid) {
+    public void deleteOwnAccount(Long pkid, ConfirmIdentityRequest confirmation) {
+        User checked = require(pkid);
+        demoAccountGuard.requireNotDemo(checked, "deleting it");
+        requireNotLastAdmin(checked, "deleted");
+        requireNoSharedBusinesses(checked, "You own ", "Hand it over or remove them first");
+        identityCheck.require(checked, confirmation);
+        // A recovery code the check used is written now, and nothing the
+        // check loaded is kept, as all of it goes with the account.
+        entityManager.flush();
+        entityManager.clear();
         User user = require(pkid);
-        demoAccountGuard.requireNotDemo(user, "deleting it");
-        requireNoSharedBusinesses(user, "You own ", "Hand it over or remove them first");
         auditLog.record(AuditEventType.ACCOUNT_DELETED, user);
         businessService.deleteOwnedBy(user);
         userRepository.delete(user);
@@ -111,7 +128,7 @@ public class UserService {
     // Newest accounts first, searched by name, email or username.
     @Transactional(readOnly = true)
     public UserPageResponse listUsers(int pageNumber, int size, String query) {
-        int page = Math.max(pageNumber, 1);
+        int page = Pages.number(pageNumber, Math.min(Math.max(size, 1), MOST_PER_PAGE));
         Specification<User> matching = null;
         if (query != null && !query.isBlank()) {
             String pattern = SearchText.containing(query);

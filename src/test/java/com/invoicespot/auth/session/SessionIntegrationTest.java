@@ -168,6 +168,25 @@ class SessionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("on the shared demo account, an old token coming back signs out only its own session")
+    void reusedTokenOnTheDemo() throws Exception {
+        User demo = demoUser();
+        demo.setPassword(passwordEncoder.encode(PASSWORD));
+        userRepository.save(demo);
+        SignedIn first = signIn(demo);
+        SignedIn otherVisitor = signIn(demo);
+        refresh(first.refresh()).andExpect(status().isOk());
+        jdbcTemplate.update(
+                "update user_sessions set rotated_at = now() - interval '1 minute' where user_pkid = ?",
+                demo.getPkid());
+
+        refresh(first.refresh()).andExpect(status().isForbidden());
+
+        profile(otherVisitor.access()).andExpect(status().isOk());
+        refresh(otherVisitor.refresh()).andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("signing out ends the session at once, even for an access token that hasn't run out")
     void signOut() throws Exception {
         User user = withPassword();

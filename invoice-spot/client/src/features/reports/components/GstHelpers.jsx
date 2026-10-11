@@ -165,7 +165,10 @@ const GstHelpers = () => {
             >
               <li>
                 Invoices worth more than {money(data.b2clLimit, "INR")} to
-                unregistered buyers in other states go in B2C large.
+                unregistered buyers in other states go in B2C large
+                {data.from < "2024-08" && data.to >= "2024-08"
+                  ? ", or more than ₹2,50,000 for invoices dated before August 2024."
+                  : "."}
               </li>
               {data.missingHsn > 0 && (
                 <li>

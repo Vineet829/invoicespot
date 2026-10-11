@@ -37,11 +37,24 @@ const moment = (value) =>
 
 const actions = "mt-6 flex flex-wrap justify-end gap-2.5";
 
+// When the link was turned on, and how often it has been opened since.
+const LinkSummary = ({ link }) => (
+  <p className="mt-5 rounded-2xl bg-spot-violet/[.06] px-4 py-3.5 text-[13.5px] leading-[1.6] text-spot-body">
+    A link has been on since {moment(link.createdAt)}.{" "}
+    {link.viewCount
+      ? `Opened ${link.viewCount} ${link.viewCount === 1 ? "time" : "times"}, last on ${moment(link.lastViewedAt)}.`
+      : "Nobody has opened it yet."}
+  </p>
+);
+
 // A client's portal link: one link to all their documents, balances and
 // statement, which can be emailed or sent on WhatsApp. A new link replaces
 // the old one. Like a share link, it is kept sealed to be shown again when
-// the server has an encryption key.
-const PortalDialog = ({ customer, open, onClose, demoNote }) => {
+// the server has an encryption key. Members who can't make changes (the
+// `refusal`) see whether a link is on and how it is used, but not the link,
+// which lets whoever has it accept quotations and report payments, nor the
+// ways to change or send it.
+const PortalDialog = ({ customer, open, onClose, demoNote, refusal }) => {
   const status = useGetPortalStatusQuery(customer._id, { skip: !open });
   const [create, { isLoading: creating }] = useCreatePortalLinkMutation();
   const [revoke, { isLoading: revoking }] = useRevokePortalLinkMutation();
@@ -185,14 +198,18 @@ const PortalDialog = ({ customer, open, onClose, demoNote }) => {
         <p className={`mt-5 ${panelNote}`} role="status">
           Checking the link…
         </p>
+      ) : refusal ? (
+        <>
+          {link.active && <LinkSummary link={link} />}
+          <p className={`${link.active ? "mt-2.5" : "mt-5"} ${panelNote}`}>
+            {link.active
+              ? "Only members who can send the link see it."
+              : "No link is on. Members who can send one can make it."}
+          </p>
+        </>
       ) : link.active ? (
         <>
-          <p className="mt-5 rounded-2xl bg-spot-violet/[.06] px-4 py-3.5 text-[13.5px] leading-[1.6] text-spot-body">
-            A link has been on since {moment(link.createdAt)}.{" "}
-            {link.viewCount
-              ? `Opened ${link.viewCount} ${link.viewCount === 1 ? "time" : "times"}, last on ${moment(link.lastViewedAt)}.`
-              : "Nobody has opened it yet."}
-          </p>
+          <LinkSummary link={link} />
           {link.url ? (
             shownLink(
               link.url,
@@ -241,7 +258,7 @@ const PortalDialog = ({ customer, open, onClose, demoNote }) => {
           </button>
         </div>
       )}
-      {!status.isError && (link || made) && (
+      {!refusal && !status.isError && (link || made) && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#23273512] pt-5">
           <p className={panelNote}>Or send them the link.</p>
           <div className="flex flex-wrap gap-2.5">

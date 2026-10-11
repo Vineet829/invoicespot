@@ -121,6 +121,9 @@ class RefundIntegrationTest extends IntegrationTest {
         refund(invoice, "{\"amount\": 350}")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("That is more than the 300.00 due back"));
+        refund(invoice, "{\"amount\": 1E+16}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Amounts can have at most 15 whole digits"));
         String refundId = JsonPath.read(
                 body(refund(invoice, """
                                 {"amount": 200, "dateRefunded": "%s", "paymentMethod": "Bank Transfer",

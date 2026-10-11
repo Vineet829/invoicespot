@@ -7,6 +7,7 @@ import * as Yup from "yup";
 import useTitle from "../../../hooks/useTitle";
 import { useLoginUserMutation, useRegisterUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
+import { PASSWORD_TOO_LONG, fitsPassword } from "../passwordLength";
 import AuthVisual from "../components/AuthVisual";
 import ProviderButtons from "../components/ProviderButtons";
 import {
@@ -44,7 +45,7 @@ const registerSchema = Yup.object().shape({
     .max(254, "Must be a valid email")
     .required("Email is required"),
   password: Yup.string()
-    .max(128, "At most 128 characters")
+    .test("fits", PASSWORD_TOO_LONG, fitsPassword)
     .required("Password is required")
     .min(8, "At least 8 characters")
     .matches(/\p{Lu}/u, "Add an uppercase letter")

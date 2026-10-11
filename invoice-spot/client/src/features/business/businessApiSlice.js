@@ -65,7 +65,11 @@ export const businessApiSlice = baseApiSlice.injectEndpoints({
       query: () => ({ url: "/business/leave", method: "POST" }),
     }),
     deleteBusiness: builder.mutation({
-      query: () => ({ url: "/business", method: "DELETE" }),
+      query: (confirmation) => ({
+        url: "/business",
+        method: "DELETE",
+        body: confirmation,
+      }),
     }),
     getInvitations: builder.query({
       query: () => "/business/invitations",

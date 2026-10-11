@@ -5,15 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.invoicespot.audit.AuditEventType;
 import com.invoicespot.audit.AuditLog;
+import com.invoicespot.auth.IdentityCheck;
 import com.invoicespot.auth.session.SessionService;
 import com.invoicespot.business.BusinessService;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.config.DemoProperties;
 import com.invoicespot.user.dto.UpdateProfileRequest;
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +39,8 @@ class UserServiceTest {
     @Mock private AuditLog auditLog;
     @Mock private AdminStats adminStats;
     @Mock private BusinessService businessService;
+    @Mock private IdentityCheck identityCheck;
+    @Mock private EntityManager entityManager;
     private UserService service;
 
     @BeforeEach
@@ -47,6 +52,8 @@ class UserServiceTest {
                 auditLog,
                 adminStats,
                 businessService,
+                identityCheck,
+                entityManager,
                 Clock.systemUTC());
     }
 
@@ -141,7 +148,11 @@ class UserServiceTest {
                 .hasMessage("The last admin can't be deactivated");
         assertThatThrownBy(() -> service.deleteUser(id.toString(), admin))
                 .hasMessage("The last admin can't be deleted");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(last));
+        assertThatThrownBy(() -> service.deleteOwnAccount(1L, null))
+                .hasMessage("The last admin can't be deleted");
         assertThat(last.getRoles()).contains("Admin");
         verify(userRepository, never()).delete(any(User.class));
+        verifyNoInteractions(identityCheck);
     }
 }

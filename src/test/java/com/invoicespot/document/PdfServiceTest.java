@@ -9,6 +9,7 @@ import com.invoicespot.settings.BusinessSettings;
 import com.invoicespot.settings.PdfTemplate;
 import com.invoicespot.tax.SupplyType;
 import com.invoicespot.tax.TaxRegime;
+import com.invoicespot.upload.TestImages;
 import com.invoicespot.upload.UploadService;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -276,6 +277,37 @@ class PdfServiceTest {
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), remote, SETTINGS)).doesNotContain("example.com");
         assertThat(service.html(sampleDocument(DocumentType.INVOICE), webp, SETTINGS)).doesNotContain("class=\"logo\"");
         assertThat(new String(service.render(sampleDocument(DocumentType.INVOICE), local, SETTINGS), 0, 5)).isEqualTo("%PDF-");
+    }
+
+    @Test
+    @DisplayName("a control character pasted into a client's name or a note no longer stops the PDF")
+    void controlCharacters() throws Exception {
+        // Word puts a vertical tab where Shift+Enter breaks a line.
+        String verticalTab = Character.toString(0x0B);
+        String nul = Character.toString(0x00);
+        Document document = sampleDocument(DocumentType.INVOICE);
+        document.getCustomerSnapshot().setName("Beta" + verticalTab + "LLC" + nul);
+        document.setAdditionalInfo("Thank you" + verticalTab + "for your business");
+
+        String text = PdfText.of(service.render(document, seller("Ada Analytics"), SETTINGS));
+
+        assertThat(text).contains("Beta LLC").contains("Thank you for your business");
+        assertThat(PdfService.printable("a" + verticalTab + "b" + nul + "c")).isEqualTo("a bc");
+    }
+
+    @Test
+    @DisplayName("a stored logo over 4 megapixels is left off the PDF without being opened")
+    void largeLogo() throws Exception {
+        // A PDF holds every pixel of its logo in memory: this one would need
+        // more than half a gigabyte. It was stored before uploads were
+        // checked for size, so only its header is ever read.
+        Files.write(uploads.resolve("huge.png"), TestImages.pngHeader(12000, 12000));
+        Business business = seller("Ada Analytics");
+        business.setLogo("/uploads/huge.png");
+
+        assertThat(service.html(sampleDocument(DocumentType.INVOICE), business, SETTINGS)).doesNotContain("class=\"logo\"");
+        assertThat(new String(service.render(sampleDocument(DocumentType.INVOICE), business, SETTINGS), 0, 5))
+                .isEqualTo("%PDF-");
     }
 
     @Test

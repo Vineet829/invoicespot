@@ -404,20 +404,18 @@ class PaymentListIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("money on documents without a currency is totalled under none, apart from every currency")
+    @DisplayName("money on documents made without a currency is totalled in the business's default currency")
     void noCurrency() throws Exception {
         pay(issue(acme, "Invoice", null, "50", today), "50", "0", "Cash", null, today);
         issue(acme, "Receipt", null, "20", today);
         pay(issue(acme, "Invoice", "USD", "30", today), "30", "0", "Cash", null, today);
 
         payments()
-                .andExpect(jsonPath("$.totals.length()").value(2))
+                .andExpect(jsonPath("$.totals.length()").value(1))
                 .andExpect(content().string(containsString(
-                        "{\"currency\":\"\",\"payments\":2,\"receipts\":1,\"received\":70.00}")))
-                .andExpect(jsonPath("$.totals[1].currency").value("USD"))
-                .andExpect(jsonPath("$.totals[1].received").value(30.0))
-                .andExpect(jsonPath("$.payments[?(@.document.number == 'REC-0001')].currency", contains(nullValue())));
-        payments("currency", "USD").andExpect(jsonPath("$.total").value(1));
+                        "{\"currency\":\"USD\",\"payments\":3,\"receipts\":1,\"received\":100.00}")))
+                .andExpect(jsonPath("$.payments[?(@.document.number == 'REC-0001')].currency", contains("USD")));
+        payments("currency", "USD").andExpect(jsonPath("$.total").value(3));
     }
 
     @Test

@@ -91,7 +91,7 @@ public class ExpenseController {
     }
 
     @DeleteMapping("/{id}")
-    public MessageResponse delete(@Requires(Permission.EDIT_RECORDS) BusinessAccess access, @PathVariable String id) {
+    public MessageResponse delete(@Requires(Permission.DELETE_RECORDS) BusinessAccess access, @PathVariable String id) {
         expenseService.delete(access, id);
         return new MessageResponse(true, "Expense deleted");
     }

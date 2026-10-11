@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -38,6 +39,9 @@ class OverdueAlertsIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
@@ -103,6 +107,25 @@ class OverdueAlertsIntegrationTest extends IntegrationTest {
         overdueAlerts.raise(Instant.now());
 
         assertThat(alerts(owner)).containsExactly("Invoice INV-0001 for Beta LLC is overdue, with USD 100.00 unpaid");
+    }
+
+    @Test
+    @DisplayName("an invoice whose alert fails is left for the next run, and the other businesses' still go")
+    void oneFailsTheRestGo() throws Exception {
+        User broken = createUser();
+        invoice(broken, today.minusDays(1));
+        User fine = createUser();
+        invoice(fine, today.minusDays(1));
+        // A time zone the server can't read, as from a business saved before
+        // zones were checked.
+        jdbcTemplate.update(
+                "update business_settings set time_zone = 'Mars/Olympus_Mons' where business_pkid = ?",
+                businessOf(broken).getPkid());
+
+        overdueAlerts.raise(Instant.now());
+
+        assertThat(alerts(broken)).isEmpty();
+        assertThat(alerts(fine)).containsExactly("Invoice INV-0001 for Beta LLC is overdue, with USD 100.00 unpaid");
     }
 
     @Test

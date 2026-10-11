@@ -124,7 +124,10 @@ class BusinessProfileIntegrationTest extends IntegrationTest {
         Business business = businessOf(user);
         assertThat(business.getName()).isEqualTo("Ada Lovelace");
 
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, bearer(user)))
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"Str0ng!pw\"}"))
                 .andExpect(status().isOk());
 
         assertThat(businessRepository.findById(business.getPkid())).isEmpty();

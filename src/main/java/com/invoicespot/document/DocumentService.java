@@ -130,7 +130,11 @@ public class DocumentService {
         document.setAdditionalInfo(request.additionalInfo());
         document.setTermsConditions(request.termsConditions());
         document.setShowPaymentDetails(!Boolean.FALSE.equals(request.showPaymentDetails()));
-        document.setCurrency(request.currency());
+        // One sent without a currency, as only through the API, is in the
+        // business's own, as the app's form starts it.
+        document.setCurrency(request.currency() != null
+                ? request.currency()
+                : settingsService.forBusiness(access.businessPkid()).getDefaultCurrency());
         exchangeRate(document, request.exchangeRate(), false, access.businessPkid());
         document.setBillingItems(toBillingItems(request.billingItems(), percentage(request.rates(), "Tax rate")));
         gstSupply.place(document, request.placeOfSupply(), request.reverseCharge(), request.exportType());
@@ -1007,7 +1011,17 @@ public class DocumentService {
         if (amount.stripTrailingZeros().scale() > 2) {
             throw new ApiException(HttpStatus.BAD_REQUEST, label + " can have at most 2 decimals");
         }
-        return amount.setScale(2);
+        return wholeDigits(amount).setScale(2);
+    }
+
+    // Amounts are kept with 15 digits before the point at most, and one
+    // written with an exponent could otherwise run to millions: it is
+    // refused before any digit of it is written out.
+    static BigDecimal wholeDigits(BigDecimal amount) {
+        if (amount.precision() - amount.scale() > 15) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Amounts can have at most 15 whole digits");
+        }
+        return amount;
     }
 
     // The day a payment was made, today where the business is unless one is

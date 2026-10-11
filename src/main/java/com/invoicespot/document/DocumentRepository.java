@@ -77,15 +77,29 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     // Locked, in a fixed order, so a run alongside another waits for it, then
     // finds the invoices it alerted already alerted. Their businesses aren't
     // fetched with them, which would lock those rows too.
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            select d from Document d
+            select d.pkid from Document d
             where d.documentType = :invoice and d.issuedAt is not null and d.voidedAt is null
               and d.status <> :paid and d.total > 0
               and d.dueDate < :before and d.overdueAlertedAt is null
             order by d.pkid
             """)
-    List<Document> findUnalertedOverdue(
+    List<Long> findUnalertedOverdue(
+            @Param("invoice") DocumentType invoice,
+            @Param("paid") DocumentStatus paid,
+            @Param("before") Instant before);
+
+    // One of those, locked, while it still is one.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select d from Document d
+            where d.pkid = :pkid
+              and d.documentType = :invoice and d.issuedAt is not null and d.voidedAt is null
+              and d.status <> :paid and d.total > 0
+              and d.dueDate < :before and d.overdueAlertedAt is null
+            """)
+    Optional<Document> findUnalertedOverdueForUpdate(
+            @Param("pkid") Long pkid,
             @Param("invoice") DocumentType invoice,
             @Param("paid") DocumentStatus paid,
             @Param("before") Instant before);

@@ -41,6 +41,15 @@ public class RateLimiter {
         checked(() -> buckets.bucket(limit, key).tryConsume(1));
     }
 
+    // Gives back what an attempt took once it turns out not to count, as a
+    // sign-in that succeeded doesn't.
+    public void refund(RateLimit limit, String key) {
+        checked(() -> {
+            buckets.bucket(limit, key).addTokens(1);
+            return null;
+        });
+    }
+
     public void reset(RateLimit limit, String key) {
         checked(() -> {
             buckets.reset(limit, key);

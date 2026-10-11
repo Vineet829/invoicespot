@@ -3,6 +3,7 @@ package com.invoicespot.document;
 import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
 import com.invoicespot.business.BusinessService;
+import com.invoicespot.common.AfterCommit;
 import com.invoicespot.common.ApiException;
 import com.invoicespot.customer.Customer;
 import com.invoicespot.document.dto.EmailDocumentRequest;
@@ -27,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -102,13 +104,24 @@ public class DocumentMailService {
 
     // An automatic reminder: no rate limit, since the reminder settings bound
     // it, and a failure is thrown for the daily job to log.
-    public void remindAutomatically(BusinessAccess access, String id) throws MessagingException {
+    // An automatic reminder is recorded first and goes out once that is
+    // saved, so a run that fails after sending it never sends it twice. One
+    // that fails to go out is logged by the run, and the next one follows on
+    // its own day.
+    public void remindAutomatically(BusinessAccess access, String id) {
         DocumentEnvelope envelope = documentService.reminderEnvelope(access, id);
         DocumentPdf pdf = documentService.renderPdf(access, id);
         EmailDraft draft = automaticDraft(access, envelope);
-        mailService.sendDocument(
-                draft.to(), replyTo(access), draft.subject(), draft.message(), pdf.fileName(), pdf.content());
         documentService.recordReminder(access, id, draft.to(), true);
+        String replyTo = replyTo(access);
+        AfterCommit.run(() -> {
+            try {
+                mailService.sendDocument(
+                        draft.to(), replyTo, draft.subject(), draft.message(), pdf.fileName(), pdf.content());
+            } catch (MessagingException exception) {
+                throw new MailSendException("The reminder could not be sent", exception);
+            }
+        });
     }
 
     // A recurring invoice sent as it is made: the invoice email as the

@@ -12,9 +12,13 @@ import com.invoicespot.user.User;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
@@ -95,6 +99,93 @@ class RateLimitIntegrationTest extends IntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.message").value(startsWith("Too many sign-in attempts from this network")));
         login(address(), user.getEmail(), PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("wrong passwords sent all at once for one email are checked five times at most")
+    void attemptsAtOnce() throws Exception {
+        User user = userWithPassword();
+        String address = address();
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<Integer>> attempts = new ArrayList<>();
+            for (int attempt = 0; attempt < 8; attempt++) {
+                attempts.add(pool.submit(() -> {
+                    start.await();
+                    return login(address, user.getEmail(), "Wrong!password1").andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> attempt : attempts) {
+                statuses.add(attempt.get(60, TimeUnit.SECONDS));
+            }
+
+            assertThat(statuses).filteredOn(status -> status == 401).hasSize(5);
+            assertThat(statuses).filteredOn(status -> status == 429).hasSize(3);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("an address gets at most three sign-up, verification and reset emails an hour, from anywhere")
+    void emailsToOneAddress() throws Exception {
+        String email = "inbox-" + UUID.randomUUID() + "@example.test";
+        for (String path : new String[] {"/reset_password_request", "/resend_email_token", "/reset_password_request"}) {
+            mockMvc.perform(post("/api/v1/auth" + path)
+                            .with(request -> {
+                                request.setRemoteAddr(address());
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\": \"%s\"}".formatted(email.toUpperCase())))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/api/v1/auth/resend_email_token")
+                        .with(request -> {
+                            request.setRemoteAddr(address());
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"%s\"}".formatted(email)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(startsWith("Too many emails sent to this address")));
+    }
+
+    @Test
+    @DisplayName("a sign-up counts toward its address's emails once it sends one, not when refused before")
+    void signUpEmails() throws Exception {
+        String taken = createUser().getUsername();
+        String email = "inbox-" + UUID.randomUUID() + "@example.test";
+        for (int attempt = 0; attempt < 3; attempt++) {
+            signUp(email, taken)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("That username is already taken"));
+        }
+        // Each one replaces the account the one before made and never verified.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            signUp(email, "fresh" + UUID.randomUUID().toString().substring(0, 8)).andExpect(status().isOk());
+        }
+
+        signUp(email, "fresh" + UUID.randomUUID().toString().substring(0, 8))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(startsWith("Too many emails sent to this address")));
+    }
+
+    private ResultActions signUp(String email, String username) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/register")
+                .with(request -> {
+                    request.setRemoteAddr(address());
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"email": "%s", "username": "%s", "firstName": "Rate", "lastName": "Limit",
+                         "password": "Str0ng!password", "passwordConfirm": "Str0ng!password"}
+                        """.formatted(email, username)));
     }
 
     @Test

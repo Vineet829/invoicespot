@@ -22,6 +22,7 @@ import {
 } from "../settingsApiSlice";
 import SettingsTabs from "../components/SettingsTabs";
 import { useBusiness } from "../../business/permissions";
+import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 
 const KEYS = [
   "accountHolder",
@@ -52,7 +53,12 @@ const formValues = (details) =>
 const PaymentFields = ({ details }) => {
   const [values, setValues] = useState(() => formValues(details));
   const [save, { isLoading: saving }] = useUpdatePaymentDetailsMutation();
-  const refusal = useBusiness().reason("MANAGE_BUSINESS");
+  // The shared demo business's payment details show on every visitor's documents.
+  const demo = useGetUserProfileQuery().data?.userProfile?.demo;
+  const roleRefusal = useBusiness().reason("MANAGE_BUSINESS");
+  const refusal = demo
+    ? "Changing the payment details is turned off for the shared demo account"
+    : roleRefusal;
   const busy = saving || Boolean(refusal);
   const field = (key) => ({
     name: key,

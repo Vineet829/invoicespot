@@ -172,6 +172,7 @@ const StatementActions = ({ customer, demo, refusal }) => {
         open={sharing}
         onClose={() => setSharing(false)}
         demoNote={demo ? DEMO_EMAIL_NOTE : undefined}
+        refusal={refusal}
       />
     </div>
   );

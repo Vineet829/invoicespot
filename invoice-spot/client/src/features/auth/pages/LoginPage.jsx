@@ -13,6 +13,7 @@ import useTitle from "../../../hooks/useTitle";
 import { pendingInvitePath } from "../../business/pendingInvite";
 import { useLoginUserMutation } from "../authApiSlice";
 import { logIn } from "../authSlice";
+import { returnPath } from "../returnPath";
 import { oauthErrorMessage } from "../oauthErrors";
 import AuthVisual from "../components/AuthVisual";
 import ProviderButtons from "../components/ProviderButtons";
@@ -48,7 +49,7 @@ const LoginPage = () => {
   // An invitation opened before logging in waits for the account it was
   // sent to, even across signing up and verifying the email.
   const from =
-    location.state?.from?.pathname || pendingInvitePath() || "/dashboard";
+    returnPath(location.state?.from) || pendingInvitePath() || "/dashboard";
 
   // A sign-in with Google that didn't work comes back here with the reason.
   // It shows once, even though StrictMode runs effects twice in development,

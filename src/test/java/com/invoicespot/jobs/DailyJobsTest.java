@@ -5,11 +5,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.invoicespot.auth.TokenCleanup;
+import com.invoicespot.auth.UnverifiedSignUps;
 import com.invoicespot.document.AutomaticReminders;
 import com.invoicespot.document.OverdueAlerts;
 import com.invoicespot.document.RecurringService;
 import com.invoicespot.metrics.AppMetrics;
 import com.invoicespot.ratelimit.RateLimiter;
+import com.invoicespot.upload.UploadCleanup;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
@@ -35,7 +37,9 @@ class DailyJobsTest {
     @Mock private AutomaticReminders automaticReminders;
     @Mock private OverdueAlerts overdueAlerts;
     @Mock private TokenCleanup tokenCleanup;
+    @Mock private UnverifiedSignUps unverifiedSignUps;
     @Mock private RateLimiter rateLimiter;
+    @Mock private UploadCleanup uploadCleanup;
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(JobsConfig.class)
@@ -44,7 +48,9 @@ class DailyJobsTest {
                     automaticReminders,
                     overdueAlerts,
                     tokenCleanup,
+                    unverifiedSignUps,
                     rateLimiter,
+                    uploadCleanup,
                     new AppMetrics(new SimpleMeterRegistry()),
                     Clock.systemUTC()));
 
@@ -65,14 +71,25 @@ class DailyJobsTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         AppMetrics metrics = new AppMetrics(registry);
-        new DailyJobs(recurringService, automaticReminders, overdueAlerts, tokenCleanup, rateLimiter, metrics, clock)
+        new DailyJobs(
+                        recurringService,
+                        automaticReminders,
+                        overdueAlerts,
+                        tokenCleanup,
+                        unverifiedSignUps,
+                        rateLimiter,
+                        uploadCleanup,
+                        metrics,
+                        clock)
                 .run();
 
         verify(recurringService).makeDue(NOW);
         verify(automaticReminders).send(NOW);
         verify(overdueAlerts).raise(NOW);
         verify(tokenCleanup).removeExpired();
+        verify(unverifiedSignUps).removeExpired();
         verify(rateLimiter).removeExpired();
+        verify(uploadCleanup).removeUnused();
         assertThat(registry.get("invoicespot.jobs").timers())
                 .extracting(timer -> timer.getId().getTag("step") + " " + timer.getId().getTag("outcome"))
                 .containsExactlyInAnyOrder(
@@ -80,7 +97,9 @@ class DailyJobsTest {
                         "automatic_reminders success",
                         "overdue_alerts success",
                         "expired_tokens success",
-                        "expired_rate_limits success");
+                        "unverified_accounts success",
+                        "expired_rate_limits success",
+                        "unused_logos success");
     }
 
     @Test

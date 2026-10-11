@@ -32,6 +32,13 @@ public class VerificationTokenService {
 
     @Transactional
     public String issue(User user) {
+        return issue(user, tokenTtl);
+    }
+
+    // A token that lasts as long as given, such as a verification link's,
+    // which may wait in an inbox longer than a password reset's.
+    @Transactional
+    public String issue(User user, Duration ttl) {
         byte[] material = new byte[32];
         random.nextBytes(material);
         String token = HexFormat.of().formatHex(material);
@@ -41,7 +48,7 @@ public class VerificationTokenService {
         entity.setToken(SecretTokens.hash(token));
         Instant now = clock.instant();
         entity.setCreatedAt(now);
-        entity.setExpiresAt(now.plus(tokenTtl));
+        entity.setExpiresAt(now.plus(ttl));
         tokenRepository.save(entity);
         return token;
     }

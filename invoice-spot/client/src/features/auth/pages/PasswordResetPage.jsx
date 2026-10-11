@@ -19,6 +19,7 @@ import {
   passwordToggle,
 } from "../components/authForm";
 import { useResetPasswordMutation } from "../authApiSlice";
+import { PASSWORD_TOO_LONG, fitsPassword } from "../passwordLength";
 
 const PasswordField = ({
   id,
@@ -93,7 +94,9 @@ const PasswordResetPage = () => {
       <Formik
         initialValues={{ password: "", passwordConfirm: "" }}
         validationSchema={Yup.object().shape({
-          password: Yup.string().max(255).required("Password is required"),
+          password: Yup.string()
+            .test("fits", PASSWORD_TOO_LONG, fitsPassword)
+            .required("Password is required"),
           passwordConfirm: Yup.string()
             .oneOf([Yup.ref("password")], "Passwords Must Match")
             .required("Please confirm your password"),

@@ -24,6 +24,7 @@ import { useUploadProfileLogoMutation } from "../../workspace/workspaceApiSlice"
 import SettingsTabs from "../components/SettingsTabs";
 import { logoHint } from "../logo";
 import { useBusiness } from "../../business/permissions";
+import { useGetUserProfileQuery } from "../../users/usersApiSlice";
 
 const KEYS = [
   "name",
@@ -46,7 +47,12 @@ const BusinessFields = ({ business }) => {
   );
   const [save, { isLoading: saving }] = useUpdateBusinessMutation();
   const [upload, { isLoading: uploading }] = useUploadProfileLogoMutation();
-  const refusal = useBusiness().reason("MANAGE_BUSINESS");
+  // The shared demo business's business details show on every visitor's documents.
+  const demo = useGetUserProfileQuery().data?.userProfile?.demo;
+  const roleRefusal = useBusiness().reason("MANAGE_BUSINESS");
+  const refusal = demo
+    ? "Changing the business details is turned off for the shared demo account"
+    : roleRefusal;
   const busy = saving || uploading || Boolean(refusal);
   const change = (key) => (event) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
@@ -189,7 +195,7 @@ const BusinessFields = ({ business }) => {
                 label="Choose your logo"
                 type="file"
                 accept="image/png,image/jpeg,image/gif"
-                hint="A PNG, JPEG or GIF image of up to 2 MB, so it prints on your PDFs too."
+                hint="A PNG, JPEG or GIF image of up to 2 MB and 2000 × 2000 pixels, so it prints on your PDFs too."
                 onChange={uploadLogo}
                 disabled={busy}
                 className="col-span-full"

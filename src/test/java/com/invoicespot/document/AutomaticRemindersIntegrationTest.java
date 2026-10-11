@@ -37,6 +37,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mail.MailSendException;
 
 class AutomaticRemindersIntegrationTest extends IntegrationTest {
 
@@ -180,6 +181,29 @@ class AutomaticRemindersIntegrationTest extends IntegrationTest {
         } finally {
             pool.shutdownNow();
         }
+
+        assertThat(recipients()).containsOnlyOnce(due.email());
+        assertThat(remindersSent(owner, due)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a reminder is recorded before it goes, so one whose email failed isn't sent again the next run")
+    void recordedBeforeSending() throws Exception {
+        User owner = createUser();
+        turnOnReminders(owner);
+        Invoice due = invoice(owner, today);
+        doAnswer(invocation -> {
+                    MimeMessage message = invocation.getArgument(0);
+                    if (message.getAllRecipients()[0].toString().equals(due.email())) {
+                        throw new MailSendException("down");
+                    }
+                    return null;
+                })
+                .when(mailSender)
+                .send(any(MimeMessage.class));
+
+        reminders.send(Instant.now());
+        reminders.send(Instant.now());
 
         assertThat(recipients()).containsOnlyOnce(due.email());
         assertThat(remindersSent(owner, due)).isEqualTo(1);

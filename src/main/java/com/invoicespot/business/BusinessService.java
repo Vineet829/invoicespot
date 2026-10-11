@@ -125,8 +125,12 @@ public class BusinessService {
         return BusinessProfileResponse.from(require(access), access.role());
     }
 
+    // The shared demo business's details and logo are on every visitor's
+    // documents, share links and PDFs, so they stay as its sample data has
+    // them.
     @Transactional
     public BusinessProfileResponse updateProfile(BusinessAccess access, UpdateBusinessRequest request) {
+        demoAccountGuard.requireNotDemo(access.user(), "changing the business's details");
         // Locked, so a save that waits for another member's starts from what
         // that one saved, instead of putting it back.
         Business business = businessRepository.findForUpdate(access.businessPkid())

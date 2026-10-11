@@ -2,7 +2,9 @@ package com.invoicespot.document;
 
 import com.invoicespot.business.Business;
 import com.invoicespot.business.BusinessAccess;
+import com.invoicespot.business.Permission;
 import com.invoicespot.common.ApiException;
+import com.invoicespot.common.Pages;
 import com.invoicespot.common.SecretBox;
 import com.invoicespot.common.SecretTokens;
 import com.invoicespot.config.AppProperties;
@@ -78,6 +80,8 @@ public class PortalService {
     }
 
     @Transactional(readOnly = true)
+    // As with a document's link, only members who can send the portal link
+    // see its address.
     public ShareStatusResponse status(BusinessAccess access, String customerId) {
         return linkRepository.findByCustomerAndRevokedAtIsNull(requireInBusiness(access, customerId))
                 .map(link -> new ShareStatusResponse(
@@ -86,7 +90,7 @@ public class PortalService {
                         link.getCreatedAt(),
                         link.getLastViewedAt(),
                         link.getViewCount(),
-                        recovered(link).orElse(null)))
+                        access.can(Permission.EDIT_RECORDS) ? recovered(link).orElse(null) : null))
                 .orElseGet(() -> new ShareStatusResponse(true, false, null, null, 0, null));
     }
 
@@ -213,11 +217,10 @@ public class PortalService {
         Business business = customer.getBusiness();
         ZoneId zone = ZoneId.of(settingsService.forBusiness(business.getPkid()).getTimeZone());
         Instant startOfToday = LocalDate.now(clock.withZone(zone)).atStartOfDay(zone).toInstant();
-        int number = Math.max(page, 1);
+        int perPage = Math.min(Math.max(size, 1), MOST_PER_PAGE);
+        int number = Pages.number(page, perPage);
         Page<Document> documents = documentRepository.findForPortal(
-                business.getPkid(),
-                customer.getPkid(),
-                PageRequest.of(number - 1, Math.min(Math.max(size, 1), MOST_PER_PAGE)));
+                business.getPkid(), customer.getPkid(), PageRequest.of(number - 1, perPage));
         return new PortalResponse(
                 true,
                 new PublicParty(PdfService.senderName(business), business.getLogo(), PdfService.senderLines(business)),

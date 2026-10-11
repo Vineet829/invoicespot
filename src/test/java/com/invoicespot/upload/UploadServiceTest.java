@@ -16,9 +16,9 @@ import org.springframework.mock.web.MockMultipartFile;
 
 class UploadServiceTest {
 
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13};
-    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16};
-    private static final byte[] GIF = {'G', 'I', 'F', '8', '9', 'a', 1, 0, 1, 0};
+    private static final byte[] PNG = TestImages.image("png", 120, 40);
+    private static final byte[] JPEG = TestImages.image("jpg", 120, 40);
+    private static final byte[] GIF = TestImages.image("gif", 120, 40);
     private static final byte[] WEBP = {'R', 'I', 'F', 'F', 36, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
 
     private static UploadService serviceFor(Path dir) {
@@ -114,6 +114,48 @@ class UploadServiceTest {
         assertThat(service.localFile("/uploads/missing.png")).isEmpty();
         assertThat(service.localFile("/uploads/../secret.txt")).isEmpty();
         assertThat(service.localFile(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a logo over 4 megapixels is refused from its header alone, before anything is written")
+    void refusesLargeImages(@TempDir Path dir) {
+        UploadService service = serviceFor(dir);
+
+        for (byte[] large : new byte[][] {TestImages.pngHeader(12000, 12000), TestImages.pngHeader(2001, 2000)}) {
+            assertThatThrownBy(() -> service.store(new MockMultipartFile("logo", "big.png", "image/png", large)))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage("Logos can be at most 4 megapixels, such as 2000 × 2000 pixels")
+                    .extracting(e -> ((ApiException) e).getStatus())
+                    .isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+        assertThat(dir.toFile().listFiles()).isEmpty();
+
+        byte[] wide = TestImages.pngHeader(4000, 1000);
+        assertThat(service.store(new MockMultipartFile("logo", "wide.png", "image/png", wide))).endsWith(".png");
+    }
+
+    @Test
+    @DisplayName("a file that starts like an image but can't be read as one is refused")
+    void refusesUnreadableImages(@TempDir Path dir) {
+        UploadService service = serviceFor(dir);
+        byte[] cutShort = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13};
+
+        assertThatThrownBy(() -> service.store(new MockMultipartFile("logo", "logo.png", "image/png", cutShort)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Logos can be PNG, JPEG or GIF images");
+        assertThat(dir.toFile().listFiles()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a stored logo prints only when it can be read and is at most 4 megapixels")
+    void printable(@TempDir Path dir) throws Exception {
+        assertThat(UploadService.printable(Files.write(dir.resolve("small.png"), PNG))).isTrue();
+        assertThat(UploadService.printable(Files.write(dir.resolve("edge.png"), TestImages.pngHeader(2000, 2000))))
+                .isTrue();
+        assertThat(UploadService.printable(Files.write(dir.resolve("huge.png"), TestImages.pngHeader(12000, 12000))))
+                .isFalse();
+        assertThat(UploadService.printable(Files.write(dir.resolve("text.png"), new byte[] {9, 9}))).isFalse();
+        assertThat(UploadService.printable(dir.resolve("missing.png"))).isFalse();
     }
 
     @Test

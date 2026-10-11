@@ -6,7 +6,10 @@ import { businessChanged } from "../business/businessSlice";
 
 vi.mock("@reduxjs/toolkit/query/react", () => ({
   fetchBaseQuery: vi.fn(() => vi.fn()),
-  createApi: (options) => options,
+  createApi: (options) => ({
+    ...options,
+    util: { resetApiState: () => ({ type: "api/resetApiState" }) },
+  }),
 }));
 
 const request = fetchBaseQuery.mock.results[0].value;
@@ -88,7 +91,7 @@ it("shares one cookie rotation between concurrent dashboard requests", async () 
   expect(api.dispatch).toHaveBeenCalledTimes(1);
 });
 
-it("clears the session when the refresh cookie is rejected", async () => {
+it("clears the session and what it loaded when the refresh cookie is rejected", async () => {
   request
     .mockResolvedValueOnce({ error: { status: 403 } })
     .mockResolvedValueOnce({ error: { status: 401 } });
@@ -97,8 +100,28 @@ it("clears the session when the refresh cookie is rejected", async () => {
 
   expect(result.error.status).toBe(403);
   expect(api.getState().auth.user).toBeNull();
+  expect(api.dispatch).toHaveBeenCalledWith({ type: "api/resetApiState" });
   expect(request).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+  { status: "FETCH_ERROR", error: "TypeError: Failed to fetch" },
+  { status: 502, data: "" },
+  { status: 503, data: { message: "Try again" } },
+])(
+  "stays signed in when the refresh doesn't reach a working server: %j",
+  async (error) => {
+    request
+      .mockResolvedValueOnce({ error: { status: 403 } })
+      .mockResolvedValueOnce({ error });
+
+    const result = await baseApiSlice.baseQuery("/customer/all", api, {});
+
+    expect(result.error.status).toBe(403);
+    expect(api.getState().auth.user).toEqual({ accessToken: "expired" });
+    expect(api.dispatch).not.toHaveBeenCalled();
+  },
+);
 
 it("returns an authentication error without retrying through another session", async () => {
   request.mockResolvedValue({

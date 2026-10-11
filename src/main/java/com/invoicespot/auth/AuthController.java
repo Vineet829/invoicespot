@@ -49,22 +49,23 @@ public class AuthController {
             HttpServletRequest http,
             HttpServletResponse response) {
         // Failures count per email from an address, and for the address as a
-        // whole; a success clears only its email's count.
+        // whole. Each attempt is counted before its password is checked, so
+        // attempts sent all at once can't pass the limits together; a success
+        // takes its own count back and clears its email's.
         String address = http.getRemoteAddr();
         String attempt = address + "|"
                 + (request.email() == null ? "" : request.email().trim().toLowerCase(Locale.ROOT));
-        rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
-        rateLimiter.requireAvailable(RateLimit.FAILED_SIGN_IN, attempt);
+        rateLimiter.consume(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
+        rateLimiter.consume(RateLimit.FAILED_SIGN_IN, attempt);
         LoginOutcome outcome;
         try {
             outcome = authService.login(request.email(), request.password(), refreshCookie);
         } catch (ApiException exception) {
-            rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN, attempt);
-            rateLimiter.recordFailure(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
             metrics.signInFailed(AppMetrics.PASSWORD);
             throw exception;
         }
         rateLimiter.reset(RateLimit.FAILED_SIGN_IN, attempt);
+        rateLimiter.refund(RateLimit.FAILED_SIGN_IN_ADDRESS, address);
         return switch (outcome) {
             case LoginOutcome.TwoFactorChallenge challenge ->
                     ResponseEntity.ok(new TwoFactorChallengeResponse(true, true, challenge.challenge()));

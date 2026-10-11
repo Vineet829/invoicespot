@@ -27,8 +27,6 @@ final class DemoData {
     // after the sample data is added the next one is made.
     record SampleSchedule(String item, int quantity, String client, RecurringFrequency frequency, int daysAhead) {}
 
-    static final String MARKER_EMAIL = "accounts@harborandpine.example";
-
     static final List<Item> ITEMS = List.of(
             item("Brand strategy workshop", "Half-day session with the leadership team", "1800", false),
             item("Logo and identity system", "Logo, colour, type and usage guide", "3200", false),
@@ -42,7 +40,8 @@ final class DemoData {
             item("Consulting (hourly)", null, "140", true));
 
     static final List<Client> CLIENTS = List.of(
-            new Client("Harbor & Pine Architects", MARKER_EMAIL, "+1 415 555 0142", "88 Bay Street", "San Francisco"),
+            new Client("Harbor & Pine Architects", "accounts@harborandpine.example", "+1 415 555 0142",
+                    "88 Bay Street", "San Francisco"),
             new Client("Bluefin Analytics", "billing@bluefin.example", "+1 206 555 0187", "1200 Western Avenue",
                     "Seattle"),
             new Client("Oak Street Bakery", "hello@oakstreetbakery.example", "+1 510 555 0119", "402 Oak Street",

@@ -6,19 +6,24 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.invoicespot.IntegrationTest;
+import com.invoicespot.upload.TestImages;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.mail.internet.MimeMessage;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 
 class DemoAccountIntegrationTest extends IntegrationTest {
 
@@ -50,6 +55,43 @@ class DemoAccountIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(createUser()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\": \"Renamed\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("the demo business's details, logo and payment details stay as they are for every visitor")
+    void businessStays() throws Exception {
+        String demo = bearer(demoUser());
+        String name = businessOf(demoUser()).getName();
+
+        mockMvc.perform(patch("/api/v1/business")
+                        .header(HttpHeaders.AUTHORIZATION, demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Renamed\", \"logo\": \"/uploads/elsewhere.png\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This is a shared demo account, so changing the business's details is turned off"));
+        mockMvc.perform(put("/api/v1/settings/payment-details")
+                        .header(HttpHeaders.AUTHORIZATION, demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"upiId\": \"someone@upi\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This is a shared demo account, so changing the payment details is turned off"));
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/v1/upload")
+                        .file(new MockMultipartFile("logo", "logo.png", "image/png", TestImages.image("png", 1, 1)))
+                        .header(HttpHeaders.AUTHORIZATION, demo))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This is a shared demo account, so uploading a logo is turned off"));
+        assertThat(businessOf(demoUser()).getName()).isEqualTo(name);
+
+        // Its clients and documents are there to try, and are renewed each day.
+        mockMvc.perform(post("/api/v1/customer/create")
+                        .header(HttpHeaders.AUTHORIZATION, demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Visitor Co\", \"email\": \"%s@clients.test\", \"phoneNumber\": \"+1\"}"
+                                .formatted(UUID.randomUUID())))
                 .andExpect(status().isOk());
     }
 

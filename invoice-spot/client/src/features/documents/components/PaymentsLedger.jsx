@@ -181,7 +181,7 @@ const DeletedPayment = ({ payment, document }) => {
 // The payments recorded on a document, each with its receipt, edit and
 // delete. The server recalculates the amount received and the status after
 // every change. Each receipt keeps the number its payment was given.
-const PaymentsLedger = ({ document, demo = false, refusal }) => {
+const PaymentsLedger = ({ document, demo = false, refusal, deleteRefusal }) => {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [emailingReceipt, setEmailingReceipt] = useState(null);
@@ -323,10 +323,12 @@ const PaymentsLedger = ({ document, demo = false, refusal }) => {
     },
   ];
   // Viewers see the payments and their receipts, but not the ways to change
-  // them.
-  const shown = refusal
-    ? columns.filter((column) => !["Edit", "Delete"].includes(column.label))
-    : columns;
+  // them; members don't see the way to delete them.
+  const shown = columns.filter(
+    (column) =>
+      !(refusal && ["Edit", "Delete"].includes(column.label)) &&
+      !(deleteRefusal && column.label === "Delete"),
+  );
   return (
     <>
       <DataTable columns={shown} rows={payments} label="Payments" />

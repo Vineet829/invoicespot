@@ -47,7 +47,9 @@ final class MigrationDatabase implements AutoCloseable {
     }
 
     // The records a migration must carry over unchanged, as they were at V21:
-    // clients, documents and payments, column by column.
+    // clients, documents and payments, column by column. The one change is
+    // V62's: a document without a currency takes its business's default,
+    // which is USD for these.
     String recordsFingerprint() {
         return jdbc.queryForObject("""
                 select md5(coalesce((select string_agg(row(pkid, id, created_by_pkid, name, email, account_no,
@@ -56,7 +58,8 @@ final class MigrationDatabase implements AutoCloseable {
                         || coalesce((select string_agg(row(pkid, id, created_by_pkid, customer_name, customer_email,
                                 customer_account_no, customer_vat_tin_no, customer_address, customer_city,
                                 customer_country, customer_phone_number, document_type, document_number, due_date,
-                                additional_info, terms_conditions, status, sub_total, sales_tax, total, currency,
+                                additional_info, terms_conditions, status, sub_total, sales_tax, total,
+                                coalesce(nullif(currency, ''), 'USD'),
                                 total_amount_received, customer_pkid, source_pkid, accepted_at, reminders_sent,
                                 last_reminded_at, overdue_alerted_at, created_at, updated_at)::text,
                                 E'\\n' order by pkid) from documents), '')

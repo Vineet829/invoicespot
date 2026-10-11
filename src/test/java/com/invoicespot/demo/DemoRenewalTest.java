@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.config.CronTask;
@@ -65,5 +66,18 @@ class DemoRenewalTest {
                 .run(context -> assertThat(context).doesNotHaveBean(DemoRenewal.class));
         runner().withPropertyValues("app.demo.seed=true", "app.demo.reset=true", "app.jobs.enabled=false")
                 .run(context -> assertThat(context).doesNotHaveBean(ScheduledTaskHolder.class));
+    }
+
+    @Test
+    @DisplayName("a seeded demo is set to reset unless DEMO_RESET turns it off")
+    void resetsWhenSeeded() {
+        ApplicationContextRunner settings =
+                new ApplicationContextRunner().withInitializer(new ConfigDataApplicationContextInitializer());
+
+        settings.withPropertyValues("DEMO_SEED=true")
+                .run(context -> assertThat(context.getEnvironment().getProperty("app.demo.reset")).isEqualTo("true"));
+        settings.withPropertyValues("DEMO_SEED=true", "DEMO_RESET=false")
+                .run(context -> assertThat(context.getEnvironment().getProperty("app.demo.reset")).isEqualTo("false"));
+        settings.run(context -> assertThat(context.getEnvironment().getProperty("app.demo.reset")).isEqualTo("false"));
     }
 }

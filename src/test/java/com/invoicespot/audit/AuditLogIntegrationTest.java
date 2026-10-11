@@ -10,10 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.invoicespot.IntegrationTest;
 import com.invoicespot.auth.VerificationTokenService;
 import com.invoicespot.user.User;
+import com.zaxxer.hikari.HikariDataSource;
 import jakarta.servlet.http.Cookie;
+import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +39,12 @@ class AuditLogIntegrationTest extends IntegrationTest {
 
     @Autowired
     private VerificationTokenService verificationTokenService;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private AuditLog auditLog;
 
     private User withPassword() {
         User user = createUser();
@@ -107,8 +117,11 @@ class AuditLogIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
         mockMvc.perform(delete("/api/v1/user/{id}", target.getId()).header(HttpHeaders.AUTHORIZATION, bearer(admin)))
                 .andExpect(status().isOk());
-        User leaving = createUser();
-        mockMvc.perform(delete("/api/v1/user/profile").header(HttpHeaders.AUTHORIZATION, bearer(leaving)))
+        User leaving = withAccountPassword(createUser());
+        mockMvc.perform(delete("/api/v1/user/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(leaving))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRMATION))
                 .andExpect(status().isOk());
 
         assertThat(events(target.getEmail())).satisfiesExactly(
@@ -122,5 +135,29 @@ class AuditLogIntegrationTest extends IntegrationTest {
         assertThat(events(leaving.getEmail())).singleElement().satisfies(row -> assertThat(row)
                 .containsEntry("type", "ACCOUNT_DELETED")
                 .containsEntry("user_pkid", null));
+    }
+
+    @Test
+    @DisplayName("an entry is written while every one of the app's own connections is in use")
+    void ownConnections() throws Exception {
+        User user = createUser();
+        int connections = dataSource.unwrap(HikariDataSource.class).getMaximumPoolSize();
+        List<Connection> inUse = new ArrayList<>();
+        try {
+            // As when that many requests are each in a transaction, and each
+            // records an entry before it ends.
+            for (int index = 0; index < connections; index++) {
+                inUse.add(dataSource.getConnection());
+            }
+            auditLog.record(AuditEventType.SIGN_IN, user);
+        } finally {
+            for (Connection connection : inUse) {
+                connection.close();
+            }
+        }
+
+        assertThat(events(user.getEmail())).singleElement().satisfies(row -> assertThat(row)
+                .containsEntry("type", "SIGN_IN")
+                .containsEntry("user_pkid", user.getPkid()));
     }
 }

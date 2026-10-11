@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -49,48 +50,52 @@ public class DocumentExport {
         ZoneId zone = zoneOf(access.businessPkid());
         LocalDate today = LocalDate.now(clock.withZone(zone));
         Instant startOfToday = today.atStartOfDay(zone).toInstant();
-        List<Document> documents = documentDirectory.all(access.businessPkid(), search.on(today), today, zone);
+        List<List<Object>> rows = new ArrayList<>();
+        documentDirectory.forEach(
+                access.businessPkid(),
+                search.on(today),
+                today,
+                zone,
+                document -> rows.add(documentRow(document, zone, startOfToday)));
         return CsvFile.of(
                 "invoice-spot-documents-" + today + ".csv",
                 List.of("Number", "Type", "Status", "Client", "Client email", "Currency", "Subtotal", "Tax", "Total",
                         "Paid", "Owed", "Issued", "Due", "Overdue", "Tax withheld", "Exchange rate",
                         "Exchange rate to", "Credits", "Credited", "Refunded"),
-                documents.stream()
-                        .map(document -> {
-                            CustomerSnapshot client = document.getCustomerSnapshot();
-                            boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
-                            boolean unbilled = document.getDocumentType() == DocumentType.QUOTATION
-                                    || creditNote
-                                    || document.state() != DocumentState.ISSUED;
-                            return Arrays.<Object>asList(
-                                    document.getDocumentNumber(),
-                                    document.getDocumentType().getValue(),
-                                    switch (document.state()) {
-                                        case DRAFT -> "Draft";
-                                        case VOID -> "Void";
-                                        case ISSUED -> creditNote ? "Issued" : STATUS.get(document.getStatus());
-                                    },
-                                    client == null ? null : client.getName(),
-                                    client == null ? null : client.getEmail(),
-                                    document.getCurrency(),
-                                    document.getSubTotal(),
-                                    document.getSalesTax(),
-                                    document.getTotal(),
-                                    unbilled ? null : document.getTotalAmountReceived(),
-                                    unbilled ? null : DocumentTotals.balanceDue(document),
-                                    document.getIssueDate(),
-                                    document.getDueDate() == null
-                                            ? null
-                                            : LocalDate.ofInstant(document.getDueDate(), zone),
-                                    DocumentTotals.isOverdue(document, startOfToday) ? "Yes" : "No",
-                                    unbilled ? null : document.getTotalTds(),
-                                    ExchangeRate.plain(document.getExchangeRate()),
-                                    document.getExchangeBase(),
-                                    document.getCredited() == null ? null : document.getCredited().getDocumentNumber(),
-                                    unbilled ? null : document.getTotalCredited(),
-                                    unbilled ? null : document.getTotalRefunded());
-                        })
-                        .toList());
+                rows);
+    }
+
+    private static List<Object> documentRow(Document document, ZoneId zone, Instant startOfToday) {
+        CustomerSnapshot client = document.getCustomerSnapshot();
+        boolean creditNote = document.getDocumentType() == DocumentType.CREDIT_NOTE;
+        boolean unbilled = document.getDocumentType() == DocumentType.QUOTATION
+                || creditNote
+                || document.state() != DocumentState.ISSUED;
+        return Arrays.<Object>asList(
+                document.getDocumentNumber(),
+                document.getDocumentType().getValue(),
+                switch (document.state()) {
+                    case DRAFT -> "Draft";
+                    case VOID -> "Void";
+                    case ISSUED -> creditNote ? "Issued" : STATUS.get(document.getStatus());
+                },
+                client == null ? null : client.getName(),
+                client == null ? null : client.getEmail(),
+                document.getCurrency(),
+                document.getSubTotal(),
+                document.getSalesTax(),
+                document.getTotal(),
+                unbilled ? null : document.getTotalAmountReceived(),
+                unbilled ? null : DocumentTotals.balanceDue(document),
+                document.getIssueDate(),
+                document.getDueDate() == null ? null : LocalDate.ofInstant(document.getDueDate(), zone),
+                DocumentTotals.isOverdue(document, startOfToday) ? "Yes" : "No",
+                unbilled ? null : document.getTotalTds(),
+                ExchangeRate.plain(document.getExchangeRate()),
+                document.getExchangeBase(),
+                document.getCredited() == null ? null : document.getCredited().getDocumentNumber(),
+                unbilled ? null : document.getTotalCredited(),
+                unbilled ? null : document.getTotalRefunded());
     }
 
     // The money the payments page counts, newest first: every payment on an

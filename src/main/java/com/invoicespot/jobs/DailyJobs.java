@@ -1,11 +1,13 @@
 package com.invoicespot.jobs;
 
 import com.invoicespot.auth.TokenCleanup;
+import com.invoicespot.auth.UnverifiedSignUps;
 import com.invoicespot.document.AutomaticReminders;
 import com.invoicespot.document.OverdueAlerts;
 import com.invoicespot.document.RecurringService;
 import com.invoicespot.metrics.AppMetrics;
 import com.invoicespot.ratelimit.RateLimiter;
+import com.invoicespot.upload.UploadCleanup;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.function.IntSupplier;
@@ -16,7 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 // The work done once a day: new recurring invoices first, then reminders,
-// overdue alerts, then token and rate-limit cleanup. A step that fails is
+// overdue alerts, then token, sign-up, rate-limit and logo cleanup. A step that fails is
 // logged and the others still run. Each step is timed for the metrics, as a
 // success or a failure. The time and zone are properties.
 @Component
@@ -28,7 +30,9 @@ public class DailyJobs {
     private final AutomaticReminders automaticReminders;
     private final OverdueAlerts overdueAlerts;
     private final TokenCleanup tokenCleanup;
+    private final UnverifiedSignUps unverifiedSignUps;
     private final RateLimiter rateLimiter;
+    private final UploadCleanup uploadCleanup;
     private final AppMetrics metrics;
     private final Clock clock;
 
@@ -37,14 +41,18 @@ public class DailyJobs {
             AutomaticReminders automaticReminders,
             OverdueAlerts overdueAlerts,
             TokenCleanup tokenCleanup,
+            UnverifiedSignUps unverifiedSignUps,
             RateLimiter rateLimiter,
+            UploadCleanup uploadCleanup,
             AppMetrics metrics,
             Clock clock) {
         this.recurringService = recurringService;
         this.automaticReminders = automaticReminders;
         this.overdueAlerts = overdueAlerts;
         this.tokenCleanup = tokenCleanup;
+        this.unverifiedSignUps = unverifiedSignUps;
         this.rateLimiter = rateLimiter;
+        this.uploadCleanup = uploadCleanup;
         this.metrics = metrics;
         this.clock = clock;
     }
@@ -61,15 +69,20 @@ public class DailyJobs {
         int reminded = step("automatic reminders", () -> automaticReminders.send(now));
         int alerted = step("overdue alerts", () -> overdueAlerts.raise(now));
         int removed = step("expired tokens", tokenCleanup::removeExpired);
+        int signUps = step("unverified accounts", unverifiedSignUps::removeExpired);
         int buckets = step("expired rate limits", rateLimiter::removeExpired);
+        int logos = step("unused logos", uploadCleanup::removeUnused);
         LOGGER.info(
                 "Daily jobs: {} recurring invoices made, {} reminders sent, {} overdue alerts raised,"
-                        + " {} expired tokens and {} expired rate limits removed",
+                        + " {} expired tokens, {} unverified accounts, {} expired rate limits and {} unused"
+                        + " logos removed",
                 made,
                 reminded,
                 alerted,
                 removed,
-                buckets);
+                signUps,
+                buckets,
+                logos);
     }
 
     private int step(String name, IntSupplier job) {

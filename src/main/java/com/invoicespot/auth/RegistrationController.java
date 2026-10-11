@@ -4,12 +4,14 @@ import com.invoicespot.auth.dto.EmailRequest;
 import com.invoicespot.auth.dto.MessageResponse;
 import com.invoicespot.auth.dto.RegisterRequest;
 import com.invoicespot.auth.dto.ResetPasswordRequest;
+import com.invoicespot.common.ApiException;
 import com.invoicespot.config.AppProperties;
 import com.invoicespot.ratelimit.RateLimit;
 import com.invoicespot.ratelimit.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,25 +47,40 @@ public class RegistrationController {
         return new MessageResponse(true, registrationService.register(request));
     }
 
+    // The emailed link opens in a browser, so whatever comes of it is shown
+    // on a page of the app rather than as the API's answer.
     @GetMapping("/verify/{emailToken}/{userId}")
     public ResponseEntity<Void> verify(
             @PathVariable String emailToken, @PathVariable String userId) {
-        registrationService.verify(userId, emailToken);
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(clientUrl + "/auth/verify"))
-                .build();
+        String page = clientUrl + "/auth/verify";
+        try {
+            registrationService.verify(userId, emailToken);
+        } catch (ApiException failed) {
+            page += failed.getStatus() == HttpStatus.CONFLICT ? "?already=1" : "?expired=1";
+        }
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(page)).build();
     }
 
     @PostMapping("/resend_email_token")
     public MessageResponse resend(@Valid @RequestBody EmailRequest request, HttpServletRequest http) {
         rateLimiter.consume(RateLimit.VERIFICATION_EMAIL, http.getRemoteAddr());
+        limitEmailsTo(request.email());
         return new MessageResponse(true, registrationService.resend(request.email()));
     }
 
     @PostMapping("/reset_password_request")
     public MessageResponse resetPasswordRequest(@Valid @RequestBody EmailRequest request, HttpServletRequest http) {
         rateLimiter.consume(RateLimit.PASSWORD_RESET, http.getRemoteAddr());
+        limitEmailsTo(request.email());
         return new MessageResponse(true, passwordResetService.requestReset(request.email()));
+    }
+
+    // Counted whether or not the address has an account, so being refused
+    // says nothing about it.
+    private void limitEmailsTo(String email) {
+        if (email != null && !email.isBlank()) {
+            rateLimiter.consume(RateLimit.ACCOUNT_EMAIL_TO, email.trim().toLowerCase(Locale.ROOT));
+        }
     }
 
     @PostMapping("/reset_password")

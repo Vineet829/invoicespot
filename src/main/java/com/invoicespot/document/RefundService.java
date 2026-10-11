@@ -150,7 +150,7 @@ public class RefundService {
         if (amount.stripTrailingZeros().scale() > 2) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "An amount can have at most 2 decimals");
         }
-        return amount.setScale(2);
+        return DocumentService.wholeDigits(amount).setScale(2);
     }
 
     // The day money was paid back, today where the business is unless one is

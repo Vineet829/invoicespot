@@ -544,12 +544,13 @@ class DocumentListIntegrationTest extends IntegrationTest {
         issue("Invoice", "USD", "100", today, today);
         issue("Invoice", "EUR", "200", today, today);
         issue("Receipt", "EUR", "50", today, null);
+        // Sent without a currency, it is in the business's own.
         issue("Invoice", null, "70", today, today);
 
         list("currency", "EUR")
                 .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0002", "REC-0001")));
         list("currency", "USD")
-                .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0001")));
+                .andExpect(jsonPath("$.myDocuments[*].documentNumber", containsInAnyOrder("INV-0001", "INV-0003")));
         list("currency", "GBP").andExpect(jsonPath("$.totalDocuments").value(0));
         list("currency", " ").andExpect(jsonPath("$.totalDocuments").value(4));
         list("currency", "EUR", "billed", "true", "type", "Receipt")
@@ -595,33 +596,27 @@ class DocumentListIntegrationTest extends IntegrationTest {
         issue("Quotation", "EUR", "999", today, today.plusDays(10));
         create("Invoice", "EUR", "800", today, today.plusDays(10), true);
         voided(issue("Invoice", "EUR", "600", today, today.plusDays(10)));
-        // And an invoice without a currency.
+        // And an invoice sent without a currency, which is in the business's own.
         issue("Invoice", null, "70", today, today.plusDays(5));
 
         String all = body(list()
                 .andExpect(jsonPath("$.totalDocuments").value(20))
-                .andExpect(jsonPath("$.totals.length()").value(3))
-                .andExpect(jsonPath("$.totals[0].currency").value(""))
-                .andExpect(jsonPath("$.totals[0].documents").value(1))
-                .andExpect(jsonPath("$.totals[0].billed").value(70.0))
-                .andExpect(jsonPath("$.totals[0].balanceDue").value(70.0))
-                .andExpect(jsonPath("$.totals[0].overdue").value(0.0))
-                .andExpect(jsonPath("$.totals[0].overdueDocuments").value(0))
-                .andExpect(jsonPath("$.totals[1].currency").value("EUR"))
-                .andExpect(jsonPath("$.totals[1].documents").value(5))
-                .andExpect(jsonPath("$.totals[1].billed").value(540.0))
-                .andExpect(jsonPath("$.totals[1].balanceDue").value(300.0))
-                .andExpect(jsonPath("$.totals[1].overdue").value(300.0))
+                .andExpect(jsonPath("$.totals.length()").value(2))
+                .andExpect(jsonPath("$.totals[0].currency").value("EUR"))
+                .andExpect(jsonPath("$.totals[0].documents").value(5))
+                .andExpect(jsonPath("$.totals[0].billed").value(540.0))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(300.0))
+                .andExpect(jsonPath("$.totals[0].overdue").value(300.0))
+                .andExpect(jsonPath("$.totals[0].overdueDocuments").value(1))
+                .andExpect(jsonPath("$.totals[1].currency").value("USD"))
+                .andExpect(jsonPath("$.totals[1].documents").value(15))
+                .andExpect(jsonPath("$.totals[1].billed").value(1170.0))
+                .andExpect(jsonPath("$.totals[1].balanceDue").value(800.0))
+                .andExpect(jsonPath("$.totals[1].overdue").value(200.0))
                 .andExpect(jsonPath("$.totals[1].overdueDocuments").value(1))
-                .andExpect(jsonPath("$.totals[2].currency").value("USD"))
-                .andExpect(jsonPath("$.totals[2].documents").value(14))
-                .andExpect(jsonPath("$.totals[2].billed").value(1100.0))
-                .andExpect(jsonPath("$.totals[2].balanceDue").value(730.0))
-                .andExpect(jsonPath("$.totals[2].overdue").value(200.0))
-                .andExpect(jsonPath("$.totals[2].overdueDocuments").value(1))
                 .andExpect(content().string(containsString(
-                        "{\"currency\":\"\",\"documents\":1,\"billed\":70.00,\"balanceDue\":70.00,\"overdue\":0.00,"
-                                + "\"overdueDocuments\":0}"))));
+                        "{\"currency\":\"EUR\",\"documents\":5,\"billed\":540.00,\"balanceDue\":300.00,"
+                                + "\"overdue\":300.00,\"overdueDocuments\":1}"))));
         assertThat(sum(all, "$.myDocuments[*].balanceDue")).isEqualByComparingTo(sum(all, "$.totals[*].balanceDue"));
         String paged = body(mockMvc.perform(get("/api/v1/document/all")
                         .param("size", "1")
@@ -634,9 +629,9 @@ class DocumentListIntegrationTest extends IntegrationTest {
 
         list("outstanding", "true", "currency", "USD")
                 .andExpect(jsonPath("$.totals.length()").value(1))
-                .andExpect(jsonPath("$.totals[0].documents").value(4))
-                .andExpect(jsonPath("$.totals[0].billed").value(1000.0))
-                .andExpect(jsonPath("$.totals[0].balanceDue").value(730.0))
+                .andExpect(jsonPath("$.totals[0].documents").value(5))
+                .andExpect(jsonPath("$.totals[0].billed").value(1070.0))
+                .andExpect(jsonPath("$.totals[0].balanceDue").value(800.0))
                 .andExpect(jsonPath("$.totals[0].overdue").value(200.0))
                 .andExpect(jsonPath("$.totals[0].overdueDocuments").value(1));
         list("type", "Quotation")

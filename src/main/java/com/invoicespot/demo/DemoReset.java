@@ -9,14 +9,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// Clears the demo account's own business of every record its sample data or a
-// visitor put in it, so that the seeder can add a fresh sample set dated from
-// today: documents and all that hangs off them, clients, items, expenses, the
-// business's notifications and email templates, and its settings, so that
-// numbering starts over. Nothing outside that business is touched, and the
-// business itself, its members, the demo account, its sessions and the audit
-// log stay. The demo account can't invite anyone, so its business has no
-// invitations to clear.
+// Clears the demo account's own business, once it holds the sample data, of
+// every record its sample data or a visitor put in it, so that the seeder can
+// add a fresh sample set dated from today: documents and all that hangs off
+// them, clients, items, expenses, the business's notifications and email
+// templates, and its settings, so that numbering starts over. Nothing outside
+// that business is touched, and the business itself, its members, the demo
+// account, its sessions and the audit log stay. The demo account can't invite
+// anyone, so its business has no invitations to clear.
 @Component
 public class DemoReset {
 
@@ -77,9 +77,20 @@ public class DemoReset {
             return Result.skipped("the demo account " + demoEmail + " does not exist");
         }
         Long businessPkid = businessService.ownedBy(demo.get().getPkid()).getPkid();
+        // Only the business the sample data was added to is cleared, so a demo
+        // email set to someone's real account never wipes it. It was marked
+        // then, where nothing in the app changes the mark.
+        if (!hasSampleData(businessPkid)) {
+            return Result.skipped("the account " + demoEmail + " holds no sample data, so it was left as it was");
+        }
         int records = transactionTemplate.execute(status -> STATEMENTS.stream()
                 .mapToInt(statement -> jdbcTemplate.update(statement, businessPkid))
                 .sum());
         return new Result(true, null, records);
+    }
+
+    private boolean hasSampleData(Long businessPkid) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "select sample_data from businesses where pkid = ?", Boolean.class, businessPkid));
     }
 }
