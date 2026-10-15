@@ -5,11 +5,25 @@ featuring GST invoices, UPI QR codes, payment tracking, and client portals.
 It is available at
 [invoice.confidental.online](https://invoice.confidental.online).
 
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Engineering](#engineering)
+- [Getting Started](#getting-started)
+- [Tests](#tests)
+- [Configuration](#configuration)
+- [Known Limitations](#known-limitations)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Features
 
 - **Invoices and Quotations**: Create invoices, quotations, receipts, and
-  credit notes with drafts and automatic numbering. Issued documents are
-  locked, so mistakes are fixed with a void or a credit note.
+  credit notes with drafts and automatic numbering. Issued documents keep
+  their client, lines, and amounts, so mistakes are fixed with a void or a
+  credit note.
 - **GST and Tax**: Set a tax rate on each line, or turn on India GST mode for
   CGST, SGST, and IGST, HSN/SAC codes, and GSTR-1 and GSTR-3B helper files.
   Record TDS withheld by your clients.
@@ -47,15 +61,17 @@ It is available at
 
 ## Engineering
 
-- **Testing**: The backend has over 850 tests, nearly 600 of which run against
+- **Testing**: The backend has over 900 tests, over 600 of which run against
   a real PostgreSQL database through Testcontainers. The client has over 650
   tests with Vitest.
 - **Money**: Amounts are stored as exact decimals, and totals are calculated
   on the server.
-- **Concurrency**: Concurrent edits and the daily job can't undo each other,
-  because records are locked while they change.
+- **Concurrency**: Concurrent edits and the daily job can't undo each other's
+  changes to documents and their payments, recurring invoices, clients, or
+  settings, because those records are locked while they change.
 - **Scaling**: The app is built to run on several servers. The daily job runs
-  on one of them at a time, and rate limits are shared through PostgreSQL.
+  on one of them at a time, rate limits are shared through PostgreSQL, and
+  uploaded logos go to a folder the servers must share (`UPLOAD_DIR`).
 - **Encryption**: Two-factor secrets and share links are encrypted with an
   app-wide key.
 
@@ -66,7 +82,7 @@ The commands below are for macOS and Linux. On Windows, use WSL.
 ### Prerequisites
 
 - Docker
-- Java 21, Maven, and Node.js 24 for local development
+- Java 21, Maven, and Node.js 24 (24.15 or newer) for local development
 
 ### Run with Docker
 
@@ -77,18 +93,20 @@ docker compose --profile mail up -d --build
 
 The first build takes a few minutes. Then open <http://localhost:8088>. Emails
 go to Mailpit at <http://localhost:8027>. To stop the app, run
-`docker compose down`, or `docker compose down -v` to delete the data as well.
+`docker compose --profile mail down`, and add `-v` to delete the data as well.
 
 ### Run Locally
 
-Create a key once with `openssl rand -base64 48` and reuse it. A new key on
-each run signs everyone out.
+Create a sign-in key with `openssl rand -base64 48` and an encryption key
+with `openssl rand -base64 32`, and keep them. A new encryption key can't
+read the two-factor secrets and share links sealed with the old one.
 
 ```bash
 # Terminal 1: PostgreSQL and Mailpit, then the API on port 8080
 docker compose -f docker/spring/local.yml up -d
-export JWT_ACCESS_SECRET_KEY="paste-your-key-here"
-export CLIENT_URL=http://localhost:3001    # where emailed links point
+export JWT_ACCESS_SECRET_KEY="paste-your-sign-in-key-here"
+export APP_ENCRYPTION_KEY="paste-your-encryption-key-here"
+export CLIENT_URL=http://localhost:3001    # the client's address, for links
 mvn spring-boot:run
 ```
 
@@ -110,7 +128,7 @@ Open <http://localhost:3001>. Emails go to Mailpit at <http://localhost:8026>.
 
 ```sql
 INSERT INTO user_roles (user_pkid, role)
-SELECT pkid, 'Admin' FROM users WHERE email = 'you@example.com';
+SELECT pkid, 'Admin' FROM users WHERE lower(email) = lower('you@example.com');
 ```
 
 If it prints `INSERT 0 0`, no account has that email. To open the database,
@@ -130,8 +148,9 @@ npx vitest run
 
 ## Configuration
 
-All settings are environment variables. `.env.example` explains each one, and
-`src/main/resources/application.yml` holds the defaults. For production:
+All settings are environment variables. `.env.example` explains the main
+ones, and `src/main/resources/application.yml` holds the defaults. For
+production:
 
 - **Keys**: Set `JWT_ACCESS_SECRET_KEY` and `APP_ENCRYPTION_KEY`, and keep the
   encryption key safe. A new key can't read the two-factor secrets and share
@@ -146,8 +165,8 @@ All settings are environment variables. `.env.example` explains each one, and
 
 ## Known Limitations
 
-- There is no payment gateway. Clients pay by UPI or bank transfer and report
-  the payment for you to confirm.
+- There is no payment gateway. Clients pay by UPI, bank transfer, or a payment
+  link you add, and you record the payment or confirm the one they report.
 - GST e-invoicing (IRN), e-way bills, cess, SEZ supplies, and the composition
   scheme aren't supported. The GSTR-1 and GSTR-3B files are helpers to check
   before filing.
@@ -162,10 +181,7 @@ All settings are environment variables. `.env.example` explains each one, and
 ## Contributing
 
 Bug reports and questions are welcome as
-[issues](https://github.com/Vineet829/invoicespot/issues). Please report
-security issues privately through the repository's
-[Security tab](https://github.com/Vineet829/invoicespot/security) instead of
-opening an issue.
+[issues](https://github.com/Vineet829/invoicespot/issues).
 
 ## License
 
