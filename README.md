@@ -187,3 +187,4 @@ Bug reports and questions are welcome as
 
 [MIT](LICENSE) © 2023-2026 Vineet Singh. The bundled Noto Sans fonts are under
 the [SIL Open Font License](src/main/resources/fonts/OFL.txt).
+
